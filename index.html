@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Queer Dance Philly</title>
-  <link rel="stylesheet" href="style.css?v=20260828-8">
+  <link rel="stylesheet" href="style.css?v=20260828-9">
 </head>
 
 <body>
@@ -40,12 +40,16 @@
         alt=""
       >
 
-      <div class="poster-date">
+      <div class="poster-date" data-layout-target="date">
         <div id="dateNumber"></div>
         <div id="dateDay"></div>
       </div>
 
-      <div id="eventStack" class="event-stack"></div>
+      <div
+        id="eventStack"
+        class="event-stack"
+        data-layout-target="list"
+      ></div>
 
       <div id="eventDetail" class="event-detail" hidden></div>
 
@@ -73,7 +77,7 @@
   </footer>
 
 
-  <script src="app.js?v=20260828-8"></script>
+  <script src="app.js?v=20260828-9"></script>
 
 </body>
 </html>
