@@ -273,6 +273,17 @@ body {
 }
 
 
+.event-feed-message {
+  margin: 0;
+
+  color: #fff1f4;
+
+  font-size: 3.1cqw;
+  line-height: 1.2;
+  text-align: center;
+}
+
+
 .event-title {
   display: block;
   flex: 0 0 auto;
@@ -482,6 +493,11 @@ body {
 
   .event-group-cards {
     gap: 1.15cqw;
+  }
+
+
+  .event-feed-message {
+    font-size: 3.35cqw;
   }
 
 
