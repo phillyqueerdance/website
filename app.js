@@ -23,7 +23,7 @@ const sampleEvents = [
   },
 
 
-  /* -------- AUG 28 — SEVEN -------- */
+  /* -------- AUG 28 — SEVEN (SPLITS 4 + 3) -------- */
 
   ...Array.from({ length: 7 }, (_, i) => ({
     title: `Friday Event ${i + 1}`,
@@ -143,7 +143,7 @@ const sampleEvents = [
 ];
 
 
-const MAX_EVENTS_PER_POSTER = 7;
+const MAX_EVENTS_PER_POSTER = 6;
 
 
 const dateNumber =
@@ -350,6 +350,7 @@ function buildPosterPages(events) {
 function formatTimeRange(event) {
 
   const start = new Date(event.start);
+
   const end =
     event.end
       ? new Date(event.end)
@@ -481,8 +482,10 @@ function renderPoster() {
 
 
   if (page.date === today) {
+
     dateButton.textContent =
       "Today";
+
   } else {
 
     dateButton.textContent =
@@ -568,6 +571,7 @@ function renderPoster() {
 
 
     eventStack.appendChild(card);
+
   });
 
 
@@ -673,13 +677,15 @@ function movePoster(direction) {
 
 previousPoster.addEventListener(
   "click",
-  () => movePoster(-1)
+  () =>
+    movePoster(-1)
 );
 
 
 nextPoster.addEventListener(
   "click",
-  () => movePoster(1)
+  () =>
+    movePoster(1)
 );
 
 
