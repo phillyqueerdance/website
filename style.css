@@ -270,7 +270,7 @@ body {
   color: #fff1f4;
 
   font-family: Georgia, "Times New Roman", serif;
-  font-size: var(--layout-date-font-size, 3.55cqw);
+  font-size: 3.55cqw;
   font-weight: 700;
   line-height: 1;
 
@@ -314,7 +314,7 @@ body {
 .event-time-group {
   display: grid;
   grid-template-columns: 20.5% minmax(0, 1fr);
-  column-gap: var(--layout-time-card-gap, 2cqw);
+  column-gap: 2cqw;
   align-items: start;
 }
 
@@ -330,16 +330,10 @@ body {
 
   color: #fff1f4;
 
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: var(--layout-time-font-size, 3.05cqw);
+  font-size: 3.05cqw;
   font-weight: 700;
   line-height: 1.05;
   text-align: right;
-}
-
-
-.event-time-meridiem {
-  display: var(--layout-time-meridiem-display, inline);
 }
 
 
@@ -597,51 +591,6 @@ body {
 }
 
 
-.layout-editor-controls {
-  display: grid;
-  gap: 7px;
-
-  margin-bottom: 8px;
-}
-
-
-.layout-editor-control {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 3px 8px;
-  align-items: center;
-
-  font-size: 11px;
-  font-weight: 700;
-}
-
-
-.layout-editor-control input[type="range"] {
-  grid-column: 1 / -1;
-
-  width: 100%;
-
-  margin: 0;
-
-  accent-color: #ff8b63;
-}
-
-
-.layout-editor-toggle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-
-  font-size: 11px;
-  font-weight: 700;
-}
-
-
-.layout-editor-toggle input {
-  accent-color: #ff8b63;
-}
-
-
 .layout-editor-actions button {
   min-height: 30px;
 
@@ -735,18 +684,18 @@ body {
   .poster-date {
     top: 10.1%;
 
-    font-size: var(--layout-date-font-size, 3.7cqw);
+    font-size: 3.7cqw;
   }
 
 
   .event-time-group {
     grid-template-columns: 21.5% minmax(0, 1fr);
-    column-gap: var(--layout-time-card-gap, 2.2cqw);
+    column-gap: 2.2cqw;
   }
 
 
   .event-time {
-    font-size: var(--layout-time-font-size, 3.2cqw);
+    font-size: 3.2cqw;
   }
 
 
@@ -814,15 +763,4 @@ body {
 
     width: min(300px, calc(100vw - 16px));
   }
-}
-
-
-/* QDP poster layout overrides */
-/* Desktop */
-.poster-date { --layout-date-x: 0.24cqw; --layout-date-y: -0.37cqw; --layout-date-font-size: 3.75cqw; }
-.event-stack { --layout-list-x: -3.56cqw; --layout-list-y: -1.96cqw; --layout-time-font-size: 3.40cqw; --layout-time-card-gap: 1.00cqw; --layout-time-meridiem-display: inline; }
-
-@media (max-width: 600px) {
-  .poster-date { --layout-date-x: 0.00cqw; --layout-date-y: 0.00cqw; --layout-date-font-size: 3.70cqw; }
-  .event-stack { --layout-list-x: 0.00cqw; --layout-list-y: 0.00cqw; --layout-time-font-size: 3.20cqw; --layout-time-card-gap: 2.20cqw; --layout-time-meridiem-display: inline; }
 }
