@@ -815,3 +815,14 @@ body {
     width: min(300px, calc(100vw - 16px));
   }
 }
+
+
+/* QDP poster layout overrides */
+/* Desktop */
+.poster-date { --layout-date-x: 0.24cqw; --layout-date-y: -0.37cqw; --layout-date-font-size: 3.75cqw; }
+.event-stack { --layout-list-x: -7.37cqw; --layout-list-y: -2.95cqw; --layout-time-font-size: 4.00cqw; --layout-time-card-gap: 5.00cqw; --layout-time-meridiem-display: none; }
+
+@media (max-width: 600px) {
+  .poster-date { --layout-date-x: 0.00cqw; --layout-date-y: 0.00cqw; --layout-date-font-size: 3.70cqw; }
+  .event-stack { --layout-list-x: 0.00cqw; --layout-list-y: 0.00cqw; --layout-time-font-size: 3.20cqw; --layout-time-card-gap: 2.50cqw; --layout-time-meridiem-display: inline; }
+}
