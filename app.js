@@ -412,12 +412,51 @@ function stripIdentityEmojis(title) {
     .trim();
 }
 
+function normalizeLocationText(value) {
+  return String(value || "")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function eventLocationParts(event) {
+  let venue = String(event.venue || "").trim();
+  const address = String(event.address || "").trim();
+
+  venue = venue
+    .replace(/,\s*\d+\s+.+$/, "")
+    .trim();
+
+  const normalizedAddress = normalizeLocationText(address);
+  const lastComma = venue.lastIndexOf(",");
+
+  if (normalizedAddress && lastComma !== -1) {
+    const trailingVenueText = venue.slice(lastComma + 1);
+
+    if (
+      normalizeLocationText(trailingVenueText) ===
+      normalizedAddress
+    ) {
+      venue = venue.slice(0, lastComma).trim();
+    }
+  }
+
+  if (
+    normalizedAddress &&
+    normalizeLocationText(venue) === normalizedAddress
+  ) {
+    venue = "";
+  }
+
+  return { venue, address };
+}
+
 function eventVenue(event) {
-  return String(event.venue || "").trim();
+  return eventLocationParts(event).venue;
 }
 
 function eventAddress(event) {
-  return String(event.address || "").trim();
+  return eventLocationParts(event).address;
 }
 
 function sortEvents(events) {
