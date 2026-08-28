@@ -1,5 +1,5 @@
 const EVENTS_API_URL =
-  "https://script.google.com/macros/s/AKfycbwGE0adh0HfbuZwrqG80uY5zS39eIpdmYSf6eR0WKejzPtcPyt29ON_2HrZnhYlK3AZ/exec?resource=events";
+  "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec?resource=events";
 
 const MAX_EVENTS_PER_POSTER = 6;
 
@@ -13,9 +13,11 @@ const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
 const siteHeader = document.querySelector(".site-header");
+
 const layoutEditorEnabled =
   new URLSearchParams(window.location.search)
     .get("edit") === "layout";
+
 const layoutTargets = {
   date: document.querySelector('[data-layout-target="date"]'),
   list: document.querySelector('[data-layout-target="list"]')
@@ -205,8 +207,10 @@ function makeLayoutDraggable(target, name, output) {
     }
 
     const scale = 100 / activeLayoutDrag.posterWidth;
+
     const deltaX =
       (event.clientX - activeLayoutDrag.startX) * scale;
+
     const deltaY =
       (event.clientY - activeLayoutDrag.startY) * scale;
 
@@ -239,6 +243,7 @@ function initializeLayoutEditor() {
 
   const panel = document.createElement("aside");
   panel.className = "layout-editor-panel";
+
   panel.innerHTML = `
     <p class="layout-editor-title">Layout editor: ${layoutBreakpoint()}</p>
     <div class="layout-editor-actions">
@@ -413,7 +418,10 @@ function stripIdentityEmojis(title) {
 }
 
 function eventVenue(event) {
-  return String(event.venue || "").trim();
+  return String(event.venue || "")
+    .trim()
+    .replace(/,\s*\d+\s+.+$/, "")
+    .trim();
 }
 
 function eventAddress(event) {
@@ -660,6 +668,7 @@ function renderDatePopover() {
 
   const monthLabel = document.createElement("div");
   monthLabel.className = "date-popover-month-label";
+
   monthLabel.textContent =
     new Intl.DateTimeFormat(
       "en-US",
@@ -710,10 +719,13 @@ function renderDatePopover() {
 
   const year = pickerMonth.getFullYear();
   const month = pickerMonth.getMonth();
+
   const firstWeekday =
     new Date(year, month, 1).getDay();
+
   const daysInMonth =
     new Date(year, month + 1, 0).getDate();
+
   const available = availableDateKeys();
   const selected = posterPages[currentPosterIndex].date;
 
@@ -821,6 +833,7 @@ function renderPoster() {
       eventsAtThisTime.forEach(event => {
         const card = document.createElement("button");
         card.type = "button";
+
         card.className =
           `event-card ${event.explicitQueer
             ? "explicit"
