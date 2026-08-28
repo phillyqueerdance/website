@@ -87,10 +87,6 @@ body {
 
   cursor: pointer;
 
-  /*
-    Visually centers the date between
-    the link row and the poster.
-  */
   transform: translateY(10px);
 }
 
@@ -113,11 +109,6 @@ body {
   overflow: visible;
 }
 
-
-/*
-  Original artwork:
-  1151 × 1510
-*/
 
 .poster {
   position: relative;
@@ -159,16 +150,8 @@ body {
 .poster-date {
   position: absolute;
 
-  /*
-    Center the two-line date vertically
-    against the two-line baked-in legend.
-  */
   top: 10.05%;
 
-  /*
-    Center the date in the open horizontal space
-    between the left frame edge and the baked-in legend.
-  */
   left: 8.5%;
   width: 22%;
 
@@ -213,7 +196,7 @@ body {
 
 
 /* =========================================================
-   GOOGLE-CALENDAR-LIKE EVENT ENTRY
+   NIGHTLIFE LISTING STRIPS
    ========================================================= */
 
 .event-card {
@@ -224,7 +207,7 @@ body {
   margin: 0;
 
   border: 0;
-  border-radius: 0.7cqw;
+  border-radius: 3px;
 
   padding: 1.1cqw 1.65cqw;
 
@@ -236,23 +219,43 @@ body {
 
   font: inherit;
 
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: 22% minmax(0, 1fr);
+  column-gap: 1.25cqw;
+  align-items: stretch;
 }
 
-
-/* Default / non-explicitly-queer event */
 
 .event-card.default {
   background: #ff8b63;
 }
 
 
-/* ExplicitQueer = Yes */
-
 .event-card.explicit {
   background: #a14eb5;
+}
+
+
+.event-time {
+  display: flex;
+  align-items: center;
+
+  min-width: 0;
+
+  padding-right: 0.75cqw;
+
+  font-size: 3.05cqw;
+  line-height: 1.05;
+  font-weight: 700;
+}
+
+
+.event-details {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  min-width: 0;
 }
 
 
@@ -275,7 +278,7 @@ body {
 
   margin-top: 0.3cqw;
 
-  font-size: 3cqw;
+  font-size: 2.85cqw;
   line-height: 1.1;
 
   font-weight: 400;
@@ -289,7 +292,7 @@ body {
 
   margin-top: 0.18cqw;
 
-  font-size: 2.7cqw;
+  font-size: 2.6cqw;
   line-height: 1.08;
 
   font-weight: 400;
@@ -423,23 +426,9 @@ body {
     line-height: 1.2;
     padding-bottom: 1px;
 
-    /*
-      The screenshot currently has noticeably
-      more space below the date than above it.
-      Shift the control downward without changing
-      the rest of the page flow.
-    */
     transform: translateY(12px);
   }
 
-
-  /*
-    The PNG has black margin outside its border.
-    Making the poster slightly wider than the
-    viewport crops only that unused outer margin
-    and brings the actual colored frame much
-    closer to the phone edges.
-  */
 
   .poster {
     width: min(
@@ -454,12 +443,6 @@ body {
   }
 
 
-  /*
-    Slight vertical adjustment so 8/28 + Fri
-    aligns with the visual center of the
-    two-line legend.
-  */
-
   .poster-date {
     top: 10.1%;
 
@@ -468,22 +451,30 @@ body {
 
 
   .event-title {
-    font-size: 3.75cqw;
+    font-size: 3.55cqw;
+  }
+
+
+  .event-time {
+    font-size: 3.2cqw;
   }
 
 
   .event-meta {
-    font-size: 3.35cqw;
+    font-size: 3.05cqw;
   }
 
 
   .event-address {
-    font-size: 3cqw;
+    font-size: 2.8cqw;
   }
 
 
   .event-card {
-    min-height: 13.6cqw;
+    min-height: 13.55cqw;
+
+    grid-template-columns: 23% minmax(0, 1fr);
+    column-gap: 1.35cqw;
 
     padding:
       1.1cqw
