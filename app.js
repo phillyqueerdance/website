@@ -412,47 +412,26 @@ function stripIdentityEmojis(title) {
     .trim();
 }
 
-function normalizeLocationText(value) {
-  return String(value || "")
-    .toLocaleLowerCase("en-US")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
 function eventLocationParts(event) {
-  let venue = String(event.venue || "").trim();
+  const venue = String(event.venue || "").trim();
   const address = String(event.address || "").trim();
 
-  venue = venue
-    .replace(/,\s*\d+\s+.+$/, "")
-    .trim();
-
-  const normalizedAddress = normalizeLocationText(address);
-  const lastComma = venue.lastIndexOf(",");
-
-  if (normalizedAddress && lastComma !== -1) {
-    const trailingVenueText = venue.slice(lastComma + 1);
-
-    if (
-      normalizeLocationText(trailingVenueText) ===
-      normalizedAddress
-    ) {
-      venue = venue.slice(0, lastComma).trim();
-    }
+  if (String(event.venueId || "").trim()) {
+    return { venue, address };
   }
 
-  if (
-    normalizedAddress &&
-    normalizeLocationText(venue) === normalizedAddress
-  ) {
-    venue = "";
-  }
-
-  return { venue, address };
+  return {
+    venue,
+    address: ""
+  };
 }
 
 function eventVenue(event) {
   return eventLocationParts(event).venue;
+}
+
+function eventAddress(event) {
+  return eventLocationParts(event).address;
 }
 
 function eventAddress(event) {
