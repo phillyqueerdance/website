@@ -314,7 +314,7 @@ body {
 .event-time-group {
   display: grid;
   grid-template-columns: 20.5% minmax(0, 1fr);
-  column-gap: 2cqw;
+  column-gap: 3cqw;
   align-items: start;
 }
 
@@ -330,7 +330,7 @@ body {
 
   color: #fff1f4;
 
-  font-size: 3.05cqw;
+  font-size: 4cqw;
   font-weight: 700;
   line-height: 1.05;
   text-align: right;
@@ -690,12 +690,12 @@ body {
 
   .event-time-group {
     grid-template-columns: 21.5% minmax(0, 1fr);
-    column-gap: 2.2cqw;
+    column-gap: 3.1cqw;
   }
 
 
   .event-time {
-    font-size: 3.2cqw;
+    font-size: 3.7cqw;
   }
 
 
