@@ -207,7 +207,7 @@ body {
 .event-card {
   width: 100%;
 
-  min-height: 11.85cqw;
+  min-height: 8.85cqw;
 
   margin: 0;
 
@@ -290,24 +290,10 @@ body {
   flex: 0 0 auto;
   width: 100%;
 
-  margin-top: 0.3cqw;
+  margin-top: 0.35cqw;
 
-  font-size: 2.85cqw;
+  font-size: 2.75cqw;
   line-height: 1.1;
-
-  font-weight: 400;
-}
-
-
-.event-address {
-  display: block;
-  flex: 0 0 auto;
-  width: 100%;
-
-  margin-top: 0.18cqw;
-
-  font-size: 2.6cqw;
-  line-height: 1.08;
 
   font-weight: 400;
 }
@@ -475,17 +461,12 @@ body {
 
 
   .event-meta {
-    font-size: 3.05cqw;
-  }
-
-
-  .event-address {
-    font-size: 2.8cqw;
+    font-size: 2.95cqw;
   }
 
 
   .event-card {
-    min-height: 12.35cqw;
+    min-height: 9.35cqw;
 
     padding:
       1.05cqw
