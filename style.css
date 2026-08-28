@@ -32,9 +32,12 @@ body {
    ========================================================= */
 
 .site-header {
+  position: relative;
+  z-index: 10;
+
   flex: 0 0 auto;
 
-  padding: 10px 10px 10px;
+  padding: 10px;
 
   display: flex;
   flex-direction: column;
@@ -91,6 +94,113 @@ body {
 }
 
 
+.date-popover {
+  position: absolute;
+  top: calc(100% - 3px);
+  left: 50%;
+  z-index: 20;
+
+  width: min(88vw, 300px);
+
+  transform: translateX(-50%);
+
+  border: 1px solid #ff3f7a;
+  border-radius: 3px;
+  background: #242329;
+
+  padding: 12px;
+
+  color: #fff1f4;
+}
+
+
+.date-popover-header {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+
+  margin-bottom: 10px;
+}
+
+
+.date-popover-month-button {
+  width: 32px;
+  height: 30px;
+
+  margin: 0;
+  padding: 0;
+
+  border: 0;
+  background: transparent;
+
+  color: inherit;
+
+  font-size: 19px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+
+.date-popover-month-label {
+  text-align: center;
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+
+.date-popover-weekdays,
+.date-popover-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+
+.date-popover-weekdays {
+  margin-bottom: 4px;
+
+  color: #c9bcc3;
+
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+
+.date-popover-day {
+  aspect-ratio: 1;
+
+  margin: 0;
+  padding: 0;
+
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+
+  color: #fff1f4;
+
+  font: inherit;
+  font-size: 13px;
+
+  cursor: pointer;
+}
+
+
+.date-popover-day:not(:disabled):hover,
+.date-popover-day.selected {
+  background: #ff8b63;
+  color: #232323;
+}
+
+
+.date-popover-day:disabled {
+  color: #746a70;
+  cursor: default;
+}
+
+
 /* =========================================================
    POSTER AREA
    ========================================================= */
@@ -109,11 +219,6 @@ body {
   overflow: visible;
 }
 
-
-/*
-  Original artwork:
-  1151 × 1510
-*/
 
 .poster {
   position: relative;
@@ -156,8 +261,8 @@ body {
   position: absolute;
 
   top: 10.05%;
-
   left: 8.5%;
+
   width: 22%;
 
   text-align: center;
@@ -165,11 +270,9 @@ body {
   color: #fff1f4;
 
   font-family: Georgia, "Times New Roman", serif;
-  font-weight: 700;
-
-  line-height: 1;
-
   font-size: 3.55cqw;
+  font-weight: 700;
+  line-height: 1;
 }
 
 
@@ -179,50 +282,77 @@ body {
 
 
 /* =========================================================
-   EVENT STACK
+   EVENT LISTING STRIPS
    ========================================================= */
 
 .event-stack {
   position: absolute;
 
-  left: 13%;
-  right: 12%;
-
   top: 22.5%;
+  right: 12%;
   bottom: 8.5%;
+  left: 13%;
 
   display: flex;
   flex-direction: column;
-
   justify-content: center;
 
   gap: 1.35cqw;
 }
 
 
-/* =========================================================
-   NIGHTLIFE LISTING STRIPS
-   ========================================================= */
+.event-time-group {
+  display: grid;
+  grid-template-columns: 20.5% minmax(0, 1fr);
+  column-gap: 0.55cqw;
+  align-items: start;
+}
+
+
+.event-time {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+
+  min-width: 0;
+
+  padding-top: 1.05cqw;
+
+  color: #fff1f4;
+
+  font-size: 3.05cqw;
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: right;
+}
+
+
+.event-group-cards {
+  display: flex;
+  flex-direction: column;
+
+  min-width: 0;
+
+  gap: 1.05cqw;
+}
+
 
 .event-card {
   width: 100%;
-
   min-height: 8.85cqw;
 
   margin: 0;
+  padding: 1.05cqw 1.5cqw;
 
   border: 0;
   border-radius: 3px;
 
-  padding: 1.05cqw 1.5cqw;
-
-  text-align: left;
-
   color: #232323;
 
-  cursor: pointer;
-
   font: inherit;
+  text-align: left;
+
+  cursor: pointer;
 
   display: flex;
   flex-direction: column;
@@ -240,36 +370,23 @@ body {
 }
 
 
-.event-time {
-  display: flex;
-  align-items: flex-start;
+.event-title {
+  width: 100%;
 
-  min-width: 0;
-
-  padding-top: 1.05cqw;
-  padding-right: 0.75cqw;
-
-  color: #fff1f4;
-  font-size: 3.05cqw;
-  line-height: 1.05;
-  font-weight: 700;
+  font-size: 3.35cqw;
+  font-weight: 400;
+  line-height: 1.08;
 }
 
 
-.event-time-group {
-  display: grid;
-  grid-template-columns: 20.5% minmax(0, 1fr);
-  column-gap: 1.25cqw;
-  align-items: start;
-}
+.event-meta {
+  width: 100%;
 
+  margin-top: 0.35cqw;
 
-.event-group-cards {
-  display: flex;
-  flex-direction: column;
-
-  min-width: 0;
-  gap: 1.05cqw;
+  font-size: 2.75cqw;
+  font-weight: 400;
+  line-height: 1.1;
 }
 
 
@@ -284,79 +401,57 @@ body {
 }
 
 
-.event-title {
-  display: block;
-  flex: 0 0 auto;
-  width: 100%;
-
-  font-size: 3.35cqw;
-  line-height: 1.08;
-
-  font-weight: 400;
-}
-
-
-.event-meta {
-  display: block;
-  flex: 0 0 auto;
-  width: 100%;
-
-  margin-top: 0.35cqw;
-
-  font-size: 2.75cqw;
-  line-height: 1.1;
-
-  font-weight: 400;
-}
-
-
 /* =========================================================
    EVENT DETAIL
    ========================================================= */
 
 .event-detail {
   position: absolute;
+  inset: 0;
+  z-index: 5;
 
-  left: 11.5%;
-  right: 10.5%;
+  display: grid;
+  place-items: center;
 
-  top: 22%;
-  bottom: 9%;
+  padding: 8cqw;
+}
+
+
+.event-detail-card {
+  width: 100%;
+  max-height: 100%;
 
   overflow: auto;
+
+  border-radius: 3px;
+  background: #242329;
+
+  padding: 3.1cqw;
 
   color: #fff1f4;
 
   font-size: 2.8cqw;
   line-height: 1.35;
+  text-align: left;
 }
 
 
-.event-detail button {
-  margin: 0 0 2cqw;
-  padding: 0;
-
-  border: 0;
-  background: transparent;
-
-  color: inherit;
-
-  font: inherit;
-
-  cursor: pointer;
-}
-
-
-.event-detail h2 {
+.event-detail-card h2 {
   margin: 0 0 2cqw;
 
   font-size: 4cqw;
+  font-weight: 700;
   line-height: 1.1;
 }
 
 
-.event-detail p {
+.event-detail-card p {
   margin: 0 0 1.7cqw;
+}
+
+
+.event-detail-card p:last-child {
+  margin-bottom: 0;
 }
 
 
@@ -413,10 +508,7 @@ body {
 @media (max-width: 600px) {
 
   .site-header {
-    padding:
-      9px
-      6px
-      9px;
+    padding: 9px 6px;
 
     gap: 12px;
   }
@@ -434,10 +526,15 @@ body {
 
   .date-button {
     font-size: 16px;
-    line-height: 1.2;
-    padding-bottom: 1px;
 
     transform: translateY(12px);
+  }
+
+
+  .date-popover {
+    width: min(92vw, 330px);
+
+    padding: 11px;
   }
 
 
@@ -461,8 +558,9 @@ body {
   }
 
 
-  .event-title {
-    font-size: 3.55cqw;
+  .event-time-group {
+    grid-template-columns: 21.5% minmax(0, 1fr);
+    column-gap: 0.65cqw;
   }
 
 
@@ -471,33 +569,47 @@ body {
   }
 
 
-  .event-meta {
-    font-size: 2.95cqw;
+  .event-group-cards {
+    gap: 1.15cqw;
   }
 
 
   .event-card {
     min-height: 9.35cqw;
 
-    padding:
-      1.05cqw
-      1.55cqw;
+    padding: 1.05cqw 1.55cqw;
   }
 
 
-  .event-time-group {
-    grid-template-columns: 21.5% minmax(0, 1fr);
-    column-gap: 1.35cqw;
+  .event-title {
+    font-size: 3.55cqw;
   }
 
 
-  .event-group-cards {
-    gap: 1.15cqw;
+  .event-meta {
+    font-size: 2.95cqw;
   }
 
 
   .event-feed-message {
     font-size: 3.35cqw;
+  }
+
+
+  .event-detail {
+    padding: 7cqw;
+  }
+
+
+  .event-detail-card {
+    padding: 3.5cqw;
+
+    font-size: 3.1cqw;
+  }
+
+
+  .event-detail-card h2 {
+    font-size: 4.35cqw;
   }
 
 
