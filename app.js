@@ -1101,4 +1101,11 @@ async function initialize() {
   }
 }
 
-initialize().finally(initializeLayoutEditor);
+initialize().finally(() => {
+  if (
+    typeof window.initializeComprehensiveLayoutEditor ===
+    "function"
+  ) {
+    window.initializeComprehensiveLayoutEditor();
+  }
+});
