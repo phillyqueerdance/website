@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Queer Dance Philly</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <header class="site-header">
+    <nav>
+      <a href="#">About</a>
+      <a href="#">Venues</a>
+      <a href="#">Submit Event</a>
+      <a href="#">Add Calendar</a>
+      <a href="#">Instagram</a>
+    </nav>
+
+    <button id="dateButton" class="date-button" type="button">
+      Today
+    </button>
+
+    <input id="datePicker" type="date" hidden>
+  </header>
+
+
+  <main class="poster-area">
+
+    <div id="poster" class="poster">
+
+      <img
+        class="frame"
+        src="frame.png"
+        alt=""
+      >
+
+      <div class="poster-date">
+        <div id="dateNumber"></div>
+        <div id="dateDay"></div>
+      </div>
+
+      <div id="eventStack" class="event-stack"></div>
+
+      <div id="eventDetail" class="event-detail" hidden></div>
+
+    </div>
+
+  </main>
+
+
+  <footer class="poster-controls">
+    <button
+      id="previousPoster"
+      type="button"
+      aria-label="Previous events"
+    >
+      ←
+    </button>
+
+    <button
+      id="nextPoster"
+      type="button"
+      aria-label="Next events"
+    >
+      →
+    </button>
+  </footer>
+
+
+  <script src="app.js"></script>
+
+</body>
+</html>
