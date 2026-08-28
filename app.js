@@ -1,146 +1,5 @@
-const sampleEvents = [
-
-  /* -------- AUG 27 -------- */
-
-  {
-    title: "🏳️‍🌈 After Dark",
-    start: "2026-08-27T20:00:00-04:00",
-    end: "2026-08-27T23:00:00-04:00",
-    venue: "Example Venue",
-    address: "123 Example St.",
-    explicitQueer: true,
-    description: "Example event description."
-  },
-
-  {
-    title: "Night Shift",
-    start: "2026-08-27T22:00:00-04:00",
-    end: "2026-08-28T02:00:00-04:00",
-    venue: "Another Venue",
-    address: "456 Example Ave.",
-    explicitQueer: false,
-    description: "Another example description."
-  },
-
-
-  /* -------- AUG 28 — SEVEN (SPLITS 4 + 3) -------- */
-
-  ...Array.from({ length: 7 }, (_, i) => ({
-    title: `Friday Event ${i + 1}`,
-    start:
-      `2026-08-28T${String(16 + i).padStart(2, "0")}:00:00-04:00`,
-    end:
-      `2026-08-28T${String(17 + i).padStart(2, "0")}:00:00-04:00`,
-    venue: "Friday Venue",
-    address: `${100 + i} Example St.`,
-    explicitQueer: i === 2 || i === 5,
-    description: `Description for Friday Event ${i + 1}.`
-  })),
-
-
-  /* -------- AUG 29 — TEN -------- */
-
-  {
-    title: "🏳️‍🌈 History on the Street: Back to School Edit",
-    start: "2026-08-29T12:00:00-04:00",
-    end: "2026-08-29T16:00:00-04:00",
-    venue: "13th & Locust",
-    address: "13th & Locust St.",
-    explicitQueer: false,
-    description: "Example description for History on the Street."
-  },
-
-  {
-    title: "HnB Sides",
-    start: "2026-08-29T15:00:00-04:00",
-    end: "2026-08-29T19:00:00-04:00",
-    venue: "Margoli's",
-    address: "9 W Wildey St.",
-    explicitQueer: false,
-    description: "Example description."
-  },
-
-  {
-    title: "Southern Comfort",
-    start: "2026-08-29T17:00:00-04:00",
-    end: "2026-08-29T23:00:00-04:00",
-    venue: "Pentridge Station",
-    address: "5110–5120 Pentridge St.",
-    explicitQueer: false,
-    description: "Example description."
-  },
-
-  {
-    title: "Tease: A Black Queer Strip Club",
-    start: "2026-08-29T20:00:00-04:00",
-    end: "2026-08-30T00:00:00-04:00",
-    venue: "Club 624",
-    address: "624 S 6th St.",
-    explicitQueer: true,
-    description: "Example description."
-  },
-
-  {
-    title: "A$$ & Waist",
-    start: "2026-08-29T21:00:00-04:00",
-    end: "2026-08-30T01:00:00-04:00",
-    venue: "Val's Lesbian Bar",
-    address: "605 S 3rd St.",
-    explicitQueer: true,
-    description: "Example description."
-  },
-
-  {
-    title: "BBYVirgo Birthday Celebration",
-    start: "2026-08-29T21:00:00-04:00",
-    end: "2026-08-30T01:00:00-04:00",
-    venue: "Concourse Dance Bar",
-    address: "1635 Market St.",
-    explicitQueer: false,
-    description: "Example description."
-  },
-
-  {
-    title: "Biome",
-    start: "2026-08-29T21:00:00-04:00",
-    end: "2026-08-30T01:00:00-04:00",
-    venue: "Dolphin Tavern",
-    address: "1539 S Broad St.",
-    explicitQueer: false,
-    description: "Example description."
-  },
-
-  {
-    title: "🏳️‍⚧️ Club Dream",
-    start: "2026-08-29T22:00:00-04:00",
-    end: "2026-08-30T02:00:00-04:00",
-    venue: "Example Club",
-    address: "800 Example Ave.",
-    explicitQueer: true,
-    description: "Example description."
-  },
-
-  {
-    title: "Late Night Test",
-    start: "2026-08-29T23:00:00-04:00",
-    end: "2026-08-30T02:00:00-04:00",
-    venue: "Test Venue",
-    address: "900 Example Ave.",
-    explicitQueer: false,
-    description: "Example description."
-  },
-
-  {
-    title: "Midnight Test",
-    start: "2026-08-29T23:30:00-04:00",
-    end: "2026-08-30T02:00:00-04:00",
-    venue: "Test Venue",
-    address: "901 Example Ave.",
-    explicitQueer: false,
-    description: "Example description."
-  }
-
-];
+const EVENTS_API_URL =
+  "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec?resource=events";
 
 
 const MAX_EVENTS_PER_POSTER = 6;
@@ -176,6 +35,10 @@ const poster =
 
 let posterPages = [];
 let currentPosterIndex = 0;
+
+
+previousPoster.disabled = true;
+nextPoster.disabled = true;
 
 
 /* -----------------------------------------
@@ -469,6 +332,68 @@ function groupEventsByStartTime(events) {
 
 
   return [...groups.values()];
+}
+
+
+/* -----------------------------------------
+   LOAD PUBLIC EVENT FEED
+----------------------------------------- */
+
+async function loadPublicEvents() {
+
+  const response =
+    await fetch(
+      EVENTS_API_URL,
+      {
+        cache: "no-store"
+      }
+    );
+
+
+  if (!response.ok) {
+    throw new Error(
+      `Event feed returned ${response.status}.`
+    );
+  }
+
+
+  const payload =
+    await response.json();
+
+
+  if (payload.error) {
+    throw new Error(payload.error);
+  }
+
+
+  if (!Array.isArray(payload.events)) {
+    throw new Error(
+      "The event feed returned an invalid response."
+    );
+  }
+
+
+  return payload.events;
+}
+
+
+function showEventFeedMessage(message) {
+
+  eventStack.hidden = false;
+  eventStack.innerHTML = "";
+
+
+  const notice =
+    document.createElement("p");
+
+  notice.className =
+    "event-feed-message";
+
+  notice.textContent =
+    message;
+
+
+  eventStack.appendChild(notice);
 }
 
 
@@ -847,6 +772,10 @@ dateButton.addEventListener(
   "click",
   () => {
 
+    if (!posterPages.length) {
+      return;
+    }
+
     const currentDate =
       posterPages[currentPosterIndex]
         .date;
@@ -909,27 +838,56 @@ datePicker.addEventListener(
    INITIALIZE
 ----------------------------------------- */
 
-posterPages =
-  buildPosterPages(
-    sampleEvents
+async function initialize() {
+
+  showEventFeedMessage(
+    "Loading listings…"
   );
 
 
-const today =
-  dateKey(new Date());
+  try {
+    const events =
+      await loadPublicEvents();
+
+    posterPages =
+      buildPosterPages(events);
 
 
-const todayIndex =
-  posterPages.findIndex(
-    page =>
-      page.date >= today
-  );
+    if (!posterPages.length) {
+      showEventFeedMessage(
+        "No upcoming listings right now."
+      );
+
+      return;
+    }
 
 
-currentPosterIndex =
-  todayIndex >= 0
-    ? todayIndex
-    : 0;
+    const today =
+      dateKey(new Date());
 
 
-renderPoster();
+    const todayIndex =
+      posterPages.findIndex(
+        page =>
+          page.date >= today
+      );
+
+
+    currentPosterIndex =
+      todayIndex >= 0
+        ? todayIndex
+        : 0;
+
+
+    renderPoster();
+  } catch (error) {
+    console.error(error);
+
+    showEventFeedMessage(
+      "Listings could not load. Please refresh."
+    );
+  }
+}
+
+
+initialize();
