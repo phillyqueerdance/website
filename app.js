@@ -540,12 +540,23 @@ function renderPoster() {
       "event-meta";
 
     meta.textContent =
-      `${formatTimeRange(event)} at ${event.venue}, ${event.address}`;
+      `${formatTimeRange(event)} at ${event.venue}`;
+
+
+    const address =
+      document.createElement("div");
+
+    address.className =
+      "event-address";
+
+    address.textContent =
+      event.address;
 
 
     card.append(
       title,
-      meta
+      meta,
+      address
     );
 
 
