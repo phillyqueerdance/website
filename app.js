@@ -618,6 +618,20 @@ function appendStartTime(time, event) {
   time.append(numberElement, meridiemElement);
 }
 
+function stripQdpFooter(description) {
+  const text = String(description || "")
+    .replace(/\r\n?/g, "\n");
+
+  const footerStart = text.search(
+    /^\s*(?:-{3,}|—+)\s*QDP IDs\s*(?:-{3,}|—+)\s*$/im
+  );
+
+  return (
+    footerStart >= 0
+      ? text.slice(0, footerStart)
+      : text
+  ).trim();
+}
 async function loadPublicEvents() {
   const response = await fetch(
     EVENTS_API_URL,
@@ -642,7 +656,10 @@ async function loadPublicEvents() {
     );
   }
 
-  return payload.events;
+  return payload.events.map(event => ({
+  ...event,
+  description: stripQdpFooter(event.description)
+}));
 }
 
 function showEventFeedMessage(message) {
