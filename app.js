@@ -1,5 +1,5 @@
 const EVENTS_API_URL =
-  "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec?resource=events";
+  "https://script.google.com/macros/s/AKfycbwGE0adh0HfbuZwrqG80uY5zS39eIpdmYSf6eR0WKejzPtcPyt29ON_2HrZnhYlK3AZ/exec?resource=events";
 
 const MAX_EVENTS_PER_POSTER = 6;
 
