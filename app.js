@@ -302,7 +302,7 @@ function initializeLayoutEditor() {
     [
       "dateFontSize",
       "timeFontSize",
-      "timeCardGap"
+      "timeCardGap",
       "cardWidth"
     ].forEach(setting => {
       const input = panel.querySelector(
