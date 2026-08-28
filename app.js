@@ -13,14 +13,236 @@ const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
 const siteHeader = document.querySelector(".site-header");
+const layoutEditorEnabled =
+  new URLSearchParams(window.location.search)
+    .get("edit") === "layout";
+const layoutTargets = {
+  date: document.querySelector('[data-layout-target="date"]'),
+  list: document.querySelector('[data-layout-target="list"]')
+};
+const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v1";
 
 let posterPages = [];
 let currentPosterIndex = 0;
 let pickerMonth = null;
 let touchStartX = null;
+let activeLayoutDrag = null;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
+
+function layoutBreakpoint() {
+  return window.matchMedia("(max-width: 600px)").matches
+    ? "mobile"
+    : "desktop";
+}
+
+function readLayoutOverrides() {
+  try {
+    return JSON.parse(
+      window.localStorage.getItem(LAYOUT_STORAGE_KEY)
+    ) || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLayoutOverrides(overrides) {
+  window.localStorage.setItem(
+    LAYOUT_STORAGE_KEY,
+    JSON.stringify(overrides)
+  );
+}
+
+function applyLayoutOverrides() {
+  const overrides = readLayoutOverrides();
+  const values = overrides[layoutBreakpoint()] || {};
+
+  ["date", "list"].forEach(name => {
+    const target = layoutTargets[name];
+    const position = values[name] || { x: 0, y: 0 };
+
+    target.style.setProperty(
+      `--layout-${name}-x`,
+      `${position.x || 0}cqw`
+    );
+    target.style.setProperty(
+      `--layout-${name}-y`,
+      `${position.y || 0}cqw`
+    );
+  });
+}
+
+function layoutCss() {
+  const overrides = readLayoutOverrides();
+  const format = value => Number(value || 0).toFixed(2);
+
+  const block = breakpoint => {
+    const values = overrides[breakpoint] || {};
+    const date = values.date || {};
+    const list = values.list || {};
+
+    return [
+      `.poster-date { --layout-date-x: ${format(date.x)}cqw; --layout-date-y: ${format(date.y)}cqw; }`,
+      `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; }`
+    ].join("\n");
+  };
+
+  return [
+    "/* QDP poster layout overrides */",
+    "/* Desktop */",
+    block("desktop"),
+    "",
+    "@media (max-width: 600px) {",
+    `  ${block("mobile").replace(/\n/g, "\n  ")}`,
+    "}"
+  ].join("\n");
+}
+
+function setLayoutOutput(output) {
+  output.value = layoutCss();
+}
+
+function moveLayoutTarget(name, deltaX, deltaY) {
+  const overrides = readLayoutOverrides();
+  const breakpoint = layoutBreakpoint();
+  const values = overrides[breakpoint] || {};
+  const current = values[name] || { x: 0, y: 0 };
+
+  values[name] = {
+    x: Math.round((current.x + deltaX) * 100) / 100,
+    y: Math.round((current.y + deltaY) * 100) / 100
+  };
+
+  overrides[breakpoint] = values;
+  writeLayoutOverrides(overrides);
+  applyLayoutOverrides();
+}
+
+function makeLayoutDraggable(target, name, output) {
+  target.addEventListener("pointerdown", event => {
+    if (!layoutEditorEnabled || event.button > 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    activeLayoutDrag = {
+      name,
+      startX: event.clientX,
+      startY: event.clientY,
+      posterWidth: poster.getBoundingClientRect().width
+    };
+
+    target.classList.add("is-dragging");
+    target.setPointerCapture(event.pointerId);
+  });
+
+  target.addEventListener("pointermove", event => {
+    if (!activeLayoutDrag || activeLayoutDrag.name !== name) {
+      return;
+    }
+
+    const scale = 100 / activeLayoutDrag.posterWidth;
+    const deltaX =
+      (event.clientX - activeLayoutDrag.startX) * scale;
+    const deltaY =
+      (event.clientY - activeLayoutDrag.startY) * scale;
+
+    moveLayoutTarget(name, deltaX, deltaY);
+
+    activeLayoutDrag.startX = event.clientX;
+    activeLayoutDrag.startY = event.clientY;
+
+    setLayoutOutput(output);
+  });
+
+  const stopDragging = () => {
+    activeLayoutDrag = null;
+    target.classList.remove("is-dragging");
+  };
+
+  target.addEventListener("pointerup", stopDragging);
+  target.addEventListener("pointercancel", stopDragging);
+}
+
+function initializeLayoutEditor() {
+  if (!layoutEditorEnabled) {
+    return;
+  }
+
+  document.body.classList.add("layout-editor-active");
+  applyLayoutOverrides();
+
+  const panel = document.createElement("aside");
+  panel.className = "layout-editor-panel";
+  panel.innerHTML = `
+    <p class="layout-editor-title">Layout editor: ${layoutBreakpoint()}</p>
+    <div class="layout-editor-actions">
+      <button type="button" data-layout-action="copy">Copy CSS</button>
+      <button type="button" data-layout-action="reset">Reset this view</button>
+      <button type="button" data-layout-action="done">Done</button>
+    </div>
+    <textarea class="layout-editor-output" readonly aria-label="Layout CSS"></textarea>
+  `;
+
+  document.body.appendChild(panel);
+
+  const output = panel.querySelector(".layout-editor-output");
+  setLayoutOutput(output);
+
+  makeLayoutDraggable(layoutTargets.date, "date", output);
+  makeLayoutDraggable(layoutTargets.list, "list", output);
+
+  panel.addEventListener("click", async event => {
+    const action = event.target.dataset.layoutAction;
+
+    if (action === "copy") {
+      output.select();
+
+      try {
+        await navigator.clipboard.writeText(output.value);
+      } catch {
+        document.execCommand("copy");
+      }
+
+      event.target.textContent = "Copied";
+
+      window.setTimeout(() => {
+        event.target.textContent = "Copy CSS";
+      }, 1200);
+    }
+
+    if (action === "reset") {
+      const overrides = readLayoutOverrides();
+
+      delete overrides[layoutBreakpoint()];
+
+      writeLayoutOverrides(overrides);
+      applyLayoutOverrides();
+      setLayoutOutput(output);
+    }
+
+    if (action === "done") {
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname
+      );
+
+      window.location.reload();
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    applyLayoutOverrides();
+    setLayoutOutput(output);
+
+    panel.querySelector(".layout-editor-title").textContent =
+      `Layout editor: ${layoutBreakpoint()}`;
+  });
+}
 
 function dateKey(date) {
   return new Intl.DateTimeFormat(
@@ -157,6 +379,7 @@ function compactTime(date) {
 
 function formatTimeRange(event) {
   let startText = compactTime(new Date(event.start));
+
   const endText = event.end
     ? compactTime(new Date(event.end))
     : "";
@@ -460,6 +683,7 @@ function renderPoster() {
         address.hidden = !address.textContent;
 
         card.append(title, venue, address);
+
         card.addEventListener(
           "click",
           () => openEventDetail(event)
@@ -481,6 +705,7 @@ function renderPoster() {
 
 function openEventDetail(event) {
   closeDatePopover();
+
   eventStack.hidden = true;
   eventDetail.hidden = false;
   eventDetail.classList.add("is-open");
@@ -581,6 +806,10 @@ window.addEventListener("keydown", event => {
 poster.addEventListener(
   "touchstart",
   event => {
+    if (layoutEditorEnabled) {
+      return;
+    }
+
     touchStartX = event.changedTouches[0].clientX;
   },
   { passive: true }
@@ -658,4 +887,4 @@ async function initialize() {
   }
 }
 
-initialize();
+initialize().finally(initializeLayoutEditor);
