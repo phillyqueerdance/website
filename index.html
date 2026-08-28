@@ -4,7 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Queer Dance Philly</title>
-  <link rel="stylesheet" href="style.css?v=20260828-14">
+  <link rel="stylesheet" href="style.css?v=20260828-15">
+  <link
+    id="layoutOverridesStylesheet"
+    rel="stylesheet"
+    href="layout-overrides.css"
+  >
+  <script>
+    document.getElementById("layoutOverridesStylesheet").href =
+      `layout-overrides.css?v=${Date.now()}`;
+  </script>
 </head>
 
 <body>
@@ -39,6 +48,24 @@
         src="frame.png"
         alt=""
       >
+
+      <div class="poster-legend-mask" aria-hidden="true"></div>
+
+      <div class="poster-legend" data-layout-target="legend">
+        <div class="poster-legend-copy">
+          <div class="poster-legend-row">
+            <span>🏳️‍🌈/🏳️‍⚧️</span>
+            <span>features queer/trans artist</span>
+          </div>
+          <div class="poster-legend-row">
+            <span class="poster-legend-dot" aria-hidden="true"></span>
+            <span>event is queer-forward</span>
+          </div>
+        </div>
+        <div class="poster-legend-sparkles" aria-hidden="true">
+          <span>✦</span><span>✦</span>
+        </div>
+      </div>
 
       <div class="poster-date" data-layout-target="date">
         <div id="dateNumber"></div>
@@ -77,7 +104,826 @@
   </footer>
 
 
-  <script src="app.js?v=20260828-14"></script>
+  <script>
+    (() => {
+      "use strict";
+    
+      const EDITOR_QUERY = "layout";
+      const STORAGE_KEY = "qdp-comprehensive-layout-v1";
+    
+      const desktopDefaults = {
+        dateX: 0.24,
+        dateY: -0.37,
+        dateTop: 10.05,
+        dateLeft: 8.5,
+        dateWidth: 22,
+        dateFontSize: 3.75,
+    
+        legendX: 0,
+        legendY: 0,
+        legendTop: 8.8,
+        legendLeft: 31,
+        legendWidth: 60,
+        legendFontSize: 2.7,
+        legendRowGap: 1.35,
+        legendSparkleSize: 8,
+    
+        listX: 0,
+        listY: -4.18,
+        listTop: 22.5,
+        listRight: 8.25,
+        listBottom: 8.5,
+        listLeft: 8.25,
+        listJustify: "center",
+    
+        timeFontSize: 3.2,
+        timeFontWeight: 700,
+        timeLineHeight: 1.05,
+        showMeridiem: true,
+        timeCardGap: 0.35,
+        cardsNextTimeGap: 0.6,
+    
+        cardWidth: 76,
+        cardHeight: 10.75,
+        cardPaddingX: 1.6,
+        cardPaddingY: 0.55,
+        cardRadius: 0.45,
+        sameTimeCardGap: 0.9,
+        cardLineGap: 0.2,
+    
+        titleFontSize: 3.55,
+        titleFontWeight: 400,
+        titleLineHeight: 1,
+        titleAlign: "left",
+    
+        venueFontSize: 2.85,
+        venueFontWeight: 400,
+        venueLineHeight: 1,
+        venueAlign: "left",
+    
+        addressFontSize: 2.85,
+        addressFontWeight: 400,
+        addressLineHeight: 1,
+        addressAlign: "left",
+    
+        detailTop: 6.36,
+        detailRight: 8.25,
+        detailBottom: 6.1,
+        detailLeft: 8.17,
+        detailPadding: 5.4,
+        detailRadius: 2.4,
+        detailFontSize: 2.8,
+        detailLineHeight: 1.35,
+        detailTitleSize: 4
+      };
+    
+      const DEFAULTS = {
+        desktop: { ...desktopDefaults },
+        mobile: {
+          ...desktopDefaults,
+          dateX: 0,
+          dateY: 0,
+          dateTop: 10.1,
+          listY: 0,
+          cardWidth: 78,
+          cardPaddingY: 0.45,
+          sameTimeCardGap: 0.95,
+          detailPadding: 6,
+          detailFontSize: 3.1,
+          detailTitleSize: 4.35
+        }
+      };
+    
+      const CSS_MAP = {
+        dateX: ["--qdp-date-x", "cqw"],
+        dateY: ["--qdp-date-y", "cqw"],
+        dateTop: ["--qdp-date-top", "%"],
+        dateLeft: ["--qdp-date-left", "%"],
+        dateWidth: ["--qdp-date-width", "%"],
+        dateFontSize: ["--qdp-date-font-size", "cqw"],
+    
+        legendX: ["--qdp-legend-x", "cqw"],
+        legendY: ["--qdp-legend-y", "cqw"],
+        legendTop: ["--qdp-legend-top", "%"],
+        legendLeft: ["--qdp-legend-left", "%"],
+        legendWidth: ["--qdp-legend-width", "%"],
+        legendFontSize: ["--qdp-legend-font-size", "cqw"],
+        legendRowGap: ["--qdp-legend-row-gap", "cqw"],
+        legendSparkleSize: ["--qdp-legend-sparkle-size", "cqw"],
+    
+        listX: ["--qdp-list-x", "cqw"],
+        listY: ["--qdp-list-y", "cqw"],
+        listTop: ["--qdp-list-top", "%"],
+        listRight: ["--qdp-list-right", "%"],
+        listBottom: ["--qdp-list-bottom", "%"],
+        listLeft: ["--qdp-list-left", "%"],
+        listJustify: ["--qdp-list-justify", ""],
+    
+        timeFontSize: ["--qdp-time-font-size", "cqw"],
+        timeFontWeight: ["--qdp-time-font-weight", ""],
+        timeLineHeight: ["--qdp-time-line-height", ""],
+        showMeridiem: ["--qdp-time-meridiem-display", "display"],
+        timeCardGap: ["--qdp-time-card-gap", "cqw"],
+        cardsNextTimeGap: ["--qdp-cards-next-time-gap", "cqw"],
+    
+        cardWidth: ["--qdp-card-width", "cqw"],
+        cardHeight: ["--qdp-card-height", "cqw"],
+        cardPaddingX: ["--qdp-card-padding-x", "cqw"],
+        cardPaddingY: ["--qdp-card-padding-y", "cqw"],
+        cardRadius: ["--qdp-card-radius", "cqw"],
+        sameTimeCardGap: ["--qdp-same-time-card-gap", "cqw"],
+        cardLineGap: ["--qdp-card-line-gap", "cqw"],
+    
+        titleFontSize: ["--qdp-title-font-size", "cqw"],
+        titleFontWeight: ["--qdp-title-font-weight", ""],
+        titleLineHeight: ["--qdp-title-line-height", ""],
+        titleAlign: ["--qdp-title-align", ""],
+    
+        venueFontSize: ["--qdp-venue-font-size", "cqw"],
+        venueFontWeight: ["--qdp-venue-font-weight", ""],
+        venueLineHeight: ["--qdp-venue-line-height", ""],
+        venueAlign: ["--qdp-venue-align", ""],
+    
+        addressFontSize: ["--qdp-address-font-size", "cqw"],
+        addressFontWeight: ["--qdp-address-font-weight", ""],
+        addressLineHeight: ["--qdp-address-line-height", ""],
+        addressAlign: ["--qdp-address-align", ""],
+    
+        detailTop: ["--qdp-detail-top", "%"],
+        detailRight: ["--qdp-detail-right", "%"],
+        detailBottom: ["--qdp-detail-bottom", "%"],
+        detailLeft: ["--qdp-detail-left", "%"],
+        detailPadding: ["--qdp-detail-padding", "cqw"],
+        detailRadius: ["--qdp-detail-radius", "cqw"],
+        detailFontSize: ["--qdp-detail-font-size", "cqw"],
+        detailLineHeight: ["--qdp-detail-line-height", ""],
+        detailTitleSize: ["--qdp-detail-title-size", "cqw"]
+      };
+    
+      const CONTROL_GROUPS = [
+        {
+          title: "Upper-left date",
+          fields: [
+            range("dateX", "Horizontal offset", -20, 20, 0.05, "cqw"),
+            range("dateY", "Vertical offset", -20, 20, 0.05, "cqw"),
+            range("dateTop", "Top", 5, 25, 0.1, "%"),
+            range("dateLeft", "Left", 0, 40, 0.1, "%"),
+            range("dateWidth", "Area width", 10, 40, 0.25, "%"),
+            range("dateFontSize", "Font size", 2, 6, 0.05, "cqw")
+          ]
+        },
+        {
+          title: "Legend",
+          fields: [
+            range("legendX", "Horizontal offset", -25, 25, 0.05, "cqw"),
+            range("legendY", "Vertical offset", -15, 20, 0.05, "cqw"),
+            range("legendTop", "Top", 5, 25, 0.1, "%"),
+            range("legendLeft", "Left", 15, 55, 0.1, "%"),
+            range("legendWidth", "Area width", 35, 75, 0.25, "%"),
+            range("legendFontSize", "Font size", 1.5, 4, 0.05, "cqw"),
+            range("legendRowGap", "Row gap", 0, 4, 0.05, "cqw"),
+            range("legendSparkleSize", "Sparkle size", 3, 13, 0.1, "cqw")
+          ]
+        },
+        {
+          title: "Event region",
+          fields: [
+            range("listX", "Horizontal offset", -25, 25, 0.05, "cqw"),
+            range("listY", "Vertical offset", -25, 25, 0.05, "cqw"),
+            range("listTop", "Top boundary", 15, 45, 0.1, "%"),
+            range("listRight", "Right boundary", 3, 25, 0.1, "%"),
+            range("listBottom", "Bottom boundary", 3, 25, 0.1, "%"),
+            range("listLeft", "Left boundary", 3, 25, 0.1, "%"),
+            select("listJustify", "Vertical alignment", [
+              ["flex-start", "Top"],
+              ["center", "Center"],
+              ["flex-end", "Bottom"],
+              ["space-between", "Spread"]
+            ])
+          ]
+        },
+        {
+          title: "Times and spacing",
+          fields: [
+            range("timeFontSize", "Time size", 2, 5.5, 0.05, "cqw"),
+            range("timeFontWeight", "Time weight", 400, 900, 100, ""),
+            range("timeLineHeight", "Time line height", 0.8, 1.6, 0.05, ""),
+            toggle("showMeridiem", "Show AM/PM"),
+            range("timeCardGap", "Time-to-cards gap", 0, 4, 0.05, "cqw"),
+            range("cardsNextTimeGap", "Cards-to-next-time gap", 0, 4, 0.05, "cqw"),
+            range("sameTimeCardGap", "Same-time card gap", 0, 3, 0.05, "cqw")
+          ]
+        },
+        {
+          title: "Cards",
+          fields: [
+            range("cardWidth", "Width", 45, 84, 0.25, "cqw"),
+            range("cardHeight", "Minimum height", 7, 18, 0.05, "cqw"),
+            range("cardPaddingX", "Horizontal padding", 0, 4, 0.05, "cqw"),
+            range("cardPaddingY", "Vertical padding", 0, 3, 0.05, "cqw"),
+            range("cardRadius", "Corner radius", 0, 4, 0.05, "cqw"),
+            range("cardLineGap", "Line gap", 0, 2, 0.05, "cqw")
+          ]
+        },
+        typographyGroup("Title", "title", 2, 6),
+        typographyGroup("Venue", "venue", 1.5, 5),
+        typographyGroup("Address", "address", 1.5, 5),
+        {
+          title: "Expanded event",
+          fields: [
+            range("detailTop", "Top inset", 3, 20, 0.1, "%"),
+            range("detailRight", "Right inset", 3, 20, 0.1, "%"),
+            range("detailBottom", "Bottom inset", 3, 20, 0.1, "%"),
+            range("detailLeft", "Left inset", 3, 20, 0.1, "%"),
+            range("detailPadding", "Padding", 1, 12, 0.1, "cqw"),
+            range("detailRadius", "Corner radius", 0, 6, 0.1, "cqw"),
+            range("detailFontSize", "Body size", 1.5, 5, 0.05, "cqw"),
+            range("detailLineHeight", "Body line height", 0.9, 2, 0.05, ""),
+            range("detailTitleSize", "Title size", 2, 7, 0.05, "cqw")
+          ]
+        }
+      ];
+    
+      function range(key, label, min, max, step, unit) {
+        return { type: "range", key, label, min, max, step, unit };
+      }
+    
+      function toggle(key, label) {
+        return { type: "checkbox", key, label };
+      }
+    
+      function select(key, label, options) {
+        return { type: "select", key, label, options };
+      }
+    
+      function typographyGroup(title, prefix, min, max) {
+        return {
+          title,
+          fields: [
+            range(`${prefix}FontSize`, "Font size", min, max, 0.05, "cqw"),
+            range(`${prefix}FontWeight`, "Weight", 300, 900, 100, ""),
+            range(`${prefix}LineHeight`, "Line height", 0.8, 1.6, 0.05, ""),
+            select(`${prefix}Align`, "Alignment", [
+              ["left", "Left"],
+              ["center", "Center"],
+              ["right", "Right"]
+            ])
+          ]
+        };
+      }
+    
+      function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+    
+      function mergedState(value) {
+        return {
+          desktop: { ...DEFAULTS.desktop, ...(value?.desktop || {}) },
+          mobile: { ...DEFAULTS.mobile, ...(value?.mobile || {}) }
+        };
+      }
+    
+      function readState() {
+        try {
+          return mergedState(
+            JSON.parse(window.localStorage.getItem(STORAGE_KEY))
+          );
+        } catch {
+          return mergedState();
+        }
+      }
+    
+      function profileName() {
+        return window.matchMedia("(max-width: 600px)").matches
+          ? "mobile"
+          : "desktop";
+      }
+    
+      function cssValue(key, value) {
+        const unit = CSS_MAP[key][1];
+    
+        if (unit === "display") {
+          return value ? "inline" : "none";
+        }
+    
+        return `${value}${unit}`;
+      }
+    
+      function stateFromCssValue(key, value) {
+        const unit = CSS_MAP[key][1];
+    
+        if (unit === "display") {
+          return value.trim() !== "none";
+        }
+    
+        if (!unit) {
+          const numeric = Number(value);
+          return Number.isFinite(numeric) ? numeric : value.trim();
+        }
+    
+        return Number.parseFloat(value);
+      }
+    
+      function declarations(profile) {
+        return Object.entries(CSS_MAP)
+          .map(([key, [variable]]) =>
+            `  ${variable}: ${cssValue(key, state[profile][key])};`
+          )
+          .join("\n");
+      }
+    
+      function layoutCssText() {
+        return [
+          "/* Generated by the QDP layout editor. */",
+          "/* QDP_PROFILE_DESKTOP_START */",
+          ".poster {",
+          declarations("desktop"),
+          "}",
+          "/* QDP_PROFILE_DESKTOP_END */",
+          "",
+          "@media (max-width: 600px) {",
+          "  /* QDP_PROFILE_MOBILE_START */",
+          "  .poster {",
+          declarations("mobile").replace(/^/gm, "  "),
+          "  }",
+          "  /* QDP_PROFILE_MOBILE_END */",
+          "}",
+          ""
+        ].join("\n");
+      }
+    
+      function parseProfileBlock(css, profile) {
+        const upper = profile.toUpperCase();
+        const match = css.match(
+          new RegExp(
+            `/\\* QDP_PROFILE_${upper}_START \\*/([\\s\\S]*?)/\\* QDP_PROFILE_${upper}_END \\*/`
+          )
+        );
+    
+        if (!match) {
+          return null;
+        }
+    
+        const parsed = {};
+    
+        Object.entries(CSS_MAP).forEach(([key, [variable]]) => {
+          const valueMatch = match[1].match(
+            new RegExp(`${variable.replace(/[-/\\^$*+?.()|[\\]{}]/g, "\\$&")}\\s*:\\s*([^;]+)`)
+          );
+    
+          if (valueMatch) {
+            parsed[key] = stateFromCssValue(key, valueMatch[1]);
+          }
+        });
+    
+        return parsed;
+      }
+    
+      function inputMarkup(field, value) {
+        if (field.type === "checkbox") {
+          return `
+            <label class="qdp-editor-toggle">
+              <input type="checkbox" data-layout-key="${field.key}" ${value ? "checked" : ""}>
+              <span>${field.label}</span>
+            </label>`;
+        }
+    
+        if (field.type === "select") {
+          const options = field.options
+            .map(([optionValue, optionLabel]) =>
+              `<option value="${optionValue}" ${optionValue === value ? "selected" : ""}>${optionLabel}</option>`
+            )
+            .join("");
+    
+          return `
+            <label class="qdp-editor-select">
+              <span>${field.label}</span>
+              <select data-layout-key="${field.key}">${options}</select>
+            </label>`;
+        }
+    
+        return `
+          <label class="qdp-editor-control">
+            <span>${field.label}</span>
+            <output data-layout-value="${field.key}">${formatValue(value, field.unit)}</output>
+            <input
+              type="range"
+              min="${field.min}"
+              max="${field.max}"
+              step="${field.step}"
+              value="${value}"
+              data-layout-key="${field.key}"
+              data-layout-unit="${field.unit}"
+            >
+          </label>`;
+      }
+    
+      function formatValue(value, unit = "") {
+        if (typeof value !== "number") {
+          return String(value);
+        }
+    
+        const rounded = Math.round(value * 100) / 100;
+        return `${rounded}${unit}`;
+      }
+    
+      let state = readState();
+      let profile = profileName();
+      let panel = null;
+      let committed = clone(state);
+      let undoStack = [];
+      let redoStack = [];
+      let selectedTarget = null;
+      let drag = null;
+    
+      function saveAndApply() {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    
+        const poster = document.getElementById("poster");
+        if (!poster) return;
+    
+        Object.entries(CSS_MAP).forEach(([key, [variable]]) => {
+          poster.style.setProperty(
+            variable,
+            cssValue(key, state[profile][key])
+          );
+        });
+      }
+    
+      function commitChange() {
+        if (JSON.stringify(committed) === JSON.stringify(state)) {
+          return;
+        }
+    
+        undoStack.push(clone(committed));
+        if (undoStack.length > 80) undoStack.shift();
+        redoStack = [];
+        committed = clone(state);
+        updateHistoryButtons();
+      }
+    
+      function restore(next) {
+        state = mergedState(next);
+        committed = clone(state);
+        saveAndApply();
+        syncPanel();
+      }
+    
+      function undo() {
+        if (!undoStack.length) return;
+        redoStack.push(clone(state));
+        restore(undoStack.pop());
+      }
+    
+      function redo() {
+        if (!redoStack.length) return;
+        undoStack.push(clone(state));
+        restore(redoStack.pop());
+      }
+    
+      function updateHistoryButtons() {
+        if (!panel) return;
+        panel.querySelector('[data-action="undo"]').disabled = !undoStack.length;
+        panel.querySelector('[data-action="redo"]').disabled = !redoStack.length;
+      }
+    
+      function renderControls() {
+        return CONTROL_GROUPS.map((group, index) => `
+          <details class="qdp-editor-section" ${index < 2 ? "open" : ""}>
+            <summary>${group.title}</summary>
+            <div class="qdp-editor-section-body">
+              ${group.fields
+                .map(field => inputMarkup(field, state[profile][field.key]))
+                .join("")}
+            </div>
+          </details>`).join("");
+      }
+    
+      function buildPanel() {
+        panel = document.createElement("aside");
+        panel.className = "qdp-layout-editor";
+        panel.innerHTML = `
+          <div class="qdp-editor-header">
+            <div>
+              <strong>QDP layout editor</strong>
+              <span data-editor-profile>${profile}</span>
+            </div>
+            <button type="button" data-action="collapse" aria-label="Collapse editor">−</button>
+          </div>
+    
+          <div class="qdp-editor-toolbar">
+            <button type="button" data-action="undo">Undo</button>
+            <button type="button" data-action="redo">Redo</button>
+            <button type="button" data-action="reset">Reset ${profile}</button>
+            <button type="button" data-action="guides">Guides</button>
+            <button type="button" data-action="preview-detail">Preview detail</button>
+            <button type="button" data-action="close-detail">Close detail</button>
+          </div>
+    
+          <p class="qdp-editor-help">
+            Drag the date, legend, or event region directly. Sliders update the poster live.
+          </p>
+    
+          <div class="qdp-editor-scroll" data-editor-controls>
+            ${renderControls()}
+          </div>
+    
+          <div class="qdp-editor-export">
+            <button type="button" data-action="download">Download layout CSS</button>
+            <button type="button" data-action="copy">Copy CSS</button>
+            <button type="button" data-action="import">Import layout CSS</button>
+            <button type="button" data-action="done">Exit layout mode</button>
+            <input type="file" accept=".css,text/css" data-editor-import hidden>
+          </div>
+        `;
+    
+        document.body.appendChild(panel);
+        bindPanel();
+        updateHistoryButtons();
+      }
+    
+      function syncPanel() {
+        if (!panel) return;
+    
+        panel.querySelector("[data-editor-profile]").textContent = profile;
+        panel.querySelector('[data-action="reset"]').textContent = `Reset ${profile}`;
+    
+        panel.querySelectorAll("[data-layout-key]").forEach(input => {
+          const key = input.dataset.layoutKey;
+          const value = state[profile][key];
+    
+          if (input.type === "checkbox") {
+            input.checked = Boolean(value);
+          } else {
+            input.value = value;
+          }
+    
+          const output = panel.querySelector(`[data-layout-value="${key}"]`);
+          if (output) {
+            output.textContent = formatValue(value, input.dataset.layoutUnit || "");
+          }
+        });
+    
+        updateHistoryButtons();
+      }
+    
+      function bindPanel() {
+        panel.addEventListener("input", event => {
+          const input = event.target.closest("[data-layout-key]");
+          if (!input || input.type === "checkbox") return;
+    
+          const key = input.dataset.layoutKey;
+          state[profile][key] = input.type === "range"
+            ? Number(input.value)
+            : input.value;
+    
+          saveAndApply();
+    
+          const output = panel.querySelector(`[data-layout-value="${key}"]`);
+          if (output) {
+            output.textContent = formatValue(
+              state[profile][key],
+              input.dataset.layoutUnit || ""
+            );
+          }
+        });
+    
+        panel.addEventListener("change", event => {
+          const input = event.target.closest("[data-layout-key]");
+    
+          if (input) {
+            const key = input.dataset.layoutKey;
+            state[profile][key] = input.type === "checkbox"
+              ? input.checked
+              : input.type === "range"
+                ? Number(input.value)
+                : input.value;
+    
+            saveAndApply();
+            commitChange();
+          }
+    
+          if (event.target.matches("[data-editor-import]")) {
+            importCssFile(event.target.files[0]);
+            event.target.value = "";
+          }
+        });
+    
+        panel.addEventListener("click", async event => {
+          const button = event.target.closest("[data-action]");
+          if (!button) return;
+    
+          const action = button.dataset.action;
+    
+          if (action === "undo") undo();
+          if (action === "redo") redo();
+    
+          if (action === "reset") {
+            state[profile] = clone(DEFAULTS[profile]);
+            saveAndApply();
+            commitChange();
+            syncPanel();
+          }
+    
+          if (action === "guides") {
+            document.body.classList.toggle("qdp-layout-guides");
+            button.classList.toggle("active");
+          }
+    
+          if (action === "preview-detail") {
+            document.querySelector(".event-card")?.click();
+          }
+    
+          if (action === "close-detail") {
+            const detail = document.getElementById("eventDetail");
+            const stack = document.getElementById("eventStack");
+            detail.hidden = true;
+            detail.classList.remove("is-open");
+            stack.hidden = false;
+          }
+    
+          if (action === "download") downloadCss();
+    
+          if (action === "copy") {
+            await copyCss();
+            const oldText = button.textContent;
+            button.textContent = "Copied";
+            window.setTimeout(() => { button.textContent = oldText; }, 1000);
+          }
+    
+          if (action === "import") {
+            panel.querySelector("[data-editor-import]").click();
+          }
+    
+          if (action === "collapse") {
+            panel.classList.toggle("collapsed");
+            button.textContent = panel.classList.contains("collapsed") ? "+" : "−";
+          }
+    
+          if (action === "done") {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("edit");
+            window.location.href = url.toString();
+          }
+        });
+      }
+    
+      function downloadCss() {
+        const blob = new Blob([layoutCssText()], { type: "text/css" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "layout-overrides.css";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+    
+      async function copyCss() {
+        const css = layoutCssText();
+    
+        try {
+          await navigator.clipboard.writeText(css);
+        } catch {
+          const area = document.createElement("textarea");
+          area.value = css;
+          document.body.appendChild(area);
+          area.select();
+          document.execCommand("copy");
+          area.remove();
+        }
+      }
+    
+      function importCssFile(file) {
+        if (!file) return;
+    
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+          const css = String(reader.result || "");
+          const desktop = parseProfileBlock(css, "desktop");
+          const mobile = parseProfileBlock(css, "mobile");
+    
+          if (!desktop || !mobile) {
+            window.alert("That file was not generated by the QDP layout editor.");
+            return;
+          }
+    
+          state = mergedState({ desktop, mobile });
+          saveAndApply();
+          commitChange();
+          syncPanel();
+        });
+        reader.readAsText(file);
+      }
+    
+      const DRAGGABLES = [
+        [".poster-date", "dateX", "dateY"],
+        [".poster-legend", "legendX", "legendY"],
+        [".event-stack", "listX", "listY"]
+      ];
+    
+      function bindDragging() {
+        DRAGGABLES.forEach(([selector, xKey, yKey]) => {
+          const target = document.querySelector(selector);
+          if (!target) return;
+    
+          target.dataset.editorDraggable = "true";
+    
+          target.addEventListener("pointerdown", event => {
+            if (event.button > 0) return;
+    
+            event.preventDefault();
+            event.stopPropagation();
+    
+            selectTarget(target);
+    
+            const posterWidth = document
+              .getElementById("poster")
+              .getBoundingClientRect()
+              .width;
+    
+            drag = {
+              target,
+              pointerId: event.pointerId,
+              startX: event.clientX,
+              startY: event.clientY,
+              originX: Number(state[profile][xKey]),
+              originY: Number(state[profile][yKey]),
+              xKey,
+              yKey,
+              posterWidth
+            };
+    
+            target.classList.add("is-dragging");
+            target.setPointerCapture(event.pointerId);
+          });
+    
+          target.addEventListener("pointermove", event => {
+            if (!drag || drag.target !== target) return;
+    
+            const scale = 100 / drag.posterWidth;
+            state[profile][drag.xKey] = round(
+              drag.originX + (event.clientX - drag.startX) * scale
+            );
+            state[profile][drag.yKey] = round(
+              drag.originY + (event.clientY - drag.startY) * scale
+            );
+    
+            saveAndApply();
+            syncPanel();
+          });
+    
+          const stop = event => {
+            if (!drag || drag.target !== target) return;
+            target.classList.remove("is-dragging");
+            if (target.hasPointerCapture(event.pointerId)) {
+              target.releasePointerCapture(event.pointerId);
+            }
+            drag = null;
+            commitChange();
+          };
+    
+          target.addEventListener("pointerup", stop);
+          target.addEventListener("pointercancel", stop);
+        });
+      }
+    
+      function selectTarget(target) {
+        selectedTarget?.classList.remove("layout-selected");
+        selectedTarget = target;
+        selectedTarget.classList.add("layout-selected");
+      }
+    
+      function round(value) {
+        return Math.round(value * 20) / 20;
+      }
+    
+      function handleResize() {
+        const nextProfile = profileName();
+        if (nextProfile === profile) return;
+        profile = nextProfile;
+        saveAndApply();
+        syncPanel();
+      }
+    
+      window.initializeComprehensiveLayoutEditor = function () {
+        if (
+          new URLSearchParams(window.location.search).get("edit") !==
+          EDITOR_QUERY
+        ) {
+          return;
+        }
+    
+        document.body.classList.add("layout-editor-active");
+        saveAndApply();
+        buildPanel();
+        bindDragging();
+        window.addEventListener("resize", handleResize);
+      };
+    })();
+  </script>
+  <script src="app.js?v=20260828-15"></script>
 
 </body>
 </html>
