@@ -13,18 +13,14 @@ const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
 const siteHeader = document.querySelector(".site-header");
-
 const layoutEditorEnabled =
   new URLSearchParams(window.location.search)
     .get("edit") === "layout";
-
 const layoutTargets = {
   date: document.querySelector('[data-layout-target="date"]'),
   list: document.querySelector('[data-layout-target="list"]')
 };
-
 const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v1";
-
 const LAYOUT_DEFAULTS = {
   desktop: {
     dateFontSize: 3.55,
@@ -95,7 +91,6 @@ function applyLayoutOverrides() {
       `--layout-${name}-x`,
       `${position.x || 0}cqw`
     );
-
     target.style.setProperty(
       `--layout-${name}-y`,
       `${position.y || 0}cqw`
@@ -106,17 +101,14 @@ function applyLayoutOverrides() {
     "--layout-date-font-size",
     `${values.dateFontSize}cqw`
   );
-
   layoutTargets.list.style.setProperty(
     "--layout-time-font-size",
     `${values.timeFontSize}cqw`
   );
-
   layoutTargets.list.style.setProperty(
     "--layout-time-card-gap",
     `${values.timeCardGap}cqw`
   );
-
   layoutTargets.list.style.setProperty(
     "--layout-time-meridiem-display",
     values.showMeridiem ? "inline" : "none"
@@ -124,8 +116,8 @@ function applyLayoutOverrides() {
 }
 
 function layoutCss() {
+  const overrides = readLayoutOverrides();
   const format = value => Number(value || 0).toFixed(2);
-
   const block = breakpoint => {
     const values = layoutValues(breakpoint);
     const date = values.date;
@@ -164,7 +156,6 @@ function moveLayoutTarget(name, deltaX, deltaY) {
   };
 
   overrides[breakpoint] = values;
-
   writeLayoutOverrides(overrides);
   applyLayoutOverrides();
 }
@@ -207,18 +198,12 @@ function makeLayoutDraggable(target, name, output) {
     }
 
     const scale = 100 / activeLayoutDrag.posterWidth;
-
-    const deltaX =
-      (event.clientX - activeLayoutDrag.startX) * scale;
-
-    const deltaY =
-      (event.clientY - activeLayoutDrag.startY) * scale;
+    const deltaX = (event.clientX - activeLayoutDrag.startX) * scale;
+    const deltaY = (event.clientY - activeLayoutDrag.startY) * scale;
 
     moveLayoutTarget(name, deltaX, deltaY);
-
     activeLayoutDrag.startX = event.clientX;
     activeLayoutDrag.startY = event.clientY;
-
     setLayoutOutput(output);
   });
 
@@ -243,41 +228,34 @@ function initializeLayoutEditor() {
 
   const panel = document.createElement("aside");
   panel.className = "layout-editor-panel";
-
   panel.innerHTML = `
     <p class="layout-editor-title">Layout editor: ${layoutBreakpoint()}</p>
-
     <div class="layout-editor-actions">
       <button type="button" data-layout-action="copy">Copy CSS</button>
       <button type="button" data-layout-action="reset">Reset this view</button>
       <button type="button" data-layout-action="done">Done</button>
     </div>
-
     <div class="layout-editor-controls">
       <label class="layout-editor-control">
         <span>Upper-left date size</span>
         <output data-layout-output="dateFontSize">${values.dateFontSize.toFixed(2)}cqw</output>
         <input type="range" min="2.8" max="5" step="0.05" value="${values.dateFontSize}" data-layout-setting="dateFontSize">
       </label>
-
       <label class="layout-editor-control">
         <span>Time size</span>
         <output data-layout-output="timeFontSize">${values.timeFontSize.toFixed(2)}cqw</output>
         <input type="range" min="2.5" max="4.5" step="0.05" value="${values.timeFontSize}" data-layout-setting="timeFontSize">
       </label>
-
       <label class="layout-editor-control">
         <span>Time-to-card gap</span>
         <output data-layout-output="timeCardGap">${values.timeCardGap.toFixed(2)}cqw</output>
         <input type="range" min="1" max="4" step="0.05" value="${values.timeCardGap}" data-layout-setting="timeCardGap">
       </label>
-
       <label class="layout-editor-toggle">
         <input type="checkbox" data-layout-setting="showMeridiem" ${values.showMeridiem ? "checked" : ""}>
         Show AM/PM
       </label>
     </div>
-
     <textarea class="layout-editor-output" readonly aria-label="Layout CSS"></textarea>
   `;
 
@@ -296,13 +274,11 @@ function initializeLayoutEditor() {
       const input = panel.querySelector(
         `[data-layout-setting="${setting}"]`
       );
-
       const settingOutput = panel.querySelector(
         `[data-layout-output="${setting}"]`
       );
 
       input.value = currentValues[setting];
-
       settingOutput.textContent =
         `${Number(currentValues[setting]).toFixed(2)}cqw`;
     });
@@ -330,13 +306,10 @@ function initializeLayoutEditor() {
     }
 
     const value = Number(event.target.value);
-
     updateLayoutSetting(setting, value);
-
     panel.querySelector(
       `[data-layout-output="${setting}"]`
     ).textContent = `${value.toFixed(2)}cqw`;
-
     setLayoutOutput(output);
   });
 
@@ -349,7 +322,6 @@ function initializeLayoutEditor() {
       "showMeridiem",
       event.target.checked
     );
-
     setLayoutOutput(output);
   });
 
@@ -366,7 +338,6 @@ function initializeLayoutEditor() {
       }
 
       event.target.textContent = "Copied";
-
       window.setTimeout(() => {
         event.target.textContent = "Copy CSS";
       }, 1200);
@@ -374,9 +345,7 @@ function initializeLayoutEditor() {
 
     if (action === "reset") {
       const overrides = readLayoutOverrides();
-
       delete overrides[layoutBreakpoint()];
-
       writeLayoutOverrides(overrides);
       applyLayoutOverrides();
       refreshLayoutEditorControls();
@@ -388,7 +357,6 @@ function initializeLayoutEditor() {
         document.title,
         window.location.pathname
       );
-
       window.location.reload();
     }
   });
@@ -423,15 +391,51 @@ function stripIdentityEmojis(title) {
     .trim();
 }
 
-function eventVenue(event) {
-  return String(event.venue || "")
-    .trim()
-    .replace(/,\s*\d+\s+.+$/, "")
+function normalizeLocationText(value) {
+  return String(value || "")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
 
+function eventLocationParts(event) {
+  let venue = String(event.venue || "").trim();
+  const address = String(event.address || "").trim();
+
+  venue = venue
+    .replace(/,\s*\d+\s+.+$/, "")
+    .trim();
+
+  const normalizedAddress = normalizeLocationText(address);
+  const lastComma = venue.lastIndexOf(",");
+
+  if (normalizedAddress && lastComma !== -1) {
+    const trailingVenueText = venue.slice(lastComma + 1);
+
+    if (
+      normalizeLocationText(trailingVenueText) ===
+      normalizedAddress
+    ) {
+      venue = venue.slice(0, lastComma).trim();
+    }
+  }
+
+  if (
+    normalizedAddress &&
+    normalizeLocationText(venue) === normalizedAddress
+  ) {
+    venue = "";
+  }
+
+  return { venue, address };
+}
+
+function eventVenue(event) {
+  return eventLocationParts(event).venue;
+}
+
 function eventAddress(event) {
-  return String(event.address || "").trim();
+  return eventLocationParts(event).address;
 }
 
 function sortEvents(events) {
@@ -537,7 +541,6 @@ function compactTime(date) {
 
 function formatTimeRange(event) {
   let startText = compactTime(new Date(event.start));
-
   const endText = event.end
     ? compactTime(new Date(event.end))
     : "";
@@ -674,7 +677,6 @@ function renderDatePopover() {
 
   const monthLabel = document.createElement("div");
   monthLabel.className = "date-popover-month-label";
-
   monthLabel.textContent =
     new Intl.DateTimeFormat(
       "en-US",
@@ -725,13 +727,10 @@ function renderDatePopover() {
 
   const year = pickerMonth.getFullYear();
   const month = pickerMonth.getMonth();
-
   const firstWeekday =
     new Date(year, month, 1).getDay();
-
   const daysInMonth =
     new Date(year, month + 1, 0).getDate();
-
   const available = availableDateKeys();
   const selected = posterPages[currentPosterIndex].date;
 
@@ -825,20 +824,10 @@ function renderPoster() {
 
   eventStack.innerHTML = "";
 
-  eventStack.style.setProperty(
-    "--event-count",
-    page.events.length
-  );
-
   groupEventsByStartTime(page.events)
     .forEach(eventsAtThisTime => {
       const group = document.createElement("div");
       group.className = "event-time-group";
-
-      group.style.setProperty(
-        "--events-at-time",
-        eventsAtThisTime.length
-      );
 
       const time = document.createElement("div");
       time.className = "event-time";
@@ -847,15 +836,9 @@ function renderPoster() {
       const cards = document.createElement("div");
       cards.className = "event-group-cards";
 
-      cards.style.setProperty(
-        "--events-at-time",
-        eventsAtThisTime.length
-      );
-
       eventsAtThisTime.forEach(event => {
         const card = document.createElement("button");
         card.type = "button";
-
         card.className =
           `event-card ${event.explicitQueer
             ? "explicit"
@@ -876,7 +859,6 @@ function renderPoster() {
         address.hidden = !address.textContent;
 
         card.append(title, venue, address);
-
         card.addEventListener(
           "click",
           () => openEventDetail(event)
@@ -898,7 +880,6 @@ function renderPoster() {
 
 function openEventDetail(event) {
   closeDatePopover();
-
   poster.classList.add("detail-open");
   eventStack.hidden = true;
   eventDetail.hidden = false;
@@ -1051,7 +1032,6 @@ async function initialize() {
 
   try {
     const events = await loadPublicEvents();
-
     posterPages = buildPosterPages(events);
 
     if (!posterPages.length) {
@@ -1063,7 +1043,6 @@ async function initialize() {
     }
 
     const today = dateKey(new Date());
-
     const todayIndex = posterPages.findIndex(
       page => page.date >= today
     );
