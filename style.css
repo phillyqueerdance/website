@@ -165,8 +165,12 @@ body {
   */
   top: 10.05%;
 
-  left: 7.4%;
-  width: 20%;
+  /*
+    Center the date in the open horizontal space
+    between the left frame edge and the baked-in legend.
+  */
+  left: 8.5%;
+  width: 22%;
 
   text-align: center;
 
@@ -204,7 +208,7 @@ body {
 
   justify-content: center;
 
-  gap: 1.35cqw;
+  gap: 1.5cqw;
 }
 
 
@@ -215,14 +219,14 @@ body {
 .event-card {
   width: 100%;
 
-  min-height: 11.25cqw;
+  min-height: 13.1cqw;
 
   margin: 0;
 
   border: 0;
   border-radius: 0.7cqw;
 
-  padding: 1.15cqw 1.65cqw;
+  padding: 1.1cqw 1.65cqw;
 
   text-align: left;
 
@@ -253,7 +257,11 @@ body {
 
 
 .event-title {
-  font-size: 3.45cqw;
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+
+  font-size: 3.35cqw;
   line-height: 1.08;
 
   font-weight: 400;
@@ -261,6 +269,10 @@ body {
 
 
 .event-meta {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+
   margin-top: 0.3cqw;
 
   font-size: 3cqw;
@@ -271,6 +283,10 @@ body {
 
 
 .event-address {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+
   margin-top: 0.18cqw;
 
   font-size: 2.7cqw;
@@ -467,10 +483,10 @@ body {
 
 
   .event-card {
-    min-height: 11.35cqw;
+    min-height: 13.6cqw;
 
     padding:
-      1.15cqw
+      1.1cqw
       1.7cqw;
   }
 
