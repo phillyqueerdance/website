@@ -842,7 +842,7 @@ body {
 /* QDP poster layout overrides */
 /* Desktop */
 .poster-date { --layout-date-x: 0.24cqw; --layout-date-y: -0.37cqw; --layout-date-font-size: 3.75cqw; }
-.event-stack { --layout-list-x: -3.56cqw; --layout-list-y: -1.96cqw; --layout-time-font-size: 3.40cqw; --layout-time-card-gap: 1.00cqw; --layout-time-meridiem-display: inline; }
+.event-stack { --layout-list-x: -3.32cqw; --layout-list-y: -4.18cqw; --layout-time-font-size: 3.20cqw; --layout-time-card-gap: 2.15cqw; --layout-time-meridiem-display: inline; }
 
 @media (max-width: 600px) {
   .poster-date { --layout-date-x: 0.00cqw; --layout-date-y: 0.00cqw; --layout-date-font-size: 3.70cqw; }
