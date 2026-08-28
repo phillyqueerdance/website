@@ -1,0 +1,306 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #000;
+  color: #f7edf1;
+  font-family: Arial, Helvetica, sans-serif;
+
+  display: grid;
+
+  grid-template-rows:
+    auto
+    minmax(0, 1fr)
+    auto;
+}
+
+
+/* ---------------- TOP NAV ---------------- */
+
+.site-header {
+  padding: 12px 20px 8px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 24px;
+
+  position: relative;
+}
+
+.site-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
+}
+
+.site-header a {
+  color: #f7edf1;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.site-header a:hover {
+  text-decoration: underline;
+}
+
+
+.date-button {
+  appearance: none;
+
+  border: 0;
+  background: transparent;
+  color: #f7edf1;
+
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+
+/* ---------------- POSTER AREA ---------------- */
+
+.poster-area {
+  min-height: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 4px 16px;
+}
+
+
+/*
+  Original artwork ratio:
+  1151 × 1510
+
+  Width is limited by BOTH:
+  - available screen width
+  - available screen height
+
+  This prevents page scrolling.
+*/
+
+.poster {
+  position: relative;
+
+  width: min(
+    94vw,
+    calc((100vh - 130px) * 0.76225)
+  );
+
+  aspect-ratio: 1151 / 1510;
+
+  container-type: inline-size;
+}
+
+
+.frame {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  pointer-events: none;
+}
+
+
+/* ---------------- DATE ---------------- */
+
+.poster-date {
+  position: absolute;
+
+  left: 10%;
+  top: 6.6%;
+
+  color: #fff1f4;
+
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+
+  line-height: 0.98;
+
+  font-size: 4.2cqw;
+}
+
+#dateDay {
+  margin-top: 0.3em;
+}
+
+
+/* ---------------- EVENT STACK ---------------- */
+
+.event-stack {
+  position: absolute;
+
+  left: 11.5%;
+  right: 10.5%;
+
+  top: 22.5%;
+  bottom: 8.5%;
+
+  display: flex;
+  flex-direction: column;
+
+  justify-content: center;
+
+  gap: 1.25cqw;
+}
+
+
+/* Google Calendar-ish entry */
+
+.event-card {
+  width: 100%;
+
+  border: 0;
+  border-radius: 0.6cqw;
+
+  padding:
+    1.3cqw
+    1.5cqw;
+
+  text-align: left;
+
+  color: #232323;
+
+  cursor: pointer;
+
+  font: inherit;
+
+  min-height: 7.1cqw;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+
+.event-card.default {
+  background: #ff8b63;
+}
+
+
+.event-card.explicit {
+  background: #a14eb5;
+}
+
+
+.event-title {
+  font-size: 2.55cqw;
+  line-height: 1.12;
+
+  font-weight: 400;
+}
+
+
+.event-meta {
+  margin-top: 0.25cqw;
+
+  font-size: 2.35cqw;
+  line-height: 1.12;
+
+  font-weight: 400;
+}
+
+
+/* ---------------- EVENT DETAIL ---------------- */
+
+.event-detail {
+  position: absolute;
+
+  left: 11.5%;
+  right: 10.5%;
+
+  top: 24%;
+  bottom: 9%;
+
+  color: #fff1f4;
+
+  font-size: 2.5cqw;
+  line-height: 1.35;
+
+  overflow: auto;
+}
+
+
+.event-detail button {
+  margin-bottom: 2cqw;
+
+  border: 0;
+  background: transparent;
+
+  color: inherit;
+
+  font: inherit;
+
+  cursor: pointer;
+}
+
+
+/* ---------------- BOTTOM CONTROLS ---------------- */
+
+.poster-controls {
+  padding: 7px 20px 12px;
+
+  display: flex;
+  justify-content: center;
+
+  gap: 54px;
+}
+
+.poster-controls button {
+  border: 0;
+
+  background: transparent;
+
+  color: #f7edf1;
+
+  font-size: 30px;
+
+  cursor: pointer;
+
+  width: 48px;
+  height: 38px;
+}
+
+
+/* ---------------- SMALL SCREENS ---------------- */
+
+@media (max-width: 600px) {
+
+  .site-header {
+    padding-inline: 8px;
+    gap: 10px;
+  }
+
+  .site-header nav {
+    gap: 10px;
+  }
+
+  .site-header a {
+    font-size: 11px;
+  }
+
+  .date-button {
+    font-size: 11px;
+  }
+
+}
