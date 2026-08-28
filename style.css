@@ -104,7 +104,7 @@ body {
 
   transform: translateX(-50%);
 
-  border: 1px solid #ff3f7a;
+  border: 0;
   border-radius: 3px;
   background: #242329;
 
@@ -304,7 +304,7 @@ body {
 .event-time-group {
   display: grid;
   grid-template-columns: 20.5% minmax(0, 1fr);
-  column-gap: 0.55cqw;
+  column-gap: 2cqw;
   align-items: start;
 }
 
@@ -339,7 +339,7 @@ body {
 
 .event-card {
   width: 100%;
-  min-height: 8.85cqw;
+  min-height: 0;
 
   margin: 0;
   padding: 1.05cqw 1.5cqw;
@@ -373,20 +373,24 @@ body {
 .event-title {
   width: 100%;
 
-  font-size: 3.35cqw;
+  font-size: 3.05cqw;
   font-weight: 400;
   line-height: 1.08;
 }
 
 
-.event-meta {
+.event-venue,
+.event-address {
   width: 100%;
 
-  margin-top: 0.35cqw;
-
-  font-size: 2.75cqw;
+  font-size: 2.35cqw;
   font-weight: 400;
-  line-height: 1.1;
+  line-height: 1.12;
+}
+
+
+.event-venue {
+  margin-top: 0.38cqw;
 }
 
 
@@ -410,10 +414,20 @@ body {
   inset: 0;
   z-index: 5;
 
-  display: grid;
+  display: none;
   place-items: center;
 
   padding: 8cqw;
+}
+
+
+.event-detail.is-open {
+  display: grid;
+}
+
+
+.event-detail[hidden] {
+  display: none;
 }
 
 
@@ -560,7 +574,7 @@ body {
 
   .event-time-group {
     grid-template-columns: 21.5% minmax(0, 1fr);
-    column-gap: 0.65cqw;
+    column-gap: 2.2cqw;
   }
 
 
@@ -575,19 +589,18 @@ body {
 
 
   .event-card {
-    min-height: 9.35cqw;
-
-    padding: 1.05cqw 1.55cqw;
+    padding: 0.95cqw 1.55cqw;
   }
 
 
   .event-title {
-    font-size: 3.55cqw;
+    font-size: 3.2cqw;
   }
 
 
-  .event-meta {
-    font-size: 2.95cqw;
+  .event-venue,
+  .event-address {
+    font-size: 2.55cqw;
   }
 
 
@@ -626,5 +639,4 @@ body {
 
     font-size: 38px;
   }
-
 }
