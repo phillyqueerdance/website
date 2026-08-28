@@ -246,32 +246,38 @@ function initializeLayoutEditor() {
 
   panel.innerHTML = `
     <p class="layout-editor-title">Layout editor: ${layoutBreakpoint()}</p>
+
     <div class="layout-editor-actions">
       <button type="button" data-layout-action="copy">Copy CSS</button>
       <button type="button" data-layout-action="reset">Reset this view</button>
       <button type="button" data-layout-action="done">Done</button>
     </div>
+
     <div class="layout-editor-controls">
       <label class="layout-editor-control">
         <span>Upper-left date size</span>
         <output data-layout-output="dateFontSize">${values.dateFontSize.toFixed(2)}cqw</output>
         <input type="range" min="2.8" max="5" step="0.05" value="${values.dateFontSize}" data-layout-setting="dateFontSize">
       </label>
+
       <label class="layout-editor-control">
         <span>Time size</span>
         <output data-layout-output="timeFontSize">${values.timeFontSize.toFixed(2)}cqw</output>
         <input type="range" min="2.5" max="4.5" step="0.05" value="${values.timeFontSize}" data-layout-setting="timeFontSize">
       </label>
+
       <label class="layout-editor-control">
         <span>Time-to-card gap</span>
         <output data-layout-output="timeCardGap">${values.timeCardGap.toFixed(2)}cqw</output>
         <input type="range" min="1" max="4" step="0.05" value="${values.timeCardGap}" data-layout-setting="timeCardGap">
       </label>
+
       <label class="layout-editor-toggle">
         <input type="checkbox" data-layout-setting="showMeridiem" ${values.showMeridiem ? "checked" : ""}>
         Show AM/PM
       </label>
     </div>
+
     <textarea class="layout-editor-output" readonly aria-label="Layout CSS"></textarea>
   `;
 
@@ -779,6 +785,7 @@ function renderPoster() {
 
   eventDetail.hidden = true;
   eventDetail.classList.remove("is-open");
+  poster.classList.remove("detail-open");
   eventStack.hidden = false;
 
   dateNumber.textContent =
@@ -818,10 +825,20 @@ function renderPoster() {
 
   eventStack.innerHTML = "";
 
+  eventStack.style.setProperty(
+    "--event-count",
+    page.events.length
+  );
+
   groupEventsByStartTime(page.events)
     .forEach(eventsAtThisTime => {
       const group = document.createElement("div");
       group.className = "event-time-group";
+
+      group.style.setProperty(
+        "--events-at-time",
+        eventsAtThisTime.length
+      );
 
       const time = document.createElement("div");
       time.className = "event-time";
@@ -829,6 +846,11 @@ function renderPoster() {
 
       const cards = document.createElement("div");
       cards.className = "event-group-cards";
+
+      cards.style.setProperty(
+        "--events-at-time",
+        eventsAtThisTime.length
+      );
 
       eventsAtThisTime.forEach(event => {
         const card = document.createElement("button");
@@ -877,6 +899,7 @@ function renderPoster() {
 function openEventDetail(event) {
   closeDatePopover();
 
+  poster.classList.add("detail-open");
   eventStack.hidden = true;
   eventDetail.hidden = false;
   eventDetail.classList.add("is-open");
