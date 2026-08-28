@@ -27,15 +27,14 @@ body {
 /* ---------------- TOP NAV ---------------- */
 
 .site-header {
-  padding: 12px 20px 8px;
+  padding: 10px 20px 6px;
 
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 
-  gap: 24px;
-
-  position: relative;
+  gap: 8px;
 }
 
 .site-header nav {
@@ -54,7 +53,6 @@ body {
 .site-header a:hover {
   text-decoration: underline;
 }
-
 
 .date-button {
   appearance: none;
@@ -87,12 +85,6 @@ body {
 /*
   Original artwork ratio:
   1151 × 1510
-
-  Width is limited by BOTH:
-  - available screen width
-  - available screen height
-
-  This prevents page scrolling.
 */
 
 .poster {
@@ -100,7 +92,7 @@ body {
 
   width: min(
     94vw,
-    calc((100vh - 130px) * 0.76225)
+    calc((100vh - 145px) * 0.76225)
   );
 
   aspect-ratio: 1151 / 1510;
@@ -127,21 +119,24 @@ body {
 .poster-date {
   position: absolute;
 
-  left: 10%;
-  top: 6.6%;
+  top: 6.2%;
+  left: 8%;
+  width: 19%;
+
+  text-align: center;
 
   color: #fff1f4;
 
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
 
-  line-height: 0.98;
+  line-height: 1;
 
-  font-size: 4.2cqw;
+  font-size: 3.1cqw;
 }
 
 #dateDay {
-  margin-top: 0.3em;
+  margin-top: 0.2em;
 }
 
 
@@ -165,17 +160,15 @@ body {
 }
 
 
-/* Google Calendar-ish entry */
+/* Google Calendar-style entry */
 
 .event-card {
   width: 100%;
 
   border: 0;
-  border-radius: 0.6cqw;
+  border-radius: 0.7cqw;
 
-  padding:
-    1.3cqw
-    1.5cqw;
+  padding: 1.5cqw 1.7cqw;
 
   text-align: left;
 
@@ -185,7 +178,7 @@ body {
 
   font: inherit;
 
-  min-height: 7.1cqw;
+  min-height: 8.2cqw;
 
   display: flex;
   flex-direction: column;
@@ -204,18 +197,18 @@ body {
 
 
 .event-title {
-  font-size: 2.55cqw;
-  line-height: 1.12;
+  font-size: 3.25cqw;
+  line-height: 1.08;
 
   font-weight: 400;
 }
 
 
 .event-meta {
-  margin-top: 0.25cqw;
+  margin-top: 0.35cqw;
 
-  font-size: 2.35cqw;
-  line-height: 1.12;
+  font-size: 2.85cqw;
+  line-height: 1.1;
 
   font-weight: 400;
 }
@@ -288,7 +281,7 @@ body {
 
   .site-header {
     padding-inline: 8px;
-    gap: 10px;
+    gap: 8px;
   }
 
   .site-header nav {
