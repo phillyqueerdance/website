@@ -2,8 +2,7 @@
   box-sizing: border-box;
 }
 
-html,
-body {
+html {
   margin: 0;
   width: 100%;
   height: 100%;
@@ -11,88 +10,131 @@ body {
 }
 
 body {
+  margin: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+
   background: #000;
   color: #f7edf1;
+
   font-family: Arial, Helvetica, sans-serif;
 
-  display: grid;
-
-  grid-template-rows:
-    auto
-    minmax(0, 1fr)
-    auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 
-/* ---------------- TOP NAV ---------------- */
+/* =========================================================
+   TOP NAV
+   ========================================================= */
 
 .site-header {
-  padding: 10px 20px 6px;
+  flex: 0 0 auto;
+
+  padding: 10px 10px 13px;
 
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
 
-  gap: 8px;
+  /*
+    Equal-ish spacing above and below the date control,
+    so the displayed date feels centered between
+    the navigation and the poster.
+  */
+  gap: 13px;
 }
+
 
 .site-header nav {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
+
   gap: 18px;
 }
 
+
 .site-header a {
   color: #f7edf1;
+
   text-decoration: none;
+
   font-size: 14px;
+  line-height: 1.2;
 }
+
 
 .site-header a:hover {
   text-decoration: underline;
 }
 
+
 .date-button {
   appearance: none;
 
+  margin: 0;
+  padding: 0;
+
   border: 0;
   background: transparent;
+
   color: #f7edf1;
 
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
+  line-height: 1;
 
   cursor: pointer;
 }
 
 
-/* ---------------- POSTER AREA ---------------- */
+/* =========================================================
+   POSTER AREA
+   ========================================================= */
 
 .poster-area {
+  flex: 0 0 auto;
+
   min-height: 0;
 
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: flex-start;
 
-  padding: 4px 16px;
+  /*
+    Keep almost the entire phone width available to the frame.
+  */
+  padding: 0 4px;
 }
 
 
 /*
-  Original artwork ratio:
+  Original artwork:
   1151 × 1510
+  ratio = 0.76225
+
+  The poster expands toward the screen edges, but is also
+  limited by available viewport height so nothing needs to
+  scroll vertically.
 */
 
 .poster {
   position: relative;
 
   width: min(
-    94vw,
-    calc((100vh - 145px) * 0.76225)
+    96vw,
+    calc((100vh - 150px) * 0.76225)
+  );
+
+  width: min(
+    96vw,
+    calc((100dvh - 150px) * 0.76225)
   );
 
   aspect-ratio: 1151 / 1510;
@@ -105,23 +147,35 @@ body {
   position: absolute;
   inset: 0;
 
+  display: block;
+
   width: 100%;
   height: 100%;
 
-  display: block;
-
   pointer-events: none;
+  user-select: none;
 }
 
 
-/* ---------------- DATE ---------------- */
+/* =========================================================
+   DATE INSIDE FRAME
+   ========================================================= */
+
+/*
+  The legend is baked into the PNG.
+
+  This date block is positioned so the center of its
+  two-line text block aligns much more closely with the
+  center of the two-line legend.
+*/
 
 .poster-date {
   position: absolute;
 
-  top: 6.2%;
-  left: 8%;
-  width: 19%;
+  top: 8.6%;
+  left: 7.4%;
+
+  width: 20%;
 
   text-align: center;
 
@@ -130,17 +184,20 @@ body {
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
 
-  line-height: 1;
+  line-height: 0.98;
 
-  font-size: 3.1cqw;
+  font-size: 3.05cqw;
 }
+
 
 #dateDay {
-  margin-top: 0.2em;
+  margin-top: 0.22em;
 }
 
 
-/* ---------------- EVENT STACK ---------------- */
+/* =========================================================
+   EVENT STACK
+   ========================================================= */
 
 .event-stack {
   position: absolute;
@@ -156,19 +213,25 @@ body {
 
   justify-content: center;
 
-  gap: 1.25cqw;
+  gap: 1.35cqw;
 }
 
 
-/* Google Calendar-style entry */
+/* =========================================================
+   GOOGLE-CALENDAR-LIKE EVENT ENTRY
+   ========================================================= */
 
 .event-card {
   width: 100%;
 
+  min-height: 8.5cqw;
+
+  margin: 0;
+
   border: 0;
   border-radius: 0.7cqw;
 
-  padding: 1.5cqw 1.7cqw;
+  padding: 1.45cqw 1.65cqw;
 
   text-align: left;
 
@@ -178,18 +241,20 @@ body {
 
   font: inherit;
 
-  min-height: 8.2cqw;
-
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 
+/* Default / non-explicitly-queer event */
+
 .event-card.default {
   background: #ff8b63;
 }
 
+
+/* ExplicitQueer = Yes */
 
 .event-card.explicit {
   background: #a14eb5;
@@ -197,7 +262,7 @@ body {
 
 
 .event-title {
-  font-size: 3.25cqw;
+  font-size: 3.45cqw;
   line-height: 1.08;
 
   font-weight: 400;
@@ -205,16 +270,18 @@ body {
 
 
 .event-meta {
-  margin-top: 0.35cqw;
+  margin-top: 0.3cqw;
 
-  font-size: 2.85cqw;
+  font-size: 3cqw;
   line-height: 1.1;
 
   font-weight: 400;
 }
 
 
-/* ---------------- EVENT DETAIL ---------------- */
+/* =========================================================
+   EVENT DETAIL
+   ========================================================= */
 
 .event-detail {
   position: absolute;
@@ -222,20 +289,21 @@ body {
   left: 11.5%;
   right: 10.5%;
 
-  top: 24%;
+  top: 22%;
   bottom: 9%;
+
+  overflow: auto;
 
   color: #fff1f4;
 
-  font-size: 2.5cqw;
+  font-size: 2.8cqw;
   line-height: 1.35;
-
-  overflow: auto;
 }
 
 
 .event-detail button {
-  margin-bottom: 2cqw;
+  margin: 0 0 2cqw;
+  padding: 0;
 
   border: 0;
   background: transparent;
@@ -248,52 +316,167 @@ body {
 }
 
 
-/* ---------------- BOTTOM CONTROLS ---------------- */
+.event-detail h2 {
+  margin: 0 0 2cqw;
+
+  font-size: 4cqw;
+  line-height: 1.1;
+}
+
+
+.event-detail p {
+  margin: 0 0 1.7cqw;
+}
+
+
+/* =========================================================
+   BOTTOM POSTER CONTROLS
+   ========================================================= */
 
 .poster-controls {
-  padding: 7px 20px 12px;
+  flex: 0 0 auto;
+
+  padding: 9px 20px 8px;
 
   display: flex;
   justify-content: center;
+  align-items: center;
 
-  gap: 54px;
+  gap: 58px;
 }
 
-.poster-controls button {
-  border: 0;
 
+.poster-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 50px;
+  height: 42px;
+
+  margin: 0;
+  padding: 0;
+
+  border: 0;
   background: transparent;
 
   color: #f7edf1;
 
-  font-size: 30px;
+  font-size: 32px;
+  line-height: 1;
 
   cursor: pointer;
-
-  width: 48px;
-  height: 38px;
 }
 
 
-/* ---------------- SMALL SCREENS ---------------- */
+.poster-controls button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
 
 @media (max-width: 600px) {
 
   .site-header {
-    padding-inline: 8px;
-    gap: 8px;
+    padding:
+      9px
+      6px
+      12px;
+
+    gap: 12px;
   }
+
+
+  /*
+    Do NOT shrink these to 11px.
+    The previous CSS was making the whole upper interface
+    unnecessarily tiny on phones.
+  */
 
   .site-header nav {
-    gap: 10px;
+    gap: 8px 12px;
   }
+
 
   .site-header a {
-    font-size: 11px;
+    font-size: 13px;
   }
 
+
   .date-button {
-    font-size: 11px;
+    font-size: 15px;
+  }
+
+
+  /*
+    Push the poster much closer to the left and right edges.
+  */
+
+  .poster-area {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+
+  .poster {
+    width: min(
+      98.5vw,
+      calc((100vh - 140px) * 0.76225)
+    );
+
+    width: min(
+      98.5vw,
+      calc((100dvh - 140px) * 0.76225)
+    );
+  }
+
+
+  /*
+    Live event typography gets a deliberate mobile boost.
+    cqw remains tied to the poster itself, so the composition
+    still scales proportionally.
+  */
+
+  .event-title {
+    font-size: 3.75cqw;
+  }
+
+
+  .event-meta {
+    font-size: 3.35cqw;
+  }
+
+
+  .event-card {
+    min-height: 9.1cqw;
+
+    padding:
+      1.55cqw
+      1.7cqw;
+  }
+
+
+  .poster-date {
+    font-size: 3.25cqw;
+  }
+
+
+  .poster-controls {
+    padding-top: 8px;
+
+    gap: 66px;
+  }
+
+
+  .poster-controls button {
+    width: 54px;
+    height: 44px;
+
+    font-size: 38px;
   }
 
 }
