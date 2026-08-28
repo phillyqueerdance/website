@@ -542,7 +542,7 @@ function renderPoster() {
           month:
             "short",
 
-            day:
+          day:
             "numeric",
 
           timeZone:
@@ -617,23 +617,12 @@ function renderPoster() {
           "event-meta";
 
         meta.textContent =
-          `at ${event.venue}`;
-
-
-        const address =
-          document.createElement("div");
-
-        address.className =
-          "event-address";
-
-        address.textContent =
-          event.address;
+          `${event.venue}, ${event.address}`;
 
 
         card.append(
           title,
-          meta,
-          address
+          meta
         );
 
 
