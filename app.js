@@ -423,6 +423,55 @@ function formatTimeRange(event) {
 }
 
 
+function formatStartTime(event) {
+
+  const formatter =
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        timeZone:
+          "America/New_York",
+
+        hour:
+          "numeric",
+
+        minute:
+          "2-digit"
+      }
+    );
+
+
+  return formatter
+    .format(new Date(event.start))
+    .replace(":00", "")
+    .replace(" ", "")
+    .toLowerCase();
+}
+
+
+function groupEventsByStartTime(events) {
+
+  const groups = new Map();
+
+  events.forEach(event => {
+
+    const key =
+      new Date(event.start).getTime();
+
+
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+
+
+    groups.get(key).push(event);
+  });
+
+
+  return [...groups.values()];
+}
+
+
 /* -----------------------------------------
    RENDER POSTER
 ----------------------------------------- */
@@ -493,7 +542,7 @@ function renderPoster() {
           month:
             "short",
 
-          day:
+            day:
             "numeric",
 
           timeZone:
@@ -509,90 +558,104 @@ function renderPoster() {
   eventStack.innerHTML = "";
 
 
-  page.events.forEach(event => {
+  groupEventsByStartTime(page.events)
+    .forEach(eventsAtThisTime => {
 
-    const card =
-      document.createElement("button");
+      const group =
+        document.createElement("div");
 
-    card.type = "button";
-
-    card.className =
-      `event-card ${
-        event.explicitQueer
-          ? "explicit"
-          : "default"
-      }`;
+      group.className =
+        "event-time-group";
 
 
-    const timeColumn =
-      document.createElement("div");
+      const time =
+        document.createElement("div");
 
-    timeColumn.className =
-      "event-time";
+      time.className =
+        "event-time";
 
-    timeColumn.textContent =
-      formatTimeRange(event);
-
-
-    const details =
-      document.createElement("div");
-
-    details.className =
-      "event-details";
+      time.textContent =
+        formatStartTime(eventsAtThisTime[0]);
 
 
-    const title =
-      document.createElement("div");
+      const cards =
+        document.createElement("div");
 
-    title.className =
-      "event-title";
-
-    title.textContent =
-      event.title;
+      cards.className =
+        "event-group-cards";
 
 
-    const meta =
-      document.createElement("div");
+      eventsAtThisTime.forEach(event => {
 
-    meta.className =
-      "event-meta";
+        const card =
+          document.createElement("button");
 
-    meta.textContent =
-      `at ${event.venue}`;
+        card.type = "button";
 
-
-    const address =
-      document.createElement("div");
-
-    address.className =
-      "event-address";
-
-    address.textContent =
-      event.address;
+        card.className =
+          `event-card ${
+            event.explicitQueer
+              ? "explicit"
+              : "default"
+          }`;
 
 
-    details.append(
-      title,
-      meta,
-      address
-    );
+        const title =
+          document.createElement("div");
+
+        title.className =
+          "event-title";
+
+        title.textContent =
+          event.title;
 
 
-    card.append(
-      timeColumn,
-      details
-    );
+        const meta =
+          document.createElement("div");
+
+        meta.className =
+          "event-meta";
+
+        meta.textContent =
+          `at ${event.venue}`;
 
 
-    card.addEventListener(
-      "click",
-      () =>
-        openEventDetail(event)
-    );
+        const address =
+          document.createElement("div");
+
+        address.className =
+          "event-address";
+
+        address.textContent =
+          event.address;
 
 
-    eventStack.appendChild(card);
-  });
+        card.append(
+          title,
+          meta,
+          address
+        );
+
+
+        card.addEventListener(
+          "click",
+          () =>
+            openEventDetail(event)
+        );
+
+
+        cards.appendChild(card);
+      });
+
+
+      group.append(
+        time,
+        cards
+      );
+
+
+      eventStack.appendChild(group);
+    });
 
 
   previousPoster.disabled =
@@ -697,15 +760,13 @@ function movePoster(direction) {
 
 previousPoster.addEventListener(
   "click",
-  () =>
-    movePoster(-1)
+  () => movePoster(-1)
 );
 
 
 nextPoster.addEventListener(
   "click",
-  () =>
-    movePoster(1)
+  () => movePoster(1)
 );
 
 
