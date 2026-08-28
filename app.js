@@ -482,10 +482,8 @@ function renderPoster() {
 
 
   if (page.date === today) {
-
     dateButton.textContent =
       "Today";
-
   } else {
 
     dateButton.textContent =
@@ -526,6 +524,23 @@ function renderPoster() {
       }`;
 
 
+    const timeColumn =
+      document.createElement("div");
+
+    timeColumn.className =
+      "event-time";
+
+    timeColumn.textContent =
+      formatTimeRange(event);
+
+
+    const details =
+      document.createElement("div");
+
+    details.className =
+      "event-details";
+
+
     const title =
       document.createElement("div");
 
@@ -543,7 +558,7 @@ function renderPoster() {
       "event-meta";
 
     meta.textContent =
-      `${formatTimeRange(event)} at ${event.venue}`;
+      `at ${event.venue}`;
 
 
     const address =
@@ -556,10 +571,16 @@ function renderPoster() {
       event.address;
 
 
-    card.append(
+    details.append(
       title,
       meta,
       address
+    );
+
+
+    card.append(
+      timeColumn,
+      details
     );
 
 
@@ -571,7 +592,6 @@ function renderPoster() {
 
 
     eventStack.appendChild(card);
-
   });
 
 
