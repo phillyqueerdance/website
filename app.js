@@ -20,7 +20,9 @@ const layoutTargets = {
   date: document.querySelector('[data-layout-target="date"]'),
   list: document.querySelector('[data-layout-target="list"]')
 };
+
 const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v1";
+
 const LAYOUT_DEFAULTS = {
   desktop: {
     dateFontSize: 3.55,
@@ -91,6 +93,7 @@ function applyLayoutOverrides() {
       `--layout-${name}-x`,
       `${position.x || 0}cqw`
     );
+
     target.style.setProperty(
       `--layout-${name}-y`,
       `${position.y || 0}cqw`
@@ -101,14 +104,17 @@ function applyLayoutOverrides() {
     "--layout-date-font-size",
     `${values.dateFontSize}cqw`
   );
+
   layoutTargets.list.style.setProperty(
     "--layout-time-font-size",
     `${values.timeFontSize}cqw`
   );
+
   layoutTargets.list.style.setProperty(
     "--layout-time-card-gap",
     `${values.timeCardGap}cqw`
   );
+
   layoutTargets.list.style.setProperty(
     "--layout-time-meridiem-display",
     values.showMeridiem ? "inline" : "none"
@@ -116,8 +122,8 @@ function applyLayoutOverrides() {
 }
 
 function layoutCss() {
-  const overrides = readLayoutOverrides();
   const format = value => Number(value || 0).toFixed(2);
+
   const block = breakpoint => {
     const values = layoutValues(breakpoint);
     const date = values.date;
@@ -156,6 +162,7 @@ function moveLayoutTarget(name, deltaX, deltaY) {
   };
 
   overrides[breakpoint] = values;
+
   writeLayoutOverrides(overrides);
   applyLayoutOverrides();
 }
@@ -198,12 +205,16 @@ function makeLayoutDraggable(target, name, output) {
     }
 
     const scale = 100 / activeLayoutDrag.posterWidth;
-    const deltaX = (event.clientX - activeLayoutDrag.startX) * scale;
-    const deltaY = (event.clientY - activeLayoutDrag.startY) * scale;
+    const deltaX =
+      (event.clientX - activeLayoutDrag.startX) * scale;
+    const deltaY =
+      (event.clientY - activeLayoutDrag.startY) * scale;
 
     moveLayoutTarget(name, deltaX, deltaY);
+
     activeLayoutDrag.startX = event.clientX;
     activeLayoutDrag.startY = event.clientY;
+
     setLayoutOutput(output);
   });
 
@@ -274,11 +285,13 @@ function initializeLayoutEditor() {
       const input = panel.querySelector(
         `[data-layout-setting="${setting}"]`
       );
+
       const settingOutput = panel.querySelector(
         `[data-layout-output="${setting}"]`
       );
 
       input.value = currentValues[setting];
+
       settingOutput.textContent =
         `${Number(currentValues[setting]).toFixed(2)}cqw`;
     });
@@ -306,10 +319,13 @@ function initializeLayoutEditor() {
     }
 
     const value = Number(event.target.value);
+
     updateLayoutSetting(setting, value);
+
     panel.querySelector(
       `[data-layout-output="${setting}"]`
     ).textContent = `${value.toFixed(2)}cqw`;
+
     setLayoutOutput(output);
   });
 
@@ -322,6 +338,7 @@ function initializeLayoutEditor() {
       "showMeridiem",
       event.target.checked
     );
+
     setLayoutOutput(output);
   });
 
@@ -338,6 +355,7 @@ function initializeLayoutEditor() {
       }
 
       event.target.textContent = "Copied";
+
       window.setTimeout(() => {
         event.target.textContent = "Copy CSS";
       }, 1200);
@@ -345,7 +363,9 @@ function initializeLayoutEditor() {
 
     if (action === "reset") {
       const overrides = readLayoutOverrides();
+
       delete overrides[layoutBreakpoint()];
+
       writeLayoutOverrides(overrides);
       applyLayoutOverrides();
       refreshLayoutEditorControls();
@@ -357,6 +377,7 @@ function initializeLayoutEditor() {
         document.title,
         window.location.pathname
       );
+
       window.location.reload();
     }
   });
@@ -391,51 +412,12 @@ function stripIdentityEmojis(title) {
     .trim();
 }
 
-function normalizeLocationText(value) {
-  return String(value || "")
-    .toLocaleLowerCase("en-US")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function eventLocationParts(event) {
-  let venue = String(event.venue || "").trim();
-  const address = String(event.address || "").trim();
-
-  venue = venue
-    .replace(/,\s*\d+\s+.+$/, "")
-    .trim();
-
-  const normalizedAddress = normalizeLocationText(address);
-  const lastComma = venue.lastIndexOf(",");
-
-  if (normalizedAddress && lastComma !== -1) {
-    const trailingVenueText = venue.slice(lastComma + 1);
-
-    if (
-      normalizeLocationText(trailingVenueText) ===
-      normalizedAddress
-    ) {
-      venue = venue.slice(0, lastComma).trim();
-    }
-  }
-
-  if (
-    normalizedAddress &&
-    normalizeLocationText(venue) === normalizedAddress
-  ) {
-    venue = "";
-  }
-
-  return { venue, address };
-}
-
 function eventVenue(event) {
-  return eventLocationParts(event).venue;
+  return String(event.venue || "").trim();
 }
 
 function eventAddress(event) {
-  return eventLocationParts(event).address;
+  return String(event.address || "").trim();
 }
 
 function sortEvents(events) {
@@ -541,6 +523,7 @@ function compactTime(date) {
 
 function formatTimeRange(event) {
   let startText = compactTime(new Date(event.start));
+
   const endText = event.end
     ? compactTime(new Date(event.end))
     : "";
@@ -784,7 +767,6 @@ function renderPoster() {
 
   eventDetail.hidden = true;
   eventDetail.classList.remove("is-open");
-  poster.classList.remove("detail-open");
   eventStack.hidden = false;
 
   dateNumber.textContent =
@@ -859,6 +841,7 @@ function renderPoster() {
         address.hidden = !address.textContent;
 
         card.append(title, venue, address);
+
         card.addEventListener(
           "click",
           () => openEventDetail(event)
@@ -880,7 +863,7 @@ function renderPoster() {
 
 function openEventDetail(event) {
   closeDatePopover();
-  poster.classList.add("detail-open");
+
   eventStack.hidden = true;
   eventDetail.hidden = false;
   eventDetail.classList.add("is-open");
@@ -1032,6 +1015,7 @@ async function initialize() {
 
   try {
     const events = await loadPublicEvents();
+
     posterPages = buildPosterPages(events);
 
     if (!posterPages.length) {
@@ -1043,6 +1027,7 @@ async function initialize() {
     }
 
     const today = dateKey(new Date());
+
     const todayIndex = posterPages.findIndex(
       page => page.date >= today
     );
