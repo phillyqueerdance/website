@@ -22,11 +22,6 @@ let touchStartX = null;
 previousPoster.disabled = true;
 nextPoster.disabled = true;
 
-
-/* -----------------------------------------
-   DATE HELPERS
------------------------------------------ */
-
 function dateKey(date) {
   return new Intl.DateTimeFormat(
     "en-CA",
@@ -39,11 +34,9 @@ function dateKey(date) {
   ).format(date);
 }
 
-
 function dateFromKey(key) {
   return new Date(`${key}T12:00:00-04:00`);
 }
-
 
 function stripIdentityEmojis(title) {
   return String(title || "")
@@ -53,38 +46,13 @@ function stripIdentityEmojis(title) {
     .trim();
 }
 
-
-function normalizeLocationText(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[-\u2010-\u2015]/g, "-")
-    .replace(/[.,]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+function eventVenue(event) {
+  return String(event.venue || "").trim();
 }
 
-
-function formatEventLocation(event) {
-  const venue = String(event.venue || "").trim();
-  const address = String(event.address || "").trim();
-
-  if (!venue) return address;
-  if (!address) return venue;
-
-  const normalizedVenue = normalizeLocationText(venue);
-  const normalizedAddress = normalizeLocationText(address);
-
-  if (normalizedVenue.includes(normalizedAddress)) {
-    return venue;
-  }
-
-  return `${venue}, ${address}`;
+function eventAddress(event) {
+  return String(event.address || "").trim();
 }
-
-
-/* -----------------------------------------
-   POSTER DATA
------------------------------------------ */
 
 function sortEvents(events) {
   return [...events].sort((a, b) => {
@@ -103,7 +71,6 @@ function sortEvents(events) {
       );
   });
 }
-
 
 function splitIntoPosterPages(events) {
   if (events.length <= MAX_EVENTS_PER_POSTER) {
@@ -133,7 +100,6 @@ function splitIntoPosterPages(events) {
   return pages;
 }
 
-
 function buildPosterPages(events) {
   const grouped = new Map();
 
@@ -159,7 +125,6 @@ function buildPosterPages(events) {
     );
 }
 
-
 function groupEventsByStartTime(events) {
   const groups = new Map();
 
@@ -176,11 +141,6 @@ function groupEventsByStartTime(events) {
   return [...groups.values()];
 }
 
-
-/* -----------------------------------------
-   TIME FORMATTING
------------------------------------------ */
-
 function compactTime(date) {
   return new Intl.DateTimeFormat(
     "en-US",
@@ -195,10 +155,8 @@ function compactTime(date) {
     .replace(" ", "");
 }
 
-
 function formatTimeRange(event) {
   let startText = compactTime(new Date(event.start));
-
   const endText = event.end
     ? compactTime(new Date(event.end))
     : "";
@@ -220,15 +178,9 @@ function formatTimeRange(event) {
   return `${startText}–${endText}`;
 }
 
-
 function formatStartTime(event) {
   return compactTime(new Date(event.start));
 }
-
-
-/* -----------------------------------------
-   EVENT FEED
------------------------------------------ */
 
 async function loadPublicEvents() {
   const response = await fetch(
@@ -257,7 +209,6 @@ async function loadPublicEvents() {
   return payload.events;
 }
 
-
 function showEventFeedMessage(message) {
   eventStack.hidden = false;
   eventStack.innerHTML = "";
@@ -269,17 +220,11 @@ function showEventFeedMessage(message) {
   eventStack.appendChild(notice);
 }
 
-
-/* -----------------------------------------
-   DATE PICKER
------------------------------------------ */
-
 function availableDateKeys() {
   return new Set(
     posterPages.map(page => page.date)
   );
 }
-
 
 function openDatePopover() {
   if (!posterPages.length) {
@@ -301,11 +246,9 @@ function openDatePopover() {
   datePopover.hidden = false;
 }
 
-
 function closeDatePopover() {
   datePopover.hidden = true;
 }
-
 
 function renderDatePopover() {
   datePopover.innerHTML = "";
@@ -385,13 +328,10 @@ function renderDatePopover() {
 
   const year = pickerMonth.getFullYear();
   const month = pickerMonth.getMonth();
-
   const firstWeekday =
     new Date(year, month, 1).getDay();
-
   const daysInMonth =
     new Date(year, month + 1, 0).getDate();
-
   const available = availableDateKeys();
   const selected = posterPages[currentPosterIndex].date;
 
@@ -435,11 +375,6 @@ function renderDatePopover() {
   );
 }
 
-
-/* -----------------------------------------
-   POSTER RENDERING
------------------------------------------ */
-
 function renderPoster() {
   if (!posterPages.length) {
     return;
@@ -449,6 +384,7 @@ function renderPoster() {
   const posterDate = dateFromKey(page.date);
 
   eventDetail.hidden = true;
+  eventDetail.classList.remove("is-open");
   eventStack.hidden = false;
 
   dateNumber.textContent =
@@ -504,24 +440,26 @@ function renderPoster() {
       eventsAtThisTime.forEach(event => {
         const card = document.createElement("button");
         card.type = "button";
-
         card.className =
-          `event-card ${
-            event.explicitQueer
-              ? "explicit"
-              : "default"
-          }`;
+          `event-card ${event.explicitQueer
+            ? "explicit"
+            : "default"}`;
 
         const title = document.createElement("div");
         title.className = "event-title";
         title.textContent = event.title;
 
-        const meta = document.createElement("div");
-        meta.className = "event-meta";
-        meta.textContent = formatEventLocation(event);
+        const venue = document.createElement("div");
+        venue.className = "event-venue";
+        venue.textContent = eventVenue(event);
+        venue.hidden = !venue.textContent;
 
-        card.append(title, meta);
+        const address = document.createElement("div");
+        address.className = "event-address";
+        address.textContent = eventAddress(event);
+        address.hidden = !address.textContent;
 
+        card.append(title, venue, address);
         card.addEventListener(
           "click",
           () => openEventDetail(event)
@@ -538,20 +476,14 @@ function renderPoster() {
     currentPosterIndex === 0;
 
   nextPoster.disabled =
-    currentPosterIndex ===
-    posterPages.length - 1;
+    currentPosterIndex === posterPages.length - 1;
 }
-
-
-/* -----------------------------------------
-   EVENT DETAIL
------------------------------------------ */
 
 function openEventDetail(event) {
   closeDatePopover();
-
   eventStack.hidden = true;
   eventDetail.hidden = false;
+  eventDetail.classList.add("is-open");
   eventDetail.innerHTML = "";
 
   const detailCard = document.createElement("article");
@@ -563,8 +495,13 @@ function openEventDetail(event) {
   const time = document.createElement("p");
   time.textContent = formatTimeRange(event);
 
-  const location = document.createElement("p");
-  location.textContent = formatEventLocation(event);
+  const venue = document.createElement("p");
+  venue.textContent = eventVenue(event);
+  venue.hidden = !venue.textContent;
+
+  const address = document.createElement("p");
+  address.textContent = eventAddress(event);
+  address.hidden = !address.textContent;
 
   const description = document.createElement("p");
   description.textContent = event.description || "";
@@ -572,31 +509,25 @@ function openEventDetail(event) {
   detailCard.append(
     heading,
     time,
-    location,
+    venue,
+    address,
     description
   );
 
   eventDetail.appendChild(detailCard);
 }
 
-
 function closeEventDetail() {
-  if (!eventDetail.hidden) {
+  if (eventDetail.classList.contains("is-open")) {
     renderPoster();
   }
 }
-
 
 eventDetail.addEventListener("click", event => {
   if (event.target === eventDetail) {
     closeEventDetail();
   }
 });
-
-
-/* -----------------------------------------
-   NAVIGATION
------------------------------------------ */
 
 function movePoster(direction) {
   const nextIndex = currentPosterIndex + direction;
@@ -609,23 +540,19 @@ function movePoster(direction) {
   }
 
   closeDatePopover();
-
   currentPosterIndex = nextIndex;
   renderPoster();
 }
-
 
 previousPoster.addEventListener(
   "click",
   () => movePoster(-1)
 );
 
-
 nextPoster.addEventListener(
   "click",
   () => movePoster(1)
 );
-
 
 window.addEventListener("keydown", event => {
   if (event.key === "Escape") {
@@ -651,7 +578,6 @@ window.addEventListener("keydown", event => {
   }
 });
 
-
 poster.addEventListener(
   "touchstart",
   event => {
@@ -659,7 +585,6 @@ poster.addEventListener(
   },
   { passive: true }
 );
-
 
 poster.addEventListener(
   "touchend",
@@ -681,7 +606,6 @@ poster.addEventListener(
   { passive: true }
 );
 
-
 dateButton.addEventListener("click", () => {
   if (datePopover.hidden) {
     openDatePopover();
@@ -689,7 +613,6 @@ dateButton.addEventListener("click", () => {
     closeDatePopover();
   }
 });
-
 
 document.addEventListener("click", event => {
   if (
@@ -700,17 +623,11 @@ document.addEventListener("click", event => {
   }
 });
 
-
-/* -----------------------------------------
-   INITIALIZE
------------------------------------------ */
-
 async function initialize() {
   showEventFeedMessage("Loading listings…");
 
   try {
     const events = await loadPublicEvents();
-
     posterPages = buildPosterPages(events);
 
     if (!posterPages.length) {
@@ -722,7 +639,6 @@ async function initialize() {
     }
 
     const today = dateKey(new Date());
-
     const todayIndex = posterPages.findIndex(
       page => page.date >= today
     );
@@ -741,6 +657,5 @@ async function initialize() {
     );
   }
 }
-
 
 initialize();
