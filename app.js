@@ -21,8 +21,6 @@ const layoutTargets = {
   list: document.querySelector('[data-layout-target="list"]')
 };
 
-const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v1";
-
 const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v2";
 
 const LAYOUT_DEFAULTS = {
