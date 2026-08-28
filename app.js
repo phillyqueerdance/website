@@ -20,7 +20,23 @@ const layoutTargets = {
   date: document.querySelector('[data-layout-target="date"]'),
   list: document.querySelector('[data-layout-target="list"]')
 };
+
 const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v1";
+
+const LAYOUT_DEFAULTS = {
+  desktop: {
+    dateFontSize: 3.55,
+    timeFontSize: 3.05,
+    timeCardGap: 2,
+    showMeridiem: true
+  },
+  mobile: {
+    dateFontSize: 3.7,
+    timeFontSize: 3.2,
+    timeCardGap: 2.2,
+    showMeridiem: true
+  }
+};
 
 let posterPages = [];
 let currentPosterIndex = 0;
@@ -54,9 +70,20 @@ function writeLayoutOverrides(overrides) {
   );
 }
 
-function applyLayoutOverrides() {
+function layoutValues(breakpoint) {
   const overrides = readLayoutOverrides();
-  const values = overrides[layoutBreakpoint()] || {};
+  const saved = overrides[breakpoint] || {};
+
+  return {
+    ...LAYOUT_DEFAULTS[breakpoint],
+    ...saved,
+    date: saved.date || { x: 0, y: 0 },
+    list: saved.list || { x: 0, y: 0 }
+  };
+}
+
+function applyLayoutOverrides() {
+  const values = layoutValues(layoutBreakpoint());
 
   ["date", "list"].forEach(name => {
     const target = layoutTargets[name];
@@ -66,25 +93,45 @@ function applyLayoutOverrides() {
       `--layout-${name}-x`,
       `${position.x || 0}cqw`
     );
+
     target.style.setProperty(
       `--layout-${name}-y`,
       `${position.y || 0}cqw`
     );
   });
+
+  layoutTargets.date.style.setProperty(
+    "--layout-date-font-size",
+    `${values.dateFontSize}cqw`
+  );
+
+  layoutTargets.list.style.setProperty(
+    "--layout-time-font-size",
+    `${values.timeFontSize}cqw`
+  );
+
+  layoutTargets.list.style.setProperty(
+    "--layout-time-card-gap",
+    `${values.timeCardGap}cqw`
+  );
+
+  layoutTargets.list.style.setProperty(
+    "--layout-time-meridiem-display",
+    values.showMeridiem ? "inline" : "none"
+  );
 }
 
 function layoutCss() {
-  const overrides = readLayoutOverrides();
   const format = value => Number(value || 0).toFixed(2);
 
   const block = breakpoint => {
-    const values = overrides[breakpoint] || {};
-    const date = values.date || {};
-    const list = values.list || {};
+    const values = layoutValues(breakpoint);
+    const date = values.date;
+    const list = values.list;
 
     return [
-      `.poster-date { --layout-date-x: ${format(date.x)}cqw; --layout-date-y: ${format(date.y)}cqw; }`,
-      `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; }`
+      `.poster-date { --layout-date-x: ${format(date.x)}cqw; --layout-date-y: ${format(date.y)}cqw; --layout-date-font-size: ${format(values.dateFontSize)}cqw; }`,
+      `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; --layout-time-font-size: ${format(values.timeFontSize)}cqw; --layout-time-card-gap: ${format(values.timeCardGap)}cqw; --layout-time-meridiem-display: ${values.showMeridiem ? "inline" : "none"}; }`
     ].join("\n");
   };
 
@@ -115,6 +162,19 @@ function moveLayoutTarget(name, deltaX, deltaY) {
   };
 
   overrides[breakpoint] = values;
+
+  writeLayoutOverrides(overrides);
+  applyLayoutOverrides();
+}
+
+function updateLayoutSetting(name, value) {
+  const overrides = readLayoutOverrides();
+  const breakpoint = layoutBreakpoint();
+  const values = overrides[breakpoint] || {};
+
+  values[name] = value;
+  overrides[breakpoint] = values;
+
   writeLayoutOverrides(overrides);
   applyLayoutOverrides();
 }
@@ -175,6 +235,8 @@ function initializeLayoutEditor() {
   document.body.classList.add("layout-editor-active");
   applyLayoutOverrides();
 
+  const values = layoutValues(layoutBreakpoint());
+
   const panel = document.createElement("aside");
   panel.className = "layout-editor-panel";
   panel.innerHTML = `
@@ -184,16 +246,101 @@ function initializeLayoutEditor() {
       <button type="button" data-layout-action="reset">Reset this view</button>
       <button type="button" data-layout-action="done">Done</button>
     </div>
+    <div class="layout-editor-controls">
+      <label class="layout-editor-control">
+        <span>Upper-left date size</span>
+        <output data-layout-output="dateFontSize">${values.dateFontSize.toFixed(2)}cqw</output>
+        <input type="range" min="2.8" max="5" step="0.05" value="${values.dateFontSize}" data-layout-setting="dateFontSize">
+      </label>
+      <label class="layout-editor-control">
+        <span>Time size</span>
+        <output data-layout-output="timeFontSize">${values.timeFontSize.toFixed(2)}cqw</output>
+        <input type="range" min="2.5" max="4.5" step="0.05" value="${values.timeFontSize}" data-layout-setting="timeFontSize">
+      </label>
+      <label class="layout-editor-control">
+        <span>Time-to-card gap</span>
+        <output data-layout-output="timeCardGap">${values.timeCardGap.toFixed(2)}cqw</output>
+        <input type="range" min="1" max="4" step="0.05" value="${values.timeCardGap}" data-layout-setting="timeCardGap">
+      </label>
+      <label class="layout-editor-toggle">
+        <input type="checkbox" data-layout-setting="showMeridiem" ${values.showMeridiem ? "checked" : ""}>
+        Show AM/PM
+      </label>
+    </div>
     <textarea class="layout-editor-output" readonly aria-label="Layout CSS"></textarea>
   `;
 
   document.body.appendChild(panel);
 
   const output = panel.querySelector(".layout-editor-output");
-  setLayoutOutput(output);
+
+  function refreshLayoutEditorControls() {
+    const currentValues = layoutValues(layoutBreakpoint());
+
+    [
+      "dateFontSize",
+      "timeFontSize",
+      "timeCardGap"
+    ].forEach(setting => {
+      const input = panel.querySelector(
+        `[data-layout-setting="${setting}"]`
+      );
+
+      const settingOutput = panel.querySelector(
+        `[data-layout-output="${setting}"]`
+      );
+
+      input.value = currentValues[setting];
+
+      settingOutput.textContent =
+        `${Number(currentValues[setting]).toFixed(2)}cqw`;
+    });
+
+    panel.querySelector(
+      '[data-layout-setting="showMeridiem"]'
+    ).checked = currentValues.showMeridiem;
+
+    panel.querySelector(".layout-editor-title").textContent =
+      `Layout editor: ${layoutBreakpoint()}`;
+
+    setLayoutOutput(output);
+  }
+
+  refreshLayoutEditorControls();
 
   makeLayoutDraggable(layoutTargets.date, "date", output);
   makeLayoutDraggable(layoutTargets.list, "list", output);
+
+  panel.addEventListener("input", event => {
+    const setting = event.target.dataset.layoutSetting;
+
+    if (!setting || event.target.type !== "range") {
+      return;
+    }
+
+    const value = Number(event.target.value);
+
+    updateLayoutSetting(setting, value);
+
+    panel.querySelector(
+      `[data-layout-output="${setting}"]`
+    ).textContent = `${value.toFixed(2)}cqw`;
+
+    setLayoutOutput(output);
+  });
+
+  panel.addEventListener("change", event => {
+    if (event.target.dataset.layoutSetting !== "showMeridiem") {
+      return;
+    }
+
+    updateLayoutSetting(
+      "showMeridiem",
+      event.target.checked
+    );
+
+    setLayoutOutput(output);
+  });
 
   panel.addEventListener("click", async event => {
     const action = event.target.dataset.layoutAction;
@@ -221,7 +368,7 @@ function initializeLayoutEditor() {
 
       writeLayoutOverrides(overrides);
       applyLayoutOverrides();
-      setLayoutOutput(output);
+      refreshLayoutEditorControls();
     }
 
     if (action === "done") {
@@ -237,10 +384,7 @@ function initializeLayoutEditor() {
 
   window.addEventListener("resize", () => {
     applyLayoutOverrides();
-    setLayoutOutput(output);
-
-    panel.querySelector(".layout-editor-title").textContent =
-      `Layout editor: ${layoutBreakpoint()}`;
+    refreshLayoutEditorControls();
   });
 }
 
@@ -403,6 +547,21 @@ function formatTimeRange(event) {
 
 function formatStartTime(event) {
   return compactTime(new Date(event.start));
+}
+
+function appendStartTime(time, event) {
+  const formatted = formatStartTime(event);
+  const meridiem = formatted.match(/[AP]M$/)?.[0] || "";
+  const number = formatted.replace(/[AP]M$/, "");
+
+  const numberElement = document.createElement("span");
+  numberElement.textContent = number;
+
+  const meridiemElement = document.createElement("span");
+  meridiemElement.className = "event-time-meridiem";
+  meridiemElement.textContent = meridiem;
+
+  time.append(numberElement, meridiemElement);
 }
 
 async function loadPublicEvents() {
@@ -654,8 +813,7 @@ function renderPoster() {
 
       const time = document.createElement("div");
       time.className = "event-time";
-      time.textContent =
-        formatStartTime(eventsAtThisTime[0]);
+      appendStartTime(time, eventsAtThisTime[0]);
 
       const cards = document.createElement("div");
       cards.className = "event-group-cards";
@@ -857,6 +1015,7 @@ async function initialize() {
 
   try {
     const events = await loadPublicEvents();
+
     posterPages = buildPosterPages(events);
 
     if (!posterPages.length) {
@@ -868,6 +1027,7 @@ async function initialize() {
     }
 
     const today = dateKey(new Date());
+
     const todayIndex = posterPages.findIndex(
       page => page.date >= today
     );
