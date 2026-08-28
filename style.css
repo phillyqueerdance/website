@@ -270,7 +270,7 @@ body {
   color: #fff1f4;
 
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 3.55cqw;
+  font-size: 3.75cqw;
   font-weight: 700;
   line-height: 1;
 
@@ -684,7 +684,7 @@ body {
   .poster-date {
     top: 10.1%;
 
-    font-size: 3.7cqw;
+    font-size: 4cqw;
   }
 
 
@@ -763,4 +763,14 @@ body {
 
     width: min(300px, calc(100vw - 16px));
   }
+}
+
+/* QDP poster layout overrides */
+/* Desktop */
+.poster-date { --layout-date-x: 0.30cqw; --layout-date-y: -0.64cqw; }
+.event-stack { --layout-list-x: -4.47cqw; --layout-list-y: -2.62cqw; }
+
+@media (max-width: 600px) {
+  .poster-date { --layout-date-x: 0.00cqw; --layout-date-y: 0.00cqw; }
+  .event-stack { --layout-list-x: 0.00cqw; --layout-list-y: 0.00cqw; }
 }
