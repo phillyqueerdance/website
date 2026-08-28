@@ -273,6 +273,11 @@ body {
   font-size: 3.55cqw;
   font-weight: 700;
   line-height: 1;
+
+  transform: translate(
+    var(--layout-date-x, 0cqw),
+    var(--layout-date-y, 0cqw)
+  );
 }
 
 
@@ -298,6 +303,11 @@ body {
   justify-content: center;
 
   gap: 1.35cqw;
+
+  transform: translate(
+    var(--layout-list-x, 0cqw),
+    var(--layout-list-y, 0cqw)
+  );
 }
 
 
@@ -516,6 +526,112 @@ body {
 
 
 /* =========================================================
+   PRIVATE LAYOUT EDITOR (?edit=layout)
+   ========================================================= */
+
+.layout-editor-active .poster-date {
+  cursor: grab;
+  touch-action: none;
+}
+
+
+.layout-editor-active .event-stack {
+  cursor: grab;
+  touch-action: none;
+}
+
+
+.layout-editor-active .poster-date:hover,
+.layout-editor-active .event-stack:hover,
+.layout-editor-active .poster-date.is-dragging {
+  outline: 1px dashed #fff1f4;
+  outline-offset: 3px;
+}
+
+
+.layout-editor-active .is-dragging {
+  cursor: grabbing;
+}
+
+
+.layout-editor-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 50;
+
+  width: min(320px, calc(100vw - 24px));
+
+  padding: 10px;
+
+  border: 1px solid #a14eb5;
+  border-radius: 4px;
+  background: #242329;
+
+  color: #fff1f4;
+
+  font-size: 12px;
+}
+
+
+.layout-editor-title {
+  margin: 0 0 8px;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+
+.layout-editor-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+
+  margin-bottom: 8px;
+}
+
+
+.layout-editor-actions button {
+  min-height: 30px;
+
+  margin: 0;
+  padding: 4px 6px;
+
+  border: 0;
+  border-radius: 3px;
+  background: #ff8b63;
+
+  color: #232323;
+
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+
+.layout-editor-output {
+  display: block;
+
+  width: 100%;
+  min-height: 88px;
+
+  resize: vertical;
+
+  border: 0;
+  border-radius: 2px;
+  background: #151519;
+
+  padding: 7px;
+
+  color: #fff1f4;
+
+  font: 10px/1.35 monospace;
+}
+
+
+/* =========================================================
    MOBILE
    ========================================================= */
 
@@ -638,5 +754,13 @@ body {
     height: 44px;
 
     font-size: 38px;
+  }
+
+
+  .layout-editor-panel {
+    right: 8px;
+    bottom: 8px;
+
+    width: min(300px, calc(100vw - 16px));
   }
 }
