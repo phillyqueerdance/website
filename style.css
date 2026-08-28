@@ -34,17 +34,12 @@ body {
 .site-header {
   flex: 0 0 auto;
 
-  padding: 10px 10px 13px;
+  padding: 10px 10px 10px;
 
   display: flex;
   flex-direction: column;
   align-items: center;
 
-  /*
-    Equal-ish spacing above and below the date control,
-    so the displayed date feels centered between
-    the navigation and the poster.
-  */
   gap: 13px;
 }
 
@@ -91,6 +86,12 @@ body {
   line-height: 1;
 
   cursor: pointer;
+
+  /*
+    Visually centers the date between
+    the link row and the poster.
+  */
+  transform: translateY(10px);
 }
 
 
@@ -107,21 +108,15 @@ body {
   justify-content: center;
   align-items: flex-start;
 
-  /*
-    Keep almost the entire phone width available to the frame.
-  */
-  padding: 0 4px;
+  padding: 0;
+
+  overflow: visible;
 }
 
 
 /*
   Original artwork:
   1151 × 1510
-  ratio = 0.76225
-
-  The poster expands toward the screen edges, but is also
-  limited by available viewport height so nothing needs to
-  scroll vertically.
 */
 
 .poster {
@@ -161,20 +156,16 @@ body {
    DATE INSIDE FRAME
    ========================================================= */
 
-/*
-  The legend is baked into the PNG.
-
-  This date block is positioned so the center of its
-  two-line text block aligns much more closely with the
-  center of the two-line legend.
-*/
-
 .poster-date {
   position: absolute;
 
-  top: 8.6%;
-  left: 7.4%;
+  /*
+    Center the two-line date vertically
+    against the two-line baked-in legend.
+  */
+  top: 9.3%;
 
+  left: 7.4%;
   width: 20%;
 
   text-align: center;
@@ -385,17 +376,11 @@ body {
     padding:
       9px
       6px
-      12px;
+      9px;
 
     gap: 12px;
   }
 
-
-  /*
-    Do NOT shrink these to 11px.
-    The previous CSS was making the whole upper interface
-    unnecessarily tiny on phones.
-  */
 
   .site-header nav {
     gap: 8px 12px;
@@ -409,37 +394,50 @@ body {
 
   .date-button {
     font-size: 15px;
+
+    /*
+      The screenshot currently has noticeably
+      more space below the date than above it.
+      Shift the control downward without changing
+      the rest of the page flow.
+    */
+    transform: translateY(12px);
   }
 
 
   /*
-    Push the poster much closer to the left and right edges.
+    The PNG has black margin outside its border.
+    Making the poster slightly wider than the
+    viewport crops only that unused outer margin
+    and brings the actual colored frame much
+    closer to the phone edges.
   */
-
-  .poster-area {
-    padding-left: 2px;
-    padding-right: 2px;
-  }
-
 
   .poster {
     width: min(
-      98.5vw,
+      106vw,
       calc((100vh - 140px) * 0.76225)
     );
 
     width: min(
-      98.5vw,
+      106vw,
       calc((100dvh - 140px) * 0.76225)
     );
   }
 
 
   /*
-    Live event typography gets a deliberate mobile boost.
-    cqw remains tied to the poster itself, so the composition
-    still scales proportionally.
+    Slight vertical adjustment so 8/28 + Fri
+    aligns with the visual center of the
+    two-line legend.
   */
+
+  .poster-date {
+    top: 9.35%;
+
+    font-size: 3.2cqw;
+  }
+
 
   .event-title {
     font-size: 3.75cqw;
@@ -457,11 +455,6 @@ body {
     padding:
       1.55cqw
       1.7cqw;
-  }
-
-
-  .poster-date {
-    font-size: 3.25cqw;
   }
 
 
