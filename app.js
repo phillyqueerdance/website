@@ -138,7 +138,7 @@ const sampleEvents = [
     address: "901 Example Ave.",
     explicitQueer: false,
     description: "Example description."
-  })
+  }
 
 ];
 
