@@ -242,6 +242,7 @@ body {
 .frame {
   position: absolute;
   inset: 0;
+  z-index: 0;
 
   display: block;
 
@@ -259,6 +260,7 @@ body {
 
 .poster-date {
   position: absolute;
+  z-index: 1;
 
   top: 10.05%;
   left: 8.5%;
@@ -292,6 +294,7 @@ body {
 
 .event-stack {
   position: absolute;
+  z-index: 1;
 
   top: 22.5%;
   right: 12%;
@@ -302,7 +305,7 @@ body {
   flex-direction: column;
   justify-content: center;
 
-  gap: 1.35cqw;
+  gap: 1.05cqw;
 
   transform: translate(
     var(--layout-list-x, 0cqw),
@@ -316,6 +319,8 @@ body {
   grid-template-columns: 20.5% minmax(0, 1fr);
   column-gap: var(--layout-time-card-gap, 2cqw);
   align-items: start;
+
+  min-height: 0;
 }
 
 
@@ -348,17 +353,18 @@ body {
   flex-direction: column;
 
   min-width: 0;
+  min-height: 0;
 
-  gap: 1.05cqw;
+  gap: 0.9cqw;
 }
 
 
 .event-card {
   width: 100%;
-  min-height: 0;
+  min-height: 12.75cqw;
 
   margin: 0;
-  padding: 1.05cqw 1.5cqw;
+  padding: 1.3cqw 1.7cqw;
 
   border: 0;
   border-radius: 3px;
@@ -389,7 +395,7 @@ body {
 .event-title {
   width: 100%;
 
-  font-size: 3.05cqw;
+  font-size: 3.55cqw;
   font-weight: 400;
   line-height: 1.08;
 }
@@ -399,14 +405,14 @@ body {
 .event-address {
   width: 100%;
 
-  font-size: 2.35cqw;
+  font-size: 2.85cqw;
   font-weight: 400;
   line-height: 1.12;
 }
 
 
 .event-venue {
-  margin-top: 0.38cqw;
+  margin-top: 0.45cqw;
 }
 
 
@@ -427,23 +433,37 @@ body {
 
 .event-detail {
   position: absolute;
-  inset: 0;
-  z-index: 5;
+  top: 6.36%;
+  right: 8.25%;
+  bottom: 6.1%;
+  left: 8.17%;
+  z-index: 20;
 
   display: none;
-  place-items: center;
 
-  padding: 8cqw;
+  overflow: hidden;
+
+  background: #202125;
+  border-radius: 2.4cqw;
+
+  padding: 5.4cqw;
 }
 
 
 .event-detail.is-open {
-  display: grid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 
 .event-detail[hidden] {
   display: none;
+}
+
+
+.poster.detail-open .poster-date {
+  visibility: hidden;
 }
 
 
@@ -453,10 +473,7 @@ body {
 
   overflow: auto;
 
-  border-radius: 3px;
-  background: #242329;
-
-  padding: 3.1cqw;
+  padding: 0;
 
   color: #fff1f4;
 
@@ -751,23 +768,25 @@ body {
 
 
   .event-group-cards {
-    gap: 1.15cqw;
+    gap: 0.95cqw;
   }
 
 
   .event-card {
-    padding: 0.95cqw 1.55cqw;
+    min-height: 13cqw;
+
+    padding: 1.25cqw 1.7cqw;
   }
 
 
   .event-title {
-    font-size: 3.2cqw;
+    font-size: 3.65cqw;
   }
 
 
   .event-venue,
   .event-address {
-    font-size: 2.55cqw;
+    font-size: 2.95cqw;
   }
 
 
@@ -777,13 +796,16 @@ body {
 
 
   .event-detail {
-    padding: 7cqw;
+    top: 6.36%;
+    right: 8.25%;
+    bottom: 6.1%;
+    left: 8.17%;
+
+    padding: 6cqw;
   }
 
 
   .event-detail-card {
-    padding: 3.5cqw;
-
     font-size: 3.1cqw;
   }
 
@@ -816,10 +838,11 @@ body {
   }
 }
 
+
 /* QDP poster layout overrides */
 /* Desktop */
 .poster-date { --layout-date-x: 0.24cqw; --layout-date-y: -0.37cqw; --layout-date-font-size: 3.75cqw; }
-.event-stack { --layout-list-x: -4.43cqw; --layout-list-y: -1.86cqw; --layout-time-font-size: 3.45cqw; --layout-time-card-gap: 2.85cqw; --layout-time-meridiem-display: inline; }
+.event-stack { --layout-list-x: -3.56cqw; --layout-list-y: -1.96cqw; --layout-time-font-size: 3.40cqw; --layout-time-card-gap: 1.00cqw; --layout-time-meridiem-display: inline; }
 
 @media (max-width: 600px) {
   .poster-date { --layout-date-x: 0.00cqw; --layout-date-y: 0.00cqw; --layout-date-font-size: 3.70cqw; }
