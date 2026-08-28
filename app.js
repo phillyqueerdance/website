@@ -23,18 +23,26 @@ const layoutTargets = {
 
 const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v1";
 
+const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v2";
+
 const LAYOUT_DEFAULTS = {
   desktop: {
-    dateFontSize: 3.55,
-    timeFontSize: 3.05,
-    timeCardGap: 2,
-    showMeridiem: true
+    dateFontSize: 3.75,
+    timeFontSize: 3.2,
+    timeCardGap: 0.65,
+    cardWidth: 76,
+    showMeridiem: true,
+    date: { x: 0.24, y: -0.37 },
+    list: { x: 0, y: -4.18 }
   },
   mobile: {
     dateFontSize: 3.7,
     timeFontSize: 3.2,
-    timeCardGap: 2.2,
-    showMeridiem: true
+    timeCardGap: 0.65,
+    cardWidth: 78,
+    showMeridiem: true,
+    date: { x: 0, y: 0 },
+    list: { x: 0, y: 0 }
   }
 };
 
@@ -77,8 +85,14 @@ function layoutValues(breakpoint) {
   return {
     ...LAYOUT_DEFAULTS[breakpoint],
     ...saved,
-    date: saved.date || { x: 0, y: 0 },
-    list: saved.list || { x: 0, y: 0 }
+    date:
+      saved.date ||
+      LAYOUT_DEFAULTS[breakpoint].date ||
+      { x: 0, y: 0 },
+    list:
+      saved.list ||
+      LAYOUT_DEFAULTS[breakpoint].list ||
+      { x: 0, y: 0 }
   };
 }
 
@@ -114,7 +128,12 @@ function applyLayoutOverrides() {
     "--layout-time-card-gap",
     `${values.timeCardGap}cqw`
   );
-
+  
+  layoutTargets.list.style.setProperty(
+    "--layout-card-width",
+    `${values.cardWidth}cqw`
+  );
+  
   layoutTargets.list.style.setProperty(
     "--layout-time-meridiem-display",
     values.showMeridiem ? "inline" : "none"
@@ -131,7 +150,7 @@ function layoutCss() {
 
     return [
       `.poster-date { --layout-date-x: ${format(date.x)}cqw; --layout-date-y: ${format(date.y)}cqw; --layout-date-font-size: ${format(values.dateFontSize)}cqw; }`,
-      `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; --layout-time-font-size: ${format(values.timeFontSize)}cqw; --layout-time-card-gap: ${format(values.timeCardGap)}cqw; --layout-time-meridiem-display: ${values.showMeridiem ? "inline" : "none"}; }`
+            `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; --layout-time-font-size: ${format(values.timeFontSize)}cqw; --layout-time-card-gap: ${format(values.timeCardGap)}cqw; --layout-card-width: ${format(values.cardWidth)}cqw; --layout-time-meridiem-display: ${values.showMeridiem ? "inline" : "none"}; }`
     ].join("\n");
   };
 
@@ -257,10 +276,15 @@ function initializeLayoutEditor() {
         <output data-layout-output="timeFontSize">${values.timeFontSize.toFixed(2)}cqw</output>
         <input type="range" min="2.5" max="4.5" step="0.05" value="${values.timeFontSize}" data-layout-setting="timeFontSize">
       </label>
-      <label class="layout-editor-control">
-        <span>Time-to-card gap</span>
+           <label class="layout-editor-control">
+        <span>Time-to-cards gap</span>
         <output data-layout-output="timeCardGap">${values.timeCardGap.toFixed(2)}cqw</output>
-        <input type="range" min="1" max="4" step="0.05" value="${values.timeCardGap}" data-layout-setting="timeCardGap">
+        <input type="range" min="0" max="2" step="0.05" value="${values.timeCardGap}" data-layout-setting="timeCardGap">
+      </label>
+      <label class="layout-editor-control">
+        <span>Card width</span>
+        <output data-layout-output="cardWidth">${values.cardWidth.toFixed(2)}cqw</output>
+        <input type="range" min="55" max="82" step="0.25" value="${values.cardWidth}" data-layout-setting="cardWidth">
       </label>
       <label class="layout-editor-toggle">
         <input type="checkbox" data-layout-setting="showMeridiem" ${values.showMeridiem ? "checked" : ""}>
@@ -281,6 +305,7 @@ function initializeLayoutEditor() {
       "dateFontSize",
       "timeFontSize",
       "timeCardGap"
+      "cardWidth"
     ].forEach(setting => {
       const input = panel.querySelector(
         `[data-layout-setting="${setting}"]`
