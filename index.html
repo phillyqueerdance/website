@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Queer Dance Philly</title>
-  <link rel="stylesheet" href="style.css?v=20260828-4">
+  <link rel="stylesheet" href="style.css?v=20260828-6">
 </head>
 
 <body>
@@ -22,14 +22,15 @@
       Today
     </button>
 
-    <input id="datePicker" type="date" hidden>
+    <div
+      id="datePopover"
+      class="date-popover"
+      hidden
+    ></div>
   </header>
 
-
   <main class="poster-area">
-
     <div id="poster" class="poster">
-
       <img
         class="frame"
         src="frame.png"
@@ -42,13 +43,9 @@
       </div>
 
       <div id="eventStack" class="event-stack"></div>
-
       <div id="eventDetail" class="event-detail" hidden></div>
-
     </div>
-
   </main>
-
 
   <footer class="poster-controls">
     <button
@@ -68,8 +65,7 @@
     </button>
   </footer>
 
-
-  <script src="app.js?v=20260828-4"></script>
+  <script src="app.js?v=20260828-6"></script>
 
 </body>
 </html>
