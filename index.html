@@ -49,24 +49,6 @@
         alt=""
       >
 
-      <div class="poster-legend-mask" aria-hidden="true"></div>
-
-      <div class="poster-legend" data-layout-target="legend">
-        <div class="poster-legend-copy">
-          <div class="poster-legend-row">
-            <span>🏳️‍🌈/🏳️‍⚧️</span>
-            <span>features queer/trans artist</span>
-          </div>
-          <div class="poster-legend-row">
-            <span class="poster-legend-dot" aria-hidden="true"></span>
-            <span>event is queer-forward</span>
-          </div>
-        </div>
-        <div class="poster-legend-sparkles" aria-hidden="true">
-          <span>✦</span><span>✦</span>
-        </div>
-      </div>
-
       <div class="poster-date" data-layout-target="date">
         <div id="dateNumber"></div>
         <div id="dateDay"></div>
@@ -118,15 +100,6 @@
         dateLeft: 8.5,
         dateWidth: 22,
         dateFontSize: 3.75,
-    
-        legendX: 0,
-        legendY: 0,
-        legendTop: 8.8,
-        legendLeft: 31,
-        legendWidth: 60,
-        legendFontSize: 2.7,
-        legendRowGap: 1.35,
-        legendSparkleSize: 8,
     
         listX: 0,
         listY: -4.18,
@@ -202,15 +175,6 @@
         dateWidth: ["--qdp-date-width", "%"],
         dateFontSize: ["--qdp-date-font-size", "cqw"],
     
-        legendX: ["--qdp-legend-x", "cqw"],
-        legendY: ["--qdp-legend-y", "cqw"],
-        legendTop: ["--qdp-legend-top", "%"],
-        legendLeft: ["--qdp-legend-left", "%"],
-        legendWidth: ["--qdp-legend-width", "%"],
-        legendFontSize: ["--qdp-legend-font-size", "cqw"],
-        legendRowGap: ["--qdp-legend-row-gap", "cqw"],
-        legendSparkleSize: ["--qdp-legend-sparkle-size", "cqw"],
-    
         listX: ["--qdp-list-x", "cqw"],
         listY: ["--qdp-list-y", "cqw"],
         listTop: ["--qdp-list-top", "%"],
@@ -270,19 +234,6 @@
             range("dateLeft", "Left", 0, 40, 0.1, "%"),
             range("dateWidth", "Area width", 10, 40, 0.25, "%"),
             range("dateFontSize", "Font size", 2, 6, 0.05, "cqw")
-          ]
-        },
-        {
-          title: "Legend",
-          fields: [
-            range("legendX", "Horizontal offset", -25, 25, 0.05, "cqw"),
-            range("legendY", "Vertical offset", -15, 20, 0.05, "cqw"),
-            range("legendTop", "Top", 5, 25, 0.1, "%"),
-            range("legendLeft", "Left", 15, 55, 0.1, "%"),
-            range("legendWidth", "Area width", 35, 75, 0.25, "%"),
-            range("legendFontSize", "Font size", 1.5, 4, 0.05, "cqw"),
-            range("legendRowGap", "Row gap", 0, 4, 0.05, "cqw"),
-            range("legendSparkleSize", "Sparkle size", 3, 13, 0.1, "cqw")
           ]
         },
         {
@@ -621,7 +572,7 @@
           </div>
     
           <p class="qdp-editor-help">
-            Drag the date, legend, or event region directly. Sliders update the poster live.
+            Drag the date or event region directly. Sliders update the poster live.
           </p>
     
           <div class="qdp-editor-scroll" data-editor-controls>
@@ -819,7 +770,6 @@
     
       const DRAGGABLES = [
         [".poster-date", "dateX", "dateY"],
-        [".poster-legend", "legendX", "legendY"],
         [".event-stack", "listX", "listY"]
       ];
     
