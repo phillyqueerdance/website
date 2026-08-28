@@ -27,7 +27,8 @@ const LAYOUT_DEFAULTS = {
   desktop: {
     dateFontSize: 3.75,
     timeFontSize: 3.2,
-    timeCardGap: 0.65,
+    timeCardGap: 0.35,
+    cardsNextTimeGap: 0.6,
     cardWidth: 76,
     showMeridiem: true,
     date: { x: 0.24, y: -0.37 },
@@ -36,7 +37,8 @@ const LAYOUT_DEFAULTS = {
   mobile: {
     dateFontSize: 3.7,
     timeFontSize: 3.2,
-    timeCardGap: 0.65,
+    timeCardGap: 0.35,
+    cardsNextTimeGap: 0.6,
     cardWidth: 78,
     showMeridiem: true,
     date: { x: 0, y: 0 },
@@ -131,6 +133,11 @@ function applyLayoutOverrides() {
     "--layout-card-width",
     `${values.cardWidth}cqw`
   );
+
+    layoutTargets.list.style.setProperty(
+    "--layout-cards-next-time-gap",
+    `${values.cardsNextTimeGap}cqw`
+  );
   
   layoutTargets.list.style.setProperty(
     "--layout-time-meridiem-display",
@@ -148,7 +155,7 @@ function layoutCss() {
 
     return [
       `.poster-date { --layout-date-x: ${format(date.x)}cqw; --layout-date-y: ${format(date.y)}cqw; --layout-date-font-size: ${format(values.dateFontSize)}cqw; }`,
-            `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; --layout-time-font-size: ${format(values.timeFontSize)}cqw; --layout-time-card-gap: ${format(values.timeCardGap)}cqw; --layout-card-width: ${format(values.cardWidth)}cqw; --layout-time-meridiem-display: ${values.showMeridiem ? "inline" : "none"}; }`
+            `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; --layout-time-font-size: ${format(values.timeFontSize)}cqw; --layout-time-card-gap: ${format(values.timeCardGap)}cqw; --layout-cards-next-time-gap: ${format(values.cardsNextTimeGap)}cqw; --layout-card-width: ${format(values.cardWidth)}cqw; --layout-time-meridiem-display: ${values.showMeridiem ? "inline" : "none"}; }`
     ].join("\n");
   };
 
@@ -279,6 +286,11 @@ function initializeLayoutEditor() {
         <output data-layout-output="timeCardGap">${values.timeCardGap.toFixed(2)}cqw</output>
         <input type="range" min="0" max="2" step="0.05" value="${values.timeCardGap}" data-layout-setting="timeCardGap">
       </label>
+            <label class="layout-editor-control">
+        <span>Cards-to-next-time gap</span>
+        <output data-layout-output="cardsNextTimeGap">${values.cardsNextTimeGap.toFixed(2)}cqw</output>
+        <input type="range" min="0" max="2" step="0.05" value="${values.cardsNextTimeGap}" data-layout-setting="cardsNextTimeGap">
+      </label>
       <label class="layout-editor-control">
         <span>Card width</span>
         <output data-layout-output="cardWidth">${values.cardWidth.toFixed(2)}cqw</output>
@@ -303,6 +315,7 @@ function initializeLayoutEditor() {
       "dateFontSize",
       "timeFontSize",
       "timeCardGap",
+       "cardsNextTimeGap",
       "cardWidth"
     ].forEach(setting => {
       const input = panel.querySelector(
