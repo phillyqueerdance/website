@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Queer Dance Philly</title>
-  <link rel="stylesheet" href="style.css?v=20260828-15">
+  <link rel="stylesheet" href="style.css?v=20260830-17">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -147,7 +147,10 @@
         detailRadius: 2.4,
         detailFontSize: 2.8,
         detailLineHeight: 1.35,
-        detailTitleSize: 4
+        detailTitleSize: 4,
+        detailFlyerMaxHeight: 60,
+        detailFlyerRadius: 1.2,
+        detailFlyerGap: 2.2
       };
     
       const DEFAULTS = {
@@ -163,7 +166,8 @@
           sameTimeCardGap: 0.95,
           detailPadding: 6,
           detailFontSize: 3.1,
-          detailTitleSize: 4.35
+          detailTitleSize: 4.35,
+          detailFlyerMaxHeight: 68
         }
       };
     
@@ -221,7 +225,10 @@
         detailRadius: ["--qdp-detail-radius", "cqw"],
         detailFontSize: ["--qdp-detail-font-size", "cqw"],
         detailLineHeight: ["--qdp-detail-line-height", ""],
-        detailTitleSize: ["--qdp-detail-title-size", "cqw"]
+        detailTitleSize: ["--qdp-detail-title-size", "cqw"],
+        detailFlyerMaxHeight: ["--qdp-detail-flyer-max-height", "cqw"],
+        detailFlyerRadius: ["--qdp-detail-flyer-radius", "cqw"],
+        detailFlyerGap: ["--qdp-detail-flyer-gap", "cqw"]
       };
     
       const CONTROL_GROUPS = [
@@ -290,7 +297,10 @@
             range("detailRadius", "Corner radius", 0, 6, 0.1, "cqw"),
             range("detailFontSize", "Body size", 1.5, 5, 0.05, "cqw"),
             range("detailLineHeight", "Body line height", 0.9, 2, 0.05, ""),
-            range("detailTitleSize", "Title size", 2, 7, 0.05, "cqw")
+            range("detailTitleSize", "Title size", 2, 7, 0.05, "cqw"),
+            range("detailFlyerMaxHeight", "Flyer maximum height", 20, 100, 0.5, "cqw"),
+            range("detailFlyerRadius", "Flyer corner radius", 0, 6, 0.1, "cqw"),
+            range("detailFlyerGap", "Flyer-to-title gap", 0, 6, 0.1, "cqw")
           ]
         }
       ];
@@ -873,7 +883,7 @@
       };
     })();
   </script>
-  <script src="app.js?v=20260828-16"></script>
+  <script src="app.js?v=20260830-17"></script>
 
 </body>
 </html>

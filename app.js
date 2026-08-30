@@ -623,7 +623,7 @@ function stripQdpFooter(description) {
     .replace(/\r\n?/g, "\n");
 
   const footerStart = text.search(
-    /^\s*(?:-{3,}|—+)\s*QDP IDs\s*(?:-{3,}|—+)\s*$/im
+    /^\s*(?:-{3,}|—+)\s*QDP (?:WEB|IDs)\s*(?:-{3,}|—+)\s*$/im
   );
 
   return (
@@ -942,6 +942,17 @@ function openEventDetail(event) {
 
   const detailCard = document.createElement("article");
   detailCard.className = "event-detail-card";
+
+  if (event.flyerUrl) {
+    const flyer = document.createElement("img");
+    flyer.className = "event-detail-flyer";
+    flyer.src = event.flyerUrl;
+    flyer.alt = `Flyer for ${event.title}`;
+    flyer.loading = "eager";
+    flyer.referrerPolicy = "no-referrer";
+    flyer.addEventListener("error", () => flyer.remove());
+    detailCard.appendChild(flyer);
+  }
 
   const heading = document.createElement("h2");
   heading.textContent = event.title;

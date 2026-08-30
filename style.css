@@ -514,6 +514,22 @@ body {
 }
 
 
+.event-detail-flyer {
+  display: block;
+
+  width: 100%;
+  max-height: var(--qdp-detail-flyer-max-height, 60cqw);
+
+  margin: 0 auto var(--qdp-detail-flyer-gap, 2.2cqw);
+
+  border-radius: var(--qdp-detail-flyer-radius, 1.2cqw);
+
+  object-fit: contain;
+
+  background: #111216;
+}
+
+
 .event-detail-card h2 {
   margin: 0 0 2cqw;
 

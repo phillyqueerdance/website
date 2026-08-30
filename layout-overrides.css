@@ -49,6 +49,9 @@
   --qdp-detail-font-size: 2.8cqw;
   --qdp-detail-line-height: 1.35;
   --qdp-detail-title-size: 4cqw;
+  --qdp-detail-flyer-max-height: 60cqw;
+  --qdp-detail-flyer-radius: 1.2cqw;
+  --qdp-detail-flyer-gap: 2.2cqw;
 }
 /* QDP_PROFILE_DESKTOP_END */
 
@@ -102,6 +105,9 @@
     --qdp-detail-font-size: 3.1cqw;
     --qdp-detail-line-height: 1.35;
     --qdp-detail-title-size: 4.35cqw;
+    --qdp-detail-flyer-max-height: 68cqw;
+    --qdp-detail-flyer-radius: 1.2cqw;
+    --qdp-detail-flyer-gap: 2.2cqw;
   }
   /* QDP_PROFILE_MOBILE_END */
 }
