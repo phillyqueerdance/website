@@ -13,9 +13,11 @@ const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
 const siteHeader = document.querySelector(".site-header");
+
 const layoutEditorEnabled =
   new URLSearchParams(window.location.search)
     .get("edit") === "layout";
+
 const layoutTargets = {
   date: document.querySelector('[data-layout-target="date"]'),
   list: document.querySelector('[data-layout-target="list"]')
@@ -128,17 +130,17 @@ function applyLayoutOverrides() {
     "--layout-time-card-gap",
     `${values.timeCardGap}cqw`
   );
-  
+
   layoutTargets.list.style.setProperty(
     "--layout-card-width",
     `${values.cardWidth}cqw`
   );
 
-    layoutTargets.list.style.setProperty(
+  layoutTargets.list.style.setProperty(
     "--layout-cards-next-time-gap",
     `${values.cardsNextTimeGap}cqw`
   );
-  
+
   layoutTargets.list.style.setProperty(
     "--layout-time-meridiem-display",
     values.showMeridiem ? "inline" : "none"
@@ -155,7 +157,7 @@ function layoutCss() {
 
     return [
       `.poster-date { --layout-date-x: ${format(date.x)}cqw; --layout-date-y: ${format(date.y)}cqw; --layout-date-font-size: ${format(values.dateFontSize)}cqw; }`,
-            `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; --layout-time-font-size: ${format(values.timeFontSize)}cqw; --layout-time-card-gap: ${format(values.timeCardGap)}cqw; --layout-cards-next-time-gap: ${format(values.cardsNextTimeGap)}cqw; --layout-card-width: ${format(values.cardWidth)}cqw; --layout-time-meridiem-display: ${values.showMeridiem ? "inline" : "none"}; }`
+      `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; --layout-time-font-size: ${format(values.timeFontSize)}cqw; --layout-time-card-gap: ${format(values.timeCardGap)}cqw; --layout-cards-next-time-gap: ${format(values.cardsNextTimeGap)}cqw; --layout-card-width: ${format(values.cardWidth)}cqw; --layout-time-meridiem-display: ${values.showMeridiem ? "inline" : "none"}; }`
     ].join("\n");
   };
 
@@ -229,8 +231,10 @@ function makeLayoutDraggable(target, name, output) {
     }
 
     const scale = 100 / activeLayoutDrag.posterWidth;
+
     const deltaX =
       (event.clientX - activeLayoutDrag.startX) * scale;
+
     const deltaY =
       (event.clientY - activeLayoutDrag.startY) * scale;
 
@@ -263,59 +267,114 @@ function initializeLayoutEditor() {
 
   const panel = document.createElement("aside");
   panel.className = "layout-editor-panel";
+
   panel.innerHTML = `
     <p class="layout-editor-title">Layout editor: ${layoutBreakpoint()}</p>
+
     <div class="layout-editor-actions">
       <button type="button" data-layout-action="copy">Copy CSS</button>
       <button type="button" data-layout-action="reset">Reset this view</button>
       <button type="button" data-layout-action="done">Done</button>
     </div>
+
     <div class="layout-editor-controls">
       <label class="layout-editor-control">
         <span>Upper-left date size</span>
         <output data-layout-output="dateFontSize">${values.dateFontSize.toFixed(2)}cqw</output>
-        <input type="range" min="2.8" max="5" step="0.05" value="${values.dateFontSize}" data-layout-setting="dateFontSize">
+        <input
+          type="range"
+          min="2.8"
+          max="5"
+          step="0.05"
+          value="${values.dateFontSize}"
+          data-layout-setting="dateFontSize"
+        >
       </label>
+
       <label class="layout-editor-control">
         <span>Time size</span>
         <output data-layout-output="timeFontSize">${values.timeFontSize.toFixed(2)}cqw</output>
-        <input type="range" min="2.5" max="4.5" step="0.05" value="${values.timeFontSize}" data-layout-setting="timeFontSize">
+        <input
+          type="range"
+          min="2.5"
+          max="4.5"
+          step="0.05"
+          value="${values.timeFontSize}"
+          data-layout-setting="timeFontSize"
+        >
       </label>
-           <label class="layout-editor-control">
+
+      <label class="layout-editor-control">
         <span>Time-to-cards gap</span>
         <output data-layout-output="timeCardGap">${values.timeCardGap.toFixed(2)}cqw</output>
-        <input type="range" min="0" max="2" step="0.05" value="${values.timeCardGap}" data-layout-setting="timeCardGap">
+        <input
+          type="range"
+          min="0"
+          max="2"
+          step="0.05"
+          value="${values.timeCardGap}"
+          data-layout-setting="timeCardGap"
+        >
       </label>
-            <label class="layout-editor-control">
+
+      <label class="layout-editor-control">
         <span>Cards-to-next-time gap</span>
         <output data-layout-output="cardsNextTimeGap">${values.cardsNextTimeGap.toFixed(2)}cqw</output>
-        <input type="range" min="0" max="2" step="0.05" value="${values.cardsNextTimeGap}" data-layout-setting="cardsNextTimeGap">
+        <input
+          type="range"
+          min="0"
+          max="2"
+          step="0.05"
+          value="${values.cardsNextTimeGap}"
+          data-layout-setting="cardsNextTimeGap"
+        >
       </label>
+
       <label class="layout-editor-control">
         <span>Card width</span>
         <output data-layout-output="cardWidth">${values.cardWidth.toFixed(2)}cqw</output>
-        <input type="range" min="55" max="82" step="0.25" value="${values.cardWidth}" data-layout-setting="cardWidth">
+        <input
+          type="range"
+          min="55"
+          max="82"
+          step="0.25"
+          value="${values.cardWidth}"
+          data-layout-setting="cardWidth"
+        >
       </label>
+
       <label class="layout-editor-toggle">
-        <input type="checkbox" data-layout-setting="showMeridiem" ${values.showMeridiem ? "checked" : ""}>
+        <input
+          type="checkbox"
+          data-layout-setting="showMeridiem"
+          ${values.showMeridiem ? "checked" : ""}
+        >
         Show AM/PM
       </label>
     </div>
-    <textarea class="layout-editor-output" readonly aria-label="Layout CSS"></textarea>
+
+    <textarea
+      class="layout-editor-output"
+      readonly
+      aria-label="Layout CSS"
+    ></textarea>
   `;
 
   document.body.appendChild(panel);
 
-  const output = panel.querySelector(".layout-editor-output");
+  const output = panel.querySelector(
+    ".layout-editor-output"
+  );
 
   function refreshLayoutEditorControls() {
-    const currentValues = layoutValues(layoutBreakpoint());
+    const currentValues =
+      layoutValues(layoutBreakpoint());
 
     [
       "dateFontSize",
       "timeFontSize",
       "timeCardGap",
-       "cardsNextTimeGap",
+      "cardsNextTimeGap",
       "cardWidth"
     ].forEach(setting => {
       const input = panel.querySelector(
@@ -336,7 +395,9 @@ function initializeLayoutEditor() {
       '[data-layout-setting="showMeridiem"]'
     ).checked = currentValues.showMeridiem;
 
-    panel.querySelector(".layout-editor-title").textContent =
+    panel.querySelector(
+      ".layout-editor-title"
+    ).textContent =
       `Layout editor: ${layoutBreakpoint()}`;
 
     setLayoutOutput(output);
@@ -344,11 +405,21 @@ function initializeLayoutEditor() {
 
   refreshLayoutEditorControls();
 
-  makeLayoutDraggable(layoutTargets.date, "date", output);
-  makeLayoutDraggable(layoutTargets.list, "list", output);
+  makeLayoutDraggable(
+    layoutTargets.date,
+    "date",
+    output
+  );
+
+  makeLayoutDraggable(
+    layoutTargets.list,
+    "list",
+    output
+  );
 
   panel.addEventListener("input", event => {
-    const setting = event.target.dataset.layoutSetting;
+    const setting =
+      event.target.dataset.layoutSetting;
 
     if (!setting || event.target.type !== "range") {
       return;
@@ -366,7 +437,10 @@ function initializeLayoutEditor() {
   });
 
   panel.addEventListener("change", event => {
-    if (event.target.dataset.layoutSetting !== "showMeridiem") {
+    if (
+      event.target.dataset.layoutSetting !==
+      "showMeridiem"
+    ) {
       return;
     }
 
@@ -379,13 +453,16 @@ function initializeLayoutEditor() {
   });
 
   panel.addEventListener("click", async event => {
-    const action = event.target.dataset.layoutAction;
+    const action =
+      event.target.dataset.layoutAction;
 
     if (action === "copy") {
       output.select();
 
       try {
-        await navigator.clipboard.writeText(output.value);
+        await navigator.clipboard.writeText(
+          output.value
+        );
       } catch {
         document.execCommand("copy");
       }
@@ -470,10 +547,6 @@ function eventAddress(event) {
   return eventLocationParts(event).address;
 }
 
-function eventAddress(event) {
-  return eventLocationParts(event).address;
-}
-
 function sortEvents(events) {
   return [...events].sort((a, b) => {
     const timeDifference =
@@ -505,15 +578,24 @@ function splitIntoPosterPages(events) {
     events.length / numberOfPages
   );
 
-  const remainder = events.length % numberOfPages;
+  const remainder =
+    events.length % numberOfPages;
+
   const pages = [];
   let index = 0;
 
-  for (let page = 0; page < numberOfPages; page++) {
+  for (
+    let page = 0;
+    page < numberOfPages;
+    page++
+  ) {
     const size =
       baseSize + (page < remainder ? 1 : 0);
 
-    pages.push(events.slice(index, index + size));
+    pages.push(
+      events.slice(index, index + size)
+    );
+
     index += size;
   }
 
@@ -576,7 +658,8 @@ function compactTime(date) {
 }
 
 function formatTimeRange(event) {
-  let startText = compactTime(new Date(event.start));
+  let startText =
+    compactTime(new Date(event.start));
 
   const endText = event.end
     ? compactTime(new Date(event.end))
@@ -593,7 +676,8 @@ function formatTimeRange(event) {
     endText.match(/[AP]M$/)?.[0];
 
   if (startMeridiem === endMeridiem) {
-    startText = startText.replace(/[AP]M$/, "");
+    startText =
+      startText.replace(/[AP]M$/, "");
   }
 
   return `${startText}–${endText}`;
@@ -605,17 +689,30 @@ function formatStartTime(event) {
 
 function appendStartTime(time, event) {
   const formatted = formatStartTime(event);
-  const meridiem = formatted.match(/[AP]M$/)?.[0] || "";
-  const number = formatted.replace(/[AP]M$/, "");
 
-  const numberElement = document.createElement("span");
+  const meridiem =
+    formatted.match(/[AP]M$/)?.[0] || "";
+
+  const number =
+    formatted.replace(/[AP]M$/, "");
+
+  const numberElement =
+    document.createElement("span");
+
   numberElement.textContent = number;
 
-  const meridiemElement = document.createElement("span");
-  meridiemElement.className = "event-time-meridiem";
+  const meridiemElement =
+    document.createElement("span");
+
+  meridiemElement.className =
+    "event-time-meridiem";
+
   meridiemElement.textContent = meridiem;
 
-  time.append(numberElement, meridiemElement);
+  time.append(
+    numberElement,
+    meridiemElement
+  );
 }
 
 function stripQdpFooter(description) {
@@ -632,6 +729,7 @@ function stripQdpFooter(description) {
       : text
   ).trim();
 }
+
 async function loadPublicEvents() {
   const response = await fetch(
     EVENTS_API_URL,
@@ -657,16 +755,19 @@ async function loadPublicEvents() {
   }
 
   return payload.events.map(event => ({
-  ...event,
-  description: stripQdpFooter(event.description)
-}));
+    ...event,
+    description:
+      stripQdpFooter(event.description)
+  }));
 }
 
 function showEventFeedMessage(message) {
   eventStack.hidden = false;
   eventStack.innerHTML = "";
 
-  const notice = document.createElement("p");
+  const notice =
+    document.createElement("p");
+
   notice.className = "event-feed-message";
   notice.textContent = message;
 
@@ -706,31 +807,49 @@ function closeDatePopover() {
 function renderDatePopover() {
   datePopover.innerHTML = "";
 
-  const pickerHeader = document.createElement("div");
-  pickerHeader.className = "date-popover-header";
+  const pickerHeader =
+    document.createElement("div");
 
-  const previousMonth = document.createElement("button");
+  pickerHeader.className =
+    "date-popover-header";
+
+  const previousMonth =
+    document.createElement("button");
+
   previousMonth.type = "button";
-  previousMonth.className = "date-popover-month-button";
+
+  previousMonth.className =
+    "date-popover-month-button";
+
   previousMonth.textContent = "←";
+
   previousMonth.setAttribute(
     "aria-label",
     "Previous month"
   );
 
-  previousMonth.addEventListener("click", () => {
-    pickerMonth = new Date(
-      pickerMonth.getFullYear(),
-      pickerMonth.getMonth() - 1,
-      1,
-      12
-    );
+  previousMonth.addEventListener(
+    "click",
+    event => {
+      event.stopPropagation();
 
-    renderDatePopover();
-  });
+      pickerMonth = new Date(
+        pickerMonth.getFullYear(),
+        pickerMonth.getMonth() - 1,
+        1,
+        12
+      );
 
-  const monthLabel = document.createElement("div");
-  monthLabel.className = "date-popover-month-label";
+      renderDatePopover();
+    }
+  );
+
+  const monthLabel =
+    document.createElement("div");
+
+  monthLabel.className =
+    "date-popover-month-label";
+
   monthLabel.textContent =
     new Intl.DateTimeFormat(
       "en-US",
@@ -740,25 +859,36 @@ function renderDatePopover() {
       }
     ).format(pickerMonth);
 
-  const nextMonth = document.createElement("button");
+  const nextMonth =
+    document.createElement("button");
+
   nextMonth.type = "button";
-  nextMonth.className = "date-popover-month-button";
+
+  nextMonth.className =
+    "date-popover-month-button";
+
   nextMonth.textContent = "→";
+
   nextMonth.setAttribute(
     "aria-label",
     "Next month"
   );
 
-  nextMonth.addEventListener("click", () => {
-    pickerMonth = new Date(
-      pickerMonth.getFullYear(),
-      pickerMonth.getMonth() + 1,
-      1,
-      12
-    );
+  nextMonth.addEventListener(
+    "click",
+    event => {
+      event.stopPropagation();
 
-    renderDatePopover();
-  });
+      pickerMonth = new Date(
+        pickerMonth.getFullYear(),
+        pickerMonth.getMonth() + 1,
+        1,
+        12
+      );
+
+      renderDatePopover();
+    }
+  );
 
   pickerHeader.append(
     previousMonth,
@@ -766,40 +896,75 @@ function renderDatePopover() {
     nextMonth
   );
 
-  const weekdayRow = document.createElement("div");
-  weekdayRow.className = "date-popover-weekdays";
+  const weekdayRow =
+    document.createElement("div");
+
+  weekdayRow.className =
+    "date-popover-weekdays";
 
   ["S", "M", "T", "W", "T", "F", "S"]
     .forEach(day => {
-      const weekday = document.createElement("div");
+      const weekday =
+        document.createElement("div");
+
       weekday.textContent = day;
       weekdayRow.appendChild(weekday);
     });
 
-  const dayGrid = document.createElement("div");
-  dayGrid.className = "date-popover-days";
+  const dayGrid =
+    document.createElement("div");
 
-  const year = pickerMonth.getFullYear();
-  const month = pickerMonth.getMonth();
+  dayGrid.className =
+    "date-popover-days";
+
+  const year =
+    pickerMonth.getFullYear();
+
+  const month =
+    pickerMonth.getMonth();
+
   const firstWeekday =
     new Date(year, month, 1).getDay();
+
   const daysInMonth =
     new Date(year, month + 1, 0).getDate();
-  const available = availableDateKeys();
-  const selected = posterPages[currentPosterIndex].date;
 
-  for (let blank = 0; blank < firstWeekday; blank++) {
-    dayGrid.appendChild(document.createElement("div"));
+  const available =
+    availableDateKeys();
+
+  const selected =
+    posterPages[currentPosterIndex].date;
+
+  for (
+    let blank = 0;
+    blank < firstWeekday;
+    blank++
+  ) {
+    dayGrid.appendChild(
+      document.createElement("div")
+    );
   }
 
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month, day, 12);
-    const key = dateKey(date);
-    const hasEvents = available.has(key);
+  for (
+    let day = 1;
+    day <= daysInMonth;
+    day++
+  ) {
+    const date =
+      new Date(year, month, day, 12);
 
-    const dayButton = document.createElement("button");
+    const key = dateKey(date);
+
+    const hasEvents =
+      available.has(key);
+
+    const dayButton =
+      document.createElement("button");
+
     dayButton.type = "button";
-    dayButton.className = "date-popover-day";
+    dayButton.className =
+      "date-popover-day";
+
     dayButton.textContent = day;
     dayButton.disabled = !hasEvents;
 
@@ -808,14 +973,18 @@ function renderDatePopover() {
     }
 
     if (hasEvents) {
-      dayButton.addEventListener("click", () => {
-        currentPosterIndex = posterPages.findIndex(
-          page => page.date === key
-        );
+      dayButton.addEventListener(
+        "click",
+        () => {
+          currentPosterIndex =
+            posterPages.findIndex(
+              page => page.date === key
+            );
 
-        closeDatePopover();
-        renderPoster();
-      });
+          closeDatePopover();
+          renderPoster();
+        }
+      );
     }
 
     dayGrid.appendChild(dayButton);
@@ -833,11 +1002,18 @@ function renderPoster() {
     return;
   }
 
-  const page = posterPages[currentPosterIndex];
-  const posterDate = dateFromKey(page.date);
+  const page =
+    posterPages[currentPosterIndex];
+
+  const posterDate =
+    dateFromKey(page.date);
 
   eventDetail.hidden = true;
-  eventDetail.classList.remove("is-open");
+
+  eventDetail.classList.remove(
+    "is-open"
+  );
+
   eventStack.hidden = false;
 
   dateNumber.textContent =
@@ -879,39 +1055,74 @@ function renderPoster() {
 
   groupEventsByStartTime(page.events)
     .forEach(eventsAtThisTime => {
-      const group = document.createElement("div");
-      group.className = "event-time-group";
+      const group =
+        document.createElement("div");
 
-      const time = document.createElement("div");
+      group.className =
+        "event-time-group";
+
+      const time =
+        document.createElement("div");
+
       time.className = "event-time";
-      appendStartTime(time, eventsAtThisTime[0]);
 
-      const cards = document.createElement("div");
-      cards.className = "event-group-cards";
+      appendStartTime(
+        time,
+        eventsAtThisTime[0]
+      );
+
+      const cards =
+        document.createElement("div");
+
+      cards.className =
+        "event-group-cards";
 
       eventsAtThisTime.forEach(event => {
-        const card = document.createElement("button");
-        card.type = "button";
-        card.className =
-          `event-card ${event.explicitQueer
-            ? "explicit"
-            : "default"}`;
+        const card =
+          document.createElement("button");
 
-        const title = document.createElement("div");
+        card.type = "button";
+
+        card.className =
+          `event-card ${
+            event.explicitQueer
+              ? "explicit"
+              : "default"
+          }`;
+
+        const title =
+          document.createElement("div");
+
         title.className = "event-title";
         title.textContent = event.title;
 
-        const venue = document.createElement("div");
+        const venue =
+          document.createElement("div");
+
         venue.className = "event-venue";
-        venue.textContent = eventVenue(event);
-        venue.hidden = !venue.textContent;
+        venue.textContent =
+          eventVenue(event);
 
-        const address = document.createElement("div");
-        address.className = "event-address";
-        address.textContent = eventAddress(event);
-        address.hidden = !address.textContent;
+        venue.hidden =
+          !venue.textContent;
 
-        card.append(title, venue, address);
+        const address =
+          document.createElement("div");
+
+        address.className =
+          "event-address";
+
+        address.textContent =
+          eventAddress(event);
+
+        address.hidden =
+          !address.textContent;
+
+        card.append(
+          title,
+          venue,
+          address
+        );
 
         card.addEventListener(
           "click",
@@ -929,7 +1140,8 @@ function renderPoster() {
     currentPosterIndex === 0;
 
   nextPoster.disabled =
-    currentPosterIndex === posterPages.length - 1;
+    currentPosterIndex ===
+    posterPages.length - 1;
 }
 
 function openEventDetail(event) {
@@ -937,39 +1149,109 @@ function openEventDetail(event) {
 
   eventStack.hidden = true;
   eventDetail.hidden = false;
-  eventDetail.classList.add("is-open");
+
+  eventDetail.classList.add(
+    "is-open"
+  );
+
   eventDetail.innerHTML = "";
 
-  const detailCard = document.createElement("article");
-  detailCard.className = "event-detail-card";
+  const detailCard =
+    document.createElement("article");
+
+  detailCard.className =
+    "event-detail-card";
 
   if (event.flyerUrl) {
-    const flyer = document.createElement("img");
-    flyer.className = "event-detail-flyer";
-    flyer.src = event.flyerUrl;
-    flyer.alt = `Flyer for ${event.title}`;
+    const flyerSource =
+      String(event.flyerUrl).trim();
+
+    const driveIdMatch =
+      flyerSource.match(
+        /drive\.google\.com\/file\/d\/([^/?#]+)/i
+      ) ||
+      flyerSource.match(
+        /[?&]id=([^&#]+)/i
+      );
+
+    const driveFileId =
+      driveIdMatch
+        ? driveIdMatch[1]
+        : "";
+
+    const flyer =
+      document.createElement("img");
+
+    flyer.className =
+      "event-detail-flyer";
+
+    flyer.src = driveFileId
+      ? `https://lh3.googleusercontent.com/d/${driveFileId}=w1600`
+      : flyerSource;
+
+    flyer.alt =
+      `Flyer for ${event.title}`;
+
     flyer.loading = "eager";
-    flyer.referrerPolicy = "no-referrer";
-    flyer.addEventListener("error", () => flyer.remove());
+
+    flyer.referrerPolicy =
+      "no-referrer";
+
+    flyer.addEventListener(
+      "error",
+      () => {
+        const fallback =
+          document.createElement("a");
+
+        fallback.href = flyerSource;
+        fallback.target = "_blank";
+
+        fallback.rel =
+          "noopener noreferrer";
+
+        fallback.textContent =
+          "Open event flyer";
+
+        flyer.replaceWith(fallback);
+      }
+    );
+
     detailCard.appendChild(flyer);
   }
 
-  const heading = document.createElement("h2");
+  const heading =
+    document.createElement("h2");
+
   heading.textContent = event.title;
 
-  const time = document.createElement("p");
-  time.textContent = formatTimeRange(event);
+  const time =
+    document.createElement("p");
 
-  const venue = document.createElement("p");
-  venue.textContent = eventVenue(event);
+  time.textContent =
+    formatTimeRange(event);
+
+  const venue =
+    document.createElement("p");
+
+  venue.textContent =
+    eventVenue(event);
+
   venue.hidden = !venue.textContent;
 
-  const address = document.createElement("p");
-  address.textContent = eventAddress(event);
-  address.hidden = !address.textContent;
+  const address =
+    document.createElement("p");
 
-  const description = document.createElement("p");
-  description.textContent = event.description || "";
+  address.textContent =
+    eventAddress(event);
+
+  address.hidden =
+    !address.textContent;
+
+  const description =
+    document.createElement("p");
+
+  description.textContent =
+    event.description || "";
 
   detailCard.append(
     heading,
@@ -983,19 +1265,27 @@ function openEventDetail(event) {
 }
 
 function closeEventDetail() {
-  if (eventDetail.classList.contains("is-open")) {
+  if (
+    eventDetail.classList.contains(
+      "is-open"
+    )
+  ) {
     renderPoster();
   }
 }
 
-eventDetail.addEventListener("click", event => {
-  if (event.target === eventDetail) {
-    closeEventDetail();
+eventDetail.addEventListener(
+  "click",
+  event => {
+    if (event.target === eventDetail) {
+      closeEventDetail();
+    }
   }
-});
+);
 
 function movePoster(direction) {
-  const nextIndex = currentPosterIndex + direction;
+  const nextIndex =
+    currentPosterIndex + direction;
 
   if (
     nextIndex < 0 ||
@@ -1005,7 +1295,9 @@ function movePoster(direction) {
   }
 
   closeDatePopover();
+
   currentPosterIndex = nextIndex;
+
   renderPoster();
 }
 
@@ -1019,29 +1311,32 @@ nextPoster.addEventListener(
   () => movePoster(1)
 );
 
-window.addEventListener("keydown", event => {
-  if (event.key === "Escape") {
-    if (!eventDetail.hidden) {
-      closeEventDetail();
-    } else {
-      closeDatePopover();
+window.addEventListener(
+  "keydown",
+  event => {
+    if (event.key === "Escape") {
+      if (!eventDetail.hidden) {
+        closeEventDetail();
+      } else {
+        closeDatePopover();
+      }
+
+      return;
     }
 
-    return;
-  }
+    if (!eventDetail.hidden) {
+      return;
+    }
 
-  if (!eventDetail.hidden) {
-    return;
-  }
+    if (event.key === "ArrowLeft") {
+      movePoster(-1);
+    }
 
-  if (event.key === "ArrowLeft") {
-    movePoster(-1);
+    if (event.key === "ArrowRight") {
+      movePoster(1);
+    }
   }
-
-  if (event.key === "ArrowRight") {
-    movePoster(1);
-  }
-});
+);
 
 poster.addEventListener(
   "touchstart",
@@ -1050,7 +1345,8 @@ poster.addEventListener(
       return;
     }
 
-    touchStartX = event.changedTouches[0].clientX;
+    touchStartX =
+      event.changedTouches[0].clientX;
   },
   { passive: true }
 );
@@ -1058,16 +1354,22 @@ poster.addEventListener(
 poster.addEventListener(
   "touchend",
   event => {
-    if (touchStartX === null || !eventDetail.hidden) {
+    if (
+      touchStartX === null ||
+      !eventDetail.hidden
+    ) {
       touchStartX = null;
       return;
     }
 
     const delta =
-      event.changedTouches[0].clientX - touchStartX;
+      event.changedTouches[0].clientX -
+      touchStartX;
 
     if (Math.abs(delta) > 50) {
-      movePoster(delta < 0 ? 1 : -1);
+      movePoster(
+        delta < 0 ? 1 : -1
+      );
     }
 
     touchStartX = null;
@@ -1075,30 +1377,40 @@ poster.addEventListener(
   { passive: true }
 );
 
-dateButton.addEventListener("click", () => {
-  if (datePopover.hidden) {
-    openDatePopover();
-  } else {
-    closeDatePopover();
+dateButton.addEventListener(
+  "click",
+  () => {
+    if (datePopover.hidden) {
+      openDatePopover();
+    } else {
+      closeDatePopover();
+    }
   }
-});
+);
 
-document.addEventListener("click", event => {
-  if (
-    !datePopover.hidden &&
-    !siteHeader.contains(event.target)
-  ) {
-    closeDatePopover();
+document.addEventListener(
+  "click",
+  event => {
+    if (
+      !datePopover.hidden &&
+      !siteHeader.contains(event.target)
+    ) {
+      closeDatePopover();
+    }
   }
-});
+);
 
 async function initialize() {
-  showEventFeedMessage("Loading listings…");
+  showEventFeedMessage(
+    "Loading listings…"
+  );
 
   try {
-    const events = await loadPublicEvents();
+    const events =
+      await loadPublicEvents();
 
-    posterPages = buildPosterPages(events);
+    posterPages =
+      buildPosterPages(events);
 
     if (!posterPages.length) {
       showEventFeedMessage(
@@ -1108,11 +1420,13 @@ async function initialize() {
       return;
     }
 
-    const today = dateKey(new Date());
+    const today =
+      dateKey(new Date());
 
-    const todayIndex = posterPages.findIndex(
-      page => page.date >= today
-    );
+    const todayIndex =
+      posterPages.findIndex(
+        page => page.date >= today
+      );
 
     currentPosterIndex =
       todayIndex >= 0
@@ -1131,9 +1445,11 @@ async function initialize() {
 
 initialize().finally(() => {
   if (
-    typeof window.initializeComprehensiveLayoutEditor ===
+    typeof window
+      .initializeComprehensiveLayoutEditor ===
     "function"
   ) {
-    window.initializeComprehensiveLayoutEditor();
+    window
+      .initializeComprehensiveLayoutEditor();
   }
 });
