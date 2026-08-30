@@ -2,13 +2,12 @@
 
 /* QDP_PROFILE_DESKTOP_START */
 .poster {
-  --qdp-date-x: 0.24cqw;
+  --qdp-date-x: -2.7cqw;
   --qdp-date-y: -0.37cqw;
   --qdp-date-top: 10.05%;
   --qdp-date-left: 8.5%;
   --qdp-date-width: 22%;
   --qdp-date-font-size: 3.75cqw;
-
   --qdp-list-x: 0cqw;
   --qdp-list-y: -4.18cqw;
   --qdp-list-top: 22.5%;
@@ -16,37 +15,31 @@
   --qdp-list-bottom: 8.5%;
   --qdp-list-left: 8.25%;
   --qdp-list-justify: center;
-
   --qdp-time-font-size: 3.2cqw;
   --qdp-time-font-weight: 700;
-  --qdp-time-line-height: 1.05;
+  --qdp-time-line-height: 1;
   --qdp-time-meridiem-display: inline;
-  --qdp-time-card-gap: 0.35cqw;
-  --qdp-cards-next-time-gap: 0.6cqw;
-
-  --qdp-card-width: 76cqw;
+  --qdp-time-card-gap: 1cqw;
+  --qdp-cards-next-time-gap: 1.15cqw;
+  --qdp-card-width: 68.5cqw;
   --qdp-card-height: 10.75cqw;
   --qdp-card-padding-x: 1.6cqw;
   --qdp-card-padding-y: 0.55cqw;
-  --qdp-card-radius: 0.45cqw;
-  --qdp-same-time-card-gap: 0.9cqw;
+  --qdp-card-radius: 2cqw;
+  --qdp-same-time-card-gap: 0.8cqw;
   --qdp-card-line-gap: 0.2cqw;
-
   --qdp-title-font-size: 3.55cqw;
   --qdp-title-font-weight: 400;
   --qdp-title-line-height: 1;
-  --qdp-title-align: left;
-
+  --qdp-title-align: center;
   --qdp-venue-font-size: 2.85cqw;
   --qdp-venue-font-weight: 400;
-  --qdp-venue-line-height: 1;
-  --qdp-venue-align: left;
-
+  --qdp-venue-line-height: 1.25;
+  --qdp-venue-align: center;
   --qdp-address-font-size: 2.85cqw;
   --qdp-address-font-weight: 400;
   --qdp-address-line-height: 1;
-  --qdp-address-align: left;
-
+  --qdp-address-align: center;
   --qdp-detail-top: 6.36%;
   --qdp-detail-right: 8.25%;
   --qdp-detail-bottom: 6.1%;
@@ -57,6 +50,7 @@
   --qdp-detail-line-height: 1.35;
   --qdp-detail-title-size: 4cqw;
 }
+/* QDP_PROFILE_DESKTOP_END */
 
 @media (max-width: 600px) {
   /* QDP_PROFILE_MOBILE_START */
