@@ -14,6 +14,72 @@
     document.getElementById("layoutOverridesStylesheet").href =
       `layout-overrides.css?v=${Date.now()}`;
   </script>
+  <style>
+    /* Keep the desktop link rail to the left of the poster. */
+    @media (min-width: 601px) {
+      .site-shell {
+        display: grid !important;
+        grid-template-areas: "links poster" !important;
+        grid-template-columns:
+          clamp(9rem, 14vw, 12rem)
+          minmax(0, 1fr) !important;
+        column-gap: clamp(0.75rem, 2vw, 1.75rem) !important;
+        align-items: stretch !important;
+      }
+
+      .poster-stage {
+        grid-area: poster !important;
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        min-width: 0;
+      }
+
+      .side-nav {
+        grid-area: links !important;
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        position: static !important;
+        inset: auto !important;
+        order: -1 !important;
+        align-self: stretch !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-evenly !important;
+        align-items: flex-end !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        text-align: right;
+      }
+    }
+
+    /* On phones the links stay above the poster, never below it. */
+    @media (max-width: 600px) {
+      .site-shell {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+      }
+
+      .side-nav {
+        position: static !important;
+        inset: auto !important;
+        order: -1 !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        justify-content: space-evenly !important;
+        align-items: center !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 0 0.75rem !important;
+      }
+
+      .poster-stage {
+        order: 0 !important;
+      }
+    }
+  </style>
 </head>
 
 <body>
