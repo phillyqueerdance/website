@@ -779,6 +779,7 @@ function availableDateKeys() {
   );
 }
 
+
 function openDatePopover() {
   if (!posterPages.length) {
     return;
@@ -1035,7 +1036,6 @@ function renderPoster() {
         weekday: "short"
       }
     ).format(posterDate);
-  }
 
   eventStack.innerHTML = "";
 
