@@ -1173,6 +1173,8 @@ body {
 
   .poster-stage {
     order: 0;
+
+    width: 100vw;
   }
 
 
@@ -1201,6 +1203,8 @@ body {
 
 
   .poster {
+    left: 50%;
+
     width: min(
       101.5vw,
       calc((100vh - 82px) * 0.76225)
@@ -1210,6 +1214,8 @@ body {
       101.5vw,
       calc((100dvh - 82px) * 0.76225)
     );
+
+    transform: translateX(-50%);
   }
 
 
