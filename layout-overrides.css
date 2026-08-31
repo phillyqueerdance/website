@@ -52,6 +52,16 @@
   --qdp-detail-flyer-radius: 1.2cqw;
   --qdp-detail-flyer-gap: 2.2cqw;
 }
+
+.side-nav {
+  --qdp-nav-x: 54px;
+  --qdp-nav-y: -20px;
+  --qdp-nav-top: 0px;
+  --qdp-nav-bottom: 0px;
+  --qdp-nav-gap: 61px;
+  --qdp-nav-width: 228px;
+  --qdp-nav-font-size: 18px;
+}
 /* QDP_PROFILE_DESKTOP_END */
 
 @media (max-width: 600px) {
@@ -107,6 +117,16 @@
     --qdp-detail-flyer-max-height: 68cqw;
     --qdp-detail-flyer-radius: 1.2cqw;
     --qdp-detail-flyer-gap: 2.2cqw;
+  }
+
+  .side-nav {
+    --qdp-nav-x: 0px;
+    --qdp-nav-y: 0px;
+    --qdp-nav-top: 0px;
+    --qdp-nav-bottom: 0px;
+    --qdp-nav-gap: 68px;
+    --qdp-nav-width: 150px;
+    --qdp-nav-font-size: 13px;
   }
   /* QDP_PROFILE_MOBILE_END */
 }
