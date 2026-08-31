@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Queer Dance Philly</title>
-  <link rel="stylesheet" href="style.css?v=20260831-19">
+  <link rel="stylesheet" href="style.css?v=20260831-20">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -18,100 +18,110 @@
 
 <body>
 
-  <header class="site-header">
-    <nav>
+  <main class="site-shell">
+
+    <section class="poster-stage" aria-label="Queer Dance Philly events">
+
+      <div id="poster" class="poster">
+
+        <img
+          class="frame"
+          src="frame.png"
+          alt=""
+        >
+
+        <button
+          id="dateButton"
+          class="poster-date"
+          type="button"
+          data-layout-target="date"
+          aria-label="Choose a date"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+        >
+          <span id="dateNumber"></span>
+          <span id="dateDay"></span>
+        </button>
+
+        <div
+          id="datePopover"
+          class="date-popover"
+          role="dialog"
+          aria-label="Choose a date"
+          hidden
+        ></div>
+
+        <div
+          id="eventStack"
+          class="event-stack"
+          data-layout-target="list"
+        ></div>
+
+        <div id="eventDetail" class="event-detail" hidden></div>
+
+      </div>
+
+      <div class="poster-controls" aria-label="Event navigation">
+        <button
+          id="previousPoster"
+          type="button"
+          aria-label="Previous events"
+        >
+          ←
+        </button>
+
+        <button
+          id="nextPoster"
+          type="button"
+          aria-label="Next events"
+        >
+          →
+        </button>
+      </div>
+
+    </section>
+
+    <nav class="side-nav" aria-label="Site links">
       <a href="#">About</a>
+
       <a
         href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
         target="_blank"
         rel="noopener noreferrer"
       >Venues</a>
+
       <a href="#">Submit Event</a>
+
       <a
         href="https://calendar.google.com/calendar/u/0?cid=cGhpbGx5cXVlZXJkYW5jZUBnbWFpbC5jb20"
         target="_blank"
         rel="noopener noreferrer"
       >Add Calendar</a>
+
       <a
         href="https://www.instagram.com/queerdancephilly/"
         target="_blank"
         rel="noopener noreferrer"
       >Instagram</a>
+
+      <a
+        class="tip-link"
+        href="https://venmo.com/u/callaia"
+        target="_blank"
+        rel="noopener noreferrer"
+      >Venmo</a>
     </nav>
 
-    <button id="dateButton" class="date-button" type="button">
-      Today
-    </button>
-
-    <div
-      id="datePopover"
-      class="date-popover"
-      hidden
-    ></div>
-  </header>
-
-
-  <main class="poster-area">
-
-    <div id="poster" class="poster">
-
-      <img
-        class="frame"
-        src="frame.png"
-        alt=""
-      >
-
-      <div class="poster-date" data-layout-target="date">
-        <div id="dateNumber"></div>
-        <div id="dateDay"></div>
-      </div>
-
-      <div
-        id="eventStack"
-        class="event-stack"
-        data-layout-target="list"
-      ></div>
-
-      <div id="eventDetail" class="event-detail" hidden></div>
-
-    </div>
-
   </main>
-
-
-  <footer class="poster-controls">
-    <button
-      id="previousPoster"
-      type="button"
-      aria-label="Previous events"
-    >
-      ←
-    </button>
-
-    <button
-      id="nextPoster"
-      type="button"
-      aria-label="Next events"
-    >
-      →
-    </button>
-  </footer>
-
-  <a
-    class="tip-link"
-    href="https://venmo.com/u/callaia"
-    target="_blank"
-    rel="noopener noreferrer"
-  >Venmo</a>
 
 
   <script>
     (() => {
       "use strict";
-    
+
       const EDITOR_QUERY = "layout";
       const STORAGE_KEY = "qdp-comprehensive-layout-v1";
-    
+
       const desktopDefaults = {
         dateX: 0.24,
         dateY: -0.37,
@@ -119,7 +129,7 @@
         dateLeft: 8.5,
         dateWidth: 22,
         dateFontSize: 3.75,
-    
+
         listX: 0,
         listY: -4.18,
         listTop: 22.5,
@@ -127,14 +137,14 @@
         listBottom: 8.5,
         listLeft: 8.25,
         listJustify: "center",
-    
+
         timeFontSize: 3.2,
         timeFontWeight: 700,
         timeLineHeight: 1.05,
         showMeridiem: true,
         timeCardGap: 0.35,
         cardsNextTimeGap: 0.6,
-    
+
         cardWidth: 76,
         cardHeight: 10.75,
         cardPaddingX: 1.6,
@@ -142,22 +152,22 @@
         cardRadius: 0.45,
         sameTimeCardGap: 0.9,
         cardLineGap: 0.2,
-    
+
         titleFontSize: 3.55,
         titleFontWeight: 400,
         titleLineHeight: 1,
         titleAlign: "left",
-    
+
         venueFontSize: 2.85,
         venueFontWeight: 400,
         venueLineHeight: 1,
         venueAlign: "left",
-    
+
         addressFontSize: 2.85,
         addressFontWeight: 400,
         addressLineHeight: 1,
         addressAlign: "left",
-    
+
         detailTop: 6.36,
         detailRight: 8.25,
         detailBottom: 6.1,
@@ -171,7 +181,7 @@
         detailFlyerRadius: 1.2,
         detailFlyerGap: 2.2
       };
-    
+
       const DEFAULTS = {
         desktop: { ...desktopDefaults },
         mobile: {
@@ -189,7 +199,7 @@
           detailFlyerMaxHeight: 68
         }
       };
-    
+
       const CSS_MAP = {
         dateX: ["--qdp-date-x", "cqw"],
         dateY: ["--qdp-date-y", "cqw"],
@@ -197,7 +207,7 @@
         dateLeft: ["--qdp-date-left", "%"],
         dateWidth: ["--qdp-date-width", "%"],
         dateFontSize: ["--qdp-date-font-size", "cqw"],
-    
+
         listX: ["--qdp-list-x", "cqw"],
         listY: ["--qdp-list-y", "cqw"],
         listTop: ["--qdp-list-top", "%"],
@@ -205,14 +215,14 @@
         listBottom: ["--qdp-list-bottom", "%"],
         listLeft: ["--qdp-list-left", "%"],
         listJustify: ["--qdp-list-justify", ""],
-    
+
         timeFontSize: ["--qdp-time-font-size", "cqw"],
         timeFontWeight: ["--qdp-time-font-weight", ""],
         timeLineHeight: ["--qdp-time-line-height", ""],
         showMeridiem: ["--qdp-time-meridiem-display", "display"],
         timeCardGap: ["--qdp-time-card-gap", "cqw"],
         cardsNextTimeGap: ["--qdp-cards-next-time-gap", "cqw"],
-    
+
         cardWidth: ["--qdp-card-width", "cqw"],
         cardHeight: ["--qdp-card-height", "cqw"],
         cardPaddingX: ["--qdp-card-padding-x", "cqw"],
@@ -220,22 +230,22 @@
         cardRadius: ["--qdp-card-radius", "cqw"],
         sameTimeCardGap: ["--qdp-same-time-card-gap", "cqw"],
         cardLineGap: ["--qdp-card-line-gap", "cqw"],
-    
+
         titleFontSize: ["--qdp-title-font-size", "cqw"],
         titleFontWeight: ["--qdp-title-font-weight", ""],
         titleLineHeight: ["--qdp-title-line-height", ""],
         titleAlign: ["--qdp-title-align", ""],
-    
+
         venueFontSize: ["--qdp-venue-font-size", "cqw"],
         venueFontWeight: ["--qdp-venue-font-weight", ""],
         venueLineHeight: ["--qdp-venue-line-height", ""],
         venueAlign: ["--qdp-venue-align", ""],
-    
+
         addressFontSize: ["--qdp-address-font-size", "cqw"],
         addressFontWeight: ["--qdp-address-font-weight", ""],
         addressLineHeight: ["--qdp-address-line-height", ""],
         addressAlign: ["--qdp-address-align", ""],
-    
+
         detailTop: ["--qdp-detail-top", "%"],
         detailRight: ["--qdp-detail-right", "%"],
         detailBottom: ["--qdp-detail-bottom", "%"],
@@ -249,7 +259,7 @@
         detailFlyerRadius: ["--qdp-detail-flyer-radius", "cqw"],
         detailFlyerGap: ["--qdp-detail-flyer-gap", "cqw"]
       };
-    
+
       const CONTROL_GROUPS = [
         {
           title: "Upper-left date",
@@ -323,19 +333,19 @@
           ]
         }
       ];
-    
+
       function range(key, label, min, max, step, unit) {
         return { type: "range", key, label, min, max, step, unit };
       }
-    
+
       function toggle(key, label) {
         return { type: "checkbox", key, label };
       }
-    
+
       function select(key, label, options) {
         return { type: "select", key, label, options };
       }
-    
+
       function typographyGroup(title, prefix, min, max) {
         return {
           title,
@@ -351,18 +361,18 @@
           ]
         };
       }
-    
+
       function clone(value) {
         return JSON.parse(JSON.stringify(value));
       }
-    
+
       function mergedState(value) {
         return {
           desktop: { ...DEFAULTS.desktop, ...(value?.desktop || {}) },
           mobile: { ...DEFAULTS.mobile, ...(value?.mobile || {}) }
         };
       }
-    
+
       function readState() {
         try {
           return mergedState(
@@ -372,38 +382,38 @@
           return mergedState();
         }
       }
-    
+
       function profileName() {
         return window.matchMedia("(max-width: 600px)").matches
           ? "mobile"
           : "desktop";
       }
-    
+
       function cssValue(key, value) {
         const unit = CSS_MAP[key][1];
-    
+
         if (unit === "display") {
           return value ? "inline" : "none";
         }
-    
+
         return `${value}${unit}`;
       }
-    
+
       function stateFromCssValue(key, value) {
         const unit = CSS_MAP[key][1];
-    
+
         if (unit === "display") {
           return value.trim() !== "none";
         }
-    
+
         if (!unit) {
           const numeric = Number(value);
           return Number.isFinite(numeric) ? numeric : value.trim();
         }
-    
+
         return Number.parseFloat(value);
       }
-    
+
       function declarations(profile) {
         return Object.entries(CSS_MAP)
           .map(([key, [variable]]) =>
@@ -411,7 +421,7 @@
           )
           .join("\n");
       }
-    
+
       function layoutCssText() {
         return [
           "/* Generated by the QDP layout editor. */",
@@ -431,7 +441,7 @@
           ""
         ].join("\n");
       }
-    
+
       function parseProfileBlock(css, profile) {
         const upper = profile.toUpperCase();
         const match = css.match(
@@ -439,26 +449,26 @@
             `/\\* QDP_PROFILE_${upper}_START \\*/([\\s\\S]*?)/\\* QDP_PROFILE_${upper}_END \\*/`
           )
         );
-    
+
         if (!match) {
           return null;
         }
-    
+
         const parsed = {};
-    
+
         Object.entries(CSS_MAP).forEach(([key, [variable]]) => {
           const valueMatch = match[1].match(
-            new RegExp(`${variable.replace(/[-/\\^$*+?.()|[\\]{}]/g, "\\$&")}\\s*:\\s*([^;]+)`)
+            new RegExp(`${variable.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\s*:\\s*([^;]+)`)
           );
-    
+
           if (valueMatch) {
             parsed[key] = stateFromCssValue(key, valueMatch[1]);
           }
         });
-    
+
         return parsed;
       }
-    
+
       function inputMarkup(field, value) {
         if (field.type === "checkbox") {
           return `
@@ -467,21 +477,21 @@
               <span>${field.label}</span>
             </label>`;
         }
-    
+
         if (field.type === "select") {
           const options = field.options
             .map(([optionValue, optionLabel]) =>
               `<option value="${optionValue}" ${optionValue === value ? "selected" : ""}>${optionLabel}</option>`
             )
             .join("");
-    
+
           return `
             <label class="qdp-editor-select">
               <span>${field.label}</span>
               <select data-layout-key="${field.key}">${options}</select>
             </label>`;
         }
-    
+
         return `
           <label class="qdp-editor-control">
             <span>${field.label}</span>
@@ -497,16 +507,16 @@
             >
           </label>`;
       }
-    
+
       function formatValue(value, unit = "") {
         if (typeof value !== "number") {
           return String(value);
         }
-    
+
         const rounded = Math.round(value * 100) / 100;
         return `${rounded}${unit}`;
       }
-    
+
       let state = readState();
       let profile = profileName();
       let panel = null;
@@ -515,13 +525,13 @@
       let redoStack = [];
       let selectedTarget = null;
       let drag = null;
-    
+
       function saveAndApply() {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    
+
         const poster = document.getElementById("poster");
         if (!poster) return;
-    
+
         Object.entries(CSS_MAP).forEach(([key, [variable]]) => {
           poster.style.setProperty(
             variable,
@@ -529,44 +539,44 @@
           );
         });
       }
-    
+
       function commitChange() {
         if (JSON.stringify(committed) === JSON.stringify(state)) {
           return;
         }
-    
+
         undoStack.push(clone(committed));
         if (undoStack.length > 80) undoStack.shift();
         redoStack = [];
         committed = clone(state);
         updateHistoryButtons();
       }
-    
+
       function restore(next) {
         state = mergedState(next);
         committed = clone(state);
         saveAndApply();
         syncPanel();
       }
-    
+
       function undo() {
         if (!undoStack.length) return;
         redoStack.push(clone(state));
         restore(undoStack.pop());
       }
-    
+
       function redo() {
         if (!redoStack.length) return;
         undoStack.push(clone(state));
         restore(redoStack.pop());
       }
-    
+
       function updateHistoryButtons() {
         if (!panel) return;
         panel.querySelector('[data-action="undo"]').disabled = !undoStack.length;
         panel.querySelector('[data-action="redo"]').disabled = !redoStack.length;
       }
-    
+
       function renderControls() {
         return CONTROL_GROUPS.map((group, index) => `
           <details class="qdp-editor-section" ${index < 2 ? "open" : ""}>
@@ -578,7 +588,7 @@
             </div>
           </details>`).join("");
       }
-    
+
       function buildPanel() {
         panel = document.createElement("aside");
         panel.className = "qdp-layout-editor";
@@ -590,7 +600,7 @@
             </div>
             <button type="button" data-action="collapse" aria-label="Collapse editor">−</button>
           </div>
-    
+
           <div class="qdp-editor-toolbar">
             <button type="button" data-action="undo">Undo</button>
             <button type="button" data-action="redo">Redo</button>
@@ -599,15 +609,15 @@
             <button type="button" data-action="preview-detail">Preview detail</button>
             <button type="button" data-action="close-detail">Close detail</button>
           </div>
-    
+
           <p class="qdp-editor-help">
             Drag the date or event region directly. Sliders update the poster live.
           </p>
-    
+
           <div class="qdp-editor-scroll" data-editor-controls>
             ${renderControls()}
           </div>
-    
+
           <div class="qdp-editor-export">
             <button type="button" data-action="download">Download layout CSS</button>
             <button type="button" data-action="copy">Copy CSS</button>
@@ -616,50 +626,58 @@
             <input type="file" accept=".css,text/css" data-editor-import hidden>
           </div>
         `;
-    
+
         document.body.appendChild(panel);
         bindPanel();
         updateHistoryButtons();
       }
-    
+
       function syncPanel() {
         if (!panel) return;
-    
+
         panel.querySelector("[data-editor-profile]").textContent = profile;
         panel.querySelector('[data-action="reset"]').textContent = `Reset ${profile}`;
-    
+
         panel.querySelectorAll("[data-layout-key]").forEach(input => {
           const key = input.dataset.layoutKey;
           const value = state[profile][key];
-    
+
           if (input.type === "checkbox") {
             input.checked = Boolean(value);
           } else {
             input.value = value;
           }
-    
+
           const output = panel.querySelector(`[data-layout-value="${key}"]`);
+
           if (output) {
-            output.textContent = formatValue(value, input.dataset.layoutUnit || "");
+            output.textContent = formatValue(
+              value,
+              input.dataset.layoutUnit || ""
+            );
           }
         });
-    
+
         updateHistoryButtons();
       }
-    
+
       function bindPanel() {
         panel.addEventListener("input", event => {
           const input = event.target.closest("[data-layout-key]");
+
           if (!input || input.type === "checkbox") return;
-    
+
           const key = input.dataset.layoutKey;
-          state[profile][key] = input.type === "range"
-            ? Number(input.value)
-            : input.value;
-    
+
+          state[profile][key] =
+            input.type === "range"
+              ? Number(input.value)
+              : input.value;
+
           saveAndApply();
-    
+
           const output = panel.querySelector(`[data-layout-value="${key}"]`);
+
           if (output) {
             output.textContent = formatValue(
               state[profile][key],
@@ -667,79 +685,91 @@
             );
           }
         });
-    
+
         panel.addEventListener("change", event => {
           const input = event.target.closest("[data-layout-key]");
-    
+
           if (input) {
             const key = input.dataset.layoutKey;
-            state[profile][key] = input.type === "checkbox"
-              ? input.checked
-              : input.type === "range"
-                ? Number(input.value)
-                : input.value;
-    
+
+            state[profile][key] =
+              input.type === "checkbox"
+                ? input.checked
+                : input.type === "range"
+                  ? Number(input.value)
+                  : input.value;
+
             saveAndApply();
             commitChange();
           }
-    
+
           if (event.target.matches("[data-editor-import]")) {
             importCssFile(event.target.files[0]);
             event.target.value = "";
           }
         });
-    
+
         panel.addEventListener("click", async event => {
           const button = event.target.closest("[data-action]");
+
           if (!button) return;
-    
+
           const action = button.dataset.action;
-    
+
           if (action === "undo") undo();
           if (action === "redo") redo();
-    
+
           if (action === "reset") {
             state[profile] = clone(DEFAULTS[profile]);
             saveAndApply();
             commitChange();
             syncPanel();
           }
-    
+
           if (action === "guides") {
             document.body.classList.toggle("qdp-layout-guides");
             button.classList.toggle("active");
           }
-    
+
           if (action === "preview-detail") {
             document.querySelector(".event-card")?.click();
           }
-    
+
           if (action === "close-detail") {
             const detail = document.getElementById("eventDetail");
             const stack = document.getElementById("eventStack");
+
             detail.hidden = true;
             detail.classList.remove("is-open");
             stack.hidden = false;
           }
-    
+
           if (action === "download") downloadCss();
-    
+
           if (action === "copy") {
             await copyCss();
+
             const oldText = button.textContent;
             button.textContent = "Copied";
-            window.setTimeout(() => { button.textContent = oldText; }, 1000);
+
+            window.setTimeout(() => {
+              button.textContent = oldText;
+            }, 1000);
           }
-    
+
           if (action === "import") {
             panel.querySelector("[data-editor-import]").click();
           }
-    
+
           if (action === "collapse") {
             panel.classList.toggle("collapsed");
-            button.textContent = panel.classList.contains("collapsed") ? "+" : "−";
+
+            button.textContent =
+              panel.classList.contains("collapsed")
+                ? "+"
+                : "−";
           }
-    
+
           if (action === "done") {
             const url = new URL(window.location.href);
             url.searchParams.delete("edit");
@@ -747,81 +777,97 @@
           }
         });
       }
-    
+
       function downloadCss() {
-        const blob = new Blob([layoutCssText()], { type: "text/css" });
+        const blob = new Blob(
+          [layoutCssText()],
+          { type: "text/css" }
+        );
+
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
+
         link.href = url;
         link.download = "layout-overrides.css";
+
         document.body.appendChild(link);
         link.click();
         link.remove();
+
         URL.revokeObjectURL(url);
       }
-    
+
       async function copyCss() {
         const css = layoutCssText();
-    
+
         try {
           await navigator.clipboard.writeText(css);
         } catch {
           const area = document.createElement("textarea");
+
           area.value = css;
           document.body.appendChild(area);
           area.select();
+
           document.execCommand("copy");
           area.remove();
         }
       }
-    
+
       function importCssFile(file) {
         if (!file) return;
-    
+
         const reader = new FileReader();
+
         reader.addEventListener("load", () => {
           const css = String(reader.result || "");
           const desktop = parseProfileBlock(css, "desktop");
           const mobile = parseProfileBlock(css, "mobile");
-    
+
           if (!desktop || !mobile) {
-            window.alert("That file was not generated by the QDP layout editor.");
+            window.alert(
+              "That file was not generated by the QDP layout editor."
+            );
+
             return;
           }
-    
+
           state = mergedState({ desktop, mobile });
+
           saveAndApply();
           commitChange();
           syncPanel();
         });
+
         reader.readAsText(file);
       }
-    
+
       const DRAGGABLES = [
         [".poster-date", "dateX", "dateY"],
         [".event-stack", "listX", "listY"]
       ];
-    
+
       function bindDragging() {
         DRAGGABLES.forEach(([selector, xKey, yKey]) => {
           const target = document.querySelector(selector);
+
           if (!target) return;
-    
+
           target.dataset.editorDraggable = "true";
-    
+
           target.addEventListener("pointerdown", event => {
             if (event.button > 0) return;
-    
+
             event.preventDefault();
             event.stopPropagation();
-    
+
             selectTarget(target);
-    
+
             const posterWidth = document
               .getElementById("poster")
               .getBoundingClientRect()
               .width;
-    
+
             drag = {
               target,
               pointerId: event.pointerId,
@@ -833,59 +879,68 @@
               yKey,
               posterWidth
             };
-    
+
             target.classList.add("is-dragging");
             target.setPointerCapture(event.pointerId);
           });
-    
+
           target.addEventListener("pointermove", event => {
             if (!drag || drag.target !== target) return;
-    
+
             const scale = 100 / drag.posterWidth;
+
             state[profile][drag.xKey] = round(
-              drag.originX + (event.clientX - drag.startX) * scale
+              drag.originX +
+              (event.clientX - drag.startX) * scale
             );
+
             state[profile][drag.yKey] = round(
-              drag.originY + (event.clientY - drag.startY) * scale
+              drag.originY +
+              (event.clientY - drag.startY) * scale
             );
-    
+
             saveAndApply();
             syncPanel();
           });
-    
+
           const stop = event => {
             if (!drag || drag.target !== target) return;
+
             target.classList.remove("is-dragging");
+
             if (target.hasPointerCapture(event.pointerId)) {
               target.releasePointerCapture(event.pointerId);
             }
+
             drag = null;
             commitChange();
           };
-    
+
           target.addEventListener("pointerup", stop);
           target.addEventListener("pointercancel", stop);
         });
       }
-    
+
       function selectTarget(target) {
         selectedTarget?.classList.remove("layout-selected");
         selectedTarget = target;
         selectedTarget.classList.add("layout-selected");
       }
-    
+
       function round(value) {
         return Math.round(value * 20) / 20;
       }
-    
+
       function handleResize() {
         const nextProfile = profileName();
+
         if (nextProfile === profile) return;
+
         profile = nextProfile;
         saveAndApply();
         syncPanel();
       }
-    
+
       window.initializeComprehensiveLayoutEditor = function () {
         if (
           new URLSearchParams(window.location.search).get("edit") !==
@@ -893,16 +948,19 @@
         ) {
           return;
         }
-    
+
         document.body.classList.add("layout-editor-active");
+
         saveAndApply();
         buildPanel();
         bindDragging();
+
         window.addEventListener("resize", handleResize);
       };
     })();
   </script>
-  <script src="app.js?v=20260831-18"></script>
+
+  <script src="app.js?v=20260831-20"></script>
 
 </body>
 </html>
