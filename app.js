@@ -12,7 +12,6 @@ const datePopover = document.getElementById("datePopover");
 const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
-const siteHeader = document.querySelector(".site-header");
 
 const layoutEditorEnabled =
   new URLSearchParams(window.location.search)
@@ -798,10 +797,12 @@ function openDatePopover() {
 
   renderDatePopover();
   datePopover.hidden = false;
+  dateButton.setAttribute("aria-expanded", "true");
 }
 
 function closeDatePopover() {
   datePopover.hidden = true;
+  dateButton.setAttribute("aria-expanded", "false");
 }
 
 function renderDatePopover() {
@@ -1034,21 +1035,6 @@ function renderPoster() {
         weekday: "short"
       }
     ).format(posterDate);
-
-  if (page.date === dateKey(new Date())) {
-    dateButton.textContent = "Today";
-  } else {
-    dateButton.textContent =
-      new Intl.DateTimeFormat(
-        "en-US",
-        {
-          month: "short",
-          day: "numeric",
-          timeZone: "America/New_York"
-        }
-      )
-        .format(posterDate)
-        .toUpperCase();
   }
 
   eventStack.innerHTML = "";
@@ -1380,6 +1366,10 @@ poster.addEventListener(
 dateButton.addEventListener(
   "click",
   () => {
+    if (layoutEditorEnabled) {
+      return;
+    }
+
     if (datePopover.hidden) {
       openDatePopover();
     } else {
@@ -1393,7 +1383,8 @@ document.addEventListener(
   event => {
     if (
       !datePopover.hidden &&
-      !siteHeader.contains(event.target)
+      !dateButton.contains(event.target) &&
+      !datePopover.contains(event.target)
     ) {
       closeDatePopover();
     }
