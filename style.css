@@ -587,6 +587,10 @@ body {
   margin-bottom: 0;
 }
 
+.event-detail-card > h2 + p + p {
+  margin-bottom: 0;
+}
+
 
 /* =========================================================
    POSTER CORNER CONTROLS
