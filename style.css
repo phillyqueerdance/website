@@ -333,7 +333,12 @@ body {
 .event-time {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+
+  width: min(
+    var(--qdp-card-width, 76cqw),
+    100%
+  );
 
   min-width: 0;
 
@@ -345,7 +350,7 @@ body {
   font-size: var(--qdp-time-font-size, 3.2cqw);
   font-weight: var(--qdp-time-font-weight, 700);
   line-height: var(--qdp-time-line-height, 1.05);
-  text-align: center;
+  text-align: left;
 }
 
 
@@ -592,6 +597,25 @@ body {
 .poster-controls button:disabled {
   opacity: 0.25;
   cursor: default;
+}
+
+
+.tip-link {
+  position: fixed;
+  z-index: 10;
+  right: 10px;
+  bottom: 7px;
+
+  color: #f7edf1;
+
+  font-size: 11px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+
+.tip-link:hover {
+  text-decoration: underline;
 }
 
 
