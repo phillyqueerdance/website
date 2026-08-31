@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Queer Dance Philly</title>
-  <link rel="stylesheet" href="style.css?v=20260831-21">
+  <link rel="stylesheet" href="style.css?v=20260831-22">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -81,41 +81,100 @@
 
     </section>
 
-    <nav class="side-nav" aria-label="Site links">
-      
-      <a
-        href="https://www.instagram.com/queerdancephilly/"
-        target="_blank"
-        rel="noopener noreferrer"
-      >Instagram</a>
-      
-      <a href="#">About</a>
+    <nav
+      class="side-nav"
+      aria-label="Site links"
+      data-layout-target="nav"
+    >
+      <button
+        id="mobileMenuButton"
+        class="mobile-menu-toggle"
+        type="button"
+        aria-controls="siteMenuLinks"
+        aria-expanded="false"
+      >MENU</button>
 
-      <a
-        href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
-        target="_blank"
-        rel="noopener noreferrer"
-      >Venue Map</a>
+      <div id="siteMenuLinks" class="side-nav-links">
+        <a
+          href="https://www.instagram.com/queerdancephilly/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Instagram</a>
 
-      <a
-        href="https://calendar.google.com/calendar/u/0?cid=cGhpbGx5cXVlZXJkYW5jZUBnbWFpbC5jb20"
-        target="_blank"
-        rel="noopener noreferrer"
-      >Add QDP Google Calendar</a>
+        <a href="#">About</a>
 
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLScZijFfh9oe1puPByS2CZ4u1Wr3WJwYa7m79za-8wMvU24tgQ/viewform"
-        target="_blank"
-        rel="noopener noreferrer"
+        <a
+          href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Venue Map</a>
+
+        <a
+          href="https://calendar.google.com/calendar/u/0?cid=cGhpbGx5cXVlZXJkYW5jZUBnbWFpbC5jb20"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Add QDP Google Calendar</a>
+
+        <a
+          href="https://docs.google.com/forms/d/e/1FAIpQLScZijFfh9oe1puPByS2CZ4u1Wr3WJwYa7m79za-8wMvU24tgQ/viewform"
+          target="_blank"
+          rel="noopener noreferrer"
         >Submit Event</a>
 
-      <a
-        href="https://venmo.com/u/callaia"
-        target="_blank"
-        rel="noopener noreferrer"
-      >Tip Jar</a>
+        <a
+          href="https://venmo.com/u/callaia"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Tip Jar</a>
+      </div>
     </nav>
 
   </main>
+
+
+  <script>
+    (() => {
+      "use strict";
+
+      const nav = document.querySelector(".side-nav");
+      const button = document.getElementById("mobileMenuButton");
+      const links = document.getElementById("siteMenuLinks");
+      const mobileQuery = window.matchMedia("(max-width: 760px)");
+
+      if (!nav || !button || !links) return;
+
+      function setMenuOpen(open) {
+        nav.classList.toggle("menu-open", open);
+        button.setAttribute("aria-expanded", String(open));
+      }
+
+      button.addEventListener("click", event => {
+        event.stopPropagation();
+        setMenuOpen(!nav.classList.contains("menu-open"));
+      });
+
+      links.addEventListener("click", event => {
+        if (event.target.closest("a")) setMenuOpen(false);
+      });
+
+      document.addEventListener("click", event => {
+        if (!nav.contains(event.target)) setMenuOpen(false);
+      });
+
+      document.addEventListener("keydown", event => {
+        if (event.key !== "Escape" || !nav.classList.contains("menu-open")) {
+          return;
+        }
+
+        setMenuOpen(false);
+        button.focus();
+      });
+
+      mobileQuery.addEventListener("change", event => {
+        if (!event.matches) setMenuOpen(false);
+      });
+    })();
+  </script>
 
 
   <script>
@@ -126,6 +185,14 @@
       const STORAGE_KEY = "qdp-comprehensive-layout-v1";
 
       const desktopDefaults = {
+        navX: 0,
+        navY: -18,
+        navTop: 0,
+        navBottom: 0,
+        navGap: 68,
+        navWidth: 150,
+        navFontSize: 15,
+
         dateX: 0.24,
         dateY: -0.37,
         dateTop: 10.05,
@@ -189,6 +256,8 @@
         desktop: { ...desktopDefaults },
         mobile: {
           ...desktopDefaults,
+          navY: 0,
+          navFontSize: 13,
           dateX: 0,
           dateY: 0,
           dateTop: 10.1,
@@ -204,6 +273,14 @@
       };
 
       const CSS_MAP = {
+        navX: ["--qdp-nav-x", "px"],
+        navY: ["--qdp-nav-y", "px"],
+        navTop: ["--qdp-nav-top", "px"],
+        navBottom: ["--qdp-nav-bottom", "px"],
+        navGap: ["--qdp-nav-gap", "px"],
+        navWidth: ["--qdp-nav-width", "px"],
+        navFontSize: ["--qdp-nav-font-size", "px"],
+
         dateX: ["--qdp-date-x", "cqw"],
         dateY: ["--qdp-date-y", "cqw"],
         dateTop: ["--qdp-date-top", "%"],
@@ -263,7 +340,30 @@
         detailFlyerGap: ["--qdp-detail-flyer-gap", "cqw"]
       };
 
+      const NAV_KEYS = new Set([
+        "navX",
+        "navY",
+        "navTop",
+        "navBottom",
+        "navGap",
+        "navWidth",
+        "navFontSize"
+      ]);
+
       const CONTROL_GROUPS = [
+        {
+          title: "Left link ladder",
+          profiles: ["desktop"],
+          fields: [
+            range("navX", "Horizontal offset", -160, 160, 1, "px"),
+            range("navY", "Vertical offset", -180, 180, 1, "px"),
+            range("navTop", "Top boundary", 0, 160, 1, "px"),
+            range("navBottom", "Bottom boundary", 0, 160, 1, "px"),
+            range("navGap", "Distance from frame", 0, 160, 1, "px"),
+            range("navWidth", "Ladder width", 80, 240, 1, "px"),
+            range("navFontSize", "Link size", 10, 24, 0.5, "px")
+          ]
+        },
         {
           title: "Upper-left date",
           fields: [
@@ -417,8 +517,11 @@
         return Number.parseFloat(value);
       }
 
-      function declarations(profile) {
+      function declarations(profile, target) {
         return Object.entries(CSS_MAP)
+          .filter(([key]) =>
+            target === "nav" ? NAV_KEYS.has(key) : !NAV_KEYS.has(key)
+          )
           .map(([key, [variable]]) =>
             `  ${variable}: ${cssValue(key, state[profile][key])};`
           )
@@ -430,14 +533,22 @@
           "/* Generated by the QDP layout editor. */",
           "/* QDP_PROFILE_DESKTOP_START */",
           ".poster {",
-          declarations("desktop"),
+          declarations("desktop", "poster"),
+          "}",
+          "",
+          ".side-nav {",
+          declarations("desktop", "nav"),
           "}",
           "/* QDP_PROFILE_DESKTOP_END */",
           "",
           "@media (max-width: 600px) {",
           "  /* QDP_PROFILE_MOBILE_START */",
           "  .poster {",
-          declarations("mobile").replace(/^/gm, "  "),
+          declarations("mobile", "poster").replace(/^/gm, "  "),
+          "  }",
+          "",
+          "  .side-nav {",
+          declarations("mobile", "nav").replace(/^/gm, "  "),
           "  }",
           "  /* QDP_PROFILE_MOBILE_END */",
           "}",
@@ -533,10 +644,14 @@
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 
         const poster = document.getElementById("poster");
-        if (!poster) return;
+        const nav = document.querySelector(".side-nav");
+
+        if (!poster || !nav) return;
 
         Object.entries(CSS_MAP).forEach(([key, [variable]]) => {
-          poster.style.setProperty(
+          const target = NAV_KEYS.has(key) ? nav : poster;
+
+          target.style.setProperty(
             variable,
             cssValue(key, state[profile][key])
           );
@@ -581,15 +696,20 @@
       }
 
       function renderControls() {
-        return CONTROL_GROUPS.map((group, index) => `
-          <details class="qdp-editor-section" ${index < 2 ? "open" : ""}>
-            <summary>${group.title}</summary>
-            <div class="qdp-editor-section-body">
-              ${group.fields
-                .map(field => inputMarkup(field, state[profile][field.key]))
-                .join("")}
-            </div>
-          </details>`).join("");
+        return CONTROL_GROUPS
+          .filter(group =>
+            !group.profiles || group.profiles.includes(profile)
+          )
+          .map((group, index) => `
+            <details class="qdp-editor-section" ${index < 2 ? "open" : ""}>
+              <summary>${group.title}</summary>
+              <div class="qdp-editor-section-body">
+                ${group.fields
+                  .map(field => inputMarkup(field, state[profile][field.key]))
+                  .join("")}
+              </div>
+            </details>`)
+          .join("");
       }
 
       function buildPanel() {
@@ -614,7 +734,7 @@
           </div>
 
           <p class="qdp-editor-help">
-            Drag the date or event region directly. Sliders update the poster live.
+            Drag the date, event region, or desktop link ladder directly. Sliders update the page live.
           </p>
 
           <div class="qdp-editor-scroll" data-editor-controls>
@@ -846,12 +966,13 @@
       }
 
       const DRAGGABLES = [
-        [".poster-date", "dateX", "dateY"],
-        [".event-stack", "listX", "listY"]
+        [".poster-date", "dateX", "dateY", "poster"],
+        [".event-stack", "listX", "listY", "poster"],
+        [".side-nav", "navX", "navY", "pixels"]
       ];
 
       function bindDragging() {
-        DRAGGABLES.forEach(([selector, xKey, yKey]) => {
+        DRAGGABLES.forEach(([selector, xKey, yKey, coordinateMode]) => {
           const target = document.querySelector(selector);
 
           if (!target) return;
@@ -860,6 +981,12 @@
 
           target.addEventListener("pointerdown", event => {
             if (event.button > 0) return;
+            if (
+              selector === ".side-nav" &&
+              window.matchMedia("(max-width: 760px)").matches
+            ) {
+              return;
+            }
 
             event.preventDefault();
             event.stopPropagation();
@@ -880,6 +1007,7 @@
               originY: Number(state[profile][yKey]),
               xKey,
               yKey,
+              coordinateMode,
               posterWidth
             };
 
@@ -890,17 +1018,28 @@
           target.addEventListener("pointermove", event => {
             if (!drag || drag.target !== target) return;
 
-            const scale = 100 / drag.posterWidth;
+            const scale =
+              drag.coordinateMode === "pixels"
+                ? 1
+                : 100 / drag.posterWidth;
 
-            state[profile][drag.xKey] = round(
+            const nextX =
               drag.originX +
-              (event.clientX - drag.startX) * scale
-            );
+              (event.clientX - drag.startX) * scale;
 
-            state[profile][drag.yKey] = round(
+            const nextY =
               drag.originY +
-              (event.clientY - drag.startY) * scale
-            );
+              (event.clientY - drag.startY) * scale;
+
+            state[profile][drag.xKey] =
+              drag.coordinateMode === "pixels"
+                ? Math.round(nextX)
+                : round(nextX);
+
+            state[profile][drag.yKey] =
+              drag.coordinateMode === "pixels"
+                ? Math.round(nextY)
+                : round(nextY);
 
             saveAndApply();
             syncPanel();
@@ -941,6 +1080,12 @@
 
         profile = nextProfile;
         saveAndApply();
+
+        if (panel) {
+          panel.querySelector("[data-editor-controls]").innerHTML =
+            renderControls();
+        }
+
         syncPanel();
       }
 
