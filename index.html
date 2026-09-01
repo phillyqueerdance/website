@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Queer Dance Philly</title>
-  <link rel="stylesheet" href="style.css?v=20260831-22">
+  <link rel="stylesheet" href="style.css?v=20260901-01">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -101,7 +101,12 @@
           rel="noopener noreferrer"
         >Instagram</a>
 
-        <a href="#">About</a>
+        <a
+          id="aboutLink"
+          href="#about"
+          aria-haspopup="dialog"
+          aria-controls="aboutDialog"
+        >About</a>
 
         <a
           href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
@@ -130,6 +135,45 @@
     </nav>
 
   </main>
+
+  <dialog
+    id="aboutDialog"
+    class="about-dialog"
+    aria-labelledby="aboutDialogTitle"
+  >
+    <div class="about-dialog-content">
+      <h2 id="aboutDialogTitle">About Queer Dance Philly</h2>
+
+      <p>
+        Queer Dance Philly is your cheat sheet for going out in Philly.
+      </p>
+
+      <p>
+        The calendar brings together queer parties, DJs, venues, and dance
+        floors across the city so you don’t have to piece your weekend
+        together from twenty different Instagram accounts. It’s built for
+        discovery: finding a party you didn’t know about, an artist you
+        haven’t heard yet, or somewhere new to dance.
+      </p>
+
+      <p>
+        QDP also throws Melt, a sapphic-leaning, trans-forward party with a
+        musical language of groove, glimmer, and grind.
+      </p>
+
+      <p>
+        The point isn’t to tell you where you should go. It’s to give you
+        enough information to find where you want to be.
+      </p>
+    </div>
+
+    <button
+      id="aboutCloseButton"
+      class="overlay-close about-dialog-close"
+      type="button"
+      aria-label="Close About"
+    >×</button>
+  </dialog>
 
 
   <script>
@@ -265,6 +309,9 @@
           cardWidth: 78,
           cardPaddingY: 0.45,
           sameTimeCardGap: 0.95,
+          titleAlign: "center",
+          venueAlign: "center",
+          addressAlign: "center",
           detailPadding: 6,
           detailFontSize: 3.1,
           detailTitleSize: 4.35,
@@ -1108,7 +1155,7 @@
     })();
   </script>
 
-  <script src="app.js?v=20260831-20"></script>
+  <script src="app.js?v=20260901-01"></script>
 
 </body>
 </html>
