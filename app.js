@@ -135,14 +135,7 @@ function eventLocationParts(event) {
   const venue = String(event.venue || "").trim();
   const address = String(event.address || "").trim();
 
-  if (String(event.venueId || "").trim()) {
-    return { venue, address };
-  }
-
-  return {
-    venue,
-    address: ""
-  };
+  return { venue, address };
 }
 
 function eventVenue(event) {
