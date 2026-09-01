@@ -12,6 +12,11 @@ const datePopover = document.getElementById("datePopover");
 const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
+const aboutLink = document.getElementById("aboutLink");
+const aboutDialog = document.getElementById("aboutDialog");
+const aboutCloseButton = document.getElementById(
+  "aboutCloseButton"
+);
 
 const layoutEditorEnabled =
   new URLSearchParams(window.location.search)
@@ -1247,7 +1252,27 @@ function openEventDetail(event) {
     description
   );
 
-  eventDetail.appendChild(detailCard);
+  const closeButton =
+  document.createElement("button");
+
+closeButton.type = "button";
+closeButton.className =
+  "overlay-close event-detail-close";
+closeButton.textContent = "×";
+closeButton.setAttribute(
+  "aria-label",
+  "Close event details"
+);
+
+closeButton.addEventListener(
+  "click",
+  closeEventDetail
+);
+
+eventDetail.append(
+  detailCard,
+  closeButton
+);
 }
 
 function closeEventDetail() {
@@ -1265,6 +1290,54 @@ eventDetail.addEventListener(
   event => {
     if (event.target === eventDetail) {
       closeEventDetail();
+    }
+  }
+);
+
+function openAboutDialog(event) {
+  event.preventDefault();
+
+  closeDatePopover();
+
+  if (!eventDetail.hidden) {
+    closeEventDetail();
+  }
+
+  if (!aboutDialog.open) {
+    aboutDialog.showModal();
+  }
+}
+
+function closeAboutDialog() {
+  if (aboutDialog.open) {
+    aboutDialog.close();
+  }
+}
+
+aboutLink.addEventListener(
+  "click",
+  openAboutDialog
+);
+
+aboutCloseButton.addEventListener(
+  "click",
+  closeAboutDialog
+);
+
+aboutDialog.addEventListener(
+  "click",
+  event => {
+    const bounds =
+      aboutDialog.getBoundingClientRect();
+
+    const clickedOutside =
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom;
+
+    if (clickedOutside) {
+      closeAboutDialog();
     }
   }
 );
@@ -1301,7 +1374,11 @@ window.addEventListener(
   "keydown",
   event => {
     if (event.key === "Escape") {
-      if (!eventDetail.hidden) {
+  if (aboutDialog.open) {
+    return;
+  }
+
+  if (!eventDetail.hidden) {
         closeEventDetail();
       } else {
         closeDatePopover();
