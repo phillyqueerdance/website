@@ -613,9 +613,9 @@ body {
   margin: 0;
   padding: 0 0 2px;
 
-  border: 1px solid rgb(255 241 244 / 58%);
-  border-radius: 50%;
-  background: rgb(17 18 22 / 84%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 
   color: #fff1f4;
 
@@ -630,7 +630,6 @@ body {
 
 .overlay-close:hover,
 .overlay-close:focus-visible {
-  border-color: #ff8b63;
   color: #ffcfdd;
 }
 
