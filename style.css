@@ -543,7 +543,7 @@ body {
 
   overflow: auto;
 
-  padding: 0;
+  padding: 0 0 clamp(34px, 5cqw, 48px);
 
   color: #fff1f4;
 
@@ -589,6 +589,114 @@ body {
 
 
 .event-detail-card p:last-child {
+  margin-bottom: 0;
+}
+
+
+/* =========================================================
+   OVERLAY CLOSE BUTTONS
+   ========================================================= */
+
+.overlay-close {
+  appearance: none;
+
+  position: absolute;
+  right: clamp(10px, 1.8cqw, 18px);
+  bottom: clamp(10px, 1.8cqw, 18px);
+  z-index: 3;
+
+  display: grid;
+  place-items: center;
+
+  width: clamp(28px, 4.2cqw, 36px);
+  height: clamp(28px, 4.2cqw, 36px);
+  margin: 0;
+  padding: 0 0 2px;
+
+  border: 1px solid rgb(255 241 244 / 58%);
+  border-radius: 50%;
+  background: rgb(17 18 22 / 84%);
+
+  color: #fff1f4;
+
+  font: inherit;
+  font-size: clamp(17px, 2.5cqw, 21px);
+  font-weight: 400;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+
+.overlay-close:hover,
+.overlay-close:focus-visible {
+  border-color: #ff8b63;
+  color: #ffcfdd;
+}
+
+
+.overlay-close:focus-visible {
+  outline: 1px dashed #fff1f4;
+  outline-offset: 3px;
+}
+
+
+/* =========================================================
+   ABOUT DIALOG
+   ========================================================= */
+
+.about-dialog {
+  position: fixed;
+
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(78dvh, 680px);
+  margin: auto;
+  padding: clamp(24px, 4vw, 38px) clamp(24px, 4.5vw, 42px)
+    clamp(60px, 7vw, 72px);
+
+  overflow: hidden;
+
+  border: 2px solid #a14eb5;
+  border-radius: 16px;
+  background: #202125;
+  box-shadow: 0 18px 70px rgb(0 0 0 / 72%);
+
+  color: #fff1f4;
+}
+
+
+.about-dialog::backdrop {
+  background: rgb(0 0 0 / 72%);
+  backdrop-filter: blur(2px);
+}
+
+
+.about-dialog-content {
+  max-height: calc(78dvh - 96px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+
+.about-dialog h2 {
+  margin: 0 0 20px;
+
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(24px, 4.4vw, 34px);
+  line-height: 1.05;
+}
+
+
+.about-dialog p {
+  margin: 0 0 16px;
+
+  font-size: clamp(15px, 2vw, 17px);
+  line-height: 1.5;
+}
+
+
+.about-dialog p:last-child {
   margin-bottom: 0;
 }
 
@@ -1173,8 +1281,6 @@ body {
 
   .poster-stage {
     order: 0;
-
-    width: 100vw;
   }
 
 
@@ -1203,8 +1309,6 @@ body {
 
 
   .poster {
-    left: 50%;
-
     width: min(
       101.5vw,
       calc((100vh - 82px) * 0.76225)
@@ -1214,8 +1318,6 @@ body {
       101.5vw,
       calc((100dvh - 82px) * 0.76225)
     );
-
-    transform: translateX(-50%);
   }
 
 
@@ -1417,15 +1519,15 @@ body {
     --qdp-title-font-size: 3.55cqw;
     --qdp-title-font-weight: 400;
     --qdp-title-line-height: 1;
-    --qdp-title-align: left;
+    --qdp-title-align: center;
     --qdp-venue-font-size: 2.85cqw;
     --qdp-venue-font-weight: 400;
     --qdp-venue-line-height: 1;
-    --qdp-venue-align: left;
+    --qdp-venue-align: center;
     --qdp-address-font-size: 2.85cqw;
     --qdp-address-font-weight: 400;
     --qdp-address-line-height: 1;
-    --qdp-address-align: left;
+    --qdp-address-align: center;
     --qdp-detail-top: 6.36%;
     --qdp-detail-right: 8.25%;
     --qdp-detail-bottom: 6.1%;
