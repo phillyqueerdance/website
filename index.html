@@ -1,4 +1,9 @@
-<title>Queer Dance Philly | Queer Dance Events in Philadelphia</title>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>Queer Dance Philly | Queer Dance Events in Philadelphia</title>
 
 <meta
   name="description"
@@ -21,3 +26,1112 @@
   content="Your cheat sheet for queer dance parties, DJs, venues, and nightlife in Philadelphia."
 >
 <meta property="og:url" content="https://queerdancephilly.com/">
+  <link rel="stylesheet" href="style.css?v=20260901-02">
+  <link
+    id="layoutOverridesStylesheet"
+    rel="stylesheet"
+    href="layout-overrides.css?v=20260901-02"
+  >
+  <link rel="icon" type="image/png" href="/favicon.png">
+</head>
+
+<body>
+
+  <main class="site-shell">
+
+    <section class="poster-stage" aria-label="Queer Dance Philly events">
+
+      <div id="poster" class="poster">
+
+        <img
+          class="frame"
+          src="frame.png"
+          alt=""
+        >
+
+        <button
+          id="dateButton"
+          class="poster-date"
+          type="button"
+          data-layout-target="date"
+          aria-label="Choose a date"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+        >
+          <span id="dateNumber"></span>
+          <span id="dateDay"></span>
+        </button>
+
+        <div
+          id="datePopover"
+          class="date-popover"
+          role="dialog"
+          aria-label="Choose a date"
+          hidden
+        ></div>
+
+        <div
+          id="eventStack"
+          class="event-stack"
+          data-layout-target="list"
+        ></div>
+
+        <div id="eventDetail" class="event-detail" hidden></div>
+
+      </div>
+
+      <div class="poster-controls" aria-label="Event navigation">
+        <button
+          id="previousPoster"
+          type="button"
+          aria-label="Previous events"
+        >
+          ←
+        </button>
+
+        <button
+          id="nextPoster"
+          type="button"
+          aria-label="Next events"
+        >
+          →
+        </button>
+      </div>
+
+    </section>
+
+    <nav
+      class="side-nav"
+      aria-label="Site links"
+      data-layout-target="nav"
+    >
+      <button
+        id="mobileMenuButton"
+        class="mobile-menu-toggle"
+        type="button"
+        aria-controls="siteMenuLinks"
+        aria-expanded="false"
+      >MENU</button>
+
+      <div id="siteMenuLinks" class="side-nav-links">
+        <a
+          href="https://www.instagram.com/queerdancephilly/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Instagram</a>
+
+        <a
+          id="aboutLink"
+          href="#about"
+          aria-haspopup="dialog"
+          aria-controls="aboutDialog"
+        >About</a>
+
+        <a
+          href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Venue Map</a>
+
+        <a
+          href="https://calendar.google.com/calendar/u/0?cid=cGhpbGx5cXVlZXJkYW5jZUBnbWFpbC5jb20"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Add QDP Google Calendar</a>
+
+        <a
+          href="https://docs.google.com/forms/d/e/1FAIpQLScZijFfh9oe1puPByS2CZ4u1Wr3WJwYa7m79za-8wMvU24tgQ/viewform"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Submit Event</a>
+
+        <a
+          href="https://venmo.com/u/callaia"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Tip Jar</a>
+      </div>
+    </nav>
+
+  </main>
+
+  <dialog
+    id="aboutDialog"
+    class="about-dialog"
+    aria-labelledby="aboutDialogTitle"
+  >
+    <div class="about-dialog-content">
+      <h2 id="aboutDialogTitle">Hi gay!</h2>
+
+      <p>
+        Welcome to Queer Dance Philly, your cheat sheet for finding the next move.
+      </p>
+
+      <p>
+        Queer Dance Philly pieces together queer artists, parties, and venues
+        so you don’t have to scour the internet just to get your groove on.
+        It’s intended for discovery: to find a party you didn’t know about, an artist you
+        haven’t heard yet, or maybe meet someone new.
+      </p>
+
+      <p>
+        Queer Dance Philly also throws Melt, a sexy, sapphic dance party based around the concepts of
+        groove, glimmer, and grind. See @melt.phl on Instagram for details.
+      </p>
+
+      <p>
+        Browse the calendar by swiping, using the arrows, or tapping the date in the upper-left corner. Tap on
+        an event to see more info. 
+        </p>
+
+      <p>
+        Follow @queerdancephilly on IG for more. See you out there!
+      </p>
+    </div>
+
+    <button
+      id="aboutCloseButton"
+      class="overlay-close about-dialog-close"
+      type="button"
+      aria-label="Close About"
+    >×</button>
+  </dialog>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const EDITOR_QUERY = "layout";
+      const STORAGE_KEY = "qdp-comprehensive-layout-v1";
+
+      const desktopDefaults = {
+        navX: 0,
+        navY: -18,
+        navTop: 0,
+        navBottom: 0,
+        navGap: 68,
+        navWidth: 150,
+        navFontSize: 15,
+
+        dateX: 0.24,
+        dateY: -0.37,
+        dateTop: 10.05,
+        dateLeft: 8.5,
+        dateWidth: 22,
+        dateFontSize: 3.75,
+
+        listX: 0,
+        listY: -4.18,
+        listTop: 22.5,
+        listRight: 8.25,
+        listBottom: 8.5,
+        listLeft: 8.25,
+        listJustify: "center",
+
+        timeFontSize: 3.2,
+        timeFontWeight: 700,
+        timeLineHeight: 1.05,
+        showMeridiem: true,
+        timeCardGap: 0.35,
+        cardsNextTimeGap: 0.6,
+
+        cardWidth: 76,
+        cardHeight: 10.75,
+        cardPaddingX: 1.6,
+        cardPaddingY: 0.55,
+        cardRadius: 0.45,
+        sameTimeCardGap: 0.9,
+        cardLineGap: 0.2,
+
+        titleFontSize: 3.55,
+        titleFontWeight: 400,
+        titleLineHeight: 1,
+        titleAlign: "left",
+
+        venueFontSize: 2.85,
+        venueFontWeight: 400,
+        venueLineHeight: 1,
+        venueAlign: "left",
+
+        addressFontSize: 2.85,
+        addressFontWeight: 400,
+        addressLineHeight: 1,
+        addressAlign: "left",
+
+        detailTop: 6.36,
+        detailRight: 8.25,
+        detailBottom: 6.1,
+        detailLeft: 8.17,
+        detailPadding: 5.4,
+        detailRadius: 2.4,
+        detailFontSize: 2.8,
+        detailLineHeight: 1.35,
+        detailTitleSize: 4,
+        detailFlyerMaxHeight: 60,
+        detailFlyerRadius: 1.2,
+        detailFlyerGap: 2.2
+      };
+
+      const DEFAULTS = {
+        desktop: { ...desktopDefaults },
+        mobile: {
+          ...desktopDefaults,
+          navY: 0,
+          navFontSize: 13,
+          dateX: 0,
+          dateY: 0,
+          dateTop: 10.1,
+          listY: 0,
+          cardWidth: 78,
+          cardPaddingY: 0.45,
+          sameTimeCardGap: 0.95,
+          titleAlign: "center",
+          venueAlign: "center",
+          addressAlign: "center",
+          detailPadding: 6,
+          detailFontSize: 3.1,
+          detailTitleSize: 4.35,
+          detailFlyerMaxHeight: 68
+        }
+      };
+
+      const CSS_MAP = {
+        navX: ["--qdp-nav-x", "px"],
+        navY: ["--qdp-nav-y", "px"],
+        navTop: ["--qdp-nav-top", "px"],
+        navBottom: ["--qdp-nav-bottom", "px"],
+        navGap: ["--qdp-nav-gap", "px"],
+        navWidth: ["--qdp-nav-width", "px"],
+        navFontSize: ["--qdp-nav-font-size", "px"],
+
+        dateX: ["--qdp-date-x", "cqw"],
+        dateY: ["--qdp-date-y", "cqw"],
+        dateTop: ["--qdp-date-top", "%"],
+        dateLeft: ["--qdp-date-left", "%"],
+        dateWidth: ["--qdp-date-width", "%"],
+        dateFontSize: ["--qdp-date-font-size", "cqw"],
+
+        listX: ["--qdp-list-x", "cqw"],
+        listY: ["--qdp-list-y", "cqw"],
+        listTop: ["--qdp-list-top", "%"],
+        listRight: ["--qdp-list-right", "%"],
+        listBottom: ["--qdp-list-bottom", "%"],
+        listLeft: ["--qdp-list-left", "%"],
+        listJustify: ["--qdp-list-justify", ""],
+
+        timeFontSize: ["--qdp-time-font-size", "cqw"],
+        timeFontWeight: ["--qdp-time-font-weight", ""],
+        timeLineHeight: ["--qdp-time-line-height", ""],
+        showMeridiem: ["--qdp-time-meridiem-display", "display"],
+        timeCardGap: ["--qdp-time-card-gap", "cqw"],
+        cardsNextTimeGap: ["--qdp-cards-next-time-gap", "cqw"],
+
+        cardWidth: ["--qdp-card-width", "cqw"],
+        cardHeight: ["--qdp-card-height", "cqw"],
+        cardPaddingX: ["--qdp-card-padding-x", "cqw"],
+        cardPaddingY: ["--qdp-card-padding-y", "cqw"],
+        cardRadius: ["--qdp-card-radius", "cqw"],
+        sameTimeCardGap: ["--qdp-same-time-card-gap", "cqw"],
+        cardLineGap: ["--qdp-card-line-gap", "cqw"],
+
+        titleFontSize: ["--qdp-title-font-size", "cqw"],
+        titleFontWeight: ["--qdp-title-font-weight", ""],
+        titleLineHeight: ["--qdp-title-line-height", ""],
+        titleAlign: ["--qdp-title-align", ""],
+
+        venueFontSize: ["--qdp-venue-font-size", "cqw"],
+        venueFontWeight: ["--qdp-venue-font-weight", ""],
+        venueLineHeight: ["--qdp-venue-line-height", ""],
+        venueAlign: ["--qdp-venue-align", ""],
+
+        addressFontSize: ["--qdp-address-font-size", "cqw"],
+        addressFontWeight: ["--qdp-address-font-weight", ""],
+        addressLineHeight: ["--qdp-address-line-height", ""],
+        addressAlign: ["--qdp-address-align", ""],
+
+        detailTop: ["--qdp-detail-top", "%"],
+        detailRight: ["--qdp-detail-right", "%"],
+        detailBottom: ["--qdp-detail-bottom", "%"],
+        detailLeft: ["--qdp-detail-left", "%"],
+        detailPadding: ["--qdp-detail-padding", "cqw"],
+        detailRadius: ["--qdp-detail-radius", "cqw"],
+        detailFontSize: ["--qdp-detail-font-size", "cqw"],
+        detailLineHeight: ["--qdp-detail-line-height", ""],
+        detailTitleSize: ["--qdp-detail-title-size", "cqw"],
+        detailFlyerMaxHeight: ["--qdp-detail-flyer-max-height", "cqw"],
+        detailFlyerRadius: ["--qdp-detail-flyer-radius", "cqw"],
+        detailFlyerGap: ["--qdp-detail-flyer-gap", "cqw"]
+      };
+
+      const NAV_KEYS = new Set([
+        "navX",
+        "navY",
+        "navTop",
+        "navBottom",
+        "navGap",
+        "navWidth",
+        "navFontSize"
+      ]);
+
+      const CONTROL_GROUPS = [
+        {
+          title: "Left link ladder",
+          profiles: ["desktop"],
+          fields: [
+            range("navX", "Horizontal offset", -160, 160, 1, "px"),
+            range("navY", "Vertical offset", -180, 180, 1, "px"),
+            range("navTop", "Top boundary", 0, 160, 1, "px"),
+            range("navBottom", "Bottom boundary", 0, 160, 1, "px"),
+            range("navGap", "Distance from frame", 0, 160, 1, "px"),
+            range("navWidth", "Ladder width", 80, 240, 1, "px"),
+            range("navFontSize", "Link size", 10, 24, 0.5, "px")
+          ]
+        },
+        {
+          title: "Upper-left date",
+          fields: [
+            range("dateX", "Horizontal offset", -20, 20, 0.05, "cqw"),
+            range("dateY", "Vertical offset", -20, 20, 0.05, "cqw"),
+            range("dateTop", "Top", 5, 25, 0.1, "%"),
+            range("dateLeft", "Left", 0, 40, 0.1, "%"),
+            range("dateWidth", "Area width", 10, 40, 0.25, "%"),
+            range("dateFontSize", "Font size", 2, 6, 0.05, "cqw")
+          ]
+        },
+        {
+          title: "Event region",
+          fields: [
+            range("listX", "Horizontal offset", -25, 25, 0.05, "cqw"),
+            range("listY", "Vertical offset", -25, 25, 0.05, "cqw"),
+            range("listTop", "Top boundary", 15, 45, 0.1, "%"),
+            range("listRight", "Right boundary", 3, 25, 0.1, "%"),
+            range("listBottom", "Bottom boundary", 3, 25, 0.1, "%"),
+            range("listLeft", "Left boundary", 3, 25, 0.1, "%"),
+            select("listJustify", "Vertical alignment", [
+              ["flex-start", "Top"],
+              ["center", "Center"],
+              ["flex-end", "Bottom"],
+              ["space-between", "Spread"]
+            ])
+          ]
+        },
+        {
+          title: "Times and spacing",
+          fields: [
+            range("timeFontSize", "Time size", 2, 5.5, 0.05, "cqw"),
+            range("timeFontWeight", "Time weight", 400, 900, 100, ""),
+            range("timeLineHeight", "Time line height", 0.8, 1.6, 0.05, ""),
+            toggle("showMeridiem", "Show AM/PM"),
+            range("timeCardGap", "Time-to-cards gap", 0, 4, 0.05, "cqw"),
+            range("cardsNextTimeGap", "Cards-to-next-time gap", 0, 4, 0.05, "cqw"),
+            range("sameTimeCardGap", "Same-time card gap", 0, 3, 0.05, "cqw")
+          ]
+        },
+        {
+          title: "Cards",
+          fields: [
+            range("cardWidth", "Width", 45, 84, 0.25, "cqw"),
+            range("cardHeight", "Minimum height", 7, 18, 0.05, "cqw"),
+            range("cardPaddingX", "Horizontal padding", 0, 4, 0.05, "cqw"),
+            range("cardPaddingY", "Vertical padding", 0, 3, 0.05, "cqw"),
+            range("cardRadius", "Corner radius", 0, 4, 0.05, "cqw"),
+            range("cardLineGap", "Line gap", 0, 2, 0.05, "cqw")
+          ]
+        },
+        typographyGroup("Title", "title", 2, 6),
+        typographyGroup("Venue", "venue", 1.5, 5),
+        typographyGroup("Address", "address", 1.5, 5),
+        {
+          title: "Expanded event",
+          fields: [
+            range("detailTop", "Top inset", 3, 20, 0.1, "%"),
+            range("detailRight", "Right inset", 3, 20, 0.1, "%"),
+            range("detailBottom", "Bottom inset", 3, 20, 0.1, "%"),
+            range("detailLeft", "Left inset", 3, 20, 0.1, "%"),
+            range("detailPadding", "Padding", 1, 12, 0.1, "cqw"),
+            range("detailRadius", "Corner radius", 0, 6, 0.1, "cqw"),
+            range("detailFontSize", "Body size", 1.5, 5, 0.05, "cqw"),
+            range("detailLineHeight", "Body line height", 0.9, 2, 0.05, ""),
+            range("detailTitleSize", "Title size", 2, 7, 0.05, "cqw"),
+            range("detailFlyerMaxHeight", "Flyer maximum height", 20, 100, 0.5, "cqw"),
+            range("detailFlyerRadius", "Flyer corner radius", 0, 6, 0.1, "cqw"),
+            range("detailFlyerGap", "Flyer-to-title gap", 0, 6, 0.1, "cqw")
+          ]
+        }
+      ];
+
+      function range(key, label, min, max, step, unit) {
+        return { type: "range", key, label, min, max, step, unit };
+      }
+
+      function toggle(key, label) {
+        return { type: "checkbox", key, label };
+      }
+
+      function select(key, label, options) {
+        return { type: "select", key, label, options };
+      }
+
+      function typographyGroup(title, prefix, min, max) {
+        return {
+          title,
+          fields: [
+            range(`${prefix}FontSize`, "Font size", min, max, 0.05, "cqw"),
+            range(`${prefix}FontWeight`, "Weight", 300, 900, 100, ""),
+            range(`${prefix}LineHeight`, "Line height", 0.8, 1.6, 0.05, ""),
+            select(`${prefix}Align`, "Alignment", [
+              ["left", "Left"],
+              ["center", "Center"],
+              ["right", "Right"]
+            ])
+          ]
+        };
+      }
+
+      function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function mergedState(value) {
+        return {
+          desktop: { ...DEFAULTS.desktop, ...(value?.desktop || {}) },
+          mobile: { ...DEFAULTS.mobile, ...(value?.mobile || {}) }
+        };
+      }
+
+      function readState() {
+        try {
+          return mergedState(
+            JSON.parse(window.localStorage.getItem(STORAGE_KEY))
+          );
+        } catch {
+          return mergedState();
+        }
+      }
+
+      function profileName() {
+        return window.matchMedia("(max-width: 600px)").matches
+          ? "mobile"
+          : "desktop";
+      }
+
+      function cssValue(key, value) {
+        const unit = CSS_MAP[key][1];
+
+        if (unit === "display") {
+          return value ? "inline" : "none";
+        }
+
+        return `${value}${unit}`;
+      }
+
+      function stateFromCssValue(key, value) {
+        const unit = CSS_MAP[key][1];
+
+        if (unit === "display") {
+          return value.trim() !== "none";
+        }
+
+        if (!unit) {
+          const numeric = Number(value);
+          return Number.isFinite(numeric) ? numeric : value.trim();
+        }
+
+        return Number.parseFloat(value);
+      }
+
+      function declarations(profile, target) {
+        return Object.entries(CSS_MAP)
+          .filter(([key]) =>
+            target === "nav" ? NAV_KEYS.has(key) : !NAV_KEYS.has(key)
+          )
+          .map(([key, [variable]]) =>
+            `  ${variable}: ${cssValue(key, state[profile][key])};`
+          )
+          .join("\n");
+      }
+
+      function layoutCssText() {
+        return [
+          "/* Generated by the QDP layout editor. */",
+          "/* QDP_PROFILE_DESKTOP_START */",
+          ".poster {",
+          declarations("desktop", "poster"),
+          "}",
+          "",
+          ".side-nav {",
+          declarations("desktop", "nav"),
+          "}",
+          "/* QDP_PROFILE_DESKTOP_END */",
+          "",
+          "@media (max-width: 600px) {",
+          "  /* QDP_PROFILE_MOBILE_START */",
+          "  .poster {",
+          declarations("mobile", "poster").replace(/^/gm, "  "),
+          "  }",
+          "",
+          "  .side-nav {",
+          declarations("mobile", "nav").replace(/^/gm, "  "),
+          "  }",
+          "  /* QDP_PROFILE_MOBILE_END */",
+          "}",
+          ""
+        ].join("\n");
+      }
+
+      function parseProfileBlock(css, profile) {
+        const upper = profile.toUpperCase();
+        const match = css.match(
+          new RegExp(
+            `/\\* QDP_PROFILE_${upper}_START \\*/([\\s\\S]*?)/\\* QDP_PROFILE_${upper}_END \\*/`
+          )
+        );
+
+        if (!match) {
+          return null;
+        }
+
+        const parsed = {};
+
+        Object.entries(CSS_MAP).forEach(([key, [variable]]) => {
+          const valueMatch = match[1].match(
+            new RegExp(`${variable.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\s*:\\s*([^;]+)`)
+          );
+
+          if (valueMatch) {
+            parsed[key] = stateFromCssValue(key, valueMatch[1]);
+          }
+        });
+
+        return parsed;
+      }
+
+      function inputMarkup(field, value) {
+        if (field.type === "checkbox") {
+          return `
+            <label class="qdp-editor-toggle">
+              <input type="checkbox" data-layout-key="${field.key}" ${value ? "checked" : ""}>
+              <span>${field.label}</span>
+            </label>`;
+        }
+
+        if (field.type === "select") {
+          const options = field.options
+            .map(([optionValue, optionLabel]) =>
+              `<option value="${optionValue}" ${optionValue === value ? "selected" : ""}>${optionLabel}</option>`
+            )
+            .join("");
+
+          return `
+            <label class="qdp-editor-select">
+              <span>${field.label}</span>
+              <select data-layout-key="${field.key}">${options}</select>
+            </label>`;
+        }
+
+        return `
+          <label class="qdp-editor-control">
+            <span>${field.label}</span>
+            <output data-layout-value="${field.key}">${formatValue(value, field.unit)}</output>
+            <input
+              type="range"
+              min="${field.min}"
+              max="${field.max}"
+              step="${field.step}"
+              value="${value}"
+              data-layout-key="${field.key}"
+              data-layout-unit="${field.unit}"
+            >
+          </label>`;
+      }
+
+      function formatValue(value, unit = "") {
+        if (typeof value !== "number") {
+          return String(value);
+        }
+
+        const rounded = Math.round(value * 100) / 100;
+        return `${rounded}${unit}`;
+      }
+
+      let state = readState();
+      let profile = profileName();
+      let panel = null;
+      let committed = clone(state);
+      let undoStack = [];
+      let redoStack = [];
+      let selectedTarget = null;
+      let drag = null;
+
+      function saveAndApply() {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+        const poster = document.getElementById("poster");
+        const nav = document.querySelector(".side-nav");
+
+        if (!poster || !nav) return;
+
+        Object.entries(CSS_MAP).forEach(([key, [variable]]) => {
+          const target = NAV_KEYS.has(key) ? nav : poster;
+
+          target.style.setProperty(
+            variable,
+            cssValue(key, state[profile][key])
+          );
+        });
+      }
+
+      function commitChange() {
+        if (JSON.stringify(committed) === JSON.stringify(state)) {
+          return;
+        }
+
+        undoStack.push(clone(committed));
+        if (undoStack.length > 80) undoStack.shift();
+        redoStack = [];
+        committed = clone(state);
+        updateHistoryButtons();
+      }
+
+      function restore(next) {
+        state = mergedState(next);
+        committed = clone(state);
+        saveAndApply();
+        syncPanel();
+      }
+
+      function undo() {
+        if (!undoStack.length) return;
+        redoStack.push(clone(state));
+        restore(undoStack.pop());
+      }
+
+      function redo() {
+        if (!redoStack.length) return;
+        undoStack.push(clone(state));
+        restore(redoStack.pop());
+      }
+
+      function updateHistoryButtons() {
+        if (!panel) return;
+        panel.querySelector('[data-action="undo"]').disabled = !undoStack.length;
+        panel.querySelector('[data-action="redo"]').disabled = !redoStack.length;
+      }
+
+      function renderControls() {
+        return CONTROL_GROUPS
+          .filter(group =>
+            !group.profiles || group.profiles.includes(profile)
+          )
+          .map((group, index) => `
+            <details class="qdp-editor-section" ${index < 2 ? "open" : ""}>
+              <summary>${group.title}</summary>
+              <div class="qdp-editor-section-body">
+                ${group.fields
+                  .map(field => inputMarkup(field, state[profile][field.key]))
+                  .join("")}
+              </div>
+            </details>`)
+          .join("");
+      }
+
+      function buildPanel() {
+        panel = document.createElement("aside");
+        panel.className = "qdp-layout-editor";
+        panel.innerHTML = `
+          <div class="qdp-editor-header">
+            <div>
+              <strong>QDP layout editor</strong>
+              <span data-editor-profile>${profile}</span>
+            </div>
+            <button type="button" data-action="collapse" aria-label="Collapse editor">−</button>
+          </div>
+
+          <div class="qdp-editor-toolbar">
+            <button type="button" data-action="undo">Undo</button>
+            <button type="button" data-action="redo">Redo</button>
+            <button type="button" data-action="reset">Reset ${profile}</button>
+            <button type="button" data-action="guides">Guides</button>
+            <button type="button" data-action="preview-detail">Preview detail</button>
+            <button type="button" data-action="close-detail">Close detail</button>
+          </div>
+
+          <p class="qdp-editor-help">
+            Drag the date, event region, or desktop link ladder directly. Sliders update the page live.
+          </p>
+
+          <div class="qdp-editor-scroll" data-editor-controls>
+            ${renderControls()}
+          </div>
+
+          <div class="qdp-editor-export">
+            <button type="button" data-action="download">Download layout CSS</button>
+            <button type="button" data-action="copy">Copy CSS</button>
+            <button type="button" data-action="import">Import layout CSS</button>
+            <button type="button" data-action="done">Exit layout mode</button>
+            <input type="file" accept=".css,text/css" data-editor-import hidden>
+          </div>
+        `;
+
+        document.body.appendChild(panel);
+        bindPanel();
+        updateHistoryButtons();
+      }
+
+      function syncPanel() {
+        if (!panel) return;
+
+        panel.querySelector("[data-editor-profile]").textContent = profile;
+        panel.querySelector('[data-action="reset"]').textContent = `Reset ${profile}`;
+
+        panel.querySelectorAll("[data-layout-key]").forEach(input => {
+          const key = input.dataset.layoutKey;
+          const value = state[profile][key];
+
+          if (input.type === "checkbox") {
+            input.checked = Boolean(value);
+          } else {
+            input.value = value;
+          }
+
+          const output = panel.querySelector(`[data-layout-value="${key}"]`);
+
+          if (output) {
+            output.textContent = formatValue(
+              value,
+              input.dataset.layoutUnit || ""
+            );
+          }
+        });
+
+        updateHistoryButtons();
+      }
+
+      function bindPanel() {
+        panel.addEventListener("input", event => {
+          const input = event.target.closest("[data-layout-key]");
+
+          if (!input || input.type === "checkbox") return;
+
+          const key = input.dataset.layoutKey;
+
+          state[profile][key] =
+            input.type === "range"
+              ? Number(input.value)
+              : input.value;
+
+          saveAndApply();
+
+          const output = panel.querySelector(`[data-layout-value="${key}"]`);
+
+          if (output) {
+            output.textContent = formatValue(
+              state[profile][key],
+              input.dataset.layoutUnit || ""
+            );
+          }
+        });
+
+        panel.addEventListener("change", event => {
+          const input = event.target.closest("[data-layout-key]");
+
+          if (input) {
+            const key = input.dataset.layoutKey;
+
+            state[profile][key] =
+              input.type === "checkbox"
+                ? input.checked
+                : input.type === "range"
+                  ? Number(input.value)
+                  : input.value;
+
+            saveAndApply();
+            commitChange();
+          }
+
+          if (event.target.matches("[data-editor-import]")) {
+            importCssFile(event.target.files[0]);
+            event.target.value = "";
+          }
+        });
+
+        panel.addEventListener("click", async event => {
+          const button = event.target.closest("[data-action]");
+
+          if (!button) return;
+
+          const action = button.dataset.action;
+
+          if (action === "undo") undo();
+          if (action === "redo") redo();
+
+          if (action === "reset") {
+            state[profile] = clone(DEFAULTS[profile]);
+            saveAndApply();
+            commitChange();
+            syncPanel();
+          }
+
+          if (action === "guides") {
+            document.body.classList.toggle("qdp-layout-guides");
+            button.classList.toggle("active");
+          }
+
+          if (action === "preview-detail") {
+            document.querySelector(".event-card")?.click();
+          }
+
+          if (action === "close-detail") {
+            const detail = document.getElementById("eventDetail");
+            const stack = document.getElementById("eventStack");
+
+            detail.hidden = true;
+            detail.classList.remove("is-open");
+            stack.hidden = false;
+          }
+
+          if (action === "download") downloadCss();
+
+          if (action === "copy") {
+            await copyCss();
+
+            const oldText = button.textContent;
+            button.textContent = "Copied";
+
+            window.setTimeout(() => {
+              button.textContent = oldText;
+            }, 1000);
+          }
+
+          if (action === "import") {
+            panel.querySelector("[data-editor-import]").click();
+          }
+
+          if (action === "collapse") {
+            panel.classList.toggle("collapsed");
+
+            button.textContent =
+              panel.classList.contains("collapsed")
+                ? "+"
+                : "−";
+          }
+
+          if (action === "done") {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("edit");
+            window.location.href = url.toString();
+          }
+        });
+      }
+
+      function downloadCss() {
+        const blob = new Blob(
+          [layoutCssText()],
+          { type: "text/css" }
+        );
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "layout-overrides.css";
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        URL.revokeObjectURL(url);
+      }
+
+      async function copyCss() {
+        const css = layoutCssText();
+
+        try {
+          await navigator.clipboard.writeText(css);
+        } catch {
+          const area = document.createElement("textarea");
+
+          area.value = css;
+          document.body.appendChild(area);
+          area.select();
+
+          document.execCommand("copy");
+          area.remove();
+        }
+      }
+
+      function importCssFile(file) {
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        reader.addEventListener("load", () => {
+          const css = String(reader.result || "");
+          const desktop = parseProfileBlock(css, "desktop");
+          const mobile = parseProfileBlock(css, "mobile");
+
+          if (!desktop || !mobile) {
+            window.alert(
+              "That file was not generated by the QDP layout editor."
+            );
+
+            return;
+          }
+
+          state = mergedState({ desktop, mobile });
+
+          saveAndApply();
+          commitChange();
+          syncPanel();
+        });
+
+        reader.readAsText(file);
+      }
+
+      const DRAGGABLES = [
+        [".poster-date", "dateX", "dateY", "poster"],
+        [".event-stack", "listX", "listY", "poster"],
+        [".side-nav", "navX", "navY", "pixels"]
+      ];
+
+      function bindDragging() {
+        DRAGGABLES.forEach(([selector, xKey, yKey, coordinateMode]) => {
+          const target = document.querySelector(selector);
+
+          if (!target) return;
+
+          target.dataset.editorDraggable = "true";
+
+          target.addEventListener("pointerdown", event => {
+            if (event.button > 0) return;
+            if (
+              selector === ".side-nav" &&
+              window.matchMedia("(max-width: 760px)").matches
+            ) {
+              return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            selectTarget(target);
+
+            const posterWidth = document
+              .getElementById("poster")
+              .getBoundingClientRect()
+              .width;
+
+            drag = {
+              target,
+              pointerId: event.pointerId,
+              startX: event.clientX,
+              startY: event.clientY,
+              originX: Number(state[profile][xKey]),
+              originY: Number(state[profile][yKey]),
+              xKey,
+              yKey,
+              coordinateMode,
+              posterWidth
+            };
+
+            target.classList.add("is-dragging");
+            target.setPointerCapture(event.pointerId);
+          });
+
+          target.addEventListener("pointermove", event => {
+            if (!drag || drag.target !== target) return;
+
+            const scale =
+              drag.coordinateMode === "pixels"
+                ? 1
+                : 100 / drag.posterWidth;
+
+            const nextX =
+              drag.originX +
+              (event.clientX - drag.startX) * scale;
+
+            const nextY =
+              drag.originY +
+              (event.clientY - drag.startY) * scale;
+
+            state[profile][drag.xKey] =
+              drag.coordinateMode === "pixels"
+                ? Math.round(nextX)
+                : round(nextX);
+
+            state[profile][drag.yKey] =
+              drag.coordinateMode === "pixels"
+                ? Math.round(nextY)
+                : round(nextY);
+
+            saveAndApply();
+            syncPanel();
+          });
+
+          const stop = event => {
+            if (!drag || drag.target !== target) return;
+
+            target.classList.remove("is-dragging");
+
+            if (target.hasPointerCapture(event.pointerId)) {
+              target.releasePointerCapture(event.pointerId);
+            }
+
+            drag = null;
+            commitChange();
+          };
+
+          target.addEventListener("pointerup", stop);
+          target.addEventListener("pointercancel", stop);
+        });
+      }
+
+      function selectTarget(target) {
+        selectedTarget?.classList.remove("layout-selected");
+        selectedTarget = target;
+        selectedTarget.classList.add("layout-selected");
+      }
+
+      function round(value) {
+        return Math.round(value * 20) / 20;
+      }
+
+      function handleResize() {
+        const nextProfile = profileName();
+
+        if (nextProfile === profile) return;
+
+        profile = nextProfile;
+        saveAndApply();
+
+        if (panel) {
+          panel.querySelector("[data-editor-controls]").innerHTML =
+            renderControls();
+        }
+
+        syncPanel();
+      }
+
+      window.initializeComprehensiveLayoutEditor = function () {
+        if (
+          new URLSearchParams(window.location.search).get("edit") !==
+          EDITOR_QUERY
+        ) {
+          return;
+        }
+
+        document.body.classList.add("layout-editor-active");
+
+        saveAndApply();
+        buildPanel();
+        bindDragging();
+
+        window.addEventListener("resize", handleResize);
+      };
+    })();
+  </script>
+
+  <script src="app.js?v=20260901-03"></script>
+
+</body>
+</html>
