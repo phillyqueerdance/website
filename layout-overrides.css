@@ -68,12 +68,12 @@
 @media (max-width: 600px) {
   /* QDP_PROFILE_MOBILE_START */
   .poster {
-    --qdp-date-x: -0.2cqw;
+    --qdp-date-x: -1.6cqw;
     --qdp-date-y: -0.4cqw;
-    --qdp-date-top: 9.7%;
+    --qdp-date-top: 9.2%;
     --qdp-date-left: 8.5%;
     --qdp-date-width: 22%;
-    --qdp-date-font-size: 4.15cqw;
+    --qdp-date-font-size: 4.2cqw;
     --qdp-list-x: 0.15cqw;
     --qdp-list-y: -3.9cqw;
     --qdp-list-top: 22.5%;
