@@ -4,16 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Queer Dance Philly</title>
-  <link rel="stylesheet" href="style.css?v=20260901-01">
+  <meta
+    name="description"
+    content="Queer Dance Philly brings together queer parties, DJs, venues, and dance floors across Philadelphia."
+  >
+  <meta name="theme-color" content="#000000">
+  <link rel="canonical" href="https://queerdancephilly.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Queer Dance Philly">
+  <meta
+    property="og:description"
+    content="Your cheat sheet for going out in Philly."
+  >
+  <meta property="og:url" content="https://queerdancephilly.com/">
+  <link rel="stylesheet" href="style.css?v=20260901-02">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
-    href="layout-overrides.css"
+    href="layout-overrides.css?v=20260901-02"
   >
-  <script>
-    document.getElementById("layoutOverridesStylesheet").href =
-      `layout-overrides.css?v=${Date.now()}`;
-  </script>
 </head>
 
 <body>
@@ -142,35 +151,29 @@
     aria-labelledby="aboutDialogTitle"
   >
     <div class="about-dialog-content">
-      <h2 id="aboutDialogTitle">Hi gay!</h2>
+      <h2 id="aboutDialogTitle">About Queer Dance Philly</h2>
 
       <p>
-        Welcome to Queer Dance Philly, your cheat sheet for finding the next move.
-      </p>
-
-      <p>
-        The calendar brings together queer parties, DJs, and venues
-        so you don’t have to piece your weekend
-        together from twenty different Instagram accounts. It’s intended as 
-        a discovery tool, so you can find a party you didn’t know about,
-         hear an artist you haven’t heard yet, and maybe even meet someone new.
-      </p>
-
-        <p>
-        QDP also throws Melt, a sexy, sapphic dance party based around the concepts of groove,
-        glimmer, and grind.
+        Queer Dance Philly is your cheat sheet for going out in Philly.
       </p>
 
       <p>
-        Browse the calendar by swiping, using the arrows, or tapping the date in the upper-left. Tapping on an event will
-        display more information.
+        The calendar brings together queer parties, DJs, venues, and dance
+        floors across the city so you don’t have to piece your weekend
+        together from twenty different Instagram accounts. It’s built for
+        discovery: finding a party you didn’t know about, an artist you
+        haven’t heard yet, or somewhere new to dance.
       </p>
 
       <p>
-        Follow @queerdancephilly on IG for more. See you out there!
+        QDP also throws Melt, a sapphic-leaning, trans-forward party with a
+        musical language of groove, glimmer, and grind.
       </p>
 
-    
+      <p>
+        The point isn’t to tell you where you should go. It’s to give you
+        enough information to find where you want to be.
+      </p>
     </div>
 
     <button
@@ -180,52 +183,6 @@
       aria-label="Close About"
     >×</button>
   </dialog>
-
-
-  <script>
-    (() => {
-      "use strict";
-
-      const nav = document.querySelector(".side-nav");
-      const button = document.getElementById("mobileMenuButton");
-      const links = document.getElementById("siteMenuLinks");
-      const mobileQuery = window.matchMedia("(max-width: 760px)");
-
-      if (!nav || !button || !links) return;
-
-      function setMenuOpen(open) {
-        nav.classList.toggle("menu-open", open);
-        button.setAttribute("aria-expanded", String(open));
-      }
-
-      button.addEventListener("click", event => {
-        event.stopPropagation();
-        setMenuOpen(!nav.classList.contains("menu-open"));
-      });
-
-      links.addEventListener("click", event => {
-        if (event.target.closest("a")) setMenuOpen(false);
-      });
-
-      document.addEventListener("click", event => {
-        if (!nav.contains(event.target)) setMenuOpen(false);
-      });
-
-      document.addEventListener("keydown", event => {
-        if (event.key !== "Escape" || !nav.classList.contains("menu-open")) {
-          return;
-        }
-
-        setMenuOpen(false);
-        button.focus();
-      });
-
-      mobileQuery.addEventListener("change", event => {
-        if (!event.matches) setMenuOpen(false);
-      });
-    })();
-  </script>
-
 
   <script>
     (() => {
@@ -1161,7 +1118,7 @@
     })();
   </script>
 
-  <script src="app.js?v=20260901-01"></script>
+  <script src="app.js?v=20260901-02"></script>
 
 </body>
 </html>

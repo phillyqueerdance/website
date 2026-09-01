@@ -22,487 +22,89 @@ const layoutEditorEnabled =
   new URLSearchParams(window.location.search)
     .get("edit") === "layout";
 
-const layoutTargets = {
-  date: document.querySelector('[data-layout-target="date"]'),
-  list: document.querySelector('[data-layout-target="list"]')
-};
-
-const LAYOUT_STORAGE_KEY = "qdp-poster-layout-v2";
-
-const LAYOUT_DEFAULTS = {
-  desktop: {
-    dateFontSize: 3.75,
-    timeFontSize: 3.2,
-    timeCardGap: 0.35,
-    cardsNextTimeGap: 0.6,
-    cardWidth: 76,
-    showMeridiem: true,
-    date: { x: 0.24, y: -0.37 },
-    list: { x: 0, y: -4.18 }
-  },
-  mobile: {
-    dateFontSize: 3.7,
-    timeFontSize: 3.2,
-    timeCardGap: 0.35,
-    cardsNextTimeGap: 0.6,
-    cardWidth: 78,
-    showMeridiem: true,
-    date: { x: 0, y: 0 },
-    list: { x: 0, y: 0 }
-  }
-};
-
 let posterPages = [];
 let currentPosterIndex = 0;
 let pickerMonth = null;
 let touchStartX = null;
-let activeLayoutDrag = null;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
 
-function layoutBreakpoint() {
-  return window.matchMedia("(max-width: 600px)").matches
-    ? "mobile"
-    : "desktop";
-}
-
-function readLayoutOverrides() {
-  try {
-    return JSON.parse(
-      window.localStorage.getItem(LAYOUT_STORAGE_KEY)
-    ) || {};
-  } catch {
-    return {};
-  }
-}
-
-function writeLayoutOverrides(overrides) {
-  window.localStorage.setItem(
-    LAYOUT_STORAGE_KEY,
-    JSON.stringify(overrides)
+function initializeMobileMenu() {
+  const nav = document.querySelector(".side-nav");
+  const button = document.getElementById(
+    "mobileMenuButton"
   );
-}
-
-function layoutValues(breakpoint) {
-  const overrides = readLayoutOverrides();
-  const saved = overrides[breakpoint] || {};
-
-  return {
-    ...LAYOUT_DEFAULTS[breakpoint],
-    ...saved,
-    date:
-      saved.date ||
-      LAYOUT_DEFAULTS[breakpoint].date ||
-      { x: 0, y: 0 },
-    list:
-      saved.list ||
-      LAYOUT_DEFAULTS[breakpoint].list ||
-      { x: 0, y: 0 }
-  };
-}
-
-function applyLayoutOverrides() {
-  const values = layoutValues(layoutBreakpoint());
-
-  ["date", "list"].forEach(name => {
-    const target = layoutTargets[name];
-    const position = values[name] || { x: 0, y: 0 };
-
-    target.style.setProperty(
-      `--layout-${name}-x`,
-      `${position.x || 0}cqw`
-    );
-
-    target.style.setProperty(
-      `--layout-${name}-y`,
-      `${position.y || 0}cqw`
-    );
-  });
-
-  layoutTargets.date.style.setProperty(
-    "--layout-date-font-size",
-    `${values.dateFontSize}cqw`
+  const links = document.getElementById(
+    "siteMenuLinks"
+  );
+  const mobileQuery = window.matchMedia(
+    "(max-width: 760px)"
   );
 
-  layoutTargets.list.style.setProperty(
-    "--layout-time-font-size",
-    `${values.timeFontSize}cqw`
-  );
-
-  layoutTargets.list.style.setProperty(
-    "--layout-time-card-gap",
-    `${values.timeCardGap}cqw`
-  );
-
-  layoutTargets.list.style.setProperty(
-    "--layout-card-width",
-    `${values.cardWidth}cqw`
-  );
-
-  layoutTargets.list.style.setProperty(
-    "--layout-cards-next-time-gap",
-    `${values.cardsNextTimeGap}cqw`
-  );
-
-  layoutTargets.list.style.setProperty(
-    "--layout-time-meridiem-display",
-    values.showMeridiem ? "inline" : "none"
-  );
-}
-
-function layoutCss() {
-  const format = value => Number(value || 0).toFixed(2);
-
-  const block = breakpoint => {
-    const values = layoutValues(breakpoint);
-    const date = values.date;
-    const list = values.list;
-
-    return [
-      `.poster-date { --layout-date-x: ${format(date.x)}cqw; --layout-date-y: ${format(date.y)}cqw; --layout-date-font-size: ${format(values.dateFontSize)}cqw; }`,
-      `.event-stack { --layout-list-x: ${format(list.x)}cqw; --layout-list-y: ${format(list.y)}cqw; --layout-time-font-size: ${format(values.timeFontSize)}cqw; --layout-time-card-gap: ${format(values.timeCardGap)}cqw; --layout-cards-next-time-gap: ${format(values.cardsNextTimeGap)}cqw; --layout-card-width: ${format(values.cardWidth)}cqw; --layout-time-meridiem-display: ${values.showMeridiem ? "inline" : "none"}; }`
-    ].join("\n");
-  };
-
-  return [
-    "/* QDP poster layout overrides */",
-    "/* Desktop */",
-    block("desktop"),
-    "",
-    "@media (max-width: 600px) {",
-    `  ${block("mobile").replace(/\n/g, "\n  ")}`,
-    "}"
-  ].join("\n");
-}
-
-function setLayoutOutput(output) {
-  output.value = layoutCss();
-}
-
-function moveLayoutTarget(name, deltaX, deltaY) {
-  const overrides = readLayoutOverrides();
-  const breakpoint = layoutBreakpoint();
-  const values = overrides[breakpoint] || {};
-  const current = values[name] || { x: 0, y: 0 };
-
-  values[name] = {
-    x: Math.round((current.x + deltaX) * 100) / 100,
-    y: Math.round((current.y + deltaY) * 100) / 100
-  };
-
-  overrides[breakpoint] = values;
-
-  writeLayoutOverrides(overrides);
-  applyLayoutOverrides();
-}
-
-function updateLayoutSetting(name, value) {
-  const overrides = readLayoutOverrides();
-  const breakpoint = layoutBreakpoint();
-  const values = overrides[breakpoint] || {};
-
-  values[name] = value;
-  overrides[breakpoint] = values;
-
-  writeLayoutOverrides(overrides);
-  applyLayoutOverrides();
-}
-
-function makeLayoutDraggable(target, name, output) {
-  target.addEventListener("pointerdown", event => {
-    if (!layoutEditorEnabled || event.button > 0) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    activeLayoutDrag = {
-      name,
-      startX: event.clientX,
-      startY: event.clientY,
-      posterWidth: poster.getBoundingClientRect().width
-    };
-
-    target.classList.add("is-dragging");
-    target.setPointerCapture(event.pointerId);
-  });
-
-  target.addEventListener("pointermove", event => {
-    if (!activeLayoutDrag || activeLayoutDrag.name !== name) {
-      return;
-    }
-
-    const scale = 100 / activeLayoutDrag.posterWidth;
-
-    const deltaX =
-      (event.clientX - activeLayoutDrag.startX) * scale;
-
-    const deltaY =
-      (event.clientY - activeLayoutDrag.startY) * scale;
-
-    moveLayoutTarget(name, deltaX, deltaY);
-
-    activeLayoutDrag.startX = event.clientX;
-    activeLayoutDrag.startY = event.clientY;
-
-    setLayoutOutput(output);
-  });
-
-  const stopDragging = () => {
-    activeLayoutDrag = null;
-    target.classList.remove("is-dragging");
-  };
-
-  target.addEventListener("pointerup", stopDragging);
-  target.addEventListener("pointercancel", stopDragging);
-}
-
-function initializeLayoutEditor() {
-  if (!layoutEditorEnabled) {
+  if (!nav || !button || !links) {
     return;
   }
 
-  document.body.classList.add("layout-editor-active");
-  applyLayoutOverrides();
-
-  const values = layoutValues(layoutBreakpoint());
-
-  const panel = document.createElement("aside");
-  panel.className = "layout-editor-panel";
-
-  panel.innerHTML = `
-    <p class="layout-editor-title">Layout editor: ${layoutBreakpoint()}</p>
-
-    <div class="layout-editor-actions">
-      <button type="button" data-layout-action="copy">Copy CSS</button>
-      <button type="button" data-layout-action="reset">Reset this view</button>
-      <button type="button" data-layout-action="done">Done</button>
-    </div>
-
-    <div class="layout-editor-controls">
-      <label class="layout-editor-control">
-        <span>Upper-left date size</span>
-        <output data-layout-output="dateFontSize">${values.dateFontSize.toFixed(2)}cqw</output>
-        <input
-          type="range"
-          min="2.8"
-          max="5"
-          step="0.05"
-          value="${values.dateFontSize}"
-          data-layout-setting="dateFontSize"
-        >
-      </label>
-
-      <label class="layout-editor-control">
-        <span>Time size</span>
-        <output data-layout-output="timeFontSize">${values.timeFontSize.toFixed(2)}cqw</output>
-        <input
-          type="range"
-          min="2.5"
-          max="4.5"
-          step="0.05"
-          value="${values.timeFontSize}"
-          data-layout-setting="timeFontSize"
-        >
-      </label>
-
-      <label class="layout-editor-control">
-        <span>Time-to-cards gap</span>
-        <output data-layout-output="timeCardGap">${values.timeCardGap.toFixed(2)}cqw</output>
-        <input
-          type="range"
-          min="0"
-          max="2"
-          step="0.05"
-          value="${values.timeCardGap}"
-          data-layout-setting="timeCardGap"
-        >
-      </label>
-
-      <label class="layout-editor-control">
-        <span>Cards-to-next-time gap</span>
-        <output data-layout-output="cardsNextTimeGap">${values.cardsNextTimeGap.toFixed(2)}cqw</output>
-        <input
-          type="range"
-          min="0"
-          max="2"
-          step="0.05"
-          value="${values.cardsNextTimeGap}"
-          data-layout-setting="cardsNextTimeGap"
-        >
-      </label>
-
-      <label class="layout-editor-control">
-        <span>Card width</span>
-        <output data-layout-output="cardWidth">${values.cardWidth.toFixed(2)}cqw</output>
-        <input
-          type="range"
-          min="55"
-          max="82"
-          step="0.25"
-          value="${values.cardWidth}"
-          data-layout-setting="cardWidth"
-        >
-      </label>
-
-      <label class="layout-editor-toggle">
-        <input
-          type="checkbox"
-          data-layout-setting="showMeridiem"
-          ${values.showMeridiem ? "checked" : ""}
-        >
-        Show AM/PM
-      </label>
-    </div>
-
-    <textarea
-      class="layout-editor-output"
-      readonly
-      aria-label="Layout CSS"
-    ></textarea>
-  `;
-
-  document.body.appendChild(panel);
-
-  const output = panel.querySelector(
-    ".layout-editor-output"
-  );
-
-  function refreshLayoutEditorControls() {
-    const currentValues =
-      layoutValues(layoutBreakpoint());
-
-    [
-      "dateFontSize",
-      "timeFontSize",
-      "timeCardGap",
-      "cardsNextTimeGap",
-      "cardWidth"
-    ].forEach(setting => {
-      const input = panel.querySelector(
-        `[data-layout-setting="${setting}"]`
-      );
-
-      const settingOutput = panel.querySelector(
-        `[data-layout-output="${setting}"]`
-      );
-
-      input.value = currentValues[setting];
-
-      settingOutput.textContent =
-        `${Number(currentValues[setting]).toFixed(2)}cqw`;
-    });
-
-    panel.querySelector(
-      '[data-layout-setting="showMeridiem"]'
-    ).checked = currentValues.showMeridiem;
-
-    panel.querySelector(
-      ".layout-editor-title"
-    ).textContent =
-      `Layout editor: ${layoutBreakpoint()}`;
-
-    setLayoutOutput(output);
+  function setMenuOpen(open) {
+    nav.classList.toggle("menu-open", open);
+    button.setAttribute(
+      "aria-expanded",
+      String(open)
+    );
   }
 
-  refreshLayoutEditorControls();
-
-  makeLayoutDraggable(
-    layoutTargets.date,
-    "date",
-    output
+  button.addEventListener(
+    "click",
+    event => {
+      event.stopPropagation();
+      setMenuOpen(
+        !nav.classList.contains("menu-open")
+      );
+    }
   );
 
-  makeLayoutDraggable(
-    layoutTargets.list,
-    "list",
-    output
+  links.addEventListener(
+    "click",
+    event => {
+      if (event.target.closest("a")) {
+        setMenuOpen(false);
+      }
+    }
   );
 
-  panel.addEventListener("input", event => {
-    const setting =
-      event.target.dataset.layoutSetting;
-
-    if (!setting || event.target.type !== "range") {
-      return;
+  document.addEventListener(
+    "click",
+    event => {
+      if (!nav.contains(event.target)) {
+        setMenuOpen(false);
+      }
     }
+  );
 
-    const value = Number(event.target.value);
-
-    updateLayoutSetting(setting, value);
-
-    panel.querySelector(
-      `[data-layout-output="${setting}"]`
-    ).textContent = `${value.toFixed(2)}cqw`;
-
-    setLayoutOutput(output);
-  });
-
-  panel.addEventListener("change", event => {
-    if (
-      event.target.dataset.layoutSetting !==
-      "showMeridiem"
-    ) {
-      return;
-    }
-
-    updateLayoutSetting(
-      "showMeridiem",
-      event.target.checked
-    );
-
-    setLayoutOutput(output);
-  });
-
-  panel.addEventListener("click", async event => {
-    const action =
-      event.target.dataset.layoutAction;
-
-    if (action === "copy") {
-      output.select();
-
-      try {
-        await navigator.clipboard.writeText(
-          output.value
-        );
-      } catch {
-        document.execCommand("copy");
+  document.addEventListener(
+    "keydown",
+    event => {
+      if (
+        event.key !== "Escape" ||
+        !nav.classList.contains("menu-open")
+      ) {
+        return;
       }
 
-      event.target.textContent = "Copied";
-
-      window.setTimeout(() => {
-        event.target.textContent = "Copy CSS";
-      }, 1200);
+      setMenuOpen(false);
+      button.focus();
     }
+  );
 
-    if (action === "reset") {
-      const overrides = readLayoutOverrides();
-
-      delete overrides[layoutBreakpoint()];
-
-      writeLayoutOverrides(overrides);
-      applyLayoutOverrides();
-      refreshLayoutEditorControls();
+  mobileQuery.addEventListener(
+    "change",
+    event => {
+      if (!event.matches) {
+        setMenuOpen(false);
+      }
     }
-
-    if (action === "done") {
-      window.history.replaceState(
-        {},
-        document.title,
-        window.location.pathname
-      );
-
-      window.location.reload();
-    }
-  });
-
-  window.addEventListener("resize", () => {
-    applyLayoutOverrides();
-    refreshLayoutEditorControls();
-  });
+  );
 }
 
 function dateKey(date) {
@@ -1253,26 +855,25 @@ function openEventDetail(event) {
   );
 
   const closeButton =
-  document.createElement("button");
+    document.createElement("button");
 
-closeButton.type = "button";
-closeButton.className =
-  "overlay-close event-detail-close";
-closeButton.textContent = "×";
-closeButton.setAttribute(
-  "aria-label",
-  "Close event details"
-);
+  closeButton.type = "button";
+  closeButton.className =
+    "overlay-close event-detail-close";
+  closeButton.textContent = "×";
+  closeButton.setAttribute(
+    "aria-label",
+    "Close event details"
+  );
+  closeButton.addEventListener(
+    "click",
+    closeEventDetail
+  );
 
-closeButton.addEventListener(
-  "click",
-  closeEventDetail
-);
-
-eventDetail.append(
-  detailCard,
-  closeButton
-);
+  eventDetail.append(
+    detailCard,
+    closeButton
+  );
 }
 
 function closeEventDetail() {
@@ -1295,7 +896,7 @@ eventDetail.addEventListener(
 );
 
 function openAboutDialog(event) {
-  event.preventDefault();
+  event?.preventDefault();
 
   closeDatePopover();
 
@@ -1374,11 +975,11 @@ window.addEventListener(
   "keydown",
   event => {
     if (event.key === "Escape") {
-  if (aboutDialog.open) {
-    return;
-  }
+      if (aboutDialog.open) {
+        return;
+      }
 
-  if (!eventDetail.hidden) {
+      if (!eventDetail.hidden) {
         closeEventDetail();
       } else {
         closeDatePopover();
@@ -1510,6 +1111,8 @@ async function initialize() {
     );
   }
 }
+
+initializeMobileMenu();
 
 initialize().finally(() => {
   if (
