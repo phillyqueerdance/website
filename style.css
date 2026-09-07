@@ -243,6 +243,13 @@ body {
   aspect-ratio: 1151 / 1510;
 
   container-type: inline-size;
+
+  order: 0;
+
+  display: flex;
+  justify-content: center;
+
+  width: 100vw;
 }
 
 
