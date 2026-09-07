@@ -244,12 +244,6 @@ body {
 
   container-type: inline-size;
 
-  order: 0;
-
-  display: flex;
-  justify-content: center;
-
-  width: 100vw;
 }
 
 
@@ -1165,6 +1159,11 @@ body {
 
   .poster-stage {
     order: 0;
+
+  display: flex;
+  justify-content: center;
+
+  width: 100vw;
   }
 
 
