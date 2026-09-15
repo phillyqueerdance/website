@@ -12,10 +12,17 @@ const datePopover = document.getElementById("datePopover");
 const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
+
 const aboutLink = document.getElementById("aboutLink");
 const aboutDialog = document.getElementById("aboutDialog");
 const aboutCloseButton = document.getElementById(
   "aboutCloseButton"
+);
+
+const meltLink = document.getElementById("meltLink");
+const meltDialog = document.getElementById("meltDialog");
+const meltCloseButton = document.getElementById(
+  "meltCloseButton"
 );
 
 const layoutEditorEnabled =
@@ -58,6 +65,7 @@ function initializeMobileMenu() {
     "click",
     event => {
       event.stopPropagation();
+
       setMenuOpen(
         !nav.classList.contains("menu-open")
       );
@@ -379,7 +387,6 @@ function availableDateKeys() {
   );
 }
 
-
 function openDatePopover() {
   if (!posterPages.length) {
     return;
@@ -397,13 +404,22 @@ function openDatePopover() {
   );
 
   renderDatePopover();
+
   datePopover.hidden = false;
-  dateButton.setAttribute("aria-expanded", "true");
+
+  dateButton.setAttribute(
+    "aria-expanded",
+    "true"
+  );
 }
 
 function closeDatePopover() {
   datePopover.hidden = true;
-  dateButton.setAttribute("aria-expanded", "false");
+
+  dateButton.setAttribute(
+    "aria-expanded",
+    "false"
+  );
 }
 
 function renderDatePopover() {
@@ -510,6 +526,7 @@ function renderDatePopover() {
         document.createElement("div");
 
       weekday.textContent = day;
+
       weekdayRow.appendChild(weekday);
     });
 
@@ -529,7 +546,11 @@ function renderDatePopover() {
     new Date(year, month, 1).getDay();
 
   const daysInMonth =
-    new Date(year, month + 1, 0).getDate();
+    new Date(
+      year,
+      month + 1,
+      0
+    ).getDate();
 
   const available =
     availableDateKeys();
@@ -564,14 +585,18 @@ function renderDatePopover() {
       document.createElement("button");
 
     dayButton.type = "button";
+
     dayButton.className =
       "date-popover-day";
 
     dayButton.textContent = day;
+
     dayButton.disabled = !hasEvents;
 
     if (key === selected) {
-      dayButton.classList.add("selected");
+      dayButton.classList.add(
+        "selected"
+      );
     }
 
     if (hasEvents) {
@@ -686,6 +711,7 @@ function renderPoster() {
           document.createElement("div");
 
         venue.className = "event-venue";
+
         venue.textContent =
           eventVenue(event);
 
@@ -719,6 +745,7 @@ function renderPoster() {
       });
 
       group.append(time, cards);
+
       eventStack.appendChild(group);
     });
 
@@ -822,7 +849,8 @@ function openEventDetail(event) {
   venue.textContent =
     eventVenue(event);
 
-  venue.hidden = !venue.textContent;
+  venue.hidden =
+    !venue.textContent;
 
   const address =
     document.createElement("p");
@@ -851,13 +879,17 @@ function openEventDetail(event) {
     document.createElement("button");
 
   closeButton.type = "button";
+
   closeButton.className =
     "overlay-close event-detail-close";
+
   closeButton.textContent = "×";
+
   closeButton.setAttribute(
     "aria-label",
     "Close event details"
   );
+
   closeButton.addEventListener(
     "click",
     closeEventDetail
@@ -936,6 +968,54 @@ aboutDialog.addEventListener(
   }
 );
 
+function openMeltDialog(event) {
+  event?.preventDefault();
+
+  closeDatePopover();
+
+  if (!eventDetail.hidden) {
+    closeEventDetail();
+  }
+
+  if (!meltDialog.open) {
+    meltDialog.showModal();
+  }
+}
+
+function closeMeltDialog() {
+  if (meltDialog.open) {
+    meltDialog.close();
+  }
+}
+
+meltLink.addEventListener(
+  "click",
+  openMeltDialog
+);
+
+meltCloseButton.addEventListener(
+  "click",
+  closeMeltDialog
+);
+
+meltDialog.addEventListener(
+  "click",
+  event => {
+    const bounds =
+      meltDialog.getBoundingClientRect();
+
+    const clickedOutside =
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom;
+
+    if (clickedOutside) {
+      closeMeltDialog();
+    }
+  }
+);
+
 function movePoster(direction) {
   const nextIndex =
     currentPosterIndex + direction;
@@ -968,7 +1048,10 @@ window.addEventListener(
   "keydown",
   event => {
     if (event.key === "Escape") {
-      if (aboutDialog.open) {
+      if (
+        aboutDialog.open ||
+        meltDialog.open
+      ) {
         return;
       }
 
