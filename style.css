@@ -1445,7 +1445,7 @@ body {
   display: block;
 
   width: auto;
-  height: 32px;
+  height: 42px;
 }
 
 .side-nav a.melt-nav-link:hover,
@@ -1470,6 +1470,8 @@ body {
 
 .melt-dialog-content {
   max-height: calc(88dvh - 96px);
+  padding-right: 32px;
+  scrollbar-gutter: stable;
 }
 
 .melt-dialog-logo {
@@ -1515,11 +1517,15 @@ body {
   }
 
   .melt-nav-logo {
-    height: 30px;
+    height: 38px;
   }
 
   .melt-dialog-logo {
     width: min(240px, 78%);
     margin-bottom: 24px;
   }
+  
+  .melt-dialog-content {
+  padding-right: 22px;
+}
 }
