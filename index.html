@@ -146,10 +146,19 @@
         >Submit Event</a>
 
          <a
-          href="https://www.instagram.com/melt.phl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >Melt</a>
+  id="meltLink"
+  class="melt-nav-link"
+  href="#melt"
+  aria-label="About Melt"
+  aria-haspopup="dialog"
+  aria-controls="meltDialog"
+>
+  <img
+    class="melt-nav-logo"
+    src="melt-logo.png"
+    alt="Melt"
+  >
+</a>
 
         <a
           href="https://ra.co/promoters/189746"
@@ -204,6 +213,62 @@
     >×</button>
   </dialog>
 
+  <dialog
+  id="meltDialog"
+  class="about-dialog melt-dialog"
+  aria-label="Melt"
+>
+  <div class="about-dialog-content melt-dialog-content">
+    <img
+      class="melt-dialog-logo"
+      src="melt-logo.png"
+      alt=""
+      aria-hidden="true"
+    >
+
+    <p>
+      Melt is a warm, sensual, sapphic- and trans-forward club night built
+      around groove, glimmer, and grind. Intimate without being slow and sexy
+      without being performative, it’s a space for giving yourself permission
+      to dance close, make the first move, and feel free in your own skin.
+    </p>
+
+    <p>
+      Expect funky house basslines, glitchy electronica, and physical club
+      rhythms woven into a high-energy night that’s sure to leave you spent.
+    </p>
+
+    <p>
+      The night is what you make it.
+    </p>
+
+    <p class="melt-instagram-line">
+      <a
+        href="https://www.instagram.com/melt.phl/"
+        target="_blank"
+        rel="noopener noreferrer"
+      >@melt.phl on Instagram</a>
+    </p>
+
+    <iframe
+      class="melt-ra-widget"
+      src="https://ra.co/promoters/189746/widget/events?theme=dark"
+      title="Upcoming Melt events on Resident Advisor"
+      height="650"
+      width="100%"
+      loading="lazy"
+      style="border:none"
+    ></iframe>
+  </div>
+
+  <button
+    id="meltCloseButton"
+    class="overlay-close about-dialog-close"
+    type="button"
+    aria-label="Close Melt"
+  >×</button>
+</dialog>
+  
   <script>
     (() => {
       "use strict";
