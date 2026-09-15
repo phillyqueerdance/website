@@ -1428,3 +1428,98 @@ body {
   }
   /* QDP_PROFILE_MOBILE_END */
 }
+
+/* =========================================================
+   MELT NAVIGATION LOGO
+   ========================================================= */
+
+.side-nav a.melt-nav-link {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+
+  text-decoration: none;
+}
+
+.melt-nav-logo {
+  display: block;
+
+  width: auto;
+  height: 32px;
+}
+
+.side-nav a.melt-nav-link:hover,
+.side-nav a.melt-nav-link:focus-visible {
+  text-decoration: none;
+}
+
+.side-nav a.melt-nav-link:hover .melt-nav-logo,
+.side-nav a.melt-nav-link:focus-visible .melt-nav-logo {
+  filter: brightness(1.12);
+}
+
+
+/* =========================================================
+   MELT DIALOG
+   ========================================================= */
+
+.melt-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(88dvh, 900px);
+}
+
+.melt-dialog-content {
+  max-height: calc(88dvh - 96px);
+}
+
+.melt-dialog-logo {
+  display: block;
+
+  width: min(280px, 76%);
+  height: auto;
+
+  margin: 0 auto 28px;
+}
+
+.melt-instagram-line {
+  margin-top: 24px;
+}
+
+.melt-instagram-line a {
+  color: #ff8b63;
+  font-weight: 700;
+}
+
+.melt-instagram-line a:hover,
+.melt-instagram-line a:focus-visible {
+  color: #ffb199;
+}
+
+.melt-ra-widget {
+  display: block;
+
+  margin-top: 24px;
+  background: #000;
+}
+
+
+/* =========================================================
+   MELT MOBILE
+   ========================================================= */
+
+@media (max-width: 760px) {
+  .side-nav a.melt-nav-link {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .melt-nav-logo {
+    height: 30px;
+  }
+
+  .melt-dialog-logo {
+    width: min(240px, 78%);
+    margin-bottom: 24px;
+  }
+}
