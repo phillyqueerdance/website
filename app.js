@@ -1,5 +1,11 @@
 const EVENTS_API_URL =
-  "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec?resource=events";
+  "/api/events";
+
+const EVENTS_STORAGE_KEY =
+  "qdp-public-events-v2";
+
+const EVENTS_STORAGE_MAX_AGE_MS =
+  24 * 60 * 60 * 1000;
 
 const MAX_EVENTS_PER_POSTER = 6;
 
@@ -337,11 +343,116 @@ function stripQdpFooter(description) {
   ).trim();
 }
 
+function normalizePublicEvents(
+  events
+) {
+  const today =
+    dateKey(new Date());
+
+  return events
+    .filter(event => {
+      const endDate =
+        new Date(
+          event.end ||
+          event.start
+        );
+
+      if (
+        Number.isNaN(
+          endDate.getTime()
+        )
+      ) {
+        return false;
+      }
+
+      return (
+        dateKey(endDate) >= today
+      );
+    })
+    .map(event => ({
+      ...event,
+
+      description:
+        stripQdpFooter(
+          event.description
+        )
+    }));
+}
+
+function readCachedPublicEvents() {
+  try {
+    const stored =
+      JSON.parse(
+        localStorage.getItem(
+          EVENTS_STORAGE_KEY
+        )
+      );
+
+    if (
+      !stored ||
+      !Array.isArray(
+        stored.events
+      ) ||
+      !Number.isFinite(
+        stored.savedAt
+      )
+    ) {
+      return null;
+    }
+
+    const cacheAge =
+      Date.now() -
+      stored.savedAt;
+
+    if (
+      cacheAge >
+      EVENTS_STORAGE_MAX_AGE_MS
+    ) {
+      localStorage.removeItem(
+        EVENTS_STORAGE_KEY
+      );
+
+      return null;
+    }
+
+    return normalizePublicEvents(
+      stored.events
+    );
+  } catch (error) {
+    console.warn(
+      "Could not read the saved event feed.",
+      error
+    );
+
+    return null;
+  }
+}
+
+function writeCachedPublicEvents(
+  events
+) {
+  try {
+    localStorage.setItem(
+      EVENTS_STORAGE_KEY,
+
+      JSON.stringify({
+        savedAt: Date.now(),
+        events
+      })
+    );
+  } catch (error) {
+    console.warn(
+      "Could not save the event feed.",
+      error
+    );
+  }
+}
+
 async function loadPublicEvents() {
-  const response = await fetch(
-    EVENTS_API_URL,
-    { cache: "no-store" }
-  );
+  const response =
+    await fetch(
+      EVENTS_API_URL
+    );
 
   if (!response.ok) {
     throw new Error(
@@ -349,23 +460,28 @@ async function loadPublicEvents() {
     );
   }
 
-  const payload = await response.json();
+  const payload =
+    await response.json();
 
   if (payload.error) {
-    throw new Error(payload.error);
+    throw new Error(
+      payload.error
+    );
   }
 
-  if (!Array.isArray(payload.events)) {
+  if (
+    !Array.isArray(
+      payload.events
+    )
+  ) {
     throw new Error(
       "The event feed returned an invalid response."
     );
   }
 
-  return payload.events.map(event => ({
-    ...event,
-    description:
-      stripQdpFooter(event.description)
-  }));
+  return normalizePublicEvents(
+    payload.events
+  );
 }
 
 function showEventFeedMessage(message) {
@@ -1145,46 +1261,84 @@ document.addEventListener(
   }
 );
 
+function renderEventCollection(
+  events
+) {
+  posterPages =
+    buildPosterPages(events);
+
+  if (!posterPages.length) {
+    previousPoster.disabled = true;
+    nextPoster.disabled = true;
+
+    showEventFeedMessage(
+      "No upcoming listings right now."
+    );
+
+    return;
+  }
+
+  const today =
+    dateKey(new Date());
+
+  const todayIndex =
+    posterPages.findIndex(
+      page =>
+        page.date >= today
+    );
+
+  currentPosterIndex =
+    todayIndex >= 0
+      ? todayIndex
+      : 0;
+
+  renderPoster();
+}
+
 async function initialize() {
-  showEventFeedMessage(
-    "Loading listings…"
-  );
+  const cachedEvents =
+    readCachedPublicEvents();
+
+  if (cachedEvents) {
+    renderEventCollection(
+      cachedEvents
+    );
+  } else {
+    showEventFeedMessage(
+      "Loading listings…"
+    );
+  }
 
   try {
-    const events =
+    const freshEvents =
       await loadPublicEvents();
 
-    posterPages =
-      buildPosterPages(events);
+    writeCachedPublicEvents(
+      freshEvents
+    );
 
-    if (!posterPages.length) {
-      showEventFeedMessage(
-        "No upcoming listings right now."
+    const listingsChanged =
+      !cachedEvents ||
+      JSON.stringify(
+        freshEvents
+      ) !==
+      JSON.stringify(
+        cachedEvents
       );
 
-      return;
+    if (listingsChanged) {
+      renderEventCollection(
+        freshEvents
+      );
     }
-
-    const today =
-      dateKey(new Date());
-
-    const todayIndex =
-      posterPages.findIndex(
-        page => page.date >= today
-      );
-
-    currentPosterIndex =
-      todayIndex >= 0
-        ? todayIndex
-        : 0;
-
-    renderPoster();
   } catch (error) {
     console.error(error);
 
-    showEventFeedMessage(
-      "Listings could not load. Please refresh."
-    );
+    if (!cachedEvents) {
+      showEventFeedMessage(
+        "Listings could not load. Please refresh."
+      );
+    }
   }
 }
 
