@@ -20,6 +20,14 @@
 /*.png
   Cache-Control: public, max-age=86400, must-revalidate
 
+/admin
+  Cache-Control: private, no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/admin/*
+  Cache-Control: private, no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow, noarchive
+
 https://:project.pages.dev/*
   X-Robots-Tag: noindex
 
