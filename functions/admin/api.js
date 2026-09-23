@@ -409,6 +409,12 @@ export async function onRequestPost(
       );
 
     if (!upstreamResponse.ok) {
+      if (upstreamResponse.status === 404) {
+        throw new Error(
+          "The Apps Script deployment URL returned 404. Verify QDP_APPS_SCRIPT_URL and redeploy the existing Apps Script Web app as a new version."
+        );
+      }
+
       throw new Error(
         `Apps Script returned ${upstreamResponse.status}.`
       );

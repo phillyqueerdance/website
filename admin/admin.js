@@ -72,6 +72,30 @@ function isUpcoming(event) {
   );
 }
 
+function compareEvents(left, right) {
+  const leftTime = new Date(left.start || 0).getTime();
+  const rightTime = new Date(right.start || 0).getTime();
+  const safeLeft = Number.isNaN(leftTime)
+    ? Number.MAX_SAFE_INTEGER
+    : leftTime;
+  const safeRight = Number.isNaN(rightTime)
+    ? Number.MAX_SAFE_INTEGER
+    : rightTime;
+
+  return safeLeft - safeRight ||
+    left.publicTitle.localeCompare(right.publicTitle);
+}
+
+function appearsOnWebsite(event) {
+  return Boolean(
+    event.publishToWeb &&
+    event.publicTitle &&
+    event.start &&
+    !/^\(DELETED ENTRY\)/i.test(event.publicTitle) &&
+    isUpcoming(event)
+  );
+}
+
 function formatEventDate(event) {
   const start = new Date(event.start);
 
@@ -279,6 +303,21 @@ function sameIds(left, right) {
   return (
     left.length === right.length &&
     left.every((value, index) => value === right[index])
+  );
+}
+
+function draftMatchesEvent(draft, event) {
+  const normalizedDescription = String(draft.description || "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+
+  return (
+    draft.publicTitle.trim() === event.publicTitle &&
+    normalizedDescription === event.description &&
+    draft.publishToWeb === event.publishToWeb &&
+    draft.venueId === event.venueId &&
+    draft.explicitQueer === event.explicitQueer &&
+    sameIds(draft.artistIds, event.artistIds)
   );
 }
 
@@ -547,6 +586,9 @@ async function saveEvent(
   setBusy(true);
   card.classList.add("is-saving");
 
+  const changedCalendarFields =
+    calendarFieldsAreDirty(event, draft);
+
   try {
     const result = await adminRequest(
       "admin.save",
@@ -563,11 +605,7 @@ async function saveEvent(
       }
     );
 
-    const changedCalendarFields =
-      calendarFieldsAreDirty(event, draft);
-
-    state.drafts.delete(event.eventId);
-    applyDashboard(result);
+    applySavedEvent(result, event.eventId);
 
     const updatedEvent = state.events.find(
       candidate => candidate.eventId === event.eventId
@@ -581,7 +619,41 @@ async function saveEvent(
         : "Website visibility saved. The public feed may take up to five minutes to refresh."
     );
   } catch (error) {
-    showToast(error.message, true);
+    const shouldReconcile =
+      /404|fetch|network|load failed|temporarily unavailable|invalid confirmation|no longer in this Admin view/i
+        .test(error.message || "");
+
+    let recovered = false;
+
+    if (shouldReconcile) {
+      try {
+        const refreshed = await adminRequest("admin.bootstrap");
+        const refreshedEvent = refreshed.events.find(
+          candidate => candidate.eventId === event.eventId
+        );
+
+        if (
+          refreshedEvent &&
+          draftMatchesEvent(draft, refreshedEvent)
+        ) {
+          state.drafts.delete(event.eventId);
+          applyDashboard(refreshed);
+          recovered = true;
+        }
+      } catch (refreshError) {
+        recovered = false;
+      }
+    }
+
+    if (recovered) {
+      showToast(
+        changedCalendarFields
+          ? "Saved to the Sheet. The response was interrupted, so Admin refreshed and confirmed the save. Push when ready."
+          : "Website visibility was saved. Admin refreshed and confirmed it."
+      );
+    } else {
+      showToast(error.message, true);
+    }
   } finally {
     setBusy(false);
   }
@@ -948,6 +1020,65 @@ function renderStatus() {
 
   elements.cacheNote.textContent =
     `“Showing on website” counts the current Sheet feed. The public site can remain cached for up to ${Math.round(state.status.websiteCacheSeconds / 60)} minutes.`;
+}
+
+function updateStatusFromEvents() {
+  if (!state.status) {
+    return;
+  }
+
+  const upcoming = state.events.filter(isUpcoming);
+  const pending = state.events.filter(event => event.needsPush);
+  const pendingInWindow = pending.filter(
+    event => event.inSyncWindow
+  );
+
+  state.status = {
+    ...state.status,
+    generatedAt: new Date().toISOString(),
+    pendingPushCount: pendingInWindow.length,
+    pendingPushTotalCount: pending.length,
+    pendingOutsideWindowCount:
+      pending.length - pendingInWindow.length,
+    activeSheetEventCount: state.events.length,
+    upcomingSheetEventCount: upcoming.length,
+    websiteEventCount:
+      state.events.filter(appearsOnWebsite).length,
+    hiddenUpcomingCount:
+      upcoming.filter(event => !event.publishToWeb).length
+  };
+}
+
+function applySavedEvent(result, expectedEventId) {
+  const savedEvent = result && result.event;
+
+  if (
+    !savedEvent ||
+    savedEvent.eventId !== expectedEventId
+  ) {
+    throw new Error(
+      "The Sheet saved, but Admin received an invalid confirmation. Refresh before editing again."
+    );
+  }
+
+  const index = state.events.findIndex(
+    event => event.eventId === expectedEventId
+  );
+
+  if (index === -1) {
+    throw new Error(
+      "The saved event is no longer in this Admin view. Refresh before editing again."
+    );
+  }
+
+  state.events[index] = savedEvent;
+  state.events.sort(compareEvents);
+  state.drafts.delete(expectedEventId);
+  updateStatusFromEvents();
+
+  renderEvents();
+  renderStatus();
+  updateGlobalControls();
 }
 
 function applyDashboard(result) {
