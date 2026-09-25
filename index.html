@@ -28,10 +28,11 @@
 >
 <meta property="og:url" content="https://queerdancephilly.com/">
  <link rel="stylesheet" href="style.css?v=20260905-01">
+ <link rel="stylesheet" href="poster-redesign.css?v=20260925-01">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
-    href="layout-overrides.css?v=20260901-02"
+    href="layout-overrides.css?v=20260925-01"
   >
   <link rel="icon" type="image/png" href="/favicon.png">
 </head>
@@ -46,8 +47,8 @@
 
         <img
           class="frame"
-          src="frame.png"
-          alt=""
+          src="frame.png?v=20260925-01"
+          alt="Queer Dance Philly. Rainbow flag: queer artist. Trans flag: trans artist. Magenta card: queer event."
         >
 
         <button
@@ -59,8 +60,7 @@
           aria-haspopup="dialog"
           aria-expanded="false"
         >
-          <span id="dateNumber"></span>
-          <span id="dateDay"></span>
+          <span id="dateLabel"></span>
         </button>
 
         <div
@@ -266,58 +266,58 @@
       "use strict";
 
       const EDITOR_QUERY = "layout";
-      const STORAGE_KEY = "qdp-comprehensive-layout-v1";
+      const STORAGE_KEY = "qdp-comprehensive-layout-v2";
 
       const desktopDefaults = {
-        navX: 0,
-        navY: -18,
+        navX: 54,
+        navY: -20,
         navTop: 0,
         navBottom: 0,
-        navGap: 68,
-        navWidth: 150,
-        navFontSize: 15,
+        navGap: 61,
+        navWidth: 228,
+        navFontSize: 18,
 
-        dateX: 0.24,
-        dateY: -0.37,
-        dateTop: 10.05,
-        dateLeft: 8.5,
-        dateWidth: 22,
-        dateFontSize: 3.75,
+        dateX: 0,
+        dateY: 0,
+        dateTop: 22.15,
+        dateLeft: 39.6,
+        dateWidth: 46.9,
+        dateFontSize: 3.1,
 
         listX: 0,
-        listY: -4.18,
-        listTop: 22.5,
-        listRight: 8.25,
-        listBottom: 8.5,
-        listLeft: 8.25,
+        listY: 0,
+        listTop: 26.65,
+        listRight: 9.5,
+        listBottom: 11.2,
+        listLeft: 9.8,
         listJustify: "center",
 
         timeFontSize: 3.2,
         timeFontWeight: 700,
         timeLineHeight: 1.05,
         showMeridiem: true,
-        timeCardGap: 0.35,
-        cardsNextTimeGap: 0.6,
+        timeCardGap: 1,
+        cardsNextTimeGap: 2.15,
 
-        cardWidth: 76,
-        cardHeight: 10.75,
-        cardPaddingX: 1.6,
-        cardPaddingY: 0.55,
-        cardRadius: 0.45,
-        sameTimeCardGap: 0.9,
-        cardLineGap: 0.2,
+        cardWidth: 68.8,
+        cardHeight: 10.8,
+        cardPaddingX: 2.2,
+        cardPaddingY: 0.45,
+        cardRadius: 4.3,
+        sameTimeCardGap: 0.85,
+        cardLineGap: 0.1,
 
-        titleFontSize: 3.55,
-        titleFontWeight: 400,
+        titleFontSize: 3.75,
+        titleFontWeight: 700,
         titleLineHeight: 1,
         titleAlign: "left",
 
-        venueFontSize: 2.85,
+        venueFontSize: 2.75,
         venueFontWeight: 400,
         venueLineHeight: 1,
         venueAlign: "left",
 
-        addressFontSize: 2.85,
+        addressFontSize: 2.3,
         addressFontWeight: 400,
         addressLineHeight: 1,
         addressAlign: "left",
@@ -344,14 +344,14 @@
           navFontSize: 13,
           dateX: 0,
           dateY: 0,
-          dateTop: 10.1,
+          dateTop: 22.15,
           listY: 0,
-          cardWidth: 78,
+          cardWidth: 68.8,
           cardPaddingY: 0.45,
-          sameTimeCardGap: 0.95,
-          titleAlign: "center",
-          venueAlign: "center",
-          addressAlign: "center",
+          sameTimeCardGap: 0.85,
+          titleAlign: "left",
+          venueAlign: "left",
+          addressAlign: "left",
           detailPadding: 6,
           detailFontSize: 3.1,
           detailTitleSize: 4.35,
@@ -452,13 +452,13 @@
           ]
         },
         {
-          title: "Upper-left date",
+          title: "Date tab",
           fields: [
             range("dateX", "Horizontal offset", -20, 20, 0.05, "cqw"),
             range("dateY", "Vertical offset", -20, 20, 0.05, "cqw"),
             range("dateTop", "Top", 5, 25, 0.1, "%"),
-            range("dateLeft", "Left", 0, 40, 0.1, "%"),
-            range("dateWidth", "Area width", 10, 40, 0.25, "%"),
+            range("dateLeft", "Left", 0, 70, 0.1, "%"),
+            range("dateWidth", "Area width", 10, 70, 0.25, "%"),
             range("dateFontSize", "Font size", 2, 6, 0.05, "cqw")
           ]
         },
@@ -486,7 +486,7 @@
             range("timeFontWeight", "Time weight", 400, 900, 100, ""),
             range("timeLineHeight", "Time line height", 0.8, 1.6, 0.05, ""),
             toggle("showMeridiem", "Show AM/PM"),
-            range("timeCardGap", "Time-to-cards gap", 0, 4, 0.05, "cqw"),
+            range("timeCardGap", "Time-to-card horizontal gap", 0, 4, 0.05, "cqw"),
             range("cardsNextTimeGap", "Cards-to-next-time gap", 0, 4, 0.05, "cqw"),
             range("sameTimeCardGap", "Same-time card gap", 0, 3, 0.05, "cqw")
           ]
@@ -498,7 +498,7 @@
             range("cardHeight", "Minimum height", 7, 18, 0.05, "cqw"),
             range("cardPaddingX", "Horizontal padding", 0, 4, 0.05, "cqw"),
             range("cardPaddingY", "Vertical padding", 0, 3, 0.05, "cqw"),
-            range("cardRadius", "Corner radius", 0, 4, 0.05, "cqw"),
+            range("cardRadius", "Corner radius", 0, 8, 0.05, "cqw"),
             range("cardLineGap", "Line gap", 0, 2, 0.05, "cqw")
           ]
         },
@@ -1195,7 +1195,7 @@
     })();
   </script>
 
-  <script src="app.js?v=20260916-01"></script>
+  <script src="app.js?v=20260925-01"></script>
 
 </body>
 </html>

@@ -9,8 +9,7 @@ const EVENTS_STORAGE_MAX_AGE_MS =
 
 const MAX_EVENTS_PER_POSTER = 6;
 
-const dateNumber = document.getElementById("dateNumber");
-const dateDay = document.getElementById("dateDay");
+const dateLabel = document.getElementById("dateLabel");
 const eventStack = document.getElementById("eventStack");
 const eventDetail = document.getElementById("eventDetail");
 const dateButton = document.getElementById("dateButton");
@@ -298,6 +297,34 @@ function formatTimeRange(event) {
 
 function formatStartTime(event) {
   return compactTime(new Date(event.start));
+}
+
+function ordinalSuffix(day) {
+  if (day % 100 >= 11 && day % 100 <= 13) return "th";
+  return ["th", "st", "nd", "rd"][Math.min(day % 10, 4)] || "th";
+}
+
+function displayTitle(event) {
+  // Public Calendar titles keep consented emoji badges; the site uses graphic flags.
+  return String(event.title || "")
+    .replace(/^(?:(?:🏳️‍🌈|🏳️‍⚧️|✊🏾)\s*)+/u, "")
+    .trim() || String(event.title || "");
+}
+
+function fitPosterTitles() {
+  eventStack.querySelectorAll(".event-title").forEach(title => {
+    title.style.fontSize = "";
+    const available = title.clientWidth;
+    const fullWidth = title.scrollWidth;
+    if (available > 0 && fullWidth > available) {
+      const base = parseFloat(getComputedStyle(title).fontSize);
+      title.style.fontSize = `${Math.max(1, base * available / fullWidth - 0.5)}px`;
+    }
+  });
+}
+
+function scheduleTitleFit() {
+  requestAnimationFrame(fitPosterTitles);
 }
 
 function appendStartTime(time, event) {
@@ -754,29 +781,20 @@ function renderPoster() {
   eventDetail.hidden = true;
 
   eventDetail.classList.remove(
-    "is-open"
+    "is-open", "explicit"
   );
 
   eventStack.hidden = false;
 
-  dateNumber.textContent =
-    new Intl.DateTimeFormat(
-      "en-US",
-      {
-        timeZone: "America/New_York",
-        month: "numeric",
-        day: "numeric"
-      }
-    ).format(posterDate);
-
-  dateDay.textContent =
-    new Intl.DateTimeFormat(
-      "en-US",
-      {
-        timeZone: "America/New_York",
-        weekday: "short"
-      }
-    ).format(posterDate);
+  const day = Number(page.date.slice(-2));
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", weekday: "long"
+  }).format(posterDate);
+  const month = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", month: "long"
+  }).format(posterDate);
+  dateLabel.textContent = `${weekday}, ${month} ${day}${ordinalSuffix(day)}`;
+  dateButton.setAttribute("aria-label", `Choose a date. Showing ${dateLabel.textContent}`);
 
   eventStack.innerHTML = "";
 
@@ -788,23 +806,22 @@ function renderPoster() {
       group.className =
         "event-time-group";
 
-      const time =
-        document.createElement("div");
+      eventsAtThisTime.forEach((event, index) => {
+        const row = document.createElement("div");
+        row.className = `event-row ${index === 0 ? "has-time" : "same-time"}`;
 
-      time.className = "event-time";
+        if (index === 0) {
+          const time = document.createElement("div");
+          time.className = "event-time";
+          appendStartTime(time, event);
+          row.appendChild(time);
+        } else {
+          const spacer = document.createElement("div");
+          spacer.className = "event-time-spacer";
+          spacer.setAttribute("aria-hidden", "true");
+          row.appendChild(spacer);
+        }
 
-      appendStartTime(
-        time,
-        eventsAtThisTime[0]
-      );
-
-      const cards =
-        document.createElement("div");
-
-      cards.className =
-        "event-group-cards";
-
-      eventsAtThisTime.forEach(event => {
         const card =
           document.createElement("button");
 
@@ -815,13 +832,36 @@ function renderPoster() {
             event.explicitQueer
               ? "explicit"
               : "default"
-          }`;
+          }${event.queerArtist || event.transArtist ? " has-flags" : ""}`;
+
+        if (event.queerArtist) {
+          const flag = document.createElement("span");
+          flag.className = "card-flag card-flag-queer";
+          flag.setAttribute("aria-label", "Features a queer artist");
+          flag.setAttribute("role", "img");
+          card.appendChild(flag);
+        }
+        if (event.transArtist) {
+          const flag = document.createElement("span");
+          flag.className = "card-flag card-flag-trans";
+          flag.setAttribute("aria-label", "Features a trans artist");
+          flag.setAttribute("role", "img");
+          card.appendChild(flag);
+        }
+
+        const shape = document.createElement("span");
+        shape.className = "event-card-shape";
+        shape.setAttribute("aria-hidden", "true");
+        card.appendChild(shape);
+
+        const content = document.createElement("span");
+        content.className = "event-card-content";
 
         const title =
           document.createElement("div");
 
         title.className = "event-title";
-        title.textContent = event.title;
+        title.textContent = displayTitle(event);
 
         const venue =
           document.createElement("div");
@@ -846,24 +886,26 @@ function renderPoster() {
         address.hidden =
           !address.textContent;
 
-        card.append(
+        content.append(
           title,
           venue,
           address
         );
+        card.appendChild(content);
 
         card.addEventListener(
           "click",
           () => openEventDetail(event)
         );
 
-        cards.appendChild(card);
+        row.appendChild(card);
+        group.appendChild(row);
       });
-
-      group.append(time, cards);
 
       eventStack.appendChild(group);
     });
+
+  scheduleTitleFit();
 
   previousPoster.disabled =
     currentPosterIndex === 0;
@@ -883,7 +925,24 @@ function openEventDetail(event) {
     "is-open"
   );
 
+  eventDetail.classList.toggle("explicit", event.explicitQueer === true);
+
   eventDetail.innerHTML = "";
+
+  if (event.queerArtist) {
+    const flag = document.createElement("span");
+    flag.className = "event-detail-flag event-detail-flag-queer";
+    flag.setAttribute("role", "img");
+    flag.setAttribute("aria-label", "Features a queer artist");
+    eventDetail.appendChild(flag);
+  }
+  if (event.transArtist) {
+    const flag = document.createElement("span");
+    flag.className = "event-detail-flag event-detail-flag-trans";
+    flag.setAttribute("role", "img");
+    flag.setAttribute("aria-label", "Features a trans artist");
+    eventDetail.appendChild(flag);
+  }
 
   const detailCard =
     document.createElement("article");
@@ -919,7 +978,7 @@ function openEventDetail(event) {
       : flyerSource;
 
     flyer.alt =
-      `Flyer for ${event.title}`;
+      `Flyer for ${displayTitle(event)}`;
 
     flyer.loading = "eager";
 
@@ -951,7 +1010,7 @@ function openEventDetail(event) {
   const heading =
     document.createElement("h2");
 
-  heading.textContent = event.title;
+  heading.textContent = displayTitle(event);
 
   const time =
     document.createElement("p");
@@ -1343,6 +1402,15 @@ async function initialize() {
 }
 
 initializeMobileMenu();
+
+if ("ResizeObserver" in window) {
+  new ResizeObserver(scheduleTitleFit).observe(poster);
+} else {
+  window.addEventListener("resize", scheduleTitleFit);
+}
+if (layoutEditorEnabled) {
+  document.addEventListener("input", scheduleTitleFit);
+}
 
 initialize().finally(() => {
   if (
