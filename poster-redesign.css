@@ -409,7 +409,7 @@
   .poster-stage { width: 100vw; }
   .poster {
     flex: 0 0 auto;
-    width: min(114vw, calc((100dvh - 48px) * 0.843289));
+    width: min(102vw, calc((100dvh - 48px) * 0.843289));
   }
   .side-nav {
     --qdp-nav-x: 0px;
