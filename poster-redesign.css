@@ -335,7 +335,7 @@
   justify-content: stretch;
 }
 .event-detail.is-open { align-items: stretch; justify-content: stretch; }
-.event-detail.explicit { background: #391935; }
+.event-detail.explicit { background: #290925; }
 .event-detail-card {
   position: relative;
   z-index: 1;
