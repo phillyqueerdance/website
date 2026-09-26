@@ -30,7 +30,7 @@
   background: var(--panel-raised);
   color-scheme: dark;
 }
-.post-generate, .post-download {
+.post-generate, .post-download, .post-share-photo, .post-share-all {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -42,6 +42,15 @@
   background: var(--yellow);
   font-weight: 800;
   text-decoration: none;
+  cursor: pointer;
+}
+.post-open {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--text);
+  text-decoration: underline;
 }
 .post-help, .post-status {
   color: var(--muted);
@@ -49,6 +58,16 @@
   line-height: 1.45;
 }
 .post-status { min-height: 1.2em; }
+.post-share-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 20px;
+  color: var(--muted);
+  font-size: .84rem;
+}
+.post-share-tools[hidden] { display: none; }
 .post-gallery { display: grid; gap: 24px; }
 .post-image {
   width: min(100%, 510px);
@@ -68,6 +87,15 @@
   font-size: .9rem;
   font-weight: 750;
 }
+.post-image-name { flex: 1 1 160px; }
+.post-image-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.post-image-actions .post-download,
+.post-image-actions .post-share-photo { padding: 9px 12px; }
 .post-image img {
   display: block;
   width: 100%;

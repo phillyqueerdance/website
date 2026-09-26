@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" href="favicon.png">
   <link rel="stylesheet" href="../poster-theme.css?v=20260926-01">
   <link rel="stylesheet" href="admin.css?v=20260923-01">
-  <link rel="stylesheet" href="post-generator.css?v=20260926-01">
+  <link rel="stylesheet" href="post-generator.css?v=20260926-02">
 </head>
 
 <body>
@@ -95,8 +95,12 @@
         <label>Last date <input id="postEnd" type="date" required></label>
         <button id="generatePost" class="post-generate" type="submit">Generate Post</button>
       </form>
-      <p class="post-help">Creates a title slide, calendar pages, and one framed flyer image per published event. On your phone, press and hold an image to save it to Photos.</p>
+      <p class="post-help">Creates a title slide, calendar pages, and one framed flyer image per published event. On iPhone, tap Save to Photos, then choose Save Image in the share sheet. If Save Image is missing, download the PNG, open it in Files, and use Share → Save Image.</p>
       <p id="postStatus" class="post-status" role="status" aria-live="polite"></p>
+      <div id="postShareTools" class="post-share-tools" hidden>
+        <button id="postShareAll" class="post-share-all" type="button">Save all to Photos…</button>
+        <span>Choose Save Images in the share sheet.</span>
+      </div>
       <div id="postGallery" class="post-gallery"></div>
     </section>
 
@@ -308,6 +312,6 @@
   </noscript>
 
   <script src="admin.js?v=20260923-01"></script>
-  <script src="post-generator.js?v=20260926-04"></script>
+  <script src="post-generator.js?v=20260926-05"></script>
 </body>
 </html>

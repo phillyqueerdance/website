@@ -26,7 +26,10 @@
   const button = document.getElementById("generatePost");
   const status = document.getElementById("postStatus");
   const gallery = document.getElementById("postGallery");
+  const shareTools = document.getElementById("postShareTools");
+  const shareAllButton = document.getElementById("postShareAll");
   const imageUrls = [];
+  const imageFiles = [];
   let titleFontPromise;
 
   function loadTitleFont() {
@@ -529,17 +532,39 @@
         new Error("Image export failed.")), "image/png"));
     const url = URL.createObjectURL(blob);
     imageUrls.push(url);
+    const file = typeof File === "function"
+      ? new File([blob], filename, { type: "image/png" }) : null;
+    if (file) imageFiles.push(file);
     const figure = document.createElement("figure");
     figure.className = "post-image";
     const label = document.createElement("figcaption");
     const name = document.createElement("span");
+    name.className = "post-image-name";
     name.textContent = caption;
+    const actions = document.createElement("span");
+    actions.className = "post-image-actions";
+    if (file && canShareFiles([file])) {
+      const save = document.createElement("button");
+      save.type = "button";
+      save.className = "post-share-photo";
+      save.textContent = "Save to Photos…";
+      save.setAttribute("aria-label", `Save ${caption} to Photos`);
+      save.addEventListener("click", () => shareFiles([file]));
+      actions.appendChild(save);
+    }
+    const open = document.createElement("a");
+    open.className = "post-open";
+    open.textContent = "Open image";
+    open.href = url;
+    open.target = "_blank";
+    open.rel = "noopener";
     const link = document.createElement("a");
     link.className = "post-download";
     link.textContent = "Download PNG";
     link.href = url;
     link.download = filename;
-    label.append(name, link);
+    actions.append(open, link);
+    label.append(name, actions);
     const img = document.createElement("img");
     img.src = url;
     img.alt = caption;
@@ -551,6 +576,30 @@
     canvasElement.height = 0;
   }
 
+  function canShareFiles(files) {
+    try {
+      return typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files });
+    } catch { return false; }
+  }
+
+  function shareFiles(files) {
+    // Call share directly from the tap: awaiting anything first loses the
+    // browser's transient user activation, especially on iPhone.
+    try {
+      navigator.share({ files }).catch(error => {
+        if (error.name !== "AbortError") {
+          status.textContent = "The share sheet could not open. Try Open image or Download PNG.";
+        }
+      });
+    } catch {
+      status.textContent = "The share sheet could not open. Try Open image or Download PNG.";
+    }
+  }
+
+  shareAllButton.addEventListener("click", () => shareFiles(imageFiles));
+
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const first = startInput.value, last = endInput.value;
@@ -560,8 +609,10 @@
     }
     button.disabled = true;
     status.textContent = "Loading published events…";
+    shareTools.hidden = true;
     gallery.replaceChildren();
     imageUrls.splice(0).forEach(url => URL.revokeObjectURL(url));
+    imageFiles.length = 0;
     try {
       const response = await fetch("/admin/post-data", {
         credentials: "same-origin", cache: "no-store"
@@ -608,6 +659,7 @@
       }
       status.textContent = `${1 + pages.length + selected.length} PNG images ready.` +
         (missingFlyers ? ` ${missingFlyers} flyer${missingFlyers === 1 ? "" : "s"} could not be loaded; those images show a placeholder.` : "");
+      shareTools.hidden = imageFiles.length < 2 || !canShareFiles(imageFiles);
     } catch (error) {
       status.textContent = `Generation stopped: ${error.message}`;
     } finally { button.disabled = false; }
