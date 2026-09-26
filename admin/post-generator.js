@@ -129,13 +129,47 @@
       if (!dates.has(key)) dates.set(key, []);
       dates.get(key).push(event);
     });
+    // Choose breaks after seeing the whole run. Greedy filling can leave a
+    // single event on the last image even when moving the preceding day
+    // would make two balanced images (Sun 3 / Mon 2 / Tue 1, for example).
+    function packRun(run) {
+      const best = new Array(run.length + 1);
+      best[run.length] = { pageCount: 0, orphans: 0, unevenness: 0, pages: [] };
+      for (let start = run.length - 1; start >= 0; start--) {
+        let count = 0;
+        for (let end = start; end < run.length; end++) {
+          count += run[end].events.length;
+          if (count > MAX_EVENTS) break;
+          const page = run.slice(start, end + 1);
+          // A single busy day can be scaled slightly by calendarSlide.
+          if (end > start &&
+              pageHeight(page) > CONTENT_BOTTOM - FIRST_DATE_TOP) break;
+          const remainder = best[end + 1];
+          const candidate = {
+            pageCount: 1 + remainder.pageCount,
+            orphans: (count === 1 ? 1 : 0) + remainder.orphans,
+            unevenness: (MAX_EVENTS - count) ** 2 + remainder.unevenness,
+            pages: [page, ...remainder.pages]
+          };
+          const current = best[start];
+          if (!current ||
+              candidate.pageCount < current.pageCount ||
+              (candidate.pageCount === current.pageCount &&
+                (candidate.orphans < current.orphans ||
+                  (candidate.orphans === current.orphans &&
+                    candidate.unevenness < current.unevenness)))) {
+            best[start] = candidate;
+          }
+        }
+      }
+      return best[0].pages;
+    }
+
     const pages = [];
-    let current = [];
-    let currentCount = 0;
+    let run = [];
     const flush = () => {
-      if (current.length) pages.push(current);
-      current = [];
-      currentCount = 0;
+      if (run.length) pages.push(...packRun(run));
+      run = [];
     };
     [...dates.keys()].sort().forEach(key => {
       const dayEvents = dates.get(key);
@@ -145,14 +179,8 @@
         return;
       }
       const day = { key, events: dayEvents };
-      const contiguous = !current.length ||
-        nextDay(current.at(-1).key) === key;
-      if (!contiguous || currentCount + dayEvents.length > MAX_EVENTS ||
-          pageHeight([...current, day]) > CONTENT_BOTTOM - FIRST_DATE_TOP) {
-        flush();
-      }
-      current.push(day);
-      currentCount += dayEvents.length;
+      if (run.length && nextDay(run.at(-1).key) !== key) flush();
+      run.push(day);
     });
     flush();
     return pages;
@@ -234,11 +262,19 @@
     const [dates, days] = titleLines(first, last);
     ctx.fillStyle = COLORS.text;
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    fitText(ctx, dates, 810, 72, 38, "bold", "Georgia, serif");
-    ctx.fillText(dates, 1024, 1552);
-    fitText(ctx, days, 810, 66, 37, "bold", "Georgia, serif");
-    ctx.fillText(days, 1024, 1657);
+    ctx.textBaseline = "alphabetic";
+    const dateSize = fitText(ctx, dates, 810, 72, 38, "bold", "Georgia, serif");
+    const dateBounds = ctx.measureText(dates);
+    // The Philly "P" reaches into the box through roughly y=1520.
+    const dateBaseline = 1545 +
+      (dateBounds.actualBoundingBoxAscent || dateSize * .85);
+    ctx.fillText(dates, 1024, dateBaseline);
+    const daySize = fitText(ctx, days, 810, 66, 37, "bold", "Georgia, serif");
+    const dayBounds = ctx.measureText(days);
+    const dayBaseline = dateBaseline +
+      (dateBounds.actualBoundingBoxDescent || dateSize * .15) + 13 +
+      (dayBounds.actualBoundingBoxAscent || daySize * .85);
+    ctx.fillText(days, 1024, dayBaseline);
     return out;
   }
 
