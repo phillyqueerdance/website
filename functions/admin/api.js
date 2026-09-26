@@ -154,7 +154,7 @@ async function accessKeys(
   return payload.keys;
 }
 
-async function verifyAccess(
+export async function verifyAccess(
   context
 ) {
   const token =

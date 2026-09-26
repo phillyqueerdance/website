@@ -48,6 +48,7 @@ let dateSections = [];
 let scrollFrame = 0;
 let savedEventScrollTop = 0;
 let navigationTargetIndex = null;
+let arrowFocusDateKey = null;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
@@ -938,17 +939,29 @@ function scrollOffset(element) {
 
 function measureDateSpacers() {
   if (!pageCards.length || eventStack.hidden) return;
-  dateSections.forEach(({ spacer, lastPageIndex }) => {
+  dateSections.forEach(({ key, spacer, lastPageIndex }) => {
     spacer.style.height = "0px";
+    // Arrow pages keep the next date out of the frame. Free scrolling uses
+    // a short, visible break between dates instead of a blank screen.
+    if (key !== arrowFocusDateKey) {
+      spacer.style.height = "4cqw";
+      return;
+    }
     const pageTop = scrollOffset(pageCards[lastPageIndex]);
     const naturalEnd = scrollOffset(spacer);
     spacer.style.height = Math.max(0,
-      pageTop + eventStack.clientHeight - naturalEnd + 2) + "px";
+      pageTop + eventStack.clientHeight - naturalEnd + 2,
+      poster.clientWidth * 0.04) + "px";
   });
 }
 
-function scrollToPage(index, behavior = "smooth") {
+function scrollToPage(index, behavior = "smooth", focusLastPage = true) {
   if (!pageCards[index]) return;
+  if (focusLastPage) {
+    const section = dateSections.find(item => item.lastPageIndex === index);
+    arrowFocusDateKey = section ? section.key : null;
+    measureDateSpacers();
+  }
   navigationTargetIndex = behavior === "smooth" ? index : null;
   currentPosterIndex = index;
   eventStack.scrollTo({ top: scrollOffset(pageCards[index]), behavior });
@@ -1024,9 +1037,16 @@ function schedulePosterLayout() {
     if (!pageCards.length || eventStack.hidden) return;
     const index = currentPosterIndex;
     measureDateSpacers();
-    scrollToPage(index, "auto");
+    scrollToPage(index, "auto", false);
     fitPosterTitles();
   });
+}
+
+function releaseArrowPageSpace() {
+  if (arrowFocusDateKey === null) return;
+  arrowFocusDateKey = null;
+  navigationTargetIndex = null;
+  measureDateSpacers();
 }
 
 function openEventDetail(event) {
@@ -1350,11 +1370,20 @@ eventStack.addEventListener("scroll", () => {
   });
 }, { passive: true });
 
+eventStack.addEventListener("wheel", releaseArrowPageSpace, { passive: true });
+eventStack.addEventListener("touchmove", releaseArrowPageSpace, { passive: true });
+eventStack.addEventListener("keydown", event => {
+  if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", " "].includes(event.key)) {
+    releaseArrowPageSpace();
+  }
+});
+
 poster.addEventListener("wheel", event => {
   if (!eventDetail.hidden || !datePopover.hidden ||
       eventStack.contains(event.target) || !pageCards.length) return;
   if (Math.abs(event.deltaY) < 1) return;
   event.preventDefault();
+  releaseArrowPageSpace();
   eventStack.scrollBy({ top: event.deltaY, behavior: "auto" });
 }, { passive: false });
 
@@ -1465,6 +1494,7 @@ function renderEventCollection(
   const previousPage = posterPages[currentPosterIndex];
   const previousFirst = previousPage?.events[0];
   navigationTargetIndex = null;
+  arrowFocusDateKey = null;
   posterPages =
     buildPosterPages(events);
 

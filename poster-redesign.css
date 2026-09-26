@@ -1,8 +1,8 @@
 /* September 2026 poster. The transparent frame contains only fixed artwork. */
 .poster {
   width: min(
-    calc(100vw - clamp(470px, 40vw, 540px)),
-    calc((100dvh - 28px) * 0.843289)
+    calc(100vw - clamp(400px, 33vw, 475px)),
+    calc((100dvh - 8px) * 0.843289)
   );
   aspect-ratio: 2400 / 2846;
 
@@ -55,11 +55,12 @@
   --qdp-detail-right: 8.23%;
   --qdp-detail-padding: 2.7cqw;
   --qdp-detail-radius: 1.7cqw;
+  --qdp-detail-border: 0.75cqw;
 }
 
 .side-nav {
   --qdp-nav-x: 54px;
-  --qdp-nav-y: -20px;
+  --qdp-nav-y: 0px;
   --qdp-nav-top: 0px;
   --qdp-nav-bottom: 0px;
   --qdp-nav-gap: 61px;
@@ -223,7 +224,7 @@
   font-family: Verdana, Geneva, sans-serif;
   isolation: isolate;
 }
-.event-card.explicit { --event-color: #922185; background: var(--event-color); }
+.event-card.explicit { --event-color: var(--qdp-queer-card); background: var(--event-color); }
 .event-card.default { background: var(--event-color); }
 .event-time-group .event-row:first-child .event-card {
   border-top-right-radius: var(--qdp-card-radius);
@@ -330,12 +331,13 @@
 
 .event-detail {
   font-family: Verdana, Geneva, sans-serif;
-  background: #202125;
+  background: var(--qdp-regular-popup);
+  border: var(--qdp-detail-border) solid #000;
   align-items: stretch;
   justify-content: stretch;
 }
 .event-detail.is-open { align-items: stretch; justify-content: stretch; }
-.event-detail.explicit { background: #290925; }
+.event-detail.explicit { background: var(--qdp-queer-popup); }
 .event-detail-card {
   position: relative;
   z-index: 1;
@@ -406,7 +408,8 @@
 @media (max-width: 760px) {
   .poster-stage { width: 100vw; }
   .poster {
-    width: min(100vw, calc((100dvh - 82px) * 0.843289));
+    flex: 0 0 auto;
+    width: min(114vw, calc((100dvh - 48px) * 0.843289));
   }
   .side-nav {
     --qdp-nav-x: 0px;
