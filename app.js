@@ -9,8 +9,7 @@ const EVENTS_STORAGE_MAX_AGE_MS =
 
 const MAX_EVENTS_PER_POSTER = 6;
 
-const dateNumber = document.getElementById("dateNumber");
-const dateDay = document.getElementById("dateDay");
+const dateLabel = document.getElementById("dateLabel");
 const eventStack = document.getElementById("eventStack");
 const eventDetail = document.getElementById("eventDetail");
 const dateButton = document.getElementById("dateButton");
@@ -18,6 +17,11 @@ const datePopover = document.getElementById("datePopover");
 const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
+const dateIncomingLabel = document.createElement("span");
+dateIncomingLabel.className = "date-scroll-label";
+dateIncomingLabel.hidden = true;
+dateIncomingLabel.setAttribute("aria-hidden", "true");
+poster.appendChild(dateIncomingLabel);
 
 const aboutLink = document.getElementById("aboutLink");
 const aboutDialog = document.getElementById("aboutDialog");
@@ -39,6 +43,12 @@ let posterPages = [];
 let currentPosterIndex = 0;
 let pickerMonth = null;
 let touchStartX = null;
+let pageCards = [];
+let dateSections = [];
+let scrollFrame = 0;
+let savedEventScrollTop = 0;
+let navigationTargetIndex = null;
+let arrowFocusDateKey = null;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
@@ -298,6 +308,52 @@ function formatTimeRange(event) {
 
 function formatStartTime(event) {
   return compactTime(new Date(event.start));
+}
+
+function ordinalSuffix(day) {
+  if (day % 100 >= 11 && day % 100 <= 13) return "th";
+  return ["th", "st", "nd", "rd"][Math.min(day % 10, 4)] || "th";
+}
+
+function displayTitle(event) {
+  // Public Calendar titles keep consented emoji badges; the site uses graphic flags.
+  return String(event.title || "")
+    .replace(/^(?:(?:🏳️‍🌈|🏳️‍⚧️|✊🏾)\s*)+/u, "")
+    .trim() || String(event.title || "");
+}
+
+function fitPosterTitles() {
+  eventStack.querySelectorAll(".event-title").forEach(title => {
+    title.style.fontSize = "";
+    const available = title.clientWidth;
+    const fullWidth = title.scrollWidth;
+    if (available > 0 && fullWidth > available) {
+      const base = parseFloat(getComputedStyle(title).fontSize);
+      title.style.fontSize = `${Math.max(1, base * available / fullWidth - 0.5)}px`;
+    }
+  });
+
+  fitDateText(dateLabel, dateButton);
+  if (!dateIncomingLabel.hidden) fitDateText(dateIncomingLabel, dateButton);
+  dateSections.forEach(({ marker }) => {
+    if (marker) fitDateText(marker, marker);
+  });
+}
+
+function fitDateText(element, container) {
+  if (!element.textContent || !container.clientWidth) return;
+  const style = getComputedStyle(container);
+  const base = parseFloat(getComputedStyle(dateButton).fontSize);
+  const room = container.clientWidth -
+    parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 4;
+  const canvas = fitDateText.canvas ||
+    (fitDateText.canvas = document.createElement("canvas"));
+  const context = canvas.getContext("2d");
+  context.font = `700 ${base}px Georgia`;
+  const width = context.measureText(element.textContent).width;
+  element.style.fontSize = width > room
+    ? `${Math.max(1, base * room / width - 0.5)}px`
+    : `${base}px`;
 }
 
 function appendStartTime(time, event) {
@@ -725,7 +781,7 @@ function renderDatePopover() {
             );
 
           closeDatePopover();
-          renderPoster();
+          scrollToPage(currentPosterIndex);
         }
       );
     }
@@ -740,142 +796,263 @@ function renderDatePopover() {
   );
 }
 
-function renderPoster() {
-  if (!posterPages.length) {
-    return;
+function formatPosterDate(key) {
+  const date = dateFromKey(key);
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", weekday: "long"
+  }).format(date);
+  const month = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", month: "long"
+  }).format(date);
+  const day = Number(key.slice(-2));
+  return weekday + ", " + month + " " + day + ordinalSuffix(day);
+}
+
+function createEventCard(event) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "event-card " +
+    (event.explicitQueer ? "explicit" : "default") +
+    (event.queerArtist || event.transArtist ? " has-flags" : "");
+
+  if (event.queerArtist) {
+    const flag = document.createElement("span");
+    flag.className = "card-flag card-flag-queer";
+    flag.setAttribute("aria-label", "Features a queer artist");
+    flag.setAttribute("role", "img");
+    card.appendChild(flag);
+  }
+  if (event.transArtist) {
+    const flag = document.createElement("span");
+    flag.className = "card-flag card-flag-trans";
+    flag.setAttribute("aria-label", "Features a trans artist");
+    flag.setAttribute("role", "img");
+    card.appendChild(flag);
   }
 
-  const page =
-    posterPages[currentPosterIndex];
+  const shape = document.createElement("span");
+  shape.className = "event-card-shape";
+  shape.setAttribute("aria-hidden", "true");
+  const content = document.createElement("span");
+  content.className = "event-card-content";
+  const title = document.createElement("div");
+  title.className = "event-title";
+  title.textContent = displayTitle(event);
+  const venue = document.createElement("div");
+  venue.className = "event-venue";
+  venue.textContent = eventVenue(event);
+  venue.hidden = !venue.textContent;
+  const address = document.createElement("div");
+  address.className = "event-address";
+  address.textContent = eventAddress(event);
+  address.hidden = !address.textContent;
 
-  const posterDate =
-    dateFromKey(page.date);
+  content.append(title, venue, address);
+  card.append(shape, content);
+  card.addEventListener("click", () => openEventDetail(event));
+  return card;
+}
+
+function renderPoster() {
+  if (!posterPages.length) return;
 
   eventDetail.hidden = true;
-
-  eventDetail.classList.remove(
-    "is-open"
-  );
-
+  eventDetail.classList.remove("is-open", "explicit");
   eventStack.hidden = false;
-
-  dateNumber.textContent =
-    new Intl.DateTimeFormat(
-      "en-US",
-      {
-        timeZone: "America/New_York",
-        month: "numeric",
-        day: "numeric"
-      }
-    ).format(posterDate);
-
-  dateDay.textContent =
-    new Intl.DateTimeFormat(
-      "en-US",
-      {
-        timeZone: "America/New_York",
-        weekday: "short"
-      }
-    ).format(posterDate);
-
   eventStack.innerHTML = "";
+  pageCards = new Array(posterPages.length);
+  dateSections = [];
 
-  groupEventsByStartTime(page.events)
-    .forEach(eventsAtThisTime => {
-      const group =
-        document.createElement("div");
+  const dates = [];
+  posterPages.forEach((page, pageIndex) => {
+    let date = dates[dates.length - 1];
+    if (!date || date.key !== page.date) {
+      date = { key: page.date, items: [], lastPageIndex: pageIndex };
+      dates.push(date);
+    }
+    date.lastPageIndex = pageIndex;
+    page.events.forEach(event => date.items.push({ event, pageIndex }));
+  });
 
-      group.className =
-        "event-time-group";
+  dates.forEach((date, dateIndex) => {
+    const section = document.createElement("section");
+    section.className = "date-section";
+    section.setAttribute("aria-label", formatPosterDate(date.key));
+    let marker = null;
+    if (dateIndex > 0) {
+      marker = document.createElement("div");
+      marker.className = "date-heading";
+      marker.textContent = formatPosterDate(date.key);
+      section.appendChild(marker);
+    }
 
-      const time =
-        document.createElement("div");
+    const pageForEvent = new Map(
+      date.items.map(({ event, pageIndex }) => [event, pageIndex])
+    );
+    groupEventsByStartTime(date.items.map(item => item.event))
+      .forEach(eventsAtThisTime => {
+        const group = document.createElement("div");
+        group.className = "event-time-group";
+        const time = document.createElement("div");
+        time.className = "event-time";
+        appendStartTime(time, eventsAtThisTime[0]);
+        const cards = document.createElement("div");
+        cards.className = "event-group-cards";
 
-      time.className = "event-time";
+        eventsAtThisTime.forEach((event, index) => {
+          const row = document.createElement("div");
+          row.className = "event-row " +
+            (index === 0 ? "has-time" : "same-time");
+          const card = createEventCard(event);
+          const pageIndex = pageForEvent.get(event);
+          if (!pageCards[pageIndex]) pageCards[pageIndex] = card;
+          row.appendChild(card);
+          cards.appendChild(row);
+        });
 
-      appendStartTime(
-        time,
-        eventsAtThisTime[0]
-      );
-
-      const cards =
-        document.createElement("div");
-
-      cards.className =
-        "event-group-cards";
-
-      eventsAtThisTime.forEach(event => {
-        const card =
-          document.createElement("button");
-
-        card.type = "button";
-
-        card.className =
-          `event-card ${
-            event.explicitQueer
-              ? "explicit"
-              : "default"
-          }`;
-
-        const title =
-          document.createElement("div");
-
-        title.className = "event-title";
-        title.textContent = event.title;
-
-        const venue =
-          document.createElement("div");
-
-        venue.className = "event-venue";
-
-        venue.textContent =
-          eventVenue(event);
-
-        venue.hidden =
-          !venue.textContent;
-
-        const address =
-          document.createElement("div");
-
-        address.className =
-          "event-address";
-
-        address.textContent =
-          eventAddress(event);
-
-        address.hidden =
-          !address.textContent;
-
-        card.append(
-          title,
-          venue,
-          address
-        );
-
-        card.addEventListener(
-          "click",
-          () => openEventDetail(event)
-        );
-
-        cards.appendChild(card);
+        group.append(time, cards);
+        section.appendChild(group);
       });
 
-      group.append(time, cards);
-
-      eventStack.appendChild(group);
+    const spacer = document.createElement("div");
+    spacer.className = "date-end-spacer";
+    spacer.setAttribute("aria-hidden", "true");
+    section.appendChild(spacer);
+    eventStack.appendChild(section);
+    dateSections.push({
+      key: date.key, section, marker, spacer,
+      lastPageIndex: date.lastPageIndex
     });
+  });
 
-  previousPoster.disabled =
-    currentPosterIndex === 0;
+  requestAnimationFrame(() => {
+    measureDateSpacers();
+    scrollToPage(currentPosterIndex, "auto");
+    fitPosterTitles();
+  });
+}
 
-  nextPoster.disabled =
-    currentPosterIndex ===
-    posterPages.length - 1;
+function scrollOffset(element) {
+  return element.getBoundingClientRect().top -
+    eventStack.getBoundingClientRect().top + eventStack.scrollTop;
+}
+
+function measureDateSpacers() {
+  if (!pageCards.length || eventStack.hidden) return;
+  dateSections.forEach(({ key, spacer, lastPageIndex }) => {
+    spacer.style.height = "0px";
+    // Arrow pages keep the next date out of the frame. Free scrolling uses
+    // a short, visible break between dates instead of a blank screen.
+    if (key !== arrowFocusDateKey) {
+      spacer.style.height = "4cqw";
+      return;
+    }
+    const pageTop = scrollOffset(pageCards[lastPageIndex]);
+    const naturalEnd = scrollOffset(spacer);
+    spacer.style.height = Math.max(0,
+      pageTop + eventStack.clientHeight - naturalEnd + 2,
+      poster.clientWidth * 0.04) + "px";
+  });
+}
+
+function scrollToPage(index, behavior = "smooth", focusLastPage = true) {
+  if (!pageCards[index]) return;
+  if (focusLastPage) {
+    const section = dateSections.find(item => item.lastPageIndex === index);
+    arrowFocusDateKey = section ? section.key : null;
+    measureDateSpacers();
+  }
+  navigationTargetIndex = behavior === "smooth" ? index : null;
+  currentPosterIndex = index;
+  eventStack.scrollTo({ top: scrollOffset(pageCards[index]), behavior });
+  if (behavior === "auto") updateScrollState();
+  else {
+    previousPoster.disabled = index === 0;
+    nextPoster.disabled = index === posterPages.length - 1;
+  }
+}
+
+function showDateLabel(key) {
+  const label = formatPosterDate(key);
+  if (dateLabel.textContent !== label) dateLabel.textContent = label;
+  dateLabel.style.transform = "translateY(0)";
+  dateIncomingLabel.hidden = true;
+  dateButton.setAttribute("aria-label", "Choose a date. Showing " + label);
+  fitDateText(dateLabel, dateButton);
+}
+
+function updateScrollState() {
+  if (!posterPages.length || !pageCards.length || eventStack.hidden) return;
+  const position = eventStack.scrollTop + 2;
+  let pageIndex = 0;
+  pageCards.forEach((card, index) => {
+    if (scrollOffset(card) <= position) pageIndex = index;
+  });
+  if (navigationTargetIndex !== null &&
+      Math.abs(eventStack.scrollTop -
+        scrollOffset(pageCards[navigationTargetIndex])) < 2) {
+    navigationTargetIndex = null;
+  }
+  currentPosterIndex = navigationTargetIndex ?? pageIndex;
+  previousPoster.disabled = currentPosterIndex === 0;
+  nextPoster.disabled = currentPosterIndex === posterPages.length - 1;
+
+  const top = eventStack.getBoundingClientRect().top;
+  const dateHeight = dateButton.getBoundingClientRect().height - 2;
+  let activeKey = dateSections[0].key;
+  let transition = null;
+  dateSections.slice(1).forEach(({ key, marker }, index) => {
+    const markerTop = marker.getBoundingClientRect().top - top;
+    marker.style.opacity = markerTop <= 0 ? "0" : "";
+    if (markerTop <= -dateHeight) activeKey = key;
+    else if (markerTop <= 0 && !transition) {
+      transition = {
+        previous: dateSections[index].key,
+        next: key,
+        progress: -markerTop / dateHeight
+      };
+    }
+  });
+
+  if (!transition) {
+    showDateLabel(activeKey);
+    return;
+  }
+  const { previous, next, progress } = transition;
+  dateLabel.textContent = formatPosterDate(previous);
+  dateIncomingLabel.textContent = formatPosterDate(next);
+  dateIncomingLabel.hidden = false;
+  dateLabel.style.transform =
+    "translateY(" + (-progress * dateHeight) + "px)";
+  dateIncomingLabel.style.transform =
+    "translateY(" + (-progress * dateHeight) + "px)";
+  dateButton.setAttribute("aria-label", "Choose a date. Showing " +
+    (progress < 0.5 ? dateLabel.textContent : dateIncomingLabel.textContent));
+  fitDateText(dateLabel, dateButton);
+  fitDateText(dateIncomingLabel, dateButton);
+}
+
+function schedulePosterLayout() {
+  requestAnimationFrame(() => {
+    if (!pageCards.length || eventStack.hidden) return;
+    const index = currentPosterIndex;
+    measureDateSpacers();
+    scrollToPage(index, "auto", false);
+    fitPosterTitles();
+  });
+}
+
+function releaseArrowPageSpace() {
+  if (arrowFocusDateKey === null) return;
+  arrowFocusDateKey = null;
+  navigationTargetIndex = null;
+  measureDateSpacers();
 }
 
 function openEventDetail(event) {
   closeDatePopover();
 
+  savedEventScrollTop = eventStack.scrollTop;
   eventStack.hidden = true;
   eventDetail.hidden = false;
 
@@ -883,13 +1060,35 @@ function openEventDetail(event) {
     "is-open"
   );
 
+  eventDetail.classList.toggle("explicit", event.explicitQueer === true);
+
   eventDetail.innerHTML = "";
+
+  if (event.queerArtist) {
+    const flag = document.createElement("span");
+    flag.className = "event-detail-flag event-detail-flag-queer";
+    flag.setAttribute("role", "img");
+    flag.setAttribute("aria-label", "Features a queer artist");
+    eventDetail.appendChild(flag);
+  }
+  if (event.transArtist) {
+    const flag = document.createElement("span");
+    flag.className = "event-detail-flag event-detail-flag-trans";
+    flag.setAttribute("role", "img");
+    flag.setAttribute("aria-label", "Features a trans artist");
+    eventDetail.appendChild(flag);
+  }
 
   const detailCard =
     document.createElement("article");
 
   detailCard.className =
     "event-detail-card";
+
+  const firstScreen = document.createElement("div");
+  firstScreen.className = "event-detail-first-screen";
+  const flyerSlot = document.createElement("div");
+  flyerSlot.className = "event-detail-flyer-slot";
 
   if (event.flyerUrl) {
     const flyerSource =
@@ -919,7 +1118,7 @@ function openEventDetail(event) {
       : flyerSource;
 
     flyer.alt =
-      `Flyer for ${event.title}`;
+      `Flyer for ${displayTitle(event)}`;
 
     flyer.loading = "eager";
 
@@ -945,13 +1144,13 @@ function openEventDetail(event) {
       }
     );
 
-    detailCard.appendChild(flyer);
+    flyerSlot.appendChild(flyer);
   }
 
   const heading =
     document.createElement("h2");
 
-  heading.textContent = event.title;
+  heading.textContent = displayTitle(event);
 
   const time =
     document.createElement("p");
@@ -983,13 +1182,15 @@ function openEventDetail(event) {
   description.textContent =
     event.description || "";
 
-  detailCard.append(
-    heading,
-    time,
-    venue,
-    address,
-    description
-  );
+  const titleLocation = document.createElement("div");
+  titleLocation.className = "event-detail-title-location";
+  titleLocation.append(heading, venue, address);
+  firstScreen.append(flyerSlot, titleLocation);
+
+  const more = document.createElement("div");
+  more.className = "event-detail-more";
+  more.append(time, description);
+  detailCard.append(firstScreen, more);
 
   const closeButton =
     document.createElement("button");
@@ -1023,7 +1224,11 @@ function closeEventDetail() {
       "is-open"
     )
   ) {
-    renderPoster();
+    eventDetail.hidden = true;
+    eventDetail.classList.remove("is-open", "explicit");
+    eventStack.hidden = false;
+    eventStack.scrollTop = savedEventScrollTop;
+    updateScrollState();
   }
 }
 
@@ -1134,7 +1339,7 @@ meltDialog.addEventListener(
 
 function movePoster(direction) {
   const nextIndex =
-    currentPosterIndex + direction;
+    (navigationTargetIndex ?? currentPosterIndex) + direction;
 
   if (
     nextIndex < 0 ||
@@ -1144,10 +1349,7 @@ function movePoster(direction) {
   }
 
   closeDatePopover();
-
-  currentPosterIndex = nextIndex;
-
-  renderPoster();
+  scrollToPage(nextIndex);
 }
 
 previousPoster.addEventListener(
@@ -1159,6 +1361,31 @@ nextPoster.addEventListener(
   "click",
   () => movePoster(1)
 );
+
+eventStack.addEventListener("scroll", () => {
+  if (scrollFrame) return;
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0;
+    updateScrollState();
+  });
+}, { passive: true });
+
+eventStack.addEventListener("wheel", releaseArrowPageSpace, { passive: true });
+eventStack.addEventListener("touchmove", releaseArrowPageSpace, { passive: true });
+eventStack.addEventListener("keydown", event => {
+  if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", " "].includes(event.key)) {
+    releaseArrowPageSpace();
+  }
+});
+
+poster.addEventListener("wheel", event => {
+  if (!eventDetail.hidden || !datePopover.hidden ||
+      eventStack.contains(event.target) || !pageCards.length) return;
+  if (Math.abs(event.deltaY) < 1) return;
+  event.preventDefault();
+  releaseArrowPageSpace();
+  eventStack.scrollBy({ top: event.deltaY, behavior: "auto" });
+}, { passive: false });
 
 window.addEventListener(
   "keydown",
@@ -1264,10 +1491,16 @@ document.addEventListener(
 function renderEventCollection(
   events
 ) {
+  const previousPage = posterPages[currentPosterIndex];
+  const previousFirst = previousPage?.events[0];
+  navigationTargetIndex = null;
+  arrowFocusDateKey = null;
   posterPages =
     buildPosterPages(events);
 
   if (!posterPages.length) {
+    pageCards = [];
+    dateSections = [];
     previousPoster.disabled = true;
     nextPoster.disabled = true;
 
@@ -1287,10 +1520,18 @@ function renderEventCollection(
         page.date >= today
     );
 
-  currentPosterIndex =
-    todayIndex >= 0
-      ? todayIndex
-      : 0;
+  const matchingPage = previousFirst
+    ? posterPages.findIndex(page =>
+        page.date === previousPage.date &&
+        page.events.some(event =>
+          event.start === previousFirst.start &&
+          event.title === previousFirst.title
+        ))
+    : -1;
+
+  currentPosterIndex = matchingPage >= 0
+    ? matchingPage
+    : todayIndex >= 0 ? todayIndex : 0;
 
   renderPoster();
 }
@@ -1343,6 +1584,15 @@ async function initialize() {
 }
 
 initializeMobileMenu();
+
+if ("ResizeObserver" in window) {
+  new ResizeObserver(schedulePosterLayout).observe(poster);
+} else {
+  window.addEventListener("resize", schedulePosterLayout);
+}
+if (layoutEditorEnabled) {
+  document.addEventListener("input", schedulePosterLayout);
+}
 
 initialize().finally(() => {
   if (

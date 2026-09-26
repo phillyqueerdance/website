@@ -16,7 +16,9 @@
   <title>QDP Admin</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
+  <link rel="stylesheet" href="../poster-theme.css?v=20260926-01">
   <link rel="stylesheet" href="admin.css?v=20260923-01">
+  <link rel="stylesheet" href="post-generator.css?v=20260926-01">
 </head>
 
 <body>
@@ -79,6 +81,23 @@
         visibility does not require a push. A pull can create “Needs push”
         items when QDP's derived Calendar fields differ.
       </p>
+    </section>
+
+    <section class="post-panel" aria-labelledby="postHeading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Share the calendar</p>
+          <h2 id="postHeading">Generate Post</h2>
+        </div>
+      </div>
+      <form id="postForm" class="post-form">
+        <label>First date <input id="postStart" type="date" required></label>
+        <label>Last date <input id="postEnd" type="date" required></label>
+        <button id="generatePost" class="post-generate" type="submit">Generate Post</button>
+      </form>
+      <p class="post-help">Creates a title slide, calendar pages, and one framed flyer image per published event. On your phone, press and hold an image to save it to Photos.</p>
+      <p id="postStatus" class="post-status" role="status" aria-live="polite"></p>
+      <div id="postGallery" class="post-gallery"></div>
     </section>
 
     <section class="events-panel" aria-labelledby="eventsHeading">
@@ -289,5 +308,6 @@
   </noscript>
 
   <script src="admin.js?v=20260923-01"></script>
+  <script src="post-generator.js?v=20260926-01"></script>
 </body>
 </html>
