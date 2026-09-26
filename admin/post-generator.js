@@ -35,7 +35,7 @@
         return Promise.reject(new Error("This browser cannot load Fraunces for the title slide."));
       }
       const face = new FontFace("QDP Fraunces",
-        'url("/admin/Fraunces-Variable.ttf?v=20260926-01")',
+        'url("/Fraunces-Variable.ttf?v=20260926-01")',
         { weight: "100 900" });
       titleFontPromise = face.load().then(loaded => {
         document.fonts.add(loaded);
@@ -289,7 +289,7 @@
     ctx.font = `700 ${titleSize}px ${family}`;
     const dateBounds = ctx.measureText(dates);
     // The Philly "P" reaches into the box through roughly y=1520.
-    const dateBaseline = 1545 +
+    const dateBaseline = 1542 +
       (dateBounds.actualBoundingBoxAscent || titleSize * .85);
     ctx.fillText(dates, 1024, dateBaseline);
     const dayBounds = ctx.measureText(days);
