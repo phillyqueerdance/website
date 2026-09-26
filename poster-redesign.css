@@ -242,7 +242,7 @@
   border-bottom-right-radius: var(--qdp-card-radius);
 }
 .event-time-group .event-row.same-time:last-child .event-card {
-  border-bottom-left-radius: var(--qdp-card-radius);
+  border-bottom-left-radius: var(--qdp-tail-radius, var(--qdp-card-radius));
 }
 .event-card:hover .event-card-shape,
 .event-card:focus-visible .event-card-shape { filter: brightness(1.1); }

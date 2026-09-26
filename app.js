@@ -45,6 +45,7 @@ let pickerMonth = null;
 let touchStartX = null;
 let pageCards = [];
 let dateSections = [];
+let cornerTransitions = [];
 let scrollFrame = 0;
 let savedEventScrollTop = 0;
 let navigationTargetIndex = null;
@@ -862,6 +863,7 @@ function renderPoster() {
   eventStack.innerHTML = "";
   pageCards = new Array(posterPages.length);
   dateSections = [];
+  cornerTransitions = [];
 
   const dates = [];
   posterPages.forEach((page, pageIndex) => {
@@ -899,11 +901,13 @@ function renderPoster() {
         const cards = document.createElement("div");
         cards.className = "event-group-cards";
 
+        let lastCard = null;
         eventsAtThisTime.forEach((event, index) => {
           const row = document.createElement("div");
           row.className = "event-row " +
             (index === 0 ? "has-time" : "same-time");
           const card = createEventCard(event);
+          lastCard = card;
           const pageIndex = pageForEvent.get(event);
           if (!pageCards[pageIndex]) pageCards[pageIndex] = card;
           row.appendChild(card);
@@ -912,6 +916,9 @@ function renderPoster() {
 
         group.append(time, cards);
         section.appendChild(group);
+        if (eventsAtThisTime.length > 1) {
+          cornerTransitions.push({ time, card: lastCard });
+        }
       });
 
     const spacer = document.createElement("div");
@@ -981,8 +988,26 @@ function showDateLabel(key) {
   fitDateText(dateLabel, dateButton);
 }
 
+function updateTimeGroupCorners() {
+  if (!cornerTransitions.length) return;
+  const radius = parseFloat(getComputedStyle(
+    cornerTransitions[0].card).borderBottomRightRadius) || 0;
+  const updates = cornerTransitions.map(({ time, card }) => {
+    const timeBottom = time.getBoundingClientRect().bottom;
+    const cardBox = card.getBoundingClientRect();
+    // Start when the time block touches the final card; finish when their
+    // bottom edges meet. Reversing the scroll reverses the radius as well.
+    const progress = Math.max(0, Math.min(1,
+      (timeBottom - cardBox.top) / cardBox.height));
+    return [card, radius * (1 - progress)];
+  });
+  updates.forEach(([card, value]) =>
+    card.style.setProperty("--qdp-tail-radius", `${value}px`));
+}
+
 function updateScrollState() {
   if (!posterPages.length || !pageCards.length || eventStack.hidden) return;
+  updateTimeGroupCorners();
   const position = eventStack.scrollTop + 2;
   let pageIndex = 0;
   pageCards.forEach((card, index) => {
@@ -1501,6 +1526,7 @@ function renderEventCollection(
   if (!posterPages.length) {
     pageCards = [];
     dateSections = [];
+    cornerTransitions = [];
     previousPoster.disabled = true;
     nextPoster.disabled = true;
 
