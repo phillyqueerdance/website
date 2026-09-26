@@ -27,6 +27,25 @@
   const status = document.getElementById("postStatus");
   const gallery = document.getElementById("postGallery");
   const imageUrls = [];
+  let titleFontPromise;
+
+  function loadTitleFont() {
+    if (!titleFontPromise) {
+      if (typeof FontFace !== "function" || !document.fonts) {
+        return Promise.reject(new Error("This browser cannot load Fraunces for the title slide."));
+      }
+      const face = new FontFace("QDP Fraunces",
+        'url("/admin/Fraunces-Variable.ttf?v=20260926-01")',
+        { weight: "100 900" });
+      titleFontPromise = face.load().then(loaded => {
+        document.fonts.add(loaded);
+      }).catch(() => {
+        titleFontPromise = null;
+        throw new Error("Fraunces could not load. Check the font file and try again.");
+      });
+    }
+    return titleFontPromise;
+  }
 
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: LOCAL_TIME, year: "numeric", month: "2-digit", day: "2-digit"
@@ -263,17 +282,20 @@
     ctx.fillStyle = COLORS.text;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    const dateSize = fitText(ctx, dates, 810, 72, 38, "bold", "Georgia, serif");
+    const family = '"QDP Fraunces"';
+    const dateSize = fitText(ctx, dates, 810, 72, 38, 700, family);
+    const daySize = fitText(ctx, days, 810, 72, 38, 700, family);
+    const titleSize = Math.min(dateSize, daySize);
+    ctx.font = `700 ${titleSize}px ${family}`;
     const dateBounds = ctx.measureText(dates);
     // The Philly "P" reaches into the box through roughly y=1520.
     const dateBaseline = 1545 +
-      (dateBounds.actualBoundingBoxAscent || dateSize * .85);
+      (dateBounds.actualBoundingBoxAscent || titleSize * .85);
     ctx.fillText(dates, 1024, dateBaseline);
-    const daySize = fitText(ctx, days, 810, 66, 37, "bold", "Georgia, serif");
     const dayBounds = ctx.measureText(days);
     const dayBaseline = dateBaseline +
-      (dateBounds.actualBoundingBoxDescent || dateSize * .15) + 13 +
-      (dayBounds.actualBoundingBoxAscent || daySize * .85);
+      (dateBounds.actualBoundingBoxDescent || titleSize * .15) + 13 +
+      (dayBounds.actualBoundingBoxAscent || titleSize * .85);
     ctx.fillText(days, 1024, dayBaseline);
     return out;
   }
@@ -558,7 +580,8 @@
       const pages = calendarPages(selected);
       const [logo, frame] = await Promise.all([
         image("../newlogoqdp.png?v=20260926-01"),
-        image("../frame.png?v=20260926-01")
+        image("../frame.png?v=20260926-01"),
+        loadTitleFont()
       ]);
       const prefix = `qdp-${first}-${last}`;
       await addImage(titleSlide(logo, first, last), "Title slide", `${prefix}-title.png`);
