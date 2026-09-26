@@ -321,6 +321,15 @@ function fitPosterTitles() {
       title.style.fontSize = `${Math.max(1, base * available / fullWidth - 0.5)}px`;
     }
   });
+
+  // The longer weekdays and months must fit the same tab as the short dates.
+  dateLabel.style.fontSize = "";
+  const available = dateLabel.clientWidth;
+  const fullWidth = dateLabel.scrollWidth;
+  if (available > 0 && fullWidth > available) {
+    const base = parseFloat(getComputedStyle(dateLabel).fontSize);
+    dateLabel.style.fontSize = `${Math.max(1, base * available / fullWidth - 0.5)}px`;
+  }
 }
 
 function scheduleTitleFit() {
