@@ -349,7 +349,7 @@ function fitDateText(element, container) {
   const canvas = fitDateText.canvas ||
     (fitDateText.canvas = document.createElement("canvas"));
   const context = canvas.getContext("2d");
-  context.font = `700 ${base}px Georgia`;
+  context.font = `${style.fontWeight} ${base}px ${style.fontFamily}`;
   const width = context.measureText(element.textContent).width;
   element.style.fontSize = width > room
     ? `${Math.max(1, base * room / width - 0.5)}px`
@@ -1584,6 +1584,13 @@ async function initialize() {
 }
 
 initializeMobileMenu();
+
+// Refit date labels after the display font replaces its fallback.
+if (document.fonts) {
+  document.fonts.load('700 32px "QDP Fraunces"')
+    .then(schedulePosterLayout)
+    .catch(error => console.warn("Fraunces could not load:", error));
+}
 
 if ("ResizeObserver" in window) {
   new ResizeObserver(schedulePosterLayout).observe(poster);

@@ -1,4 +1,12 @@
 /* September 2026 poster. The transparent frame contains only fixed artwork. */
+@font-face {
+  font-family: "QDP Fraunces";
+  src: url("Fraunces-Variable.ttf?v=20260926-01") format("truetype");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 .poster {
   width: min(
     calc(100vw - clamp(400px, 33vw, 475px)),
@@ -59,6 +67,7 @@
 }
 
 .side-nav {
+  font-family: "QDP Fraunces", Georgia, serif;
   --qdp-nav-x: 54px;
   --qdp-nav-y: 0px;
   --qdp-nav-top: 0px;
@@ -79,7 +88,7 @@
   border-radius: 5cqw 5cqw 0 0;
   background: #fa2b5a;
   color: #ffeff2;
-  font: 700 var(--qdp-date-font-size) / 1 Georgia, "Times New Roman", serif;
+  font: 700 var(--qdp-date-font-size) / 1 "QDP Fraunces", Georgia, serif;
   white-space: nowrap;
   display: flex;
   align-items: center;
@@ -114,7 +123,7 @@
   align-items: center;
   justify-content: center;
   color: #ffeff2;
-  font: 700 var(--qdp-date-font-size) / 1 Georgia, "Times New Roman", serif;
+  font: 700 var(--qdp-date-font-size) / 1 "QDP Fraunces", Georgia, serif;
   white-space: nowrap;
   text-align: center;
   pointer-events: none;
@@ -154,7 +163,7 @@
   margin-left: 33.03cqw;
   padding: 0 1cqw 0.45cqw;
   color: #ffeff2;
-  font: 700 var(--qdp-date-font-size) / 1 Georgia, "Times New Roman", serif;
+  font: 700 var(--qdp-date-font-size) / 1 "QDP Fraunces", Georgia, serif;
   white-space: nowrap;
   text-align: center;
 }
@@ -197,7 +206,7 @@
   border-radius: 4.2cqw 0 0 4.2cqw;
   background: #fa2b5a;
   color: #ffeff2;
-  font: var(--qdp-time-font-weight) var(--qdp-time-font-size) / var(--qdp-time-line-height) Georgia, "Times New Roman", serif;
+  font: var(--qdp-time-font-weight) var(--qdp-time-font-size) / var(--qdp-time-line-height) "QDP Fraunces", Georgia, serif;
   text-align: center;
   white-space: nowrap;
 }
