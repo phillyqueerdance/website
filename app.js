@@ -44,10 +44,12 @@ let currentPosterIndex = 0;
 let pickerMonth = null;
 let touchStartX = null;
 let pageCards = [];
+let pageLastCards = [];
 let dateSections = [];
 let scrollFrame = 0;
 let savedEventScrollTop = 0;
 let navigationTargetIndex = null;
+let framedPageIndex = null;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
@@ -542,6 +544,8 @@ async function loadPublicEvents() {
 function showEventFeedMessage(message) {
   eventStack.hidden = false;
   eventStack.innerHTML = "";
+  eventStack.style.clipPath = "";
+  framedPageIndex = null;
 
   const notice =
     document.createElement("p");
@@ -860,7 +864,9 @@ function renderPoster() {
   eventStack.hidden = false;
   eventStack.innerHTML = "";
   pageCards = new Array(posterPages.length);
+  pageLastCards = new Array(posterPages.length);
   dateSections = [];
+  eventStack.style.clipPath = "";
 
   const dates = [];
   posterPages.forEach((page, pageIndex) => {
@@ -905,6 +911,7 @@ function renderPoster() {
           const card = createEventCard(event);
           const pageIndex = pageForEvent.get(event);
           if (!pageCards[pageIndex]) pageCards[pageIndex] = card;
+          pageLastCards[pageIndex] = card;
           row.appendChild(card);
           cards.appendChild(row);
         });
@@ -949,6 +956,7 @@ function measureDateSpacers() {
 
 function scrollToPage(index, behavior = "smooth") {
   if (!pageCards[index]) return;
+  framedPageIndex = index;
   navigationTargetIndex = behavior === "smooth" ? index : null;
   currentPosterIndex = index;
   eventStack.scrollTo({ top: scrollOffset(pageCards[index]), behavior });
@@ -957,6 +965,28 @@ function scrollToPage(index, behavior = "smooth") {
     previousPoster.disabled = index === 0;
     nextPoster.disabled = index === posterPages.length - 1;
   }
+}
+
+function releasePageFrame() {
+  framedPageIndex = null;
+  navigationTargetIndex = null;
+  eventStack.style.clipPath = "";
+}
+
+function updatePageFrame() {
+  if (framedPageIndex === null || !pageLastCards[framedPageIndex] ||
+      Math.abs(eventStack.scrollTop -
+        scrollOffset(pageCards[framedPageIndex])) > 2) {
+    eventStack.style.clipPath = "";
+    return;
+  }
+  const lastBottom = pageLastCards[framedPageIndex]
+    .getBoundingClientRect().bottom -
+    eventStack.getBoundingClientRect().top;
+  const hiddenTail = Math.max(0,
+    eventStack.clientHeight - lastBottom - 1);
+  eventStack.style.clipPath = hiddenTail > 0
+    ? `inset(0 0 ${hiddenTail}px 0)` : "";
 }
 
 function showDateLabel(key) {
@@ -983,6 +1013,7 @@ function updateScrollState() {
   currentPosterIndex = navigationTargetIndex ?? pageIndex;
   previousPoster.disabled = currentPosterIndex === 0;
   nextPoster.disabled = currentPosterIndex === posterPages.length - 1;
+  updatePageFrame();
 
   const top = eventStack.getBoundingClientRect().top;
   const dateHeight = dateButton.getBoundingClientRect().height - 2;
@@ -1065,6 +1096,11 @@ function openEventDetail(event) {
   detailCard.className =
     "event-detail-card";
 
+  const firstScreen = document.createElement("div");
+  firstScreen.className = "event-detail-first-screen";
+  const flyerSlot = document.createElement("div");
+  flyerSlot.className = "event-detail-flyer-slot";
+
   if (event.flyerUrl) {
     const flyerSource =
       String(event.flyerUrl).trim();
@@ -1119,7 +1155,7 @@ function openEventDetail(event) {
       }
     );
 
-    detailCard.appendChild(flyer);
+    flyerSlot.appendChild(flyer);
   }
 
   const heading =
@@ -1157,13 +1193,15 @@ function openEventDetail(event) {
   description.textContent =
     event.description || "";
 
-  detailCard.append(
-    heading,
-    time,
-    venue,
-    address,
-    description
-  );
+  const titleLocation = document.createElement("div");
+  titleLocation.className = "event-detail-title-location";
+  titleLocation.append(heading, venue, address);
+  firstScreen.append(flyerSlot, titleLocation);
+
+  const more = document.createElement("div");
+  more.className = "event-detail-more";
+  more.append(time, description);
+  detailCard.append(firstScreen, more);
 
   const closeButton =
     document.createElement("button");
@@ -1343,11 +1381,15 @@ eventStack.addEventListener("scroll", () => {
   });
 }, { passive: true });
 
+eventStack.addEventListener("wheel", releasePageFrame, { passive: true });
+eventStack.addEventListener("touchstart", releasePageFrame, { passive: true });
+
 poster.addEventListener("wheel", event => {
   if (!eventDetail.hidden || !datePopover.hidden ||
       eventStack.contains(event.target) || !pageCards.length) return;
   if (Math.abs(event.deltaY) < 1) return;
   event.preventDefault();
+  releasePageFrame();
   eventStack.scrollBy({ top: event.deltaY, behavior: "auto" });
 }, { passive: false });
 
@@ -1373,6 +1415,12 @@ window.addEventListener(
 
     if (!eventDetail.hidden) {
       return;
+    }
+
+    if (document.activeElement === eventStack &&
+        ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]
+          .includes(event.key)) {
+      releasePageFrame();
     }
 
     if (event.key === "ArrowLeft") {
@@ -1463,6 +1511,7 @@ function renderEventCollection(
 
   if (!posterPages.length) {
     pageCards = [];
+    pageLastCards = [];
     dateSections = [];
     previousPoster.disabled = true;
     nextPoster.disabled = true;
