@@ -995,10 +995,11 @@ function updateTimeGroupCorners() {
   const updates = cornerTransitions.map(({ time, card }) => {
     const timeBottom = time.getBoundingClientRect().bottom;
     const cardBox = card.getBoundingClientRect();
-    // Start when the time block touches the final card; finish when their
-    // bottom edges meet. Reversing the scroll reverses the radius as well.
+    // Keep the corner rounded until the time block reaches the card midpoint.
+    // Straighten over the remaining half, and reverse when scrolling back.
+    const midpoint = cardBox.top + cardBox.height / 2;
     const progress = Math.max(0, Math.min(1,
-      (timeBottom - cardBox.top) / cardBox.height));
+      (timeBottom - midpoint) / (cardBox.height / 2)));
     return [card, radius * (1 - progress)];
   });
   updates.forEach(([card, value]) =>
