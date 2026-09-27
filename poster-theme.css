@@ -1,5 +1,5 @@
 :root {
-  /* Edit this value to change both the live queer popup and generated posts. */
+  /* Fallback color; queer popups use queer-popup-background.png. */
   --qdp-queer-popup: #290925;
   --qdp-regular-popup: #202125;
   --qdp-queer-card: #922185;
