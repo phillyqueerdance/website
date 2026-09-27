@@ -348,7 +348,7 @@
 .event-detail.is-open { align-items: stretch; justify-content: stretch; }
 .event-detail.explicit {
   background-color: var(--qdp-queer-popup);
-  background-image: url("queer-popup-background.png?v=20260927-02");
+  background-image: url("queer-popup-background.png?v=a87c9d4");
   background-position: center;
   background-repeat: no-repeat;
   background-size: 100% 100%;
