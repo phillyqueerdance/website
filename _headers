@@ -20,6 +20,10 @@
 /*.png
   Cache-Control: public, max-age=86400, must-revalidate
 
+/queer-popup-background.png
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
+
 /admin
   Cache-Control: private, no-store, max-age=0
   X-Robots-Tag: noindex, nofollow, noarchive

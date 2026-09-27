@@ -640,7 +640,7 @@
       const [logo, frame, queerBackground] = await Promise.all([
         image("../newlogoqdp.png?v=20260926-01"),
         image("../frame.png?v=20260926-01"),
-        image("../queer-popup-background.png?v=20260927-01"),
+        image("../queer-popup-background.png?v=20260927-02"),
         loadTitleFont()
       ]);
       const prefix = `qdp-${first}-${last}`;
