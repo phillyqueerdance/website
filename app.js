@@ -7,8 +7,6 @@ const EVENTS_STORAGE_KEY =
 const EVENTS_STORAGE_MAX_AGE_MS =
   24 * 60 * 60 * 1000;
 
-const MAX_EVENTS_PER_POSTER = 6;
-
 const dateLabel = document.getElementById("dateLabel");
 const eventStack = document.getElementById("eventStack");
 const eventDetail = document.getElementById("eventDetail");
@@ -49,7 +47,6 @@ let cornerTransitions = [];
 let scrollFrame = 0;
 let savedEventScrollTop = 0;
 let navigationTargetIndex = null;
-let arrowFocusDateKey = null;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
@@ -189,43 +186,6 @@ function sortEvents(events) {
   });
 }
 
-function splitIntoPosterPages(events) {
-  if (events.length <= MAX_EVENTS_PER_POSTER) {
-    return [events];
-  }
-
-  const numberOfPages = Math.ceil(
-    events.length / MAX_EVENTS_PER_POSTER
-  );
-
-  const baseSize = Math.floor(
-    events.length / numberOfPages
-  );
-
-  const remainder =
-    events.length % numberOfPages;
-
-  const pages = [];
-  let index = 0;
-
-  for (
-    let page = 0;
-    page < numberOfPages;
-    page++
-  ) {
-    const size =
-      baseSize + (page < remainder ? 1 : 0);
-
-    pages.push(
-      events.slice(index, index + size)
-    );
-
-    index += size;
-  }
-
-  return pages;
-}
-
 function buildPosterPages(events) {
   const grouped = new Map();
 
@@ -241,14 +201,10 @@ function buildPosterPages(events) {
 
   return [...grouped.keys()]
     .sort()
-    .flatMap(key =>
-      splitIntoPosterPages(
-        sortEvents(grouped.get(key))
-      ).map(pageEvents => ({
-        date: key,
-        events: pageEvents
-      }))
-    );
+    .map(key => ({
+      date: key,
+      events: sortEvents(grouped.get(key))
+    }));
 }
 
 function groupEventsByStartTime(events) {
@@ -921,10 +877,16 @@ function renderPoster() {
         }
       });
 
-    const spacer = document.createElement("div");
-    spacer.className = "date-end-spacer";
-    spacer.setAttribute("aria-hidden", "true");
-    section.appendChild(spacer);
+    // Only the final date needs room below it to scroll its first card
+    // to the top when there is no later content.
+    const spacer = dateIndex === dates.length - 1
+      ? document.createElement("div")
+      : null;
+    if (spacer) {
+      spacer.className = "date-end-spacer";
+      spacer.setAttribute("aria-hidden", "true");
+      section.appendChild(spacer);
+    }
     eventStack.appendChild(section);
     dateSections.push({
       key: date.key, section, marker, spacer,
@@ -933,7 +895,7 @@ function renderPoster() {
   });
 
   requestAnimationFrame(() => {
-    measureDateSpacers();
+    measureEndSpacer();
     scrollToPage(currentPosterIndex, "auto");
     fitPosterTitles();
   });
@@ -944,31 +906,21 @@ function scrollOffset(element) {
     eventStack.getBoundingClientRect().top + eventStack.scrollTop;
 }
 
-function measureDateSpacers() {
+function measureEndSpacer() {
   if (!pageCards.length || eventStack.hidden) return;
-  dateSections.forEach(({ key, spacer, lastPageIndex }) => {
-    spacer.style.height = "0px";
-    // Arrow pages keep the next date out of the frame. Free scrolling uses
-    // a short, visible break between dates instead of a blank screen.
-    if (key !== arrowFocusDateKey) {
-      spacer.style.height = "4cqw";
-      return;
-    }
-    const pageTop = scrollOffset(pageCards[lastPageIndex]);
-    const naturalEnd = scrollOffset(spacer);
-    spacer.style.height = Math.max(0,
-      pageTop + eventStack.clientHeight - naturalEnd + 2,
-      poster.clientWidth * 0.04) + "px";
-  });
+  const lastDate = dateSections[dateSections.length - 1];
+  const spacer = lastDate?.spacer;
+  if (!spacer) return;
+
+  spacer.style.height = "0px";
+  const pageTop = scrollOffset(pageCards[lastDate.lastPageIndex]);
+  const naturalEnd = scrollOffset(spacer);
+  spacer.style.height = Math.max(0,
+    pageTop + eventStack.clientHeight - naturalEnd + 2) + "px";
 }
 
-function scrollToPage(index, behavior = "smooth", focusLastPage = true) {
+function scrollToPage(index, behavior = "smooth") {
   if (!pageCards[index]) return;
-  if (focusLastPage) {
-    const section = dateSections.find(item => item.lastPageIndex === index);
-    arrowFocusDateKey = section ? section.key : null;
-    measureDateSpacers();
-  }
   navigationTargetIndex = behavior === "smooth" ? index : null;
   currentPosterIndex = index;
   eventStack.scrollTo({ top: scrollOffset(pageCards[index]), behavior });
@@ -1062,17 +1014,10 @@ function schedulePosterLayout() {
   requestAnimationFrame(() => {
     if (!pageCards.length || eventStack.hidden) return;
     const index = currentPosterIndex;
-    measureDateSpacers();
-    scrollToPage(index, "auto", false);
+    measureEndSpacer();
+    scrollToPage(index, "auto");
     fitPosterTitles();
   });
-}
-
-function releaseArrowPageSpace() {
-  if (arrowFocusDateKey === null) return;
-  arrowFocusDateKey = null;
-  navigationTargetIndex = null;
-  measureDateSpacers();
 }
 
 function openEventDetail(event) {
@@ -1396,20 +1341,11 @@ eventStack.addEventListener("scroll", () => {
   });
 }, { passive: true });
 
-eventStack.addEventListener("wheel", releaseArrowPageSpace, { passive: true });
-eventStack.addEventListener("touchmove", releaseArrowPageSpace, { passive: true });
-eventStack.addEventListener("keydown", event => {
-  if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", " "].includes(event.key)) {
-    releaseArrowPageSpace();
-  }
-});
-
 poster.addEventListener("wheel", event => {
   if (!eventDetail.hidden || !datePopover.hidden ||
       eventStack.contains(event.target) || !pageCards.length) return;
   if (Math.abs(event.deltaY) < 1) return;
   event.preventDefault();
-  releaseArrowPageSpace();
   eventStack.scrollBy({ top: event.deltaY, behavior: "auto" });
 }, { passive: false });
 
@@ -1520,7 +1456,6 @@ function renderEventCollection(
   const previousPage = posterPages[currentPosterIndex];
   const previousFirst = previousPage?.events[0];
   navigationTargetIndex = null;
-  arrowFocusDateKey = null;
   posterPages =
     buildPosterPages(events);
 
