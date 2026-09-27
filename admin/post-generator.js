@@ -440,7 +440,7 @@
     finally { URL.revokeObjectURL(url); }
   }
 
-  function popupSlide(frame, event, flyer) {
+  function popupSlide(frame, event, flyer, queerBackground) {
     const [out, ctx] = canvas();
     ctx.drawImage(frame, 0, 0, WIDTH, HEIGHT);
     const x = WIDTH * .084, y = HEIGHT * .0679;
@@ -456,6 +456,14 @@
       [1.25 * Q, 1.25 * Q, 1.25 * Q, 1.25 * Q]);
     ctx.fillStyle = event.explicitQueer ? COLORS.queerPopup : COLORS.regularPopup;
     ctx.fill();
+    if (event.explicitQueer && queerBackground) {
+      ctx.save();
+      roundedPath(ctx, inner.x, inner.y, inner.w, inner.h,
+        [1.25 * Q, 1.25 * Q, 1.25 * Q, 1.25 * Q]);
+      ctx.clip();
+      ctx.drawImage(queerBackground, inner.x, inner.y, inner.w, inner.h);
+      ctx.restore();
+    }
 
     const flagSize = 9 * Q;
     if (event.queerArtist) {
@@ -629,9 +637,10 @@
         stripFlags(a.title).localeCompare(stripFlags(b.title), undefined,
           { sensitivity: "base" }));
       const pages = calendarPages(selected);
-      const [logo, frame] = await Promise.all([
+      const [logo, frame, queerBackground] = await Promise.all([
         image("../newlogoqdp.png?v=20260926-01"),
         image("../frame.png?v=20260926-01"),
+        image("../queer-popup-background.png?v=20260927-01"),
         loadTitleFont()
       ]);
       const prefix = `qdp-${first}-${last}`;
@@ -653,7 +662,7 @@
         try { flyer = await flyerImage(item); }
         catch (error) { console.warn(error); }
         if (!flyer) missingFlyers++;
-        await addImage(popupSlide(frame, item, flyer),
+        await addImage(popupSlide(frame, item, flyer, queerBackground),
           `${stripFlags(item.title)} · ${posterDate(dateKey(item.start))}`,
           `${prefix}-event-${String(index + 1).padStart(2, "0")}.png`);
       }

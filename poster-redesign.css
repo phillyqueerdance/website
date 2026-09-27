@@ -346,7 +346,15 @@
   justify-content: stretch;
 }
 .event-detail.is-open { align-items: stretch; justify-content: stretch; }
-.event-detail.explicit { background: var(--qdp-queer-popup); }
+.event-detail.explicit {
+  background-color: var(--qdp-queer-popup);
+  background-image: url("queer-popup-background.png?v=20260927-01");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-origin: padding-box;
+  background-clip: padding-box;
+}
 .event-detail-card {
   position: relative;
   z-index: 1;
