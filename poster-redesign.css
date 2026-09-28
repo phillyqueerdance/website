@@ -414,7 +414,7 @@
 }
 .event-detail-close {
   top: 1cqw;
-  right: 0.8cqw;
+  right: 4.5cqw;
   bottom: auto;
 }
 .event-detail.has-trans-flag .event-detail-close { top: 11cqw; }
@@ -479,6 +479,7 @@
 }
 
 @media (max-width: 760px) {
+  .event-detail-close { right: 0.8cqw; }
   .poster-stage { width: 100vw; }
   .poster {
     flex: 0 0 auto;
