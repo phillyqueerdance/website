@@ -5,6 +5,8 @@
   const desktopHover = window.matchMedia("(min-width: 761px) and (hover: hover)");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const svgNamespace = "http://www.w3.org/2000/svg";
+  const sparkleColors = ["#fa2b5a", "#ff7945", "#922185"];
+  let nextColor = Math.floor(Math.random() * sparkleColors.length);
   let activeLink = null;
   let nextSparkleTimer = null;
 
@@ -44,6 +46,8 @@
 
     element.className = "menu-sparkle menu-sparkle--" + (inFront ? "front" : "back");
     element.setAttribute("aria-hidden", "true");
+    element.style.color = sparkleColors[nextColor];
+    nextColor = (nextColor + 1) % sparkleColors.length;
     element.style.left = x + "px";
     element.style.top = y + "px";
     element.style.setProperty("--sparkle-size", (12 + Math.random() * 7).toFixed(1) + "px");
