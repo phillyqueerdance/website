@@ -1216,7 +1216,9 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   );
 
   eventDetail.classList.toggle("explicit", event.explicitQueer === true);
-  eventDetail.innerHTML = "";
+  const dateBadge = eventDetail.querySelector(".event-detail-date-badge") ||
+    document.createElement("div");
+  eventDetail.replaceChildren();
   eventDetail.setAttribute("role", "dialog");
   eventDetail.setAttribute("aria-modal", "true");
   eventDetail.setAttribute("aria-labelledby", "eventDetailTitle");
@@ -1237,7 +1239,6 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     eventDetail.appendChild(flag);
   }
 
-  const dateBadge = document.createElement("div");
   dateBadge.className = "event-detail-date-badge";
   const dateParts = formatDetailDateBadge(event);
   dateBadge.textContent = dateParts.date;
@@ -1392,30 +1393,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   if (more.childNodes.length) detailCard.appendChild(more);
   detailCard.appendChild(actions);
 
-  const closeButton =
-    document.createElement("button");
-
-  closeButton.type = "button";
-
-  closeButton.className =
-    "overlay-close event-detail-close";
-
-  closeButton.textContent = "×";
-
-  closeButton.setAttribute(
-    "aria-label",
-    "Close event details"
-  );
-
-  closeButton.addEventListener(
-    "click",
-    closeEventDetail
-  );
-
-  eventDetail.append(
-    detailCard,
-    closeButton
-  );
+  eventDetail.appendChild(detailCard);
   fitDetailFlyer();
   updateDetailNavigationState();
   eventDetail.focus({ preventScroll: true });
@@ -1436,14 +1414,15 @@ function updateDetailNavigationState() {
 
 function finishDetailSlide() {
   if (!activeDetailSlide) return;
-  const { viewport, animations } = activeDetailSlide;
+  const { viewport, card, ghostFlags, animations } = activeDetailSlide;
   const focused = eventDetail.contains(document.activeElement)
     ? document.activeElement : null;
   activeDetailSlide = null;
   animations.forEach(animation => animation.cancel());
-  poster.appendChild(eventDetail);
+  eventDetail.appendChild(card);
+  ghostFlags.forEach(flag => flag.remove());
   viewport.remove();
-  focused?.focus({ preventScroll: true });
+  if (focused?.isConnected) focused.focus({ preventScroll: true });
 }
 
 function moveEventDetail(direction) {
@@ -1453,11 +1432,15 @@ function moveEventDetail(direction) {
   if (!next) return;
 
   const animateSlide = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const outgoing = animateSlide ? eventDetail.cloneNode(true) : null;
+  const previousFlags = {
+    queer: Boolean(eventDetail.querySelector(".event-detail-flag-queer")),
+    trans: Boolean(eventDetail.querySelector(".event-detail-flag-trans"))
+  };
+  const previousCard = eventDetail.querySelector(".event-detail-card");
+  const previousScrollTop = previousCard?.scrollTop || 0;
+  const outgoing = animateSlide ? previousCard?.cloneNode(true) : null;
   if (outgoing) {
-    outgoing.removeAttribute("id");
     outgoing.querySelectorAll("[id]").forEach(node => node.removeAttribute("id"));
-    outgoing.removeAttribute("aria-labelledby");
     outgoing.setAttribute("aria-hidden", "true");
     outgoing.inert = true;
   }
@@ -1481,9 +1464,11 @@ function moveEventDetail(direction) {
 
   if (!outgoing) return;
   const viewport = document.createElement("div");
-  viewport.className = "event-detail-slide-viewport";
-  viewport.append(outgoing, eventDetail);
-  poster.appendChild(viewport);
+  viewport.className = "event-detail-content-viewport";
+  const incoming = eventDetail.querySelector(".event-detail-card");
+  viewport.append(outgoing, incoming);
+  eventDetail.appendChild(viewport);
+  outgoing.scrollTop = previousScrollTop;
   eventDetail.focus({ preventScroll: true });
   fitDetailFlyer();
 
@@ -1494,12 +1479,33 @@ function moveEventDetail(direction) {
       { transform: "translateX(0)" },
       { transform: `translateX(${-distance}px)` }
     ], timing),
-    eventDetail.animate([
+    incoming.animate([
       { transform: `translateX(${distance}px)` },
       { transform: "translateX(0)" }
     ], timing)
   ];
-  activeDetailSlide = { viewport, animations };
+  const ghostFlags = [];
+  for (const type of ["queer", "trans"]) {
+    const newFlag = eventDetail.querySelector(`.event-detail-flag-${type}`);
+    const flagShift = (type === "queer" ? -1 : 1) * viewport.clientWidth * 0.16;
+    if (previousFlags[type] && !newFlag) {
+      const oldFlag = document.createElement("span");
+      oldFlag.className = `event-detail-flag event-detail-flag-${type}`;
+      oldFlag.setAttribute("aria-hidden", "true");
+      eventDetail.appendChild(oldFlag);
+      ghostFlags.push(oldFlag);
+      animations.push(oldFlag.animate([
+        { transform: "translateX(0)", opacity: 1 },
+        { transform: `translateX(${flagShift}px)`, opacity: 0 }
+      ], timing));
+    } else if (!previousFlags[type] && newFlag) {
+      animations.push(newFlag.animate([
+        { transform: `translateX(${flagShift}px)`, opacity: 0 },
+        { transform: "translateX(0)", opacity: 1 }
+      ], timing));
+    }
+  }
+  activeDetailSlide = { viewport, card: incoming, ghostFlags, animations };
   Promise.all(animations.map(animation => animation.finished.catch(() => {})))
     .then(() => {
       if (activeDetailSlide?.viewport === viewport) finishDetailSlide();
@@ -1572,7 +1578,8 @@ window.addEventListener("popstate", () => syncEventFromUrl());
 
 eventDetail.addEventListener("keydown", event => {
   if (event.key !== "Tab") return;
-  const controls = [...eventDetail.querySelectorAll("a[href], button:not([disabled])")];
+  const liveCard = eventDetail.querySelector(".event-detail-card:not([aria-hidden])");
+  const controls = [...(liveCard?.querySelectorAll("a[href], button:not([disabled])") || [])];
   const first = controls[0];
   const last = controls[controls.length - 1];
   if (document.activeElement === eventDetail) {
@@ -1595,6 +1602,13 @@ eventDetail.addEventListener(
     }
   }
 );
+
+document.addEventListener("click", event => {
+  if (!event.isTrusted || eventDetail.hidden || eventDetail.contains(event.target)) return;
+  if (event.target instanceof Element &&
+      event.target.closest("#previousPoster, #nextPoster, .event-card")) return;
+  closeEventDetail();
+});
 
 function openAboutDialog(event) {
   event?.preventDefault();
