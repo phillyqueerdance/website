@@ -1382,7 +1382,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   addToCalendar.textContent = "Add to Calendar";
   addToCalendar.addEventListener("click", () => downloadCalendarEvent(event));
   const separator = document.createElement("span");
-  separator.textContent = "·";
+  separator.textContent = "|";
   separator.setAttribute("aria-hidden", "true");
   const share = document.createElement("button");
   share.type = "button";
