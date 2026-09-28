@@ -1429,7 +1429,7 @@ function finishDetailSlide() {
   activeDetailSlide = null;
   animations.forEach(animation => animation.cancel());
   eventDetail.appendChild(card);
-  outgoingDateText.remove();
+  outgoingDateText?.remove();
   ghostFlags.forEach(flag => flag.remove());
   viewport.remove();
   if (focused?.isConnected) focused.focus({ preventScroll: true });
@@ -1442,6 +1442,9 @@ function moveEventDetail(direction) {
   if (!next) return;
 
   const animateSlide = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const currentDate = dateKey(new Date(activeEvent.start));
+  const nextDate = dateKey(new Date(next.start));
+  const dateChanged = currentDate !== nextDate;
   const previousFlags = {
     queer: Boolean(eventDetail.querySelector(".event-detail-flag-queer")),
     trans: Boolean(eventDetail.querySelector(".event-detail-flag-trans"))
@@ -1449,7 +1452,7 @@ function moveEventDetail(direction) {
   const previousCard = eventDetail.querySelector(".event-detail-card");
   const previousScrollTop = previousCard?.scrollTop || 0;
   const outgoing = animateSlide ? previousCard?.cloneNode(true) : null;
-  const outgoingDateText = animateSlide
+  const outgoingDateText = animateSlide && dateChanged
     ? eventDetail.querySelector(".event-detail-date-text")?.cloneNode(true)
     : null;
   if (outgoing) {
@@ -1481,8 +1484,10 @@ function moveEventDetail(direction) {
   const incoming = eventDetail.querySelector(".event-detail-card");
   const dateBadge = eventDetail.querySelector(".event-detail-date-badge");
   const incomingDateText = dateBadge.querySelector(".event-detail-date-text");
-  outgoingDateText.setAttribute("aria-hidden", "true");
-  dateBadge.appendChild(outgoingDateText);
+  if (outgoingDateText) {
+    outgoingDateText.setAttribute("aria-hidden", "true");
+    dateBadge.appendChild(outgoingDateText);
+  }
   viewport.append(outgoing, incoming);
   eventDetail.appendChild(viewport);
   outgoing.scrollTop = previousScrollTop;
@@ -1490,7 +1495,6 @@ function moveEventDetail(direction) {
   fitDetailFlyer();
 
   const distance = viewport.clientWidth * direction;
-  const dateDistance = dateBadge.clientWidth * direction;
   const timing = { duration: 380, easing: "cubic-bezier(.25,.8,.25,1)", fill: "forwards" };
   const animations = [
     outgoing.animate([
@@ -1500,16 +1504,21 @@ function moveEventDetail(direction) {
     incoming.animate([
       { transform: `translateX(${distance}px)` },
       { transform: "translateX(0)" }
-    ], timing),
-    outgoingDateText.animate([
-      { transform: "translateX(0)" },
-      { transform: `translateX(${-dateDistance}px)` }
-    ], timing),
-    incomingDateText.animate([
-      { transform: `translateX(${dateDistance}px)` },
-      { transform: "translateX(0)" }
     ], timing)
   ];
+  if (outgoingDateText) {
+    const dateDistance = dateBadge.clientHeight * (nextDate > currentDate ? -1 : 1);
+    animations.push(
+      outgoingDateText.animate([
+        { transform: "translateY(0)" },
+        { transform: `translateY(${-dateDistance}px)` }
+      ], timing),
+      incomingDateText.animate([
+        { transform: `translateY(${dateDistance}px)` },
+        { transform: "translateY(0)" }
+      ], timing)
+    );
+  }
   const ghostFlags = [];
   for (const type of ["queer", "trans"]) {
     const newFlag = eventDetail.querySelector(`.event-detail-flag-${type}`);
