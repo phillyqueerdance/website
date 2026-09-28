@@ -373,17 +373,17 @@
   margin-top: 2cqw;
 }
 .event-detail-flyer {
-  width: 100%;
+  width: auto;
   height: auto;
   max-width: 100%;
-  max-height: none;
-  margin: 0;
+  max-height: 55cqw;
+  margin: 0 auto;
   object-fit: contain;
   background: transparent;
 }
 .event-detail-title-location {
-  min-height: 18cqw;
-  padding: 5.5cqw 25cqw 0.6cqw 4cqw;
+  min-height: 13cqw;
+  padding: 5.5cqw 22cqw 0.6cqw 4cqw;
 }
 .event-detail-title-location h2 {
   margin: 0 0 0.8cqw;
@@ -402,13 +402,13 @@
   align-items: center;
   justify-content: center;
   gap: 0.15cqw;
-  width: 14cqw;
-  height: 17cqw;
-  padding: 1cqw 0.5cqw 1.5cqw;
-  border-radius: 0 0 7cqw 7cqw;
+  width: 10.9cqw;
+  height: var(--qdp-card-height);
+  padding: 0.6cqw 0.25cqw 0.8cqw;
+  border-radius: 0 0 5.4cqw 5.4cqw;
   background: #fa2b5a;
   color: #ffeff2;
-  font: 700 2.9cqw / 1.05 "QDP Fraunces", Georgia, serif;
+  font: 700 2.7cqw / 1.05 "QDP Fraunces", Georgia, serif;
   text-align: center;
   pointer-events: none;
 }

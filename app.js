@@ -1067,6 +1067,7 @@ function updateScrollState() {
 
 function schedulePosterLayout() {
   requestAnimationFrame(() => {
+    fitDetailFlyer();
     if (!pageCards.length || eventStack.hidden) return;
     const index = currentPosterIndex;
     measureEndSpacer();
@@ -1187,6 +1188,25 @@ async function shareEvent(event, status) {
   setTimeout(() => {
     if (status.isConnected) status.textContent = "";
   }, 2500);
+}
+
+function fitDetailFlyer() {
+  if (eventDetail.hidden) return;
+  const card = eventDetail.querySelector(".event-detail-card");
+  const header = card?.querySelector(".event-detail-title-location");
+  const slot = card?.querySelector(".event-detail-flyer-slot");
+  const flyer = slot?.querySelector(".event-detail-flyer");
+  if (!flyer) return;
+
+  const cardStyle = getComputedStyle(card);
+  const slotStyle = getComputedStyle(slot);
+  const roomForDetails = Math.min(52, poster.clientWidth * 0.1);
+  const availableHeight = card.clientHeight -
+    parseFloat(cardStyle.paddingBottom) -
+    header.offsetHeight -
+    parseFloat(slotStyle.marginTop) -
+    roomForDetails;
+  flyer.style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
 }
 
 function openEventDetail(event, { updateHistory = true } = {}) {
@@ -1397,6 +1417,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     detailCard,
     closeButton
   );
+  fitDetailFlyer();
   updateDetailNavigationState();
   closeButton.focus({ preventScroll: true });
 }
