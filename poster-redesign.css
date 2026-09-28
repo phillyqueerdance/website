@@ -442,6 +442,15 @@
   white-space: nowrap;
   transform: translateX(-50%);
   pointer-events: none;
+  overflow: hidden;
+}
+.event-detail-date-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1cqw 0.45cqw;
 }
 .event-detail-more { padding: 2cqw 4cqw 0; }
 .event-detail-more p:last-child {

@@ -1241,7 +1241,10 @@ function openEventDetail(event, { updateHistory = true } = {}) {
 
   dateBadge.className = "event-detail-date-badge";
   const dateParts = formatDetailDateBadge(event);
-  dateBadge.textContent = dateParts.date;
+  const dateText = document.createElement("span");
+  dateText.className = "event-detail-date-text";
+  dateText.textContent = dateParts.date;
+  dateBadge.replaceChildren(dateText);
   eventDetail.appendChild(dateBadge);
 
   const detailCard =
@@ -1414,12 +1417,13 @@ function updateDetailNavigationState() {
 
 function finishDetailSlide() {
   if (!activeDetailSlide) return;
-  const { viewport, card, ghostFlags, animations } = activeDetailSlide;
+  const { viewport, card, outgoingDateText, ghostFlags, animations } = activeDetailSlide;
   const focused = eventDetail.contains(document.activeElement)
     ? document.activeElement : null;
   activeDetailSlide = null;
   animations.forEach(animation => animation.cancel());
   eventDetail.appendChild(card);
+  outgoingDateText.remove();
   ghostFlags.forEach(flag => flag.remove());
   viewport.remove();
   if (focused?.isConnected) focused.focus({ preventScroll: true });
@@ -1439,6 +1443,9 @@ function moveEventDetail(direction) {
   const previousCard = eventDetail.querySelector(".event-detail-card");
   const previousScrollTop = previousCard?.scrollTop || 0;
   const outgoing = animateSlide ? previousCard?.cloneNode(true) : null;
+  const outgoingDateText = animateSlide
+    ? eventDetail.querySelector(".event-detail-date-text")?.cloneNode(true)
+    : null;
   if (outgoing) {
     outgoing.querySelectorAll("[id]").forEach(node => node.removeAttribute("id"));
     outgoing.setAttribute("aria-hidden", "true");
@@ -1466,6 +1473,10 @@ function moveEventDetail(direction) {
   const viewport = document.createElement("div");
   viewport.className = "event-detail-content-viewport";
   const incoming = eventDetail.querySelector(".event-detail-card");
+  const dateBadge = eventDetail.querySelector(".event-detail-date-badge");
+  const incomingDateText = dateBadge.querySelector(".event-detail-date-text");
+  outgoingDateText.setAttribute("aria-hidden", "true");
+  dateBadge.appendChild(outgoingDateText);
   viewport.append(outgoing, incoming);
   eventDetail.appendChild(viewport);
   outgoing.scrollTop = previousScrollTop;
@@ -1473,6 +1484,7 @@ function moveEventDetail(direction) {
   fitDetailFlyer();
 
   const distance = viewport.clientWidth * direction;
+  const dateDistance = dateBadge.clientWidth * direction;
   const timing = { duration: 380, easing: "cubic-bezier(.25,.8,.25,1)", fill: "forwards" };
   const animations = [
     outgoing.animate([
@@ -1481,6 +1493,14 @@ function moveEventDetail(direction) {
     ], timing),
     incoming.animate([
       { transform: `translateX(${distance}px)` },
+      { transform: "translateX(0)" }
+    ], timing),
+    outgoingDateText.animate([
+      { transform: "translateX(0)" },
+      { transform: `translateX(${-dateDistance}px)` }
+    ], timing),
+    incomingDateText.animate([
+      { transform: `translateX(${dateDistance}px)` },
       { transform: "translateX(0)" }
     ], timing)
   ];
@@ -1505,7 +1525,7 @@ function moveEventDetail(direction) {
       ], timing));
     }
   }
-  activeDetailSlide = { viewport, card: incoming, ghostFlags, animations };
+  activeDetailSlide = { viewport, card: incoming, outgoingDateText, ghostFlags, animations };
   Promise.all(animations.map(animation => animation.finished.catch(() => {})))
     .then(() => {
       if (activeDetailSlide?.viewport === viewport) finishDetailSlide();
