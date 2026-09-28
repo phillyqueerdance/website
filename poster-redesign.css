@@ -394,6 +394,9 @@
 }
 .event-detail-card > * { flex-shrink: 0; }
 .event-detail-flyer-slot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
   margin: max(0cqw, calc(9cqw - var(--qdp-detail-padding))) 0 2cqw 4cqw;
 }
 .event-detail-flyer {

@@ -1186,8 +1186,15 @@ function fitDetailFlyer() {
   if (!flyer) return;
 
   const slotStyle = getComputedStyle(slot);
+  const cardStyle = getComputedStyle(card);
+  const topMargin = parseFloat(slotStyle.marginTop) || 0;
+  const leftMargin = parseFloat(slotStyle.marginLeft) || 0;
+  const rightPadding = parseFloat(cardStyle.paddingRight) || 0;
+  const scrollbarWidth = card.offsetWidth - card.clientWidth;
+  slot.style.marginRight = `${Math.max(0, leftMargin - rightPadding - scrollbarWidth)}px`;
+  slot.style.minHeight = `${Math.max(0, Math.ceil(card.clientHeight - topMargin))}px`;
   const availableHeight = card.clientHeight -
-    parseFloat(slotStyle.marginTop) - 2;
+    topMargin - 2;
   flyer.style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
 }
 
@@ -1294,6 +1301,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     flyer.addEventListener(
       "error",
       () => {
+        flyerSlot.style.minHeight = "";
         const fallback =
           document.createElement("a");
 
