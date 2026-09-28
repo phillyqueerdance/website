@@ -347,6 +347,7 @@
   justify-content: stretch;
 }
 .event-detail.is-open { align-items: stretch; justify-content: stretch; }
+.event-detail:focus { outline: none; }
 .event-detail.explicit {
   background-color: var(--qdp-queer-popup);
   background-image: url("queer-popup-background.png?v=a87c9d4");
@@ -383,7 +384,7 @@
 }
 .event-detail-title-location {
   min-height: 13cqw;
-  padding: 5.5cqw 22cqw 0.6cqw 4cqw;
+  padding: 5.5cqw 28cqw 0.6cqw 4cqw;
 }
 .event-detail-title-location h2 {
   margin: 0 0 0.8cqw;
@@ -395,7 +396,7 @@
 .event-detail-date-badge {
   position: absolute;
   top: 0;
-  right: 10cqw;
+  right: 15.45cqw;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -408,16 +409,21 @@
   border-radius: 0 0 5.4cqw 5.4cqw;
   background: #fa2b5a;
   color: #ffeff2;
-  font: 700 2.7cqw / 1.05 "QDP Fraunces", Georgia, serif;
+  font: 700 2.25cqw / 1.05 "QDP Fraunces", Georgia, serif;
   text-align: center;
   pointer-events: none;
 }
 .event-detail-close {
-  top: 1cqw;
+  top: 11cqw;
   right: 4.5cqw;
   bottom: auto;
+  border-radius: 50%;
 }
-.event-detail.has-trans-flag .event-detail-close { top: 11cqw; }
+.event-detail-close:hover { background: rgba(255, 241, 244, 0.12); }
+.event-detail-close:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
 .event-detail-more { padding: 2cqw 2cqw 0 0; }
 .event-detail-more p:last-child {
   white-space: pre-line;
@@ -479,7 +485,6 @@
 }
 
 @media (max-width: 760px) {
-  .event-detail-close { right: 0.8cqw; }
   .poster-stage { width: 100vw; }
   .poster {
     flex: 0 0 auto;

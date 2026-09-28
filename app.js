@@ -867,7 +867,7 @@ function renderPoster() {
   if (!posterPages.length) return;
 
   eventDetail.hidden = true;
-  eventDetail.classList.remove("is-open", "explicit", "has-trans-flag");
+  eventDetail.classList.remove("is-open", "explicit");
   eventStack.hidden = false;
   eventStack.innerHTML = "";
   pageCards = new Array(posterPages.length);
@@ -1234,12 +1234,11 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   );
 
   eventDetail.classList.toggle("explicit", event.explicitQueer === true);
-  eventDetail.classList.toggle("has-trans-flag", event.transArtist === true);
-
   eventDetail.innerHTML = "";
   eventDetail.setAttribute("role", "dialog");
   eventDetail.setAttribute("aria-modal", "true");
   eventDetail.setAttribute("aria-labelledby", "eventDetailTitle");
+  eventDetail.tabIndex = -1;
 
   if (event.queerArtist) {
     const flag = document.createElement("span");
@@ -1419,7 +1418,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   );
   fitDetailFlyer();
   updateDetailNavigationState();
-  closeButton.focus({ preventScroll: true });
+  eventDetail.focus({ preventScroll: true });
 }
 
 function orderedEvents() {
@@ -1466,7 +1465,7 @@ function hideEventDetail({ restoreFocus = true } = {}) {
     )
   ) {
     eventDetail.hidden = true;
-    eventDetail.classList.remove("is-open", "explicit", "has-trans-flag");
+    eventDetail.classList.remove("is-open", "explicit");
     eventStack.hidden = false;
     eventStack.scrollTop = savedEventScrollTop;
     updateScrollState();
@@ -1527,7 +1526,10 @@ eventDetail.addEventListener("keydown", event => {
   const controls = [...eventDetail.querySelectorAll("a[href], button:not([disabled])")];
   const first = controls[0];
   const last = controls[controls.length - 1];
-  if (event.shiftKey && document.activeElement === first) {
+  if (document.activeElement === eventDetail) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();
   } else if (!event.shiftKey && document.activeElement === last) {
