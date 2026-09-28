@@ -348,6 +348,22 @@
 }
 .event-detail.is-open { align-items: stretch; justify-content: stretch; }
 .event-detail:focus { outline: none; }
+.event-detail-slide-viewport {
+  position: absolute;
+  top: var(--qdp-detail-top);
+  right: var(--qdp-detail-right);
+  bottom: var(--qdp-detail-bottom);
+  left: var(--qdp-detail-left);
+  z-index: 20;
+  overflow: hidden;
+  border-radius: var(--qdp-detail-radius);
+}
+.event-detail-slide-viewport > .event-detail {
+  inset: 0;
+}
+.event-detail-slide-viewport > .event-detail[aria-hidden="true"] {
+  pointer-events: none;
+}
 .event-detail.explicit {
   background-color: var(--qdp-queer-popup);
   background-image: url("queer-popup-background.png?v=a87c9d4");
@@ -371,7 +387,7 @@
 }
 .event-detail-card > * { flex-shrink: 0; }
 .event-detail-flyer-slot {
-  margin-top: 2cqw;
+  margin: 17cqw 0 2cqw;
 }
 .event-detail-flyer {
   width: auto;
@@ -383,9 +399,9 @@
   background: transparent;
 }
 .event-detail-title-location {
-  min-height: 13cqw;
-  padding: 5.5cqw 28cqw 0.6cqw 4cqw;
+  padding: 0 4cqw 0.6cqw;
 }
+.event-detail-card.without-flyer .event-detail-title-location { padding-top: 16cqw; }
 .event-detail-title-location h2 {
   margin: 0 0 0.8cqw;
   font-family: "QDP Fraunces", Georgia, serif;
@@ -393,24 +409,31 @@
   overflow-wrap: anywhere;
 }
 .event-detail-title-location p { margin: 0 0 0.2cqw; }
+.event-detail-venue-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25em;
+}
+.event-detail-address { font-size: 0.86em; }
 .event-detail-date-badge {
   position: absolute;
   top: 0;
-  right: 15.45cqw;
+  left: 50%;
   z-index: 2;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.15cqw;
-  width: 10.9cqw;
-  height: var(--qdp-card-height);
-  padding: 0.6cqw 0.25cqw 0.8cqw;
-  border-radius: 0 0 5.4cqw 5.4cqw;
+  width: 43.42cqw;
+  height: var(--qdp-date-height);
+  padding: 0 1cqw 0.45cqw;
+  border-radius: 0 0 5cqw 5cqw;
   background: #fa2b5a;
   color: #ffeff2;
-  font: 700 2.25cqw / 1.05 "QDP Fraunces", Georgia, serif;
+  font: 700 var(--qdp-date-font-size) / 1 "QDP Fraunces", Georgia, serif;
   text-align: center;
+  white-space: nowrap;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 .event-detail-close {
@@ -424,7 +447,7 @@
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
-.event-detail-more { padding: 2cqw 2cqw 0 0; }
+.event-detail-more { padding: 2cqw 4cqw 0; }
 .event-detail-more p:last-child {
   white-space: pre-line;
   overflow-wrap: anywhere;

@@ -55,6 +55,7 @@ let activeEventId = "";
 let activeEvent = null;
 let eventEntryPushed = false;
 let freshEventsLoaded = false;
+let activeDetailSlide = null;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
@@ -273,23 +274,9 @@ function formatTimeRange(event) {
 
 function formatDetailDateBadge(event) {
   const start = new Date(event.start);
-  const options = { timeZone: "America/New_York" };
-  const fullDate = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  }).format(start);
   return {
-    date: new Intl.DateTimeFormat("en-US", {
-      ...options, month: "numeric", day: "numeric"
-    }).format(start),
-    weekday: new Intl.DateTimeFormat("en-US", {
-      ...options, weekday: "short"
-    }).format(start),
-    time: compactTime(start),
-    label: `${fullDate} at ${compactTime(start)}`
+    date: formatPosterDate(dateKey(start)),
+    time: compactTime(start)
   };
 }
 
@@ -866,6 +853,7 @@ function createEventCard(event) {
 function renderPoster() {
   if (!posterPages.length) return;
 
+  finishDetailSlide();
   eventDetail.hidden = true;
   eventDetail.classList.remove("is-open", "explicit");
   eventStack.hidden = false;
@@ -1200,11 +1188,12 @@ function fitDetailFlyer() {
 
   const cardStyle = getComputedStyle(card);
   const slotStyle = getComputedStyle(slot);
-  const roomForDetails = Math.min(52, poster.clientWidth * 0.1);
+  const roomForDetails = Math.min(48, poster.clientWidth * 0.09);
   const availableHeight = card.clientHeight -
     parseFloat(cardStyle.paddingBottom) -
     header.offsetHeight -
     parseFloat(slotStyle.marginTop) -
+    parseFloat(slotStyle.marginBottom) -
     roomForDetails;
   flyer.style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
 }
@@ -1258,14 +1247,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   const dateBadge = document.createElement("div");
   dateBadge.className = "event-detail-date-badge";
   const dateParts = formatDetailDateBadge(event);
-  dateBadge.setAttribute("role", "group");
-  dateBadge.setAttribute("aria-label", dateParts.label);
-  [dateParts.date, dateParts.weekday, dateParts.time].forEach(part => {
-    const line = document.createElement("span");
-    line.textContent = part;
-    line.setAttribute("aria-hidden", "true");
-    dateBadge.appendChild(line);
-  });
+  dateBadge.textContent = dateParts.date;
   eventDetail.appendChild(dateBadge);
 
   const detailCard =
@@ -1340,19 +1322,42 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   heading.id = "eventDetailTitle";
   heading.textContent = displayTitle(event);
 
-  const venue =
-    document.createElement("p");
+  const venue = document.createElement("span");
+  const venueTime = document.createElement("p");
+  venueTime.className = "event-detail-venue-time";
+  const address = document.createElement("p");
+  address.className = "event-detail-address";
   const venueText = eventVenue(event);
+  const addressText = eventAddress(event);
+  const mapsQuery = [venueText, addressText].filter(Boolean).join(", ");
+  const mapsUrl = mapsQuery
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
+    : "";
   if (venueText) {
     const mapLink = document.createElement("a");
-    const query = [venueText, eventAddress(event)].filter(Boolean).join(", ");
-    mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    mapLink.href = mapsUrl;
     mapLink.target = "_blank";
     mapLink.rel = "noopener noreferrer";
     mapLink.textContent = venueText;
     venue.appendChild(mapLink);
-  } else {
-    venue.hidden = true;
+    venueTime.appendChild(venue);
+    const separator = document.createElement("span");
+    separator.setAttribute("aria-hidden", "true");
+    separator.textContent = " | ";
+    venueTime.appendChild(separator);
+  }
+  const time = document.createElement("time");
+  time.dateTime = event.start;
+  time.textContent = dateParts.time;
+  venueTime.appendChild(time);
+
+  if (addressText) {
+    const mapLink = document.createElement("a");
+    mapLink.href = mapsUrl;
+    mapLink.target = "_blank";
+    mapLink.rel = "noopener noreferrer";
+    mapLink.textContent = addressText;
+    address.appendChild(mapLink);
   }
 
   const description =
@@ -1363,7 +1368,8 @@ function openEventDetail(event, { updateHistory = true } = {}) {
 
   const titleLocation = document.createElement("div");
   titleLocation.className = "event-detail-title-location";
-  titleLocation.append(heading, venue);
+  titleLocation.append(heading, venueTime);
+  if (addressText) titleLocation.appendChild(address);
 
   const more = document.createElement("div");
   more.className = "event-detail-more";
@@ -1387,8 +1393,9 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   share.addEventListener("click", () => shareEvent(event, status));
   actions.append(addToCalendar, separator, share, status);
 
-  detailCard.appendChild(titleLocation);
   if (flyerSlot.childNodes.length) detailCard.appendChild(flyerSlot);
+  else detailCard.classList.add("without-flyer");
+  detailCard.appendChild(titleLocation);
   if (more.childNodes.length) detailCard.appendChild(more);
   detailCard.appendChild(actions);
 
@@ -1434,11 +1441,33 @@ function updateDetailNavigationState() {
   nextPoster.setAttribute("aria-label", "Next event");
 }
 
+function finishDetailSlide() {
+  if (!activeDetailSlide) return;
+  const { viewport, animations } = activeDetailSlide;
+  const focused = eventDetail.contains(document.activeElement)
+    ? document.activeElement : null;
+  activeDetailSlide = null;
+  animations.forEach(animation => animation.cancel());
+  poster.appendChild(eventDetail);
+  viewport.remove();
+  focused?.focus({ preventScroll: true });
+}
+
 function moveEventDetail(direction) {
+  finishDetailSlide();
   const events = orderedEvents();
   const next = events[events.indexOf(activeEvent) + direction];
   if (!next) return;
 
+  const animateSlide = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const outgoing = animateSlide ? eventDetail.cloneNode(true) : null;
+  if (outgoing) {
+    outgoing.removeAttribute("id");
+    outgoing.querySelectorAll("[id]").forEach(node => node.removeAttribute("id"));
+    outgoing.removeAttribute("aria-labelledby");
+    outgoing.setAttribute("aria-hidden", "true");
+    outgoing.inert = true;
+  }
   const keepPushedEntry = eventEntryPushed;
   hideEventDetail({ restoreFocus: false });
   const pageIndex = posterPages.findIndex(page => page.events.includes(next));
@@ -1456,9 +1485,36 @@ function moveEventDetail(direction) {
   }
   openEventDetail(next, { updateHistory: false });
   eventEntryPushed = keepPushedEntry;
+
+  if (!outgoing) return;
+  const viewport = document.createElement("div");
+  viewport.className = "event-detail-slide-viewport";
+  viewport.append(outgoing, eventDetail);
+  poster.appendChild(viewport);
+  eventDetail.focus({ preventScroll: true });
+  fitDetailFlyer();
+
+  const distance = viewport.clientWidth * direction;
+  const timing = { duration: 380, easing: "cubic-bezier(.25,.8,.25,1)", fill: "forwards" };
+  const animations = [
+    outgoing.animate([
+      { transform: "translateX(0)" },
+      { transform: `translateX(${-distance}px)` }
+    ], timing),
+    eventDetail.animate([
+      { transform: `translateX(${distance}px)` },
+      { transform: "translateX(0)" }
+    ], timing)
+  ];
+  activeDetailSlide = { viewport, animations };
+  Promise.all(animations.map(animation => animation.finished.catch(() => {})))
+    .then(() => {
+      if (activeDetailSlide?.viewport === viewport) finishDetailSlide();
+    });
 }
 
 function hideEventDetail({ restoreFocus = true } = {}) {
+  finishDetailSlide();
   if (
     eventDetail.classList.contains(
       "is-open"
