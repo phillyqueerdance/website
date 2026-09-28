@@ -1,0 +1,80 @@
+/* Desktop menu: bold links and calendar-color sparkles that follow the pointer. */
+@media (min-width: 761px) {
+  .side-nav-links > a:not(.melt-nav-link) {
+    font-weight: 700;
+  }
+}
+
+.menu-sparkle-field { display: none; }
+
+@media (min-width: 761px) and (hover: hover) {
+  .side-nav-links {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .side-nav-links > a {
+    position: relative;
+    z-index: 1;
+  }
+
+  .menu-sparkle-field {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .menu-sparkle-field--back {
+    z-index: 0;
+    --sparkle-opacity: 0.72;
+  }
+
+  .menu-sparkle-field--front {
+    z-index: 2;
+    --sparkle-opacity: 0.5;
+  }
+
+  .menu-sparkle {
+    position: absolute;
+    display: block;
+    width: var(--sparkle-size);
+    height: var(--sparkle-size);
+    color: currentColor;
+    pointer-events: none;
+    animation: menu-sparkle-twinkle 1200ms ease-in-out forwards;
+  }
+
+  .menu-sparkle svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+    animation: menu-sparkle-spin 1200ms linear forwards;
+  }
+}
+
+@keyframes menu-sparkle-twinkle {
+  0% {
+    opacity: 0.12;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  45% {
+    opacity: var(--sparkle-opacity);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.1);
+  }
+}
+
+@keyframes menu-sparkle-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(130deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-sparkle-field { display: none; }
+}
