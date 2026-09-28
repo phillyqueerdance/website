@@ -1160,7 +1160,10 @@ async function shareEvent(event, status) {
   const url = eventPermalink(id);
   if (navigator.share) {
     try {
-      await navigator.share({ title: displayTitle(event), url });
+      await navigator.share({
+        title: `Check out ${displayTitle(event)} on Queer Dance Philly`,
+        url
+      });
       return;
     } catch (error) {
       if (error.name === "AbortError") return;
