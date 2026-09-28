@@ -15,6 +15,7 @@ const datePopover = document.getElementById("datePopover");
 const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
+const todayButton = document.getElementById("todayButton");
 const dateIncomingLabel = document.createElement("span");
 dateIncomingLabel.className = "date-scroll-label";
 dateIncomingLabel.hidden = true;
@@ -41,12 +42,20 @@ let posterPages = [];
 let currentPosterIndex = 0;
 let pickerMonth = null;
 let touchStartX = null;
+let touchStartY = null;
 let pageCards = [];
+let eventCardsById = new Map();
 let dateSections = [];
 let cornerTransitions = [];
 let scrollFrame = 0;
 let savedEventScrollTop = 0;
 let navigationTargetIndex = null;
+let detailReturnFocus = null;
+let activeEventId = "";
+let activeEvent = null;
+let eventEntryPushed = false;
+let freshEventsLoaded = false;
+let activeDetailSlide = null;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
@@ -263,6 +272,34 @@ function formatTimeRange(event) {
   return `${startText}–${endText}`;
 }
 
+function formatDetailDateBadge(event) {
+  const start = new Date(event.start);
+  return {
+    date: formatPosterDate(dateKey(start)),
+    time: compactTime(start)
+  };
+}
+
+function eventIdOf(event) {
+  return String(event.eventId ?? event.EventID ?? "").trim();
+}
+
+function eventPermalink(eventId) {
+  const url = new URL("/", window.location.origin);
+  url.searchParams.set("event", eventId);
+  return url.toString();
+}
+
+function homepageUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("event");
+  return url.toString();
+}
+
+function requestedEventId() {
+  return new URLSearchParams(window.location.search).get("event") || "";
+}
+
 function formatStartTime(event) {
   return compactTime(new Date(event.start));
 }
@@ -384,6 +421,8 @@ function normalizePublicEvents(
     })
     .map(event => ({
       ...event,
+
+      eventId: eventIdOf(event),
 
       description:
         stripQdpFooter(
@@ -768,6 +807,7 @@ function formatPosterDate(key) {
 function createEventCard(event) {
   const card = document.createElement("button");
   card.type = "button";
+  card.dataset.eventId = eventIdOf(event);
   card.className = "event-card " +
     (event.explicitQueer ? "explicit" : "default") +
     (event.queerArtist || event.transArtist ? " has-flags" : "");
@@ -813,11 +853,13 @@ function createEventCard(event) {
 function renderPoster() {
   if (!posterPages.length) return;
 
+  finishDetailSlide();
   eventDetail.hidden = true;
   eventDetail.classList.remove("is-open", "explicit");
   eventStack.hidden = false;
   eventStack.innerHTML = "";
   pageCards = new Array(posterPages.length);
+  eventCardsById = new Map();
   dateSections = [];
   cornerTransitions = [];
 
@@ -863,6 +905,7 @@ function renderPoster() {
           row.className = "event-row " +
             (index === 0 ? "has-time" : "same-time");
           const card = createEventCard(event);
+          if (eventIdOf(event)) eventCardsById.set(eventIdOf(event), card);
           lastCard = card;
           const pageIndex = pageForEvent.get(event);
           if (!pageCards[pageIndex]) pageCards[pageIndex] = card;
@@ -1012,6 +1055,7 @@ function updateScrollState() {
 
 function schedulePosterLayout() {
   requestAnimationFrame(() => {
+    fitDetailFlyer();
     if (!pageCards.length || eventStack.hidden) return;
     const index = currentPosterIndex;
     measureEndSpacer();
@@ -1020,8 +1064,148 @@ function schedulePosterLayout() {
   });
 }
 
-function openEventDetail(event) {
+function escapeIcsText(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r\n?|\n/g, "\\n")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,");
+}
+
+function foldIcsLine(value) {
+  const encoder = new TextEncoder();
+  const lines = [];
+  let line = "";
+  let bytes = 0;
+
+  for (const character of value) {
+    const size = encoder.encode(character).length;
+    if (bytes + size > 75) {
+      lines.push(line);
+      line = " ";
+      bytes = 1;
+    }
+    line += character;
+    bytes += size;
+  }
+
+  lines.push(line);
+  return lines.join("\r\n");
+}
+
+function calendarFile(event) {
+  const start = new Date(event.start);
+  const end = event.end ? new Date(event.end) : null;
+  const utc = date => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const uid = encodeURIComponent(eventIdOf(event) ||
+    `${event.start}-${displayTitle(event)}`);
+  const location = [eventVenue(event), eventAddress(event)].filter(Boolean).join(", ");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Queer Dance Philly//Events//EN",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:${uid}@queerdancephilly.com`,
+    `DTSTAMP:${utc(new Date())}`,
+    `DTSTART:${utc(start)}`
+  ];
+
+  if (end && !Number.isNaN(end.getTime())) lines.push(`DTEND:${utc(end)}`);
+  lines.push(`SUMMARY:${escapeIcsText(displayTitle(event))}`);
+  if (location) lines.push(`LOCATION:${escapeIcsText(location)}`);
+  if (event.description) lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+  if (eventIdOf(event)) lines.push(`URL:${eventPermalink(eventIdOf(event))}`);
+  lines.push("END:VEVENT", "END:VCALENDAR");
+
+  return lines.map(foldIcsLine).join("\r\n") + "\r\n";
+}
+
+function downloadCalendarEvent(event) {
+  const blob = new Blob([calendarFile(event)], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${eventIdOf(event) || "qdp-event"}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+async function copyEventLink(url) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(url);
+    return;
+  }
+
+  const input = document.createElement("textarea");
+  input.value = url;
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  input.remove();
+  if (!copied) throw new Error("Clipboard copy failed.");
+}
+
+async function shareEvent(event, status) {
+  const id = eventIdOf(event);
+  if (!id) {
+    status.textContent = "Link unavailable";
+    return;
+  }
+
+  const url = eventPermalink(id);
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: displayTitle(event), url });
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") return;
+    }
+  }
+
+  try {
+    await copyEventLink(url);
+    status.textContent = "Link copied";
+  } catch (error) {
+    status.textContent = "Could not copy link";
+  }
+  setTimeout(() => {
+    if (status.isConnected) status.textContent = "";
+  }, 2500);
+}
+
+function fitDetailFlyer() {
+  if (eventDetail.hidden) return;
+  const card = eventDetail.querySelector(".event-detail-card");
+  const slot = card?.querySelector(".event-detail-flyer-slot");
+  const flyer = slot?.querySelector(".event-detail-flyer");
+  if (!flyer) return;
+
+  const slotStyle = getComputedStyle(slot);
+  const availableHeight = card.clientHeight -
+    parseFloat(slotStyle.marginTop) - 2;
+  flyer.style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
+}
+
+function openEventDetail(event, { updateHistory = true } = {}) {
   closeDatePopover();
+
+  const id = eventIdOf(event);
+  detailReturnFocus = document.activeElement?.classList.contains("event-card")
+    ? document.activeElement
+    : [...eventStack.querySelectorAll(".event-card")]
+      .find(card => card.dataset.eventId === id && id) || null;
+  activeEventId = id;
+  activeEvent = event;
+  eventEntryPushed = updateHistory && Boolean(id);
+
+  if (eventEntryPushed) {
+    history.pushState({ qdpEvent: id, qdpPushed: true }, "", eventPermalink(id));
+  }
 
   savedEventScrollTop = eventStack.scrollTop;
   eventStack.hidden = true;
@@ -1032,8 +1216,13 @@ function openEventDetail(event) {
   );
 
   eventDetail.classList.toggle("explicit", event.explicitQueer === true);
-
-  eventDetail.innerHTML = "";
+  const dateBadge = eventDetail.querySelector(".event-detail-date-badge") ||
+    document.createElement("div");
+  eventDetail.replaceChildren();
+  eventDetail.setAttribute("role", "dialog");
+  eventDetail.setAttribute("aria-modal", "true");
+  eventDetail.setAttribute("aria-labelledby", "eventDetailTitle");
+  eventDetail.tabIndex = -1;
 
   if (event.queerArtist) {
     const flag = document.createElement("span");
@@ -1050,14 +1239,20 @@ function openEventDetail(event) {
     eventDetail.appendChild(flag);
   }
 
+  dateBadge.className = "event-detail-date-badge";
+  const dateParts = formatDetailDateBadge(event);
+  const dateText = document.createElement("span");
+  dateText.className = "event-detail-date-text";
+  dateText.textContent = dateParts.date;
+  dateBadge.replaceChildren(dateText);
+  eventDetail.appendChild(dateBadge);
+
   const detailCard =
     document.createElement("article");
 
   detailCard.className =
     "event-detail-card";
 
-  const firstScreen = document.createElement("div");
-  firstScreen.className = "event-detail-first-screen";
   const flyerSlot = document.createElement("div");
   flyerSlot.className = "event-detail-flyer-slot";
 
@@ -1121,31 +1316,46 @@ function openEventDetail(event) {
   const heading =
     document.createElement("h2");
 
+  heading.id = "eventDetailTitle";
   heading.textContent = displayTitle(event);
 
-  const time =
-    document.createElement("p");
+  const venue = document.createElement("span");
+  const venueTime = document.createElement("p");
+  venueTime.className = "event-detail-venue-time";
+  const address = document.createElement("p");
+  address.className = "event-detail-address";
+  const venueText = eventVenue(event);
+  const addressText = eventAddress(event);
+  const mapsQuery = [venueText, addressText].filter(Boolean).join(", ");
+  const mapsUrl = mapsQuery
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
+    : "";
+  if (venueText) {
+    const mapLink = document.createElement("a");
+    mapLink.href = mapsUrl;
+    mapLink.target = "_blank";
+    mapLink.rel = "noopener noreferrer";
+    mapLink.textContent = venueText;
+    venue.appendChild(mapLink);
+    venueTime.appendChild(venue);
+    const separator = document.createElement("span");
+    separator.setAttribute("aria-hidden", "true");
+    separator.textContent = " | ";
+    venueTime.appendChild(separator);
+  }
+  const time = document.createElement("time");
+  time.dateTime = event.start;
+  time.textContent = dateParts.time;
+  venueTime.appendChild(time);
 
-  time.textContent =
-    formatTimeRange(event);
-
-  const venue =
-    document.createElement("p");
-
-  venue.textContent =
-    eventVenue(event);
-
-  venue.hidden =
-    !venue.textContent;
-
-  const address =
-    document.createElement("p");
-
-  address.textContent =
-    eventAddress(event);
-
-  address.hidden =
-    !address.textContent;
+  if (addressText) {
+    const mapLink = document.createElement("a");
+    mapLink.href = mapsUrl;
+    mapLink.target = "_blank";
+    mapLink.rel = "noopener noreferrer";
+    mapLink.textContent = addressText;
+    address.appendChild(mapLink);
+  }
 
   const description =
     document.createElement("p");
@@ -1155,41 +1365,175 @@ function openEventDetail(event) {
 
   const titleLocation = document.createElement("div");
   titleLocation.className = "event-detail-title-location";
-  titleLocation.append(heading, venue, address);
-  firstScreen.append(flyerSlot, titleLocation);
+  titleLocation.append(heading, venueTime);
+  if (addressText) titleLocation.appendChild(address);
 
   const more = document.createElement("div");
   more.className = "event-detail-more";
-  more.append(time, description);
-  detailCard.append(firstScreen, more);
+  if (description.textContent) more.appendChild(description);
 
-  const closeButton =
-    document.createElement("button");
+  const actions = document.createElement("div");
+  actions.className = "event-detail-actions";
+  const addToCalendar = document.createElement("button");
+  addToCalendar.type = "button";
+  addToCalendar.textContent = "Add to Calendar";
+  addToCalendar.addEventListener("click", () => downloadCalendarEvent(event));
+  const separator = document.createElement("span");
+  separator.textContent = "|";
+  separator.setAttribute("aria-hidden", "true");
+  const share = document.createElement("button");
+  share.type = "button";
+  share.textContent = "Share";
+  const status = document.createElement("span");
+  status.className = "event-share-status";
+  status.setAttribute("role", "status");
+  share.addEventListener("click", () => shareEvent(event, status));
+  actions.append(addToCalendar, separator, share, status);
 
-  closeButton.type = "button";
+  if (flyerSlot.childNodes.length) detailCard.appendChild(flyerSlot);
+  else detailCard.classList.add("without-flyer");
+  detailCard.appendChild(titleLocation);
+  if (more.childNodes.length) detailCard.appendChild(more);
+  detailCard.appendChild(actions);
 
-  closeButton.className =
-    "overlay-close event-detail-close";
-
-  closeButton.textContent = "×";
-
-  closeButton.setAttribute(
-    "aria-label",
-    "Close event details"
-  );
-
-  closeButton.addEventListener(
-    "click",
-    closeEventDetail
-  );
-
-  eventDetail.append(
-    detailCard,
-    closeButton
-  );
+  eventDetail.appendChild(detailCard);
+  fitDetailFlyer();
+  updateDetailNavigationState();
+  eventDetail.focus({ preventScroll: true });
 }
 
-function closeEventDetail() {
+function orderedEvents() {
+  return posterPages.flatMap(page => page.events);
+}
+
+function updateDetailNavigationState() {
+  const events = orderedEvents();
+  const index = events.indexOf(activeEvent);
+  previousPoster.disabled = index <= 0;
+  nextPoster.disabled = index < 0 || index === events.length - 1;
+  previousPoster.setAttribute("aria-label", "Previous event");
+  nextPoster.setAttribute("aria-label", "Next event");
+}
+
+function finishDetailSlide() {
+  if (!activeDetailSlide) return;
+  const { viewport, card, outgoingDateText, ghostFlags, animations } = activeDetailSlide;
+  const focused = eventDetail.contains(document.activeElement)
+    ? document.activeElement : null;
+  activeDetailSlide = null;
+  animations.forEach(animation => animation.cancel());
+  eventDetail.appendChild(card);
+  outgoingDateText.remove();
+  ghostFlags.forEach(flag => flag.remove());
+  viewport.remove();
+  if (focused?.isConnected) focused.focus({ preventScroll: true });
+}
+
+function moveEventDetail(direction) {
+  finishDetailSlide();
+  const events = orderedEvents();
+  const next = events[events.indexOf(activeEvent) + direction];
+  if (!next) return;
+
+  const animateSlide = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const previousFlags = {
+    queer: Boolean(eventDetail.querySelector(".event-detail-flag-queer")),
+    trans: Boolean(eventDetail.querySelector(".event-detail-flag-trans"))
+  };
+  const previousCard = eventDetail.querySelector(".event-detail-card");
+  const previousScrollTop = previousCard?.scrollTop || 0;
+  const outgoing = animateSlide ? previousCard?.cloneNode(true) : null;
+  const outgoingDateText = animateSlide
+    ? eventDetail.querySelector(".event-detail-date-text")?.cloneNode(true)
+    : null;
+  if (outgoing) {
+    outgoing.querySelectorAll("[id]").forEach(node => node.removeAttribute("id"));
+    outgoing.setAttribute("aria-hidden", "true");
+    outgoing.inert = true;
+  }
+  const keepPushedEntry = eventEntryPushed;
+  hideEventDetail({ restoreFocus: false });
+  const pageIndex = posterPages.findIndex(page => page.events.includes(next));
+  scrollToPage(pageIndex, "auto");
+  const target = eventCardsById.get(eventIdOf(next)) || pageCards[pageIndex];
+  if (target) {
+    eventStack.scrollTo({ top: scrollOffset(target), behavior: "auto" });
+    updateScrollState();
+  }
+  if (eventIdOf(next)) {
+    history.replaceState(
+      { qdpEvent: eventIdOf(next), qdpPushed: keepPushedEntry },
+      "", eventPermalink(eventIdOf(next))
+    );
+  }
+  openEventDetail(next, { updateHistory: false });
+  eventEntryPushed = keepPushedEntry;
+
+  if (!outgoing) return;
+  const viewport = document.createElement("div");
+  viewport.className = "event-detail-content-viewport";
+  const incoming = eventDetail.querySelector(".event-detail-card");
+  const dateBadge = eventDetail.querySelector(".event-detail-date-badge");
+  const incomingDateText = dateBadge.querySelector(".event-detail-date-text");
+  outgoingDateText.setAttribute("aria-hidden", "true");
+  dateBadge.appendChild(outgoingDateText);
+  viewport.append(outgoing, incoming);
+  eventDetail.appendChild(viewport);
+  outgoing.scrollTop = previousScrollTop;
+  eventDetail.focus({ preventScroll: true });
+  fitDetailFlyer();
+
+  const distance = viewport.clientWidth * direction;
+  const dateDistance = dateBadge.clientWidth * direction;
+  const timing = { duration: 380, easing: "cubic-bezier(.25,.8,.25,1)", fill: "forwards" };
+  const animations = [
+    outgoing.animate([
+      { transform: "translateX(0)" },
+      { transform: `translateX(${-distance}px)` }
+    ], timing),
+    incoming.animate([
+      { transform: `translateX(${distance}px)` },
+      { transform: "translateX(0)" }
+    ], timing),
+    outgoingDateText.animate([
+      { transform: "translateX(0)" },
+      { transform: `translateX(${-dateDistance}px)` }
+    ], timing),
+    incomingDateText.animate([
+      { transform: `translateX(${dateDistance}px)` },
+      { transform: "translateX(0)" }
+    ], timing)
+  ];
+  const ghostFlags = [];
+  for (const type of ["queer", "trans"]) {
+    const newFlag = eventDetail.querySelector(`.event-detail-flag-${type}`);
+    const flagShift = (type === "queer" ? -1 : 1) * viewport.clientWidth * 0.16;
+    if (previousFlags[type] && !newFlag) {
+      const oldFlag = document.createElement("span");
+      oldFlag.className = `event-detail-flag event-detail-flag-${type}`;
+      oldFlag.setAttribute("aria-hidden", "true");
+      eventDetail.appendChild(oldFlag);
+      ghostFlags.push(oldFlag);
+      animations.push(oldFlag.animate([
+        { transform: "translateX(0)", opacity: 1 },
+        { transform: `translateX(${flagShift}px)`, opacity: 0 }
+      ], timing));
+    } else if (!previousFlags[type] && newFlag) {
+      animations.push(newFlag.animate([
+        { transform: `translateX(${flagShift}px)`, opacity: 0 },
+        { transform: "translateX(0)", opacity: 1 }
+      ], timing));
+    }
+  }
+  activeDetailSlide = { viewport, card: incoming, outgoingDateText, ghostFlags, animations };
+  Promise.all(animations.map(animation => animation.finished.catch(() => {})))
+    .then(() => {
+      if (activeDetailSlide?.viewport === viewport) finishDetailSlide();
+    });
+}
+
+function hideEventDetail({ restoreFocus = true } = {}) {
+  finishDetailSlide();
   if (
     eventDetail.classList.contains(
       "is-open"
@@ -1200,8 +1544,75 @@ function closeEventDetail() {
     eventStack.hidden = false;
     eventStack.scrollTop = savedEventScrollTop;
     updateScrollState();
+    previousPoster.setAttribute("aria-label", "Previous events");
+    nextPoster.setAttribute("aria-label", "Next events");
+    if (restoreFocus) detailReturnFocus?.isConnected &&
+      detailReturnFocus.focus({ preventScroll: true });
   }
+  activeEventId = "";
+  activeEvent = null;
+  eventEntryPushed = false;
 }
+
+function closeEventDetail() {
+  if (eventDetail.hidden) return;
+  const shouldGoBack = eventEntryPushed && history.state?.qdpPushed &&
+    requestedEventId() === activeEventId;
+  const hasEventUrl = Boolean(requestedEventId());
+  hideEventDetail();
+  if (shouldGoBack) history.back();
+  else if (hasEventUrl) history.replaceState(null, "", homepageUrl());
+}
+
+function syncEventFromUrl({ final = freshEventsLoaded } = {}) {
+  const id = requestedEventId();
+  if (!id) {
+    hideEventDetail();
+    return;
+  }
+
+  const index = posterPages.findIndex(page =>
+    page.events.some(event => eventIdOf(event) === id));
+  if (index < 0) {
+    if (final) {
+      hideEventDetail();
+      history.replaceState(null, "", homepageUrl());
+    }
+    return;
+  }
+
+  if (activeEventId === id && !eventDetail.hidden) return;
+  if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
+  scrollToPage(index, "auto");
+  const targetCard = eventCardsById.get(id);
+  if (targetCard) {
+    eventStack.scrollTo({ top: scrollOffset(targetCard), behavior: "auto" });
+    updateScrollState();
+  }
+  const event = posterPages[index].events.find(item => eventIdOf(item) === id);
+  openEventDetail(event, { updateHistory: false });
+  eventEntryPushed = Boolean(history.state?.qdpPushed);
+}
+
+window.addEventListener("popstate", () => syncEventFromUrl());
+
+eventDetail.addEventListener("keydown", event => {
+  if (event.key !== "Tab") return;
+  const liveCard = eventDetail.querySelector(".event-detail-card:not([aria-hidden])");
+  const controls = [...(liveCard?.querySelectorAll("a[href], button:not([disabled])") || [])];
+  const first = controls[0];
+  const last = controls[controls.length - 1];
+  if (document.activeElement === eventDetail) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 eventDetail.addEventListener(
   "click",
@@ -1211,6 +1622,13 @@ eventDetail.addEventListener(
     }
   }
 );
+
+document.addEventListener("click", event => {
+  if (!event.isTrusted || eventDetail.hidden || eventDetail.contains(event.target)) return;
+  if (event.target instanceof Element &&
+      event.target.closest("#previousPoster, #nextPoster, .event-card")) return;
+  closeEventDetail();
+});
 
 function openAboutDialog(event) {
   event?.preventDefault();
@@ -1309,6 +1727,10 @@ meltDialog.addEventListener(
 );
 
 function movePoster(direction) {
+  if (!eventDetail.hidden) {
+    moveEventDetail(direction);
+    return;
+  }
   const nextIndex =
     (navigationTargetIndex ?? currentPosterIndex) + direction;
 
@@ -1332,6 +1754,15 @@ nextPoster.addEventListener(
   "click",
   () => movePoster(1)
 );
+
+todayButton.addEventListener("click", () => {
+  const today = dateKey(new Date());
+  const index = posterPages.findIndex(page => page.date >= today);
+  if (index < 0) return;
+  if (!eventDetail.hidden) closeEventDetail();
+  closeDatePopover();
+  scrollToPage(index);
+});
 
 eventStack.addEventListener("scroll", () => {
   if (scrollFrame) return;
@@ -1369,15 +1800,13 @@ window.addEventListener(
       return;
     }
 
-    if (!eventDetail.hidden) {
-      return;
-    }
-
     if (event.key === "ArrowLeft") {
+      event.preventDefault();
       movePoster(-1);
     }
 
     if (event.key === "ArrowRight") {
+      event.preventDefault();
       movePoster(1);
     }
   }
@@ -1392,6 +1821,8 @@ poster.addEventListener(
 
     touchStartX =
       event.changedTouches[0].clientX;
+    touchStartY =
+      event.changedTouches[0].clientY;
   },
   { passive: true }
 );
@@ -1400,24 +1831,28 @@ poster.addEventListener(
   "touchend",
   event => {
     if (
-      touchStartX === null ||
-      !eventDetail.hidden
+      touchStartX === null
     ) {
       touchStartX = null;
+      touchStartY = null;
       return;
     }
 
-    const delta =
+    const deltaX =
       event.changedTouches[0].clientX -
       touchStartX;
+    const deltaY =
+      event.changedTouches[0].clientY -
+      touchStartY;
 
-    if (Math.abs(delta) > 50) {
+    if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
       movePoster(
-        delta < 0 ? 1 : -1
+        deltaX < 0 ? 1 : -1
       );
     }
 
     touchStartX = null;
+    touchStartY = null;
   },
   { passive: true }
 );
@@ -1461,6 +1896,7 @@ function renderEventCollection(
 
   if (!posterPages.length) {
     pageCards = [];
+    eventCardsById = new Map();
     dateSections = [];
     cornerTransitions = [];
     previousPoster.disabled = true;
@@ -1496,6 +1932,7 @@ function renderEventCollection(
     : todayIndex >= 0 ? todayIndex : 0;
 
   renderPoster();
+  requestAnimationFrame(() => syncEventFromUrl());
 }
 
 async function initialize() {
@@ -1542,6 +1979,9 @@ async function initialize() {
         "Listings could not load. Please refresh."
       );
     }
+  } finally {
+    freshEventsLoaded = true;
+    requestAnimationFrame(() => syncEventFromUrl({ final: true }));
   }
 }
 

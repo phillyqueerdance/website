@@ -234,7 +234,7 @@
   isolation: isolate;
 }
 .event-card.explicit { --event-color: var(--qdp-queer-card); background: var(--event-color); }
-.event-card.default { background: var(--event-color); }
+.event-card.default { background: var(--event-color); color: #2A1220; }
 .event-time-group .event-row:first-child .event-card {
   border-top-right-radius: var(--qdp-card-radius);
 }
@@ -246,7 +246,12 @@
 }
 .event-card:hover .event-card-shape,
 .event-card:focus-visible .event-card-shape { filter: brightness(1.1); }
-.event-card:focus-visible { outline: 2px solid #ffea86; outline-offset: 3px; }
+.event-card:focus-visible { outline: none; }
+.event-card:focus-visible .event-title {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.12em;
+}
 .event-card-shape {
   position: absolute;
   inset: 0;
@@ -308,6 +313,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: clip;
+  font-family: "QDP Fraunces", Georgia, serif;
   font-size: var(--qdp-title-font-size);
   font-weight: var(--qdp-title-font-weight);
   line-height: var(--qdp-title-line-height);
@@ -346,6 +352,25 @@
   justify-content: stretch;
 }
 .event-detail.is-open { align-items: stretch; justify-content: stretch; }
+.event-detail:focus { outline: none; }
+.event-detail-content-viewport {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.event-detail-content-viewport > .event-detail-card {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.event-detail-content-viewport > .event-detail-card[aria-hidden="true"] {
+  pointer-events: none;
+}
 .event-detail.explicit {
   background-color: var(--qdp-queer-popup);
   background-image: url("queer-popup-background.png?v=a87c9d4");
@@ -358,24 +383,18 @@
 .event-detail-card {
   position: relative;
   z-index: 1;
-  height: 100%;
-  max-height: none;
-  padding: 0;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-}
-.event-detail-first-screen {
-  height: 100%;
-  min-height: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  max-height: none;
+  padding: 0 1cqw 3cqw 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  touch-action: pan-y;
 }
+.event-detail-card > * { flex-shrink: 0; }
 .event-detail-flyer-slot {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  margin: max(0cqw, calc(9cqw - var(--qdp-detail-padding))) 0 2cqw 4cqw;
 }
 .event-detail-flyer {
   width: auto;
@@ -387,15 +406,86 @@
   background: transparent;
 }
 .event-detail-title-location {
-  flex: 0 0 auto;
-  padding: 1.25cqw 5cqw 0.6cqw 0;
+  padding: 0 4cqw 0.6cqw;
 }
-.event-detail-title-location h2 { margin: 0 0 0.45cqw; }
+.event-detail-card.without-flyer .event-detail-title-location { padding-top: 11cqw; }
+.event-detail-title-location h2 {
+  margin: 0 0 0.8cqw;
+  font-family: "QDP Fraunces", Georgia, serif;
+  font-size: calc(var(--qdp-detail-title-size, 4cqw) * 1.12);
+  overflow-wrap: anywhere;
+}
 .event-detail-title-location p { margin: 0 0 0.2cqw; }
-.event-detail-more { padding: 3cqw 2cqw 6cqw 0; }
+.event-detail-venue-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25em;
+}
+.event-detail-address { font-size: 0.86em; }
+.event-detail-date-badge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 43.42cqw;
+  height: var(--qdp-date-height);
+  padding: 0 1cqw 0.45cqw;
+  border-radius: 0 0 5cqw 5cqw;
+  background: #fa2b5a;
+  color: #ffeff2;
+  font: 700 var(--qdp-date-font-size) / 1 "QDP Fraunces", Georgia, serif;
+  text-align: center;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+  overflow: hidden;
+}
+.event-detail-date-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1cqw 0.45cqw;
+}
+.event-detail-more { padding: 2cqw 4cqw 0; }
 .event-detail-more p:last-child {
   white-space: pre-line;
   overflow-wrap: anywhere;
+}
+.event-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.55em;
+  margin-top: auto;
+  padding-top: 3cqw;
+  text-align: center;
+}
+.event-detail-actions button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.event-detail-actions button:hover,
+.event-detail-actions button:focus-visible { text-decoration-thickness: 2px; }
+.event-detail-actions button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+.event-share-status:not(:empty) {
+  flex-basis: 100%;
+  font-size: 0.85em;
 }
 .event-detail-flag {
   position: absolute;
