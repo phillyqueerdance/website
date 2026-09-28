@@ -15,6 +15,7 @@ const datePopover = document.getElementById("datePopover");
 const previousPoster = document.getElementById("previousPoster");
 const nextPoster = document.getElementById("nextPoster");
 const poster = document.getElementById("poster");
+const todayButton = document.getElementById("todayButton");
 const dateIncomingLabel = document.createElement("span");
 dateIncomingLabel.className = "date-scroll-label";
 dateIncomingLabel.hidden = true;
@@ -42,11 +43,16 @@ let currentPosterIndex = 0;
 let pickerMonth = null;
 let touchStartX = null;
 let pageCards = [];
+let eventCardsById = new Map();
 let dateSections = [];
 let cornerTransitions = [];
 let scrollFrame = 0;
 let savedEventScrollTop = 0;
 let navigationTargetIndex = null;
+let detailReturnFocus = null;
+let activeEventId = "";
+let eventEntryPushed = false;
+let freshEventsLoaded = false;
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
@@ -263,6 +269,49 @@ function formatTimeRange(event) {
   return `${startText}–${endText}`;
 }
 
+function formatDetailDateTime(event) {
+  const start = new Date(event.start);
+  const end = event.end ? new Date(event.end) : null;
+  const dateFormat = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+  const startDate = dateFormat.format(start);
+  const startTime = compactTime(start);
+
+  if (!end || Number.isNaN(end.getTime())) {
+    return `${startDate} · ${startTime}`;
+  }
+
+  const endDate = dateFormat.format(end);
+  return endDate === startDate
+    ? `${startDate} · ${startTime}–${compactTime(end)}`
+    : `${startDate} · ${startTime}–${endDate} · ${compactTime(end)}`;
+}
+
+function eventIdOf(event) {
+  return String(event.eventId ?? event.EventID ?? "").trim();
+}
+
+function eventPermalink(eventId) {
+  const url = new URL("/", window.location.origin);
+  url.searchParams.set("event", eventId);
+  return url.toString();
+}
+
+function homepageUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("event");
+  return url.toString();
+}
+
+function requestedEventId() {
+  return new URLSearchParams(window.location.search).get("event") || "";
+}
+
 function formatStartTime(event) {
   return compactTime(new Date(event.start));
 }
@@ -384,6 +433,8 @@ function normalizePublicEvents(
     })
     .map(event => ({
       ...event,
+
+      eventId: eventIdOf(event),
 
       description:
         stripQdpFooter(
@@ -768,6 +819,7 @@ function formatPosterDate(key) {
 function createEventCard(event) {
   const card = document.createElement("button");
   card.type = "button";
+  card.dataset.eventId = eventIdOf(event);
   card.className = "event-card " +
     (event.explicitQueer ? "explicit" : "default") +
     (event.queerArtist || event.transArtist ? " has-flags" : "");
@@ -818,6 +870,7 @@ function renderPoster() {
   eventStack.hidden = false;
   eventStack.innerHTML = "";
   pageCards = new Array(posterPages.length);
+  eventCardsById = new Map();
   dateSections = [];
   cornerTransitions = [];
 
@@ -863,6 +916,7 @@ function renderPoster() {
           row.className = "event-row " +
             (index === 0 ? "has-time" : "same-time");
           const card = createEventCard(event);
+          if (eventIdOf(event)) eventCardsById.set(eventIdOf(event), card);
           lastCard = card;
           const pageIndex = pageForEvent.get(event);
           if (!pageCards[pageIndex]) pageCards[pageIndex] = card;
@@ -1020,8 +1074,134 @@ function schedulePosterLayout() {
   });
 }
 
-function openEventDetail(event) {
+function escapeIcsText(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r\n?|\n/g, "\\n")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,");
+}
+
+function foldIcsLine(value) {
+  const encoder = new TextEncoder();
+  const lines = [];
+  let line = "";
+  let bytes = 0;
+
+  for (const character of value) {
+    const size = encoder.encode(character).length;
+    if (bytes + size > 75) {
+      lines.push(line);
+      line = " ";
+      bytes = 1;
+    }
+    line += character;
+    bytes += size;
+  }
+
+  lines.push(line);
+  return lines.join("\r\n");
+}
+
+function calendarFile(event) {
+  const start = new Date(event.start);
+  const end = event.end ? new Date(event.end) : null;
+  const utc = date => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const uid = encodeURIComponent(eventIdOf(event) ||
+    `${event.start}-${displayTitle(event)}`);
+  const location = [eventVenue(event), eventAddress(event)].filter(Boolean).join(", ");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Queer Dance Philly//Events//EN",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:${uid}@queerdancephilly.com`,
+    `DTSTAMP:${utc(new Date())}`,
+    `DTSTART:${utc(start)}`
+  ];
+
+  if (end && !Number.isNaN(end.getTime())) lines.push(`DTEND:${utc(end)}`);
+  lines.push(`SUMMARY:${escapeIcsText(displayTitle(event))}`);
+  if (location) lines.push(`LOCATION:${escapeIcsText(location)}`);
+  if (event.description) lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+  if (eventIdOf(event)) lines.push(`URL:${eventPermalink(eventIdOf(event))}`);
+  lines.push("END:VEVENT", "END:VCALENDAR");
+
+  return lines.map(foldIcsLine).join("\r\n") + "\r\n";
+}
+
+function downloadCalendarEvent(event) {
+  const blob = new Blob([calendarFile(event)], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${eventIdOf(event) || "qdp-event"}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+async function copyEventLink(url) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(url);
+    return;
+  }
+
+  const input = document.createElement("textarea");
+  input.value = url;
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  input.remove();
+  if (!copied) throw new Error("Clipboard copy failed.");
+}
+
+async function shareEvent(event, status) {
+  const id = eventIdOf(event);
+  if (!id) {
+    status.textContent = "Link unavailable";
+    return;
+  }
+
+  const url = eventPermalink(id);
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: displayTitle(event), url });
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") return;
+    }
+  }
+
+  try {
+    await copyEventLink(url);
+    status.textContent = "Link copied";
+  } catch (error) {
+    status.textContent = "Could not copy link";
+  }
+  setTimeout(() => {
+    if (status.isConnected) status.textContent = "";
+  }, 2500);
+}
+
+function openEventDetail(event, { updateHistory = true } = {}) {
   closeDatePopover();
+
+  const id = eventIdOf(event);
+  detailReturnFocus = document.activeElement?.classList.contains("event-card")
+    ? document.activeElement
+    : [...eventStack.querySelectorAll(".event-card")]
+      .find(card => card.dataset.eventId === id && id) || null;
+  activeEventId = id;
+  eventEntryPushed = updateHistory && Boolean(id);
+
+  if (eventEntryPushed) {
+    history.pushState({ qdpEvent: id, qdpPushed: true }, "", eventPermalink(id));
+  }
 
   savedEventScrollTop = eventStack.scrollTop;
   eventStack.hidden = true;
@@ -1034,6 +1214,9 @@ function openEventDetail(event) {
   eventDetail.classList.toggle("explicit", event.explicitQueer === true);
 
   eventDetail.innerHTML = "";
+  eventDetail.setAttribute("role", "dialog");
+  eventDetail.setAttribute("aria-modal", "true");
+  eventDetail.setAttribute("aria-labelledby", "eventDetailTitle");
 
   if (event.queerArtist) {
     const flag = document.createElement("span");
@@ -1056,8 +1239,6 @@ function openEventDetail(event) {
   detailCard.className =
     "event-detail-card";
 
-  const firstScreen = document.createElement("div");
-  firstScreen.className = "event-detail-first-screen";
   const flyerSlot = document.createElement("div");
   flyerSlot.className = "event-detail-flyer-slot";
 
@@ -1121,13 +1302,14 @@ function openEventDetail(event) {
   const heading =
     document.createElement("h2");
 
+  heading.id = "eventDetailTitle";
   heading.textContent = displayTitle(event);
 
   const time =
     document.createElement("p");
 
   time.textContent =
-    formatTimeRange(event);
+    formatDetailDateTime(event);
 
   const venue =
     document.createElement("p");
@@ -1138,14 +1320,18 @@ function openEventDetail(event) {
   venue.hidden =
     !venue.textContent;
 
-  const address =
-    document.createElement("p");
-
-  address.textContent =
-    eventAddress(event);
-
-  address.hidden =
-    !address.textContent;
+  const address = document.createElement("p");
+  const addressText = eventAddress(event);
+  if (addressText) {
+    const mapLink = document.createElement("a");
+    mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`;
+    mapLink.target = "_blank";
+    mapLink.rel = "noopener noreferrer";
+    mapLink.textContent = addressText;
+    address.appendChild(mapLink);
+  } else {
+    address.hidden = true;
+  }
 
   const description =
     document.createElement("p");
@@ -1155,13 +1341,34 @@ function openEventDetail(event) {
 
   const titleLocation = document.createElement("div");
   titleLocation.className = "event-detail-title-location";
-  titleLocation.append(heading, venue, address);
-  firstScreen.append(flyerSlot, titleLocation);
+  titleLocation.append(heading, time, venue, address);
 
   const more = document.createElement("div");
   more.className = "event-detail-more";
-  more.append(time, description);
-  detailCard.append(firstScreen, more);
+  if (description.textContent) more.appendChild(description);
+
+  const actions = document.createElement("div");
+  actions.className = "event-detail-actions";
+  const addToCalendar = document.createElement("button");
+  addToCalendar.type = "button";
+  addToCalendar.textContent = "Add to Calendar";
+  addToCalendar.addEventListener("click", () => downloadCalendarEvent(event));
+  const separator = document.createElement("span");
+  separator.textContent = "·";
+  separator.setAttribute("aria-hidden", "true");
+  const share = document.createElement("button");
+  share.type = "button";
+  share.textContent = "Share";
+  const status = document.createElement("span");
+  status.className = "event-share-status";
+  status.setAttribute("role", "status");
+  share.addEventListener("click", () => shareEvent(event, status));
+  actions.append(addToCalendar, separator, share, status);
+
+  detailCard.appendChild(titleLocation);
+  if (flyerSlot.childNodes.length) detailCard.appendChild(flyerSlot);
+  if (more.childNodes.length) detailCard.appendChild(more);
+  detailCard.appendChild(actions);
 
   const closeButton =
     document.createElement("button");
@@ -1187,9 +1394,10 @@ function openEventDetail(event) {
     detailCard,
     closeButton
   );
+  closeButton.focus({ preventScroll: true });
 }
 
-function closeEventDetail() {
+function hideEventDetail({ restoreFocus = true } = {}) {
   if (
     eventDetail.classList.contains(
       "is-open"
@@ -1200,8 +1408,68 @@ function closeEventDetail() {
     eventStack.hidden = false;
     eventStack.scrollTop = savedEventScrollTop;
     updateScrollState();
+    if (restoreFocus) detailReturnFocus?.isConnected &&
+      detailReturnFocus.focus({ preventScroll: true });
   }
+  activeEventId = "";
+  eventEntryPushed = false;
 }
+
+function closeEventDetail() {
+  if (eventDetail.hidden) return;
+  const shouldGoBack = eventEntryPushed && history.state?.qdpPushed &&
+    requestedEventId() === activeEventId;
+  const hasEventUrl = Boolean(requestedEventId());
+  hideEventDetail();
+  if (shouldGoBack) history.back();
+  else if (hasEventUrl) history.replaceState(null, "", homepageUrl());
+}
+
+function syncEventFromUrl({ final = freshEventsLoaded } = {}) {
+  const id = requestedEventId();
+  if (!id) {
+    hideEventDetail();
+    return;
+  }
+
+  const index = posterPages.findIndex(page =>
+    page.events.some(event => eventIdOf(event) === id));
+  if (index < 0) {
+    if (final) {
+      hideEventDetail();
+      history.replaceState(null, "", homepageUrl());
+    }
+    return;
+  }
+
+  if (activeEventId === id && !eventDetail.hidden) return;
+  if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
+  scrollToPage(index, "auto");
+  const targetCard = eventCardsById.get(id);
+  if (targetCard) {
+    eventStack.scrollTo({ top: scrollOffset(targetCard), behavior: "auto" });
+    updateScrollState();
+  }
+  const event = posterPages[index].events.find(item => eventIdOf(item) === id);
+  openEventDetail(event, { updateHistory: false });
+  eventEntryPushed = Boolean(history.state?.qdpPushed);
+}
+
+window.addEventListener("popstate", () => syncEventFromUrl());
+
+eventDetail.addEventListener("keydown", event => {
+  if (event.key !== "Tab") return;
+  const controls = [...eventDetail.querySelectorAll("a[href], button:not([disabled])")];
+  const first = controls[0];
+  const last = controls[controls.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 eventDetail.addEventListener(
   "click",
@@ -1333,6 +1601,15 @@ nextPoster.addEventListener(
   () => movePoster(1)
 );
 
+todayButton.addEventListener("click", () => {
+  const today = dateKey(new Date());
+  const index = posterPages.findIndex(page => page.date >= today);
+  if (index < 0) return;
+  if (!eventDetail.hidden) closeEventDetail();
+  closeDatePopover();
+  scrollToPage(index);
+});
+
 eventStack.addEventListener("scroll", () => {
   if (scrollFrame) return;
   scrollFrame = requestAnimationFrame(() => {
@@ -1461,6 +1738,7 @@ function renderEventCollection(
 
   if (!posterPages.length) {
     pageCards = [];
+    eventCardsById = new Map();
     dateSections = [];
     cornerTransitions = [];
     previousPoster.disabled = true;
@@ -1496,6 +1774,7 @@ function renderEventCollection(
     : todayIndex >= 0 ? todayIndex : 0;
 
   renderPoster();
+  requestAnimationFrame(() => syncEventFromUrl());
 }
 
 async function initialize() {
@@ -1542,6 +1821,9 @@ async function initialize() {
         "Listings could not load. Please refresh."
       );
     }
+  } finally {
+    freshEventsLoaded = true;
+    requestAnimationFrame(() => syncEventFromUrl({ final: true }));
   }
 }
 

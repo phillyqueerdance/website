@@ -27,6 +27,17 @@ body {
   padding: 14px 18px;
 }
 
+a:any-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
 
 /* =========================================================
    PAGE SHELL + SIDE NAV
@@ -81,7 +92,7 @@ body {
 
 
 .side-nav a {
-  color: #f7edf1;
+  color: inherit;
 
   text-decoration: none;
 
@@ -749,6 +760,10 @@ body {
   cursor: default;
 }
 
+.today-button {
+  display: none;
+}
+
 
 /* =========================================================
    PRIVATE LAYOUT EDITOR
@@ -1102,7 +1117,7 @@ body {
     color: #f7edf1;
 
     font: inherit;
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: 0.08em;
@@ -1173,8 +1188,29 @@ body {
     width: 100%;
     padding: 7px 4px;
 
-    font-size: 13px;
+    font-size: 15px;
     text-align: center;
+  }
+
+  .today-button {
+    position: absolute;
+    bottom: -36px;
+    left: 50%;
+    z-index: 11;
+    display: block;
+    transform: translateX(-50%);
+    border: 0;
+    background: transparent;
+    color: #f7edf1;
+    font: 700 17px/1.2 "QDP Fraunces", Georgia, serif;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .today-button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
   }
 
 
@@ -1488,14 +1524,13 @@ body {
 }
 
 .melt-instagram-line a {
-  color: #ff8b63;
   font-weight: 700;
   text-align: center;
 }
 
 .melt-instagram-line a:hover,
 .melt-instagram-line a:focus-visible {
-  color: #ffb199;
+  text-decoration-thickness: 2px;
 }
 
 .melt-ra-widget {
