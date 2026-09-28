@@ -465,7 +465,7 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 0.55em;
+  gap: 0.55em clamp(12px, 4cqw, 24px);
   padding-top: 3cqw;
   text-align: center;
 }
@@ -473,9 +473,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35em;
-  min-height: 44px;
-  padding: 0 4px;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  padding: 4px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -484,16 +485,11 @@
 }
 .event-detail-action-icon {
   display: block;
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
 }
-.event-detail-actions button span {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.event-detail-actions button:hover span,
-.event-detail-actions button:focus-visible span { text-decoration-thickness: 2px; }
+.event-detail-actions button:hover .event-detail-action-icon { filter: brightness(1.15); }
 .event-detail-actions button:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 3px;
