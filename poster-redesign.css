@@ -308,6 +308,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: clip;
+  font-family: "QDP Fraunces", Georgia, serif;
   font-size: var(--qdp-title-font-size);
   font-weight: var(--qdp-title-font-weight);
   line-height: var(--qdp-title-line-height);
@@ -365,6 +366,7 @@
   padding: 0 1cqw 3cqw 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
+  touch-action: pan-y;
 }
 .event-detail-card > * { flex-shrink: 0; }
 .event-detail-flyer-slot {
@@ -380,14 +382,42 @@
   background: transparent;
 }
 .event-detail-title-location {
-  padding: 1.25cqw 5cqw 0.6cqw 0;
+  min-height: 18cqw;
+  padding: 5.5cqw 25cqw 0.6cqw 4cqw;
 }
 .event-detail-title-location h2 {
   margin: 0 0 0.8cqw;
   font-family: "QDP Fraunces", Georgia, serif;
   font-size: calc(var(--qdp-detail-title-size, 4cqw) * 1.12);
+  overflow-wrap: anywhere;
 }
 .event-detail-title-location p { margin: 0 0 0.2cqw; }
+.event-detail-date-badge {
+  position: absolute;
+  top: 0;
+  right: 10cqw;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15cqw;
+  width: 14cqw;
+  height: 17cqw;
+  padding: 1cqw 0.5cqw 1.5cqw;
+  border-radius: 0 0 7cqw 7cqw;
+  background: #fa2b5a;
+  color: #ffeff2;
+  font: 700 2.9cqw / 1.05 "QDP Fraunces", Georgia, serif;
+  text-align: center;
+  pointer-events: none;
+}
+.event-detail-close {
+  top: 1cqw;
+  right: 0.8cqw;
+  bottom: auto;
+}
+.event-detail.has-trans-flag .event-detail-close { top: 11cqw; }
 .event-detail-more { padding: 2cqw 2cqw 0 0; }
 .event-detail-more p:last-child {
   white-space: pre-line;

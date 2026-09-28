@@ -42,6 +42,7 @@ let posterPages = [];
 let currentPosterIndex = 0;
 let pickerMonth = null;
 let touchStartX = null;
+let touchStartY = null;
 let pageCards = [];
 let eventCardsById = new Map();
 let dateSections = [];
@@ -51,6 +52,7 @@ let savedEventScrollTop = 0;
 let navigationTargetIndex = null;
 let detailReturnFocus = null;
 let activeEventId = "";
+let activeEvent = null;
 let eventEntryPushed = false;
 let freshEventsLoaded = false;
 
@@ -269,27 +271,26 @@ function formatTimeRange(event) {
   return `${startText}–${endText}`;
 }
 
-function formatDetailDateTime(event) {
+function formatDetailDateBadge(event) {
   const start = new Date(event.start);
-  const end = event.end ? new Date(event.end) : null;
-  const dateFormat = new Intl.DateTimeFormat("en-US", {
+  const options = { timeZone: "America/New_York" };
+  const fullDate = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric"
-  });
-  const startDate = dateFormat.format(start);
-  const startTime = compactTime(start);
-
-  if (!end || Number.isNaN(end.getTime())) {
-    return `${startDate} · ${startTime}`;
-  }
-
-  const endDate = dateFormat.format(end);
-  return endDate === startDate
-    ? `${startDate} · ${startTime}–${compactTime(end)}`
-    : `${startDate} · ${startTime}–${endDate} · ${compactTime(end)}`;
+  }).format(start);
+  return {
+    date: new Intl.DateTimeFormat("en-US", {
+      ...options, month: "numeric", day: "numeric"
+    }).format(start),
+    weekday: new Intl.DateTimeFormat("en-US", {
+      ...options, weekday: "short"
+    }).format(start),
+    time: compactTime(start),
+    label: `${fullDate} at ${compactTime(start)}`
+  };
 }
 
 function eventIdOf(event) {
@@ -866,7 +867,7 @@ function renderPoster() {
   if (!posterPages.length) return;
 
   eventDetail.hidden = true;
-  eventDetail.classList.remove("is-open", "explicit");
+  eventDetail.classList.remove("is-open", "explicit", "has-trans-flag");
   eventStack.hidden = false;
   eventStack.innerHTML = "";
   pageCards = new Array(posterPages.length);
@@ -1197,6 +1198,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     : [...eventStack.querySelectorAll(".event-card")]
       .find(card => card.dataset.eventId === id && id) || null;
   activeEventId = id;
+  activeEvent = event;
   eventEntryPushed = updateHistory && Boolean(id);
 
   if (eventEntryPushed) {
@@ -1212,6 +1214,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   );
 
   eventDetail.classList.toggle("explicit", event.explicitQueer === true);
+  eventDetail.classList.toggle("has-trans-flag", event.transArtist === true);
 
   eventDetail.innerHTML = "";
   eventDetail.setAttribute("role", "dialog");
@@ -1232,6 +1235,19 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     flag.setAttribute("aria-label", "Features a trans artist");
     eventDetail.appendChild(flag);
   }
+
+  const dateBadge = document.createElement("div");
+  dateBadge.className = "event-detail-date-badge";
+  const dateParts = formatDetailDateBadge(event);
+  dateBadge.setAttribute("role", "group");
+  dateBadge.setAttribute("aria-label", dateParts.label);
+  [dateParts.date, dateParts.weekday, dateParts.time].forEach(part => {
+    const line = document.createElement("span");
+    line.textContent = part;
+    line.setAttribute("aria-hidden", "true");
+    dateBadge.appendChild(line);
+  });
+  eventDetail.appendChild(dateBadge);
 
   const detailCard =
     document.createElement("article");
@@ -1305,32 +1321,19 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   heading.id = "eventDetailTitle";
   heading.textContent = displayTitle(event);
 
-  const time =
-    document.createElement("p");
-
-  time.textContent =
-    formatDetailDateTime(event);
-
   const venue =
     document.createElement("p");
-
-  venue.textContent =
-    eventVenue(event);
-
-  venue.hidden =
-    !venue.textContent;
-
-  const address = document.createElement("p");
-  const addressText = eventAddress(event);
-  if (addressText) {
+  const venueText = eventVenue(event);
+  if (venueText) {
     const mapLink = document.createElement("a");
-    mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`;
+    const query = [venueText, eventAddress(event)].filter(Boolean).join(", ");
+    mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     mapLink.target = "_blank";
     mapLink.rel = "noopener noreferrer";
-    mapLink.textContent = addressText;
-    address.appendChild(mapLink);
+    mapLink.textContent = venueText;
+    venue.appendChild(mapLink);
   } else {
-    address.hidden = true;
+    venue.hidden = true;
   }
 
   const description =
@@ -1341,7 +1344,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
 
   const titleLocation = document.createElement("div");
   titleLocation.className = "event-detail-title-location";
-  titleLocation.append(heading, time, venue, address);
+  titleLocation.append(heading, venue);
 
   const more = document.createElement("div");
   more.className = "event-detail-more";
@@ -1394,7 +1397,45 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     detailCard,
     closeButton
   );
+  updateDetailNavigationState();
   closeButton.focus({ preventScroll: true });
+}
+
+function orderedEvents() {
+  return posterPages.flatMap(page => page.events);
+}
+
+function updateDetailNavigationState() {
+  const events = orderedEvents();
+  const index = events.indexOf(activeEvent);
+  previousPoster.disabled = index <= 0;
+  nextPoster.disabled = index < 0 || index === events.length - 1;
+  previousPoster.setAttribute("aria-label", "Previous event");
+  nextPoster.setAttribute("aria-label", "Next event");
+}
+
+function moveEventDetail(direction) {
+  const events = orderedEvents();
+  const next = events[events.indexOf(activeEvent) + direction];
+  if (!next) return;
+
+  const keepPushedEntry = eventEntryPushed;
+  hideEventDetail({ restoreFocus: false });
+  const pageIndex = posterPages.findIndex(page => page.events.includes(next));
+  scrollToPage(pageIndex, "auto");
+  const target = eventCardsById.get(eventIdOf(next)) || pageCards[pageIndex];
+  if (target) {
+    eventStack.scrollTo({ top: scrollOffset(target), behavior: "auto" });
+    updateScrollState();
+  }
+  if (eventIdOf(next)) {
+    history.replaceState(
+      { qdpEvent: eventIdOf(next), qdpPushed: keepPushedEntry },
+      "", eventPermalink(eventIdOf(next))
+    );
+  }
+  openEventDetail(next, { updateHistory: false });
+  eventEntryPushed = keepPushedEntry;
 }
 
 function hideEventDetail({ restoreFocus = true } = {}) {
@@ -1404,14 +1445,17 @@ function hideEventDetail({ restoreFocus = true } = {}) {
     )
   ) {
     eventDetail.hidden = true;
-    eventDetail.classList.remove("is-open", "explicit");
+    eventDetail.classList.remove("is-open", "explicit", "has-trans-flag");
     eventStack.hidden = false;
     eventStack.scrollTop = savedEventScrollTop;
     updateScrollState();
+    previousPoster.setAttribute("aria-label", "Previous events");
+    nextPoster.setAttribute("aria-label", "Next events");
     if (restoreFocus) detailReturnFocus?.isConnected &&
       detailReturnFocus.focus({ preventScroll: true });
   }
   activeEventId = "";
+  activeEvent = null;
   eventEntryPushed = false;
 }
 
@@ -1577,6 +1621,10 @@ meltDialog.addEventListener(
 );
 
 function movePoster(direction) {
+  if (!eventDetail.hidden) {
+    moveEventDetail(direction);
+    return;
+  }
   const nextIndex =
     (navigationTargetIndex ?? currentPosterIndex) + direction;
 
@@ -1646,15 +1694,13 @@ window.addEventListener(
       return;
     }
 
-    if (!eventDetail.hidden) {
-      return;
-    }
-
     if (event.key === "ArrowLeft") {
+      event.preventDefault();
       movePoster(-1);
     }
 
     if (event.key === "ArrowRight") {
+      event.preventDefault();
       movePoster(1);
     }
   }
@@ -1669,6 +1715,8 @@ poster.addEventListener(
 
     touchStartX =
       event.changedTouches[0].clientX;
+    touchStartY =
+      event.changedTouches[0].clientY;
   },
   { passive: true }
 );
@@ -1677,24 +1725,28 @@ poster.addEventListener(
   "touchend",
   event => {
     if (
-      touchStartX === null ||
-      !eventDetail.hidden
+      touchStartX === null
     ) {
       touchStartX = null;
+      touchStartY = null;
       return;
     }
 
-    const delta =
+    const deltaX =
       event.changedTouches[0].clientX -
       touchStartX;
+    const deltaY =
+      event.changedTouches[0].clientY -
+      touchStartY;
 
-    if (Math.abs(delta) > 50) {
+    if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
       movePoster(
-        delta < 0 ? 1 : -1
+        deltaX < 0 ? 1 : -1
       );
     }
 
     touchStartX = null;
+    touchStartY = null;
   },
   { passive: true }
 );
