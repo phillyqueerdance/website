@@ -1181,20 +1181,13 @@ async function shareEvent(event, status) {
 function fitDetailFlyer() {
   if (eventDetail.hidden) return;
   const card = eventDetail.querySelector(".event-detail-card");
-  const header = card?.querySelector(".event-detail-title-location");
   const slot = card?.querySelector(".event-detail-flyer-slot");
   const flyer = slot?.querySelector(".event-detail-flyer");
   if (!flyer) return;
 
-  const cardStyle = getComputedStyle(card);
   const slotStyle = getComputedStyle(slot);
-  const roomForDetails = Math.min(48, poster.clientWidth * 0.09);
   const availableHeight = card.clientHeight -
-    parseFloat(cardStyle.paddingBottom) -
-    header.offsetHeight -
-    parseFloat(slotStyle.marginTop) -
-    parseFloat(slotStyle.marginBottom) -
-    roomForDetails;
+    parseFloat(slotStyle.marginTop) - 2;
   flyer.style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
 }
 

@@ -387,21 +387,21 @@
 }
 .event-detail-card > * { flex-shrink: 0; }
 .event-detail-flyer-slot {
-  margin: 17cqw 0 2cqw;
+  margin: max(0cqw, calc(9cqw - var(--qdp-detail-padding))) 0 2cqw 4cqw;
 }
 .event-detail-flyer {
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: 55cqw;
-  margin: 0 auto;
+  max-height: 100%;
+  margin: 0;
   object-fit: contain;
   background: transparent;
 }
 .event-detail-title-location {
   padding: 0 4cqw 0.6cqw;
 }
-.event-detail-card.without-flyer .event-detail-title-location { padding-top: 16cqw; }
+.event-detail-card.without-flyer .event-detail-title-location { padding-top: 11cqw; }
 .event-detail-title-location h2 {
   margin: 0 0 0.8cqw;
   font-family: "QDP Fraunces", Georgia, serif;
@@ -437,8 +437,8 @@
   pointer-events: none;
 }
 .event-detail-close {
-  top: 11cqw;
-  right: 4.5cqw;
+  top: 0.8cqw;
+  right: 10cqw;
   bottom: auto;
   border-radius: 50%;
 }
