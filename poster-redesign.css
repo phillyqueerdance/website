@@ -358,12 +358,15 @@
 .event-detail-card {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   max-height: none;
   padding: 0 1cqw 3cqw 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
+.event-detail-card > * { flex-shrink: 0; }
 .event-detail-flyer-slot {
   margin-top: 2cqw;
 }
@@ -396,7 +399,8 @@
   justify-content: center;
   align-items: baseline;
   gap: 0.55em;
-  margin-top: 3cqw;
+  margin-top: auto;
+  padding-top: 3cqw;
   text-align: center;
 }
 .event-detail-actions button {
