@@ -1,0 +1,45 @@
+/* Desktop menu sparkles: ornaments outside the link text. */
+@media (min-width: 761px) and (hover: hover) {
+  .side-nav-links > a {
+    position: relative;
+  }
+
+  .side-nav-links > a .menu-sparkle {
+    position: absolute;
+    z-index: 1;
+    display: block;
+    width: var(--sparkle-size);
+    height: var(--sparkle-size);
+    color: currentColor;
+    pointer-events: none;
+    animation: menu-sparkle-twinkle 1200ms ease-in-out forwards;
+  }
+
+  .side-nav-links > a .menu-sparkle svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+    animation: menu-sparkle-spin 1200ms linear forwards;
+  }
+}
+
+@keyframes menu-sparkle-twinkle {
+  0%, 100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.15);
+  }
+  48% {
+    opacity: 0.72;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes menu-sparkle-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(105deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-nav-links > a .menu-sparkle { display: none; }
+}
