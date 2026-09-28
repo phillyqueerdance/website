@@ -30,19 +30,23 @@
 
     const width = link.getBoundingClientRect().width;
     const height = link.getBoundingClientRect().height;
+    const inText = Math.random() < 0.48;
+    const inFront = Math.random() < 0.42;
     const edge = Math.floor(Math.random() * 4);
-    const along = 0.15 + Math.random() * 0.7;
-    const x = edge === 0 ? -9 : edge === 1 ? width + 9 : width * along;
-    const y = edge === 2 ? -9 : edge === 3 ? height + 9 : height * along;
+    const along = 0.12 + Math.random() * 0.76;
+    const x = inText ? width * along :
+      edge === 0 ? -8 : edge === 1 ? width + 8 : width * along;
+    const y = inText ? height * (0.15 + Math.random() * 0.7) :
+      edge === 2 ? -8 : edge === 3 ? height + 8 : height * along;
     const element = document.createElement("span");
     const svg = document.createElementNS(svgNamespace, "svg");
     const path = document.createElementNS(svgNamespace, "path");
 
-    element.className = "menu-sparkle";
+    element.className = "menu-sparkle menu-sparkle--" + (inFront ? "front" : "back");
     element.setAttribute("aria-hidden", "true");
     element.style.left = x + "px";
     element.style.top = y + "px";
-    element.style.setProperty("--sparkle-size", (8 + Math.random() * 4).toFixed(1) + "px");
+    element.style.setProperty("--sparkle-size", (12 + Math.random() * 7).toFixed(1) + "px");
 
     svg.setAttribute("viewBox", "0 0 24 24");
     svg.setAttribute("aria-hidden", "true");
@@ -51,21 +55,21 @@
     element.append(svg);
 
     const existing = link.querySelectorAll(".menu-sparkle");
-    if (existing.length >= 2) existing[0].remove();
+    if (existing.length >= 4) existing[0].remove();
     link.append(element);
 
     element.addEventListener("animationend", event => {
       if (event.target === element) element.remove();
     });
 
-    nextSparkleTimer = window.setTimeout(() => sparkle(link), 1000 + Math.random() * 900);
+    nextSparkleTimer = window.setTimeout(() => sparkle(link), 420 + Math.random() * 420);
   }
 
   function start(link) {
     if (!canSparkle(link) || activeLink === link) return;
     stop();
     activeLink = link;
-    nextSparkleTimer = window.setTimeout(() => sparkle(link), 160 + Math.random() * 240);
+    nextSparkleTimer = window.setTimeout(() => sparkle(link), 80 + Math.random() * 140);
   }
 
   links.forEach(link => {

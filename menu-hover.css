@@ -1,18 +1,34 @@
-/* Desktop menu sparkles: ornaments outside the link text. */
+/* Desktop menu: warm-white sparkles at two depths, with bold links at rest. */
+@media (min-width: 761px) {
+  .side-nav-links > a:not(.melt-nav-link) {
+    font-weight: 700;
+  }
+}
+
 @media (min-width: 761px) and (hover: hover) {
   .side-nav-links > a {
     position: relative;
+    isolation: isolate;
   }
 
   .side-nav-links > a .menu-sparkle {
     position: absolute;
-    z-index: 1;
     display: block;
     width: var(--sparkle-size);
     height: var(--sparkle-size);
     color: currentColor;
     pointer-events: none;
-    animation: menu-sparkle-twinkle 1200ms ease-in-out forwards;
+    animation: menu-sparkle-twinkle 1500ms ease-in-out forwards;
+  }
+
+  .side-nav-links > a .menu-sparkle--back {
+    z-index: -1;
+    --sparkle-opacity: 0.72;
+  }
+
+  .side-nav-links > a .menu-sparkle--front {
+    z-index: 2;
+    --sparkle-opacity: 0.5;
   }
 
   .side-nav-links > a .menu-sparkle svg {
@@ -20,24 +36,24 @@
     width: 100%;
     height: 100%;
     fill: currentColor;
-    animation: menu-sparkle-spin 1200ms linear forwards;
+    animation: menu-sparkle-spin 1500ms linear forwards;
   }
 }
 
 @keyframes menu-sparkle-twinkle {
   0%, 100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.15);
+    transform: translate(-50%, -50%) scale(0.12);
   }
   48% {
-    opacity: 0.72;
+    opacity: var(--sparkle-opacity);
     transform: translate(-50%, -50%) scale(1);
   }
 }
 
 @keyframes menu-sparkle-spin {
   from { transform: rotate(0deg); }
-  to { transform: rotate(105deg); }
+  to { transform: rotate(125deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
