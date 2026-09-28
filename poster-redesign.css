@@ -464,23 +464,36 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: baseline;
+  align-items: center;
   gap: 0.55em;
   padding-top: 3cqw;
   text-align: center;
 }
 .event-detail-actions button {
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  min-height: 44px;
+  padding: 0 4px;
   border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
   cursor: pointer;
 }
-.event-detail-actions button:hover,
-.event-detail-actions button:focus-visible { text-decoration-thickness: 2px; }
+.event-detail-action-icon {
+  display: block;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+}
+.event-detail-actions button span {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.event-detail-actions button:hover span,
+.event-detail-actions button:focus-visible span { text-decoration-thickness: 2px; }
 .event-detail-actions button:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 3px;

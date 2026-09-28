@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Add to calendar</title>
+  <g stroke="#ffeff2" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.25" y="5.25" width="17.5" height="15.5" rx="2.2"/>
+    <path d="M3.4 9.75h17.2M7.5 3.4v3.8M16.5 3.4v3.8"/>
+  </g>
+  <path d="M12 12.55v5.3m-2.65-2.65h5.3" stroke="#fa2b5a" stroke-width="2.3" stroke-linecap="round"/>
+</svg>
