@@ -1055,7 +1055,7 @@ function updateScrollState() {
 
 function schedulePosterLayout() {
   requestAnimationFrame(() => {
-    fitDetailFlyer();
+    fitDetailContent();
     if (!pageCards.length || eventStack.hidden) return;
     const index = currentPosterIndex;
     measureEndSpacer();
@@ -1181,19 +1181,31 @@ async function shareEvent(event, status) {
   }, 2500);
 }
 
-function fitDetailFlyer() {
+function fitDetailContent() {
   if (eventDetail.hidden) return;
-  const card = eventDetail.querySelector(".event-detail-card");
-  const slot = card?.querySelector(".event-detail-flyer-slot");
+  const card = eventDetail.querySelector(".event-detail-card:not([aria-hidden])");
+  if (!card) return;
+
+  const cardStyle = getComputedStyle(card);
+  const rightPadding = parseFloat(cardStyle.paddingRight) || 0;
+  const scrollbarWidth = card.offsetWidth - card.clientWidth;
+  const frame = poster.getBoundingClientRect();
+  const detail = eventDetail.getBoundingClientRect();
+  const frameOffset = (frame.left + frame.width / 2) -
+    (detail.left + detail.width / 2);
+  // Center the actions against the frame, outside the reserved scrollbar gutter.
+  card.style.setProperty(
+    "--qdp-detail-action-offset",
+    `${(scrollbarWidth + rightPadding) / 2 + frameOffset}px`
+  );
+
+  const slot = card.querySelector(".event-detail-flyer-slot");
   const flyer = slot?.querySelector(".event-detail-flyer");
   if (!flyer) return;
 
   const slotStyle = getComputedStyle(slot);
-  const cardStyle = getComputedStyle(card);
   const topMargin = parseFloat(slotStyle.marginTop) || 0;
   const leftMargin = parseFloat(slotStyle.marginLeft) || 0;
-  const rightPadding = parseFloat(cardStyle.paddingRight) || 0;
-  const scrollbarWidth = card.offsetWidth - card.clientWidth;
   slot.style.marginRight = `${Math.max(0, leftMargin - rightPadding - scrollbarWidth)}px`;
   const availableHeight = card.clientHeight -
     topMargin - 2;
@@ -1415,7 +1427,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   detailCard.appendChild(actions);
 
   eventDetail.appendChild(detailCard);
-  fitDetailFlyer();
+  fitDetailContent();
   updateDetailNavigationState();
   eventDetail.focus({ preventScroll: true });
 }
@@ -1504,7 +1516,7 @@ function moveEventDetail(direction) {
   eventDetail.appendChild(viewport);
   outgoing.scrollTop = previousScrollTop;
   eventDetail.focus({ preventScroll: true });
-  fitDetailFlyer();
+  fitDetailContent();
 
   const distance = viewport.clientWidth * direction;
   const timing = { duration: 380, easing: "cubic-bezier(.25,.8,.25,1)", fill: "forwards" };

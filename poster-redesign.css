@@ -468,6 +468,7 @@
   gap: 0.55em clamp(12px, 4cqw, 24px);
   padding-top: 3cqw;
   text-align: center;
+  transform: translateX(var(--qdp-detail-action-offset, 0px));
 }
 .event-detail-actions button {
   display: inline-flex;
