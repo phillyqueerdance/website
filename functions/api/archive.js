@@ -1,0 +1,142 @@
+// Read-only bridge to the same Apps Script deployment used by /api/events.
+// The deployed script must explicitly provide the six archive resources below.
+import { DEFAULT_APPS_SCRIPT_URL } from "./events.js";
+
+const RESOURCES = {
+  artists: "archiveArtists",
+  venues: "archiveVenues",
+  months: "archiveMonths",
+  artist: "archiveArtist",
+  venue: "archiveVenue",
+  month: "archiveMonth"
+};
+const CACHE_SECONDS = 300;
+
+const value = (input, limit = 500) => String(input ?? "").trim().slice(0, limit);
+const yes = input => input === true || /^yes$/i.test(String(input));
+
+function safeUrl(input) {
+  try {
+    const url = new URL(value(input, 2048));
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function profile(input, kind) {
+  if (!input || !yes(input.publicOk)) return null;
+  const id = value(input.id, 80);
+  const name = value(input.name, 180);
+  if (!/^[\w-]{1,80}$/.test(id) || !name) return null;
+  return {
+    id, name,
+    count: Number.isSafeInteger(input.count) && input.count >= 0 ? input.count : null,
+    bio: value(input.bio, 1200),
+    website: safeUrl(input.website),
+    instagram: safeUrl(input.instagram),
+    ...(kind === "artists"
+      ? { music: safeUrl(input.music) }
+      : {
+          neighborhood: value(input.neighborhood, 120),
+          address: value(input.address, 260),
+          maps: safeUrl(input.maps)
+        })
+  };
+}
+
+function publicEvent(input) {
+  if (!input || !yes(input.public)) return null;
+  const status = value(input.status, 80);
+  if (/cancel|delet|draft|private|reject/i.test(status)) return null;
+  const eventId = value(input.eventId, 100);
+  const start = value(input.start, 60);
+  const title = value(input.title, 300);
+  if (!eventId || !title || Number.isNaN(Date.parse(start))) return null;
+  const description = value(input.description, 8000)
+    .split(/^\s*(?:-{3,}|—+)\s*QDP (?:WEB|IDs)\s*(?:-{3,}|—+)\s*$/im)[0].trim();
+  return {
+    eventId, title, start,
+    end: Number.isNaN(Date.parse(input.end)) ? "" : value(input.end, 60),
+    description,
+    venue: value(input.venue, 180),
+    address: value(input.address, 260),
+    venueId: value(input.venueId, 80),
+    artistIds: Array.isArray(input.artistIds)
+      ? input.artistIds.map(id => value(id, 80)).filter(Boolean).slice(0, 40)
+      : [],
+    flyerUrl: safeUrl(input.flyerUrl),
+    explicitQueer: yes(input.explicitQueer),
+    queerArtist: yes(input.queerArtist),
+    transArtist: yes(input.transArtist)
+  };
+}
+
+function cleanPayload(resource, input, id) {
+  if (!input || typeof input !== "object") return null;
+  if (resource === "artists" || resource === "venues") {
+    if (!Array.isArray(input[resource])) return null;
+    return { [resource]: input[resource].map(item => profile(item, resource)).filter(Boolean) };
+  }
+  if (resource === "months") {
+    if (!Array.isArray(input.months)) return null;
+    return { months: input.months.filter(item => /^\d{4}-(?:0[1-9]|1[0-2])$/.test(item.month))
+      .map(item => ({ month: item.month, count: Number.isSafeInteger(item.count) ? item.count : null })) };
+  }
+  if (!Array.isArray(input.events)) return null;
+  const events = input.events.map(publicEvent).filter(Boolean);
+  if (resource === "month") return { events: events.filter(event => event.start.slice(0, 7) === id) };
+  const person = profile(input.profile, resource === "artist" ? "artists" : "venues");
+  if (!person || person.id !== id) return null;
+  return {
+    profile: person,
+    events: events.filter(event => resource === "artist"
+      ? event.artistIds.includes(id)
+      : event.venueId === id)
+  };
+}
+
+export async function onRequestGet(context) {
+  const url = new URL(context.request.url);
+  const resource = url.searchParams.get("resource") || "";
+  const id = resource === "month"
+    ? url.searchParams.get("month") || ""
+    : url.searchParams.get("id") || "";
+  if (!Object.hasOwn(RESOURCES, resource) ||
+      (["artist", "venue"].includes(resource) && !/^[\w-]{1,80}$/.test(id)) ||
+      (resource === "month" && !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(id))) {
+    return Response.json({ error: "Invalid archive request." }, { status: 400 });
+  }
+
+  const headers = {
+    "Cache-Control": `public, max-age=${CACHE_SECONDS}`,
+    "X-Robots-Tag": "noindex, nofollow",
+    "X-Content-Type-Options": "nosniff"
+  };
+  const key = new URL("/api/archive", url);
+  key.searchParams.set("resource", resource);
+  if (id) key.searchParams.set(resource === "month" ? "month" : "id", id);
+  const cacheKey = new Request(key.href);
+  const cache = caches.default;
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  try {
+    const upstream = new URL(context.env.QDP_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL);
+    upstream.searchParams.set("resource", RESOURCES[resource]);
+    if (id) upstream.searchParams.set(resource === "month" ? "month" : "id", id);
+    const response = await fetch(upstream, { redirect: "follow", headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`Apps Script returned ${response.status}`);
+    const payload = cleanPayload(resource, await response.json(), id);
+    if (!payload) throw new Error("Apps Script archive resource is unavailable or has an invalid shape");
+    const result = Response.json(payload, { headers });
+    context.waitUntil(cache.put(cacheKey, result.clone()));
+    return result;
+  } catch (error) {
+    console.error("QDP archive feed unavailable:", error);
+    return Response.json({ error: "Archive feed is not connected yet." }, {
+      status: 503,
+      headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
+    });
+  }
+}

@@ -38,6 +38,7 @@
  <link rel="stylesheet" href="style.css?v=20260928-01">
  <link rel="stylesheet" href="poster-theme.css?v=20260926-01">
  <link rel="stylesheet" href="poster-redesign.css?v=20260928-15">
+ <link rel="stylesheet" href="archive.css?v=massive-1">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -143,6 +144,10 @@
           aria-controls="aboutDialog"
         >About</a>
 
+        <a href="/?archive=events" data-archive-link>Archived Events</a>
+        <a href="/?archive=artists" data-archive-link>Artists</a>
+        <a href="/?archive=venues" data-archive-link>Venues</a>
+
         <a
           href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
           target="_blank"
@@ -183,6 +188,13 @@
         >QDP on RA</a>
         
       </div>
+    </nav>
+
+    <nav id="archiveMenu" class="archive-menu" aria-label="Archive" hidden>
+      <a href="/?archive=events" data-archive-link>Archived Events</a>
+      <a href="/?archive=artists" data-archive-link>Artists</a>
+      <a href="/?archive=venues" data-archive-link>Venues</a>
+      <a href="/" data-archive-link>Back to Calendar</a>
     </nav>
 
   </main>
@@ -1215,6 +1227,7 @@
   </script>
 
   <script src="app.js?v=20260928-15"></script>
+  <script src="archive.js?v=massive-1"></script>
   <script src="menu-pointer-sparkles.js"></script>
 
 </body>

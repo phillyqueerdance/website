@@ -285,12 +285,18 @@ function eventIdOf(event) {
 }
 
 function eventPermalink(eventId) {
+  if (window.QDPArchive?.active) {
+    return window.QDPArchive.eventUrl(eventId);
+  }
   const url = new URL("/", window.location.origin);
   url.searchParams.set("event", eventId);
   return url.toString();
 }
 
 function homepageUrl() {
+  if (window.QDPArchive?.active) {
+    return window.QDPArchive.baseUrl();
+  }
   const url = new URL(window.location.href);
   url.searchParams.delete("event");
   return url.toString();
@@ -1002,6 +1008,7 @@ function updateTimeGroupCorners() {
 }
 
 function updateScrollState() {
+  if (window.QDPArchive?.active) return;
   if (!posterPages.length || !pageCards.length || eventStack.hidden) return;
   updateTimeGroupCorners();
   const position = eventStack.scrollTop + 2;
@@ -1056,6 +1063,10 @@ function updateScrollState() {
 function schedulePosterLayout() {
   requestAnimationFrame(() => {
     fitDetailContent();
+    if (window.QDPArchive?.active) {
+      window.QDPArchive.updateLayout();
+      return;
+    }
     if (!pageCards.length || eventStack.hidden) return;
     const index = currentPosterIndex;
     measureEndSpacer();
@@ -1428,6 +1439,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
 }
 
 function orderedEvents() {
+  if (window.QDPArchive?.active) return window.QDPArchive.events;
   return posterPages.flatMap(page => page.events);
 }
 
@@ -1455,6 +1467,21 @@ function finishDetailSlide() {
 }
 
 function moveEventDetail(direction) {
+  if (window.QDPArchive?.active) {
+    const items = orderedEvents();
+    const next = items[items.indexOf(activeEvent) + direction];
+    if (!next) return;
+    const pushed = eventEntryPushed;
+    hideEventDetail({ restoreFocus: false });
+    window.QDPArchive.focusEvent(next);
+    history.replaceState(
+      { qdpEvent: eventIdOf(next), qdpPushed: pushed },
+      "", window.QDPArchive.eventUrl(eventIdOf(next))
+    );
+    openEventDetail(next, { updateHistory: false });
+    eventEntryPushed = pushed;
+    return;
+  }
   finishDetailSlide();
   const events = orderedEvents();
   const next = events[events.indexOf(activeEvent) + direction];
@@ -1577,7 +1604,8 @@ function hideEventDetail({ restoreFocus = true } = {}) {
     eventDetail.classList.remove("is-open", "explicit");
     eventStack.hidden = false;
     eventStack.scrollTop = savedEventScrollTop;
-    updateScrollState();
+    if (window.QDPArchive?.active) window.QDPArchive.updateControls();
+    else updateScrollState();
     previousPoster.setAttribute("aria-label", "Previous events");
     nextPoster.setAttribute("aria-label", "Next events");
     if (restoreFocus) detailReturnFocus?.isConnected &&
@@ -1599,6 +1627,8 @@ function closeEventDetail() {
 }
 
 function syncEventFromUrl({ final = freshEventsLoaded } = {}) {
+  if (window.QDPArchive?.active ||
+      new URLSearchParams(window.location.search).has("archive")) return;
   const id = requestedEventId();
   if (!id) {
     hideEventDetail();
@@ -1660,7 +1690,7 @@ eventDetail.addEventListener(
 document.addEventListener("click", event => {
   if (!event.isTrusted || eventDetail.hidden || eventDetail.contains(event.target)) return;
   if (event.target instanceof Element &&
-      event.target.closest("#previousPoster, #nextPoster, .event-card")) return;
+      event.target.closest("#previousPoster, #nextPoster, .event-card, a[data-archive-link]")) return;
   closeEventDetail();
 });
 
@@ -1761,6 +1791,11 @@ meltDialog.addEventListener(
 );
 
 function movePoster(direction) {
+  if (window.QDPArchive?.active) {
+    if (!eventDetail.hidden) moveEventDetail(direction);
+    else window.QDPArchive.move(direction);
+    return;
+  }
   if (!eventDetail.hidden) {
     moveEventDetail(direction);
     return;
@@ -1790,6 +1825,7 @@ nextPoster.addEventListener(
 );
 
 todayButton.addEventListener("click", () => {
+  if (window.QDPArchive?.active) return;
   const today = dateKey(new Date());
   const index = posterPages.findIndex(page => page.date >= today);
   if (index < 0) return;
@@ -1802,11 +1838,18 @@ eventStack.addEventListener("scroll", () => {
   if (scrollFrame) return;
   scrollFrame = requestAnimationFrame(() => {
     scrollFrame = 0;
-    updateScrollState();
+    if (window.QDPArchive?.active) window.QDPArchive.updateControls();
+    else updateScrollState();
   });
 }, { passive: true });
 
 poster.addEventListener("wheel", event => {
+  if (window.QDPArchive?.active) {
+    if (!eventDetail.hidden || eventStack.contains(event.target)) return;
+    event.preventDefault();
+    eventStack.scrollBy({ top: event.deltaY, behavior: "auto" });
+    return;
+  }
   if (!eventDetail.hidden || !datePopover.hidden ||
       eventStack.contains(event.target) || !pageCards.length) return;
   if (Math.abs(event.deltaY) < 1) return;
@@ -1894,6 +1937,7 @@ poster.addEventListener(
 dateButton.addEventListener(
   "click",
   () => {
+    if (window.QDPArchive?.active) return;
     if (layoutEditorEnabled) {
       return;
     }
@@ -1936,9 +1980,9 @@ function renderEventCollection(
     previousPoster.disabled = true;
     nextPoster.disabled = true;
 
-    showEventFeedMessage(
-      "No upcoming listings right now."
-    );
+    if (!window.QDPArchive?.active) {
+      showEventFeedMessage("No upcoming listings right now.");
+    }
 
     return;
   }
@@ -1965,8 +2009,10 @@ function renderEventCollection(
     ? matchingPage
     : todayIndex >= 0 ? todayIndex : 0;
 
-  renderPoster();
-  requestAnimationFrame(() => syncEventFromUrl());
+  if (!window.QDPArchive?.active) {
+    renderPoster();
+    requestAnimationFrame(() => syncEventFromUrl());
+  }
 }
 
 async function initialize() {
@@ -2008,7 +2054,7 @@ async function initialize() {
   } catch (error) {
     console.error(error);
 
-    if (!cachedEvents) {
+    if (!cachedEvents && !window.QDPArchive?.active) {
       showEventFeedMessage(
         "Listings could not load. Please refresh."
       );

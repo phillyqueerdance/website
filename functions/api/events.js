@@ -1,5 +1,7 @@
-const GOOGLE_EVENTS_URL =
-  "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec?resource=events";
+export const DEFAULT_APPS_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec";
+
+const GOOGLE_EVENTS_URL = `${DEFAULT_APPS_SCRIPT_URL}?resource=events`;
 
 const EDGE_CACHE_SECONDS = 300;
 

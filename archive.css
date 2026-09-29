@@ -1,0 +1,96 @@
+/* Archive views share the calendar's frame, type, strips, badges, and popup. */
+.archive-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + var(--qdp-nav-gap, 68px));
+  z-index: 11;
+  width: var(--qdp-nav-width, 150px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(14px, 3vh, 25px);
+  font: 700 var(--qdp-nav-font-size, 15px)/1.2 "QDP Fraunces", Georgia, serif;
+  animation: archive-menu-enter 220ms ease-out both;
+}
+.archive-menu[hidden] { display: none; }
+.archive-menu a { color: inherit; text-decoration: none; }
+.archive-menu a:hover,
+.archive-menu a:focus-visible,
+.archive-menu a[aria-current="page"] { text-decoration: underline; }
+@keyframes archive-menu-enter {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.archive-mode .poster-date { cursor: default; }
+.archive-mode .today-button { display: none; }
+.archive-mode .event-stack { overscroll-behavior: contain; }
+.archive-mode .archive-section + .archive-section { margin-top: var(--qdp-cards-next-time-gap); }
+.archive-mode .archive-group { margin-bottom: var(--qdp-cards-next-time-gap); }
+.archive-mode .archive-group .event-time { font: var(--qdp-time-font-weight) var(--qdp-time-font-size)/var(--qdp-time-line-height) "QDP Fraunces", Georgia, serif; }
+.archive-mode .archive-year .event-time { font-size: calc(var(--qdp-time-font-size) * 0.68); }
+.archive-mode .archive-group .event-card { cursor: pointer; }
+.archive-mode .archive-group .event-row:first-child .event-card { border-top-right-radius: var(--qdp-card-radius); }
+.archive-mode .archive-group .event-row:last-child .event-card { border-bottom-right-radius: var(--qdp-card-radius); }
+.archive-mode .archive-group .event-row.same-time:last-child .event-card {
+  border-bottom-left-radius: var(--qdp-tail-radius, var(--qdp-card-radius));
+}
+.archive-mode a.event-card { text-decoration: none; }
+.archive-mode a.event-card:focus-visible .event-title { text-decoration: underline; }
+.archive-mode .archive-card .event-card-content { pointer-events: none; }
+.archive-mode .archive-month .date-heading { margin-bottom: var(--qdp-cards-next-time-gap); }
+.archive-mode .archive-month .date-section + .date-section { margin-top: var(--qdp-cards-next-time-gap); }
+
+.archive-profile-info {
+  margin-bottom: 2.15cqw;
+  color: #ffeff2;
+  font-family: Verdana, Geneva, sans-serif;
+  font-size: var(--qdp-venue-font-size);
+  line-height: 1.35;
+}
+.archive-profile-info .archive-profile-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--qdp-card-height);
+  margin-left: calc(10.9cqw + var(--qdp-time-card-gap));
+  padding: var(--qdp-card-padding-y) var(--qdp-card-padding-x);
+  border-radius: 0 var(--qdp-card-radius) var(--qdp-card-radius) 0;
+  background: #ff7945;
+  color: #2a1220;
+}
+.archive-profile-info h1 {
+  margin: 0;
+  font: var(--qdp-title-font-weight) var(--qdp-title-font-size)/var(--qdp-title-line-height) "QDP Fraunces", Georgia, serif;
+  overflow-wrap: anywhere;
+}
+.archive-profile-info p,
+.archive-profile-info address { margin: 1cqw 0 0; font-style: normal; white-space: pre-line; overflow-wrap: anywhere; }
+.archive-profile-info .archive-profile-links { display: flex; flex-wrap: wrap; gap: 0 2cqw; }
+.archive-profile-info a { color: inherit; text-decoration: underline; }
+.archive-mode .event-feed-message { padding: 0 3cqw; text-align: center; }
+
+@media (max-width: 760px) {
+  .archive-menu {
+    position: relative;
+    order: 2;
+    top: auto;
+    left: auto;
+    width: min(94vw, 500px);
+    height: auto;
+    padding: 8px 8px 32px;
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    text-align: center;
+    font-size: 15px;
+  }
+  .archive-menu a { white-space: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .archive-menu { animation: none; }
+}
