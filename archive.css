@@ -73,6 +73,9 @@
 .archive-mode .event-feed-message { padding: 0 3cqw; text-align: center; }
 
 @media (max-width: 760px) {
+  html.archive-open { height: auto; min-height: 100%; overflow-y: auto; }
+  body.archive-mode { height: auto; min-height: 100dvh; overflow: visible; }
+  .archive-mode .site-shell { max-height: none; }
   .archive-menu {
     position: relative;
     order: 2;

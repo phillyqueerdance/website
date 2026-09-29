@@ -76,6 +76,7 @@
     cards = [];
     corners = [];
     document.body.classList.remove("archive-mode");
+    document.documentElement.classList.remove("archive-open");
     menu.hidden = true;
     dateButton.tabIndex = 0;
     dateButton.setAttribute("aria-haspopup", "dialog");
@@ -313,6 +314,7 @@
     renderedKey = params.key;
     loadingKey = params.key;
     document.body.classList.add("archive-mode");
+    document.documentElement.classList.add("archive-open");
     setMenu(params.view);
     closeDatePopover();
     eventStack.hidden = false;
