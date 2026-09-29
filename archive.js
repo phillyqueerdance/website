@@ -67,7 +67,10 @@
 
   function leave() {
     requestNumber++;
-    if (!archive.active) return;
+    if (!archive.active) {
+      window.QDPEnsureLiveEvents?.();
+      return;
+    }
     if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
     archive.active = false;
     archive.events = [];
@@ -89,6 +92,7 @@
       previousPoster.disabled = true;
       nextPoster.disabled = true;
     }
+    window.QDPEnsureLiveEvents?.();
   }
 
   function endpoint(resource, value = "") {

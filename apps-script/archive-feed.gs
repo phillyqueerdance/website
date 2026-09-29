@@ -395,3 +395,63 @@ function qdpArchiveInstallRefreshTrigger() {
   if (ScriptApp.getProjectTriggers().some(trigger => trigger.getHandlerFunction() === name)) return;
   ScriptApp.newTrigger(name).timeBased().everyMinutes(15).create();
 }
+
+// Keep the existing public events response ready for first-time visitors. This
+// calls the same doGet used by /api/events; it does not read a second event
+// source or change the public Web app's dispatch.
+function qdpLivePublish() {
+  const properties = PropertiesService.getScriptProperties();
+  const account = trim(properties.getProperty('QDP_ARCHIVE_CF_ACCOUNT_ID'));
+  const namespace = trim(properties.getProperty('QDP_ARCHIVE_CF_NAMESPACE_ID'));
+  const token = trim(properties.getProperty('QDP_ARCHIVE_CF_API_TOKEN'));
+  if (!/^[a-f0-9]{32}$/i.test(account) || !/^[a-f0-9]{32}$/i.test(namespace) || !token) {
+    throw new Error('Set the existing Cloudflare account ID, KV namespace ID, and write token first.');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const output = doGet({ parameter: { resource: 'events' } });
+    const source = JSON.parse(output.getContent());
+    if (!Array.isArray(source.events)) throw new Error('The public events feed is unavailable.');
+    const events = source.events.map(event => {
+      if (!event || !trim(event.eventId) || !trim(event.title) ||
+          Number.isNaN(Date.parse(event.start))) {
+        throw new Error('The public events feed contains an invalid event.');
+      }
+      return {
+        eventId: trim(event.eventId),
+        hasVenueId: event.hasVenueId === true,
+        title: trim(event.title),
+        start: trim(event.start),
+        end: trim(event.end),
+        venue: trim(event.venue),
+        address: trim(event.address),
+        explicitQueer: event.explicitQueer === true,
+        queerArtist: event.queerArtist === true,
+        transArtist: event.transArtist === true,
+        description: stripAllQdpMetadata_(trim(event.description)),
+        flyerUrl: qdpArchiveLink_(event.flyerUrl)
+      };
+    });
+    const publishedAt = new Date().toISOString();
+    const record = JSON.stringify({ schema: 1, publishedAt,
+      payload: { generatedAt: source.generatedAt || publishedAt, events } });
+    if (Utilities.newBlob(record).getBytes().length > 25 * 1024 * 1024) {
+      throw new Error('The public events feed exceeds the Cloudflare KV value limit.');
+    }
+    const url = 'https://api.cloudflare.com/client/v4/accounts/' + account +
+      '/storage/kv/namespaces/' + namespace + '/values/' +
+      encodeURIComponent('qdp-live:v1:feed');
+    qdpArchiveCloudflareRequest_(url, token, 'put', record, 'application/octet-stream');
+    Logger.log(JSON.stringify({ liveEventCount: events.length, publishedAt }));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Run once. The five-minute refresh retains the current feed's update cadence.
+function qdpLiveInstallRefreshTrigger() {
+  const name = 'qdpLivePublish';
+  if (ScriptApp.getProjectTriggers().some(trigger => trigger.getHandlerFunction() === name)) return;
+  ScriptApp.newTrigger(name).timeBased().everyMinutes(5).create();
+}

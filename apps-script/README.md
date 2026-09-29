@@ -70,7 +70,7 @@ public gates, and writes 13 grouped records to Cloudflare KV. It writes no
 sheet cells, Calendar entries, or public data into GitHub.
 
 1. In Cloudflare, create a Workers KV namespace named `qdp-archive-preview`.
-   In the `qdp-ali` Pages project's **Preview** environment, add a KV binding
+   In the `qdp` Pages project's **Preview** environment, add a KV binding
    with variable name `QDP_ARCHIVE_KV` pointing to that namespace. Leave the
    Production environment unbound. Redeploy the `massive` preview after adding
    the binding.
@@ -104,3 +104,41 @@ the same popup and navigation. Until a successful publish, or briefly while
 Cloudflare's locations receive an update, a request uses the live feed. A
 removed profile is excluded by the new manifest. Refresh the browser page to
 see new data; the current page keeps loaded archive views in memory.
+
+## Prepared live listings for first-time visitors
+
+The public calendar has a separate `/api/events` path. Its current five-minute
+cache can miss at a Cloudflare location and make that visitor wait for Google.
+The updated helper file adds `qdpLivePublish` to this **same Apps Script
+project**. It calls the existing public `doGet({ resource: 'events' })` directly,
+keeps only the current public response fields, and writes one `qdp-live:v1:feed`
+record to the **existing** KV namespace. No new token or `doGet` dispatch is
+needed.
+
+1. Replace the archive helper code in your existing Apps Script project with
+   the updated [`archive-feed.gs`](archive-feed.gs). Save it; do not keep two
+   copies of the functions.
+2. Run `qdpLivePublish` once in the Apps Script editor. Check that its log says
+   `liveEventCount` and a recent `publishedAt`. Then run
+   `qdpLiveInstallRefreshTrigger` once. It adds one five-minute trigger and is
+   safe to run again without creating duplicates. Keep the archive's existing
+   fifteen-minute trigger. If a listing must disappear urgently, run
+   `qdpLivePublish` after changing its publication status.
+3. The `massive` preview already has `QDP_ARCHIVE_KV` in the **Preview**
+   environment, so after the new branch deployment its `/api/events` response
+   should have `X-QDP-Cache: PREPARED`. Test the calendar and an archive link.
+   If the record is missing or older than six minutes, the endpoint uses its
+   existing five-minute cached Google path and marks it `HIT` or `MISS`.
+4. After reviewing the preview, bring the speed changes to `main`. In the
+   `qdp` Pages project's **Production** environment, bind the **same** KV
+   namespace under `QDP_PUBLIC_FEED_KV`, then redeploy production. The
+   production function reads only the `qdp-live:v1:feed` record. Until both
+   the code and production binding are present, the live site remains on the
+   old feed path.
+
+The prepared feed is refreshed every five minutes. Cloudflare's local KV
+copies and the browser can add roughly another minute before a visitor sees a
+change. A missed trigger or stale record switches back to the current Google
+path. The trigger consumes Apps Script execution time and writes one KV record
+per run (about 288 per day); check your Apps Script executions and Cloudflare
+plan's daily limits after enabling it.

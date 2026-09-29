@@ -323,15 +323,18 @@ function displayTitle(event) {
 }
 
 function fitPosterTitles() {
-  eventStack.querySelectorAll(".event-title").forEach(title => {
-    title.style.fontSize = "";
+  const titles = [...eventStack.querySelectorAll(".event-title")];
+  titles.forEach(title => { title.style.fontSize = ""; });
+  const adjustments = titles.map(title => {
     const available = title.clientWidth;
     const fullWidth = title.scrollWidth;
     if (available > 0 && fullWidth > available) {
       const base = parseFloat(getComputedStyle(title).fontSize);
-      title.style.fontSize = `${Math.max(1, base * available / fullWidth - 0.5)}px`;
+      return [title, `${Math.max(1, base * available / fullWidth - 0.5)}px`];
     }
+    return null;
   });
+  adjustments.forEach(item => { if (item) item[0].style.fontSize = item[1]; });
 
   fitDateText(dateLabel, dateButton);
   if (!dateIncomingLabel.hidden) fitDateText(dateIncomingLabel, dateButton);
@@ -2083,7 +2086,15 @@ if (layoutEditorEnabled) {
   document.addEventListener("input", schedulePosterLayout);
 }
 
-initialize().finally(() => {
+let liveInitializationPromise = null;
+function ensureLiveEvents() {
+  if (!liveInitializationPromise) liveInitializationPromise = initialize();
+  return liveInitializationPromise;
+}
+window.QDPEnsureLiveEvents = ensureLiveEvents;
+
+const initialArchiveView = new URLSearchParams(location.search).get("archive");
+(initialArchiveView ? Promise.resolve() : ensureLiveEvents()).finally(() => {
   if (
     typeof window
       .initializeComprehensiveLayoutEditor ===
