@@ -1,7 +1,7 @@
 /*
- * QDP archive feed extension for the existing Code.gs.
- * Add this as a NEW file in that Apps Script project. Then replace the existing
- * doGet with the small change documented in apps-script/README.md.
+ * QDP archive feed extension for the existing Apps Script project.
+ * The helpers can live in Code.gs or another .gs file in that same project.
+ * Add the small dispatch to the existing doGet as documented in README.md.
  * This file reads the live spreadsheet through ss_(); it never writes to it.
  */
 
