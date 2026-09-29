@@ -1370,12 +1370,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   venueTime.appendChild(time);
 
   if (addressText) {
-    const mapLink = document.createElement("a");
-    mapLink.href = mapsUrl;
-    mapLink.target = "_blank";
-    mapLink.rel = "noopener noreferrer";
-    mapLink.textContent = addressText;
-    address.appendChild(mapLink);
+    address.textContent = addressText;
   }
 
   const description =

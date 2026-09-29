@@ -425,6 +425,8 @@
   align-items: baseline;
   gap: 0.25em;
 }
+.event-detail-venue-time a:any-link { text-decoration: none; }
+.event-detail-venue-time a:hover { text-decoration: underline; }
 .event-detail-address { font-size: 0.86em; }
 .event-detail-date-badge {
   position: absolute;
