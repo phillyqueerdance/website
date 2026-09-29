@@ -232,6 +232,7 @@
   text-align: left;
   font-family: Verdana, Geneva, sans-serif;
   isolation: isolate;
+  text-decoration: none;
 }
 .event-card.explicit { --event-color: var(--qdp-queer-card); background: var(--event-color); }
 .event-card.default { background: var(--event-color); color: #2A1220; }

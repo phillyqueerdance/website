@@ -67,7 +67,7 @@ function createJsonResponse(
   );
 }
 
-async function readPreparedEvents(context) {
+export async function readPreparedEvents(context) {
   const kv = context.env?.QDP_PUBLIC_FEED_KV || context.env?.QDP_ARCHIVE_KV;
   if (!kv) return null;
   const record = await kv.get(PREPARED_KEY, "json");

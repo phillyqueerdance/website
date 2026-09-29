@@ -107,8 +107,15 @@ see new data; the current page keeps loaded archive views in memory.
 
 ## Prepared live listings for first-time visitors
 
-The public calendar has a separate `/api/events` path. Its current five-minute
-cache can miss at a Cloudflare location and make that visitor wait for Google.
+The public calendar used to send an empty poster to new visitors and wait for
+`/api/events` before drawing a single card. A fast API still left that extra
+request in the first-page path. The preview's home page now reads the prepared
+feed and includes the current public cards and event links in its HTML. Its
+JavaScript enables the poster controls and refreshes in the background. The
+page uses the existing client-side feed as a fallback if no fresh record exists.
+
+The current five-minute API cache can miss at a Cloudflare location and make
+that visitor wait for Google during fallback.
 The updated helper file adds `qdpLivePublish` to this **same Apps Script
 project**. It calls the existing public `doGet({ resource: 'events' })` directly,
 keeps only the current public response fields, and writes one `qdp-live:v1:feed`
@@ -126,7 +133,10 @@ needed.
    `qdpLivePublish` after changing its publication status.
 3. The `massive` preview already has `QDP_ARCHIVE_KV` in the **Preview**
    environment, so after the new branch deployment its `/api/events` response
-   should have `X-QDP-Cache: PREPARED`. Test the calendar and an archive link.
+   should have `X-QDP-Cache: PREPARED`. The home page's HTML response should
+   have `X-QDP-Initial-Events: PREPARED`, and its page source should contain
+   event cards inside `id="eventStack"`. Test a fresh private window and an
+   archive link.
    If the record is missing or older than six minutes, the endpoint uses its
    existing five-minute cached Google path and marks it `HIT` or `MISS`.
 4. After reviewing the preview, bring the speed changes to `main`. In the

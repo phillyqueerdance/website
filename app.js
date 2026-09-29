@@ -489,6 +489,21 @@ function readCachedPublicEvents() {
   }
 }
 
+function readInitialPublicEvents() {
+  const template = document.getElementById("qdpInitialEvents");
+  const content = template?.content?.textContent;
+  if (!content) return null;
+  try {
+    const payload = JSON.parse(content);
+    return Array.isArray(payload.events)
+      ? normalizePublicEvents(payload.events)
+      : null;
+  } catch (error) {
+    console.error("Could not read the events included in the page.", error);
+    return null;
+  }
+}
+
 function writeCachedPublicEvents(
   events
 ) {
@@ -2019,8 +2034,9 @@ function renderEventCollection(
 }
 
 async function initialize() {
-  const cachedEvents =
-    readCachedPublicEvents();
+  // The first response already includes current events when the prepared feed
+  // is available. Make the cards interactive before refreshing in background.
+  const cachedEvents = readInitialPublicEvents() ?? readCachedPublicEvents();
 
   if (cachedEvents) {
     renderEventCollection(
