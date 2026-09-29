@@ -1,5 +1,5 @@
-// Read-only bridge to the same Apps Script deployment used by /api/events.
-// The deployed script must explicitly provide the six archive resources below.
+// Read the prepared public archive when the preview has a KV binding. Until
+// its first publish (or during propagation), keep the live Apps Script feed.
 import { DEFAULT_APPS_SCRIPT_URL } from "./events.js";
 
 const RESOURCES = {
@@ -11,6 +11,8 @@ const RESOURCES = {
   month: "archiveMonth"
 };
 const CACHE_SECONDS = 300;
+const KV_PREFIX = "qdp-archive:v1:";
+const SHARDS = { artist: 4, venue: 2, month: 4 };
 
 const value = (input, limit = 500) => String(input ?? "").trim().slice(0, limit);
 const yes = input => input === true || /^yes$/i.test(String(input));
@@ -96,6 +98,34 @@ function cleanPayload(resource, input, id) {
   };
 }
 
+function shard(id, count) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return hash % count;
+}
+
+async function preparedPayload(kv, resource, id) {
+  if (!kv) return null;
+  const manifest = await kv.get(KV_PREFIX + "manifest", "json");
+  if (manifest?.schema !== 1 || !manifest.revision) return null;
+
+  const directory = ["artists", "venues", "months"].includes(resource);
+  if (!directory) {
+    const list = manifest[resource === "artist" ? "artists" :
+      resource === "venue" ? "venues" : "months"];
+    if (!Array.isArray(list)) return null;
+    // A removed public profile must not be reachable by its old direct URL.
+    if (!list.includes(id)) return { missing: true };
+  }
+  const key = directory ? resource : `${resource}:${shard(id, SHARDS[resource])}`;
+  const record = await kv.get(KV_PREFIX + key, "json");
+  if (record?.revision !== manifest.revision) return null;
+  const raw = directory ? record.payload : record.entries?.[id];
+  if (!raw || (!directory && !Object.hasOwn(record.entries, id))) return null;
+  const payload = cleanPayload(resource, raw, id);
+  return payload ? { payload } : null;
+}
+
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const resource = url.searchParams.get("resource") || "";
@@ -113,6 +143,23 @@ export async function onRequestGet(context) {
     "X-Robots-Tag": "noindex, nofollow",
     "X-Content-Type-Options": "nosniff"
   };
+  try {
+    const prepared = await preparedPayload(context.env.QDP_ARCHIVE_KV, resource, id);
+    if (prepared?.missing) {
+      return Response.json({ error: "Public archive entry not found." }, {
+        status: 404, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
+      });
+    }
+    if (prepared?.payload) {
+      return Response.json(prepared.payload, {
+        headers: { ...headers, "Cache-Control": "public, max-age=60",
+          "X-QDP-Archive-Source": "prepared" }
+      });
+    }
+  } catch (error) {
+    console.error("Prepared QDP archive unavailable; using live feed:", error);
+  }
+
   const key = new URL("/api/archive", url);
   key.searchParams.set("resource", resource);
   if (id) key.searchParams.set(resource === "month" ? "month" : "id", id);

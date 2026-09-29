@@ -2,7 +2,8 @@
  * QDP archive feed extension for the existing Apps Script project.
  * The helpers can live in Code.gs or another .gs file in that same project.
  * Add the small dispatch to the existing doGet as documented in README.md.
- * This file reads the live spreadsheet through ss_(); it never writes to it.
+ * This file reads the live spreadsheet through ss_(). Publishing writes only
+ * approved public display fields to the configured Cloudflare KV namespace.
  */
 
 const QDP_ARCHIVE_TABS_ = ['Archive 2024', 'Archive 2025', 'Events_Archive'];
@@ -142,13 +143,11 @@ function qdpArchivePublicEvent_(row, index, source, artists, venues, flags) {
   };
 }
 
-function qdpArchiveEvents_(ss, includeActive, artists, venues) {
+function qdpArchiveEventSets_(ss, artists, venues, includeActive) {
   const flags = qdpPublicArtistFlags_();
-  const byId = new Map();
-  const sheets = includeActive
-    ? [...QDP_ARCHIVE_TABS_, CONFIG.SHEET_EVENTS]
-    : QDP_ARCHIVE_TABS_;
-  sheets.forEach(name => {
+  const archivedById = new Map();
+  const allById = new Map();
+  (includeActive ? [...QDP_ARCHIVE_TABS_, CONFIG.SHEET_EVENTS] : QDP_ARCHIVE_TABS_).forEach(name => {
     const data = qdpArchiveSheet_(ss, name);
     if (!data) return;
     // A missing publication header excludes this entire sheet, even if rows
@@ -156,10 +155,17 @@ function qdpArchiveEvents_(ss, includeActive, artists, venues) {
     if (data.index.publish_to_web == null && data.index['publish to web'] == null) return;
     data.rows.forEach(row => {
       const event = qdpArchivePublicEvent_(row, data.index, name, artists, venues, flags);
-      if (event) byId.set(event.eventId, event);
+      if (!event) return;
+      allById.set(event.eventId, event);
+      if (name !== CONFIG.SHEET_EVENTS) archivedById.set(event.eventId, event);
     });
   });
-  return [...byId.values()];
+  return { archived: [...archivedById.values()], all: [...allById.values()] };
+}
+
+function qdpArchiveEvents_(ss, includeActive, artists, venues) {
+  const sets = qdpArchiveEventSets_(ss, artists, venues, includeActive);
+  return includeActive ? sets.all : sets.archived;
 }
 
 function qdpArchiveResource_(resource, parameters) {
@@ -213,4 +219,179 @@ function qdpArchivePreviewCheck() {
     archiveMonthCount: months.length,
     archivedEventCount: months.reduce((sum, month) => sum + month.count, 0)
   }));
+}
+
+// The publisher lives in this same Apps Script project. It prepares the
+// public archive once, then the Pages preview reads small prebuilt records.
+// Set these three Script Properties before running qdpArchivePublish:
+// QDP_ARCHIVE_CF_ACCOUNT_ID, QDP_ARCHIVE_CF_NAMESPACE_ID,
+// QDP_ARCHIVE_CF_API_TOKEN (Workers KV Storage Write permission).
+const QDP_ARCHIVE_KV_PREFIX_ = 'qdp-archive:v1:';
+const QDP_ARCHIVE_SHARDS_ = { artist: 4, venue: 2, month: 4 };
+
+function qdpArchiveShard_(id, count) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return hash % count;
+}
+
+function qdpArchivePublishSource_(ss) {
+  for (const name of QDP_ARCHIVE_TABS_) {
+    const sheet = ss.getSheetByName(name);
+    const headers = sheet && sheet.getLastColumn() > 0
+      ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] : [];
+    const index = qdpArchiveIndex_(headers);
+    if (!sheet || (index.publish_to_web == null && index['publish to web'] == null)) {
+      throw new Error('Cannot publish: ' + name + ' is missing or has no Publish_To_Web header.');
+    }
+  }
+  const artists = qdpArchiveProfiles_(ss, 'artists');
+  const venues = qdpArchiveProfiles_(ss, 'venues');
+  if (!artists.size || !venues.size) throw new Error('Cannot publish an empty public directory.');
+  const sets = qdpArchiveEventSets_(ss, artists, venues, true);
+  if (!sets.archived.length) throw new Error('Cannot publish an empty archive.');
+  return qdpArchiveSnapshot_(artists, venues, sets);
+}
+
+function qdpArchiveSnapshot_(artists, venues, sets) {
+  const sortByName = (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
+  const artistEntries = Object.create(null);
+  const venueEntries = Object.create(null);
+  const monthEntries = Object.create(null);
+  artists.forEach((profile, id) => {
+    artistEntries[id] = { profile: { ...profile, count: 0 }, events: [] };
+  });
+  venues.forEach((profile, id) => {
+    venueEntries[id] = { profile: { ...profile, count: 0 }, events: [] };
+  });
+  sets.all.forEach(event => {
+    event.artistIds.forEach(id => {
+      if (Object.prototype.hasOwnProperty.call(artistEntries, id)) artistEntries[id].events.push(event);
+    });
+    if (Object.prototype.hasOwnProperty.call(venueEntries, event.venueId)) {
+      venueEntries[event.venueId].events.push(event);
+    }
+  });
+  Object.keys(artistEntries).forEach(id => {
+    artistEntries[id].profile.count = artistEntries[id].events.length;
+  });
+  Object.keys(venueEntries).forEach(id => {
+    venueEntries[id].profile.count = venueEntries[id].events.length;
+  });
+  sets.archived.forEach(event => {
+    const month = event.start.slice(0, 7);
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return;
+    if (!Object.prototype.hasOwnProperty.call(monthEntries, month)) monthEntries[month] = { events: [] };
+    monthEntries[month].events.push(event);
+  });
+  return {
+    artists: [...artists.values()].sort(sortByName),
+    venues: [...venues.values()].sort(sortByName),
+    months: Object.keys(monthEntries).sort().reverse()
+      .map(month => ({ month, count: monthEntries[month].events.length })),
+    artistEntries, venueEntries, monthEntries
+  };
+}
+
+function qdpArchiveKvRecords_(snapshot, revision) {
+  const records = [];
+  const add = (key, data) => {
+    const value = JSON.stringify({ revision, ...data });
+    // The KV value limit is 25 MiB. Fail before writing any partial snapshot.
+    if (Utilities.newBlob(value).getBytes().length > 25 * 1024 * 1024) {
+      throw new Error('Archive record exceeds the Cloudflare KV value limit: ' + key);
+    }
+    records.push({ key: QDP_ARCHIVE_KV_PREFIX_ + key, value });
+  };
+  add('artists', { payload: { artists: snapshot.artists } });
+  add('venues', { payload: { venues: snapshot.venues } });
+  add('months', { payload: { months: snapshot.months } });
+  for (const [kind, entries] of [
+    ['artist', snapshot.artistEntries], ['venue', snapshot.venueEntries], ['month', snapshot.monthEntries]
+  ]) {
+    const shards = Array.from({ length: QDP_ARCHIVE_SHARDS_[kind] }, () => Object.create(null));
+    Object.keys(entries).forEach(id => {
+      shards[qdpArchiveShard_(id, shards.length)][id] = entries[id];
+    });
+    shards.forEach((items, index) => add(kind + ':' + index, { entries: items }));
+  }
+  return records;
+}
+
+function qdpArchiveCloudflareRequest_(url, token, method, payload, contentType) {
+  const response = UrlFetchApp.fetch(url, {
+    method, contentType,
+    headers: { Authorization: 'Bearer ' + token },
+    payload, muteHttpExceptions: true
+  });
+  let result;
+  try { result = JSON.parse(response.getContentText()); } catch (_) { result = null; }
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || !result?.success) {
+    // Never log the token or a response that might include archive content.
+    throw new Error('Cloudflare archive write failed (HTTP ' + response.getResponseCode() + ').');
+  }
+  return result.result;
+}
+
+function qdpArchivePublish_(force) {
+  const properties = PropertiesService.getScriptProperties();
+  const account = trim(properties.getProperty('QDP_ARCHIVE_CF_ACCOUNT_ID'));
+  const namespace = trim(properties.getProperty('QDP_ARCHIVE_CF_NAMESPACE_ID'));
+  const token = trim(properties.getProperty('QDP_ARCHIVE_CF_API_TOKEN'));
+  if (!/^[a-f0-9]{32}$/i.test(account) || !/^[a-f0-9]{32}$/i.test(namespace) || !token) {
+    throw new Error('Set the Cloudflare account ID, KV namespace ID, and write token in Script Properties first.');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const snapshot = qdpArchivePublishSource_(ss_());
+    const digest = Utilities.base64EncodeWebSafe(Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256, JSON.stringify(snapshot)));
+    const fingerprint = account + ':' + namespace + ':' + digest;
+    if (!force && properties.getProperty('QDP_ARCHIVE_LAST_PUBLISHED') === fingerprint) {
+      Logger.log('Public archive is unchanged; no Cloudflare write needed.');
+      return;
+    }
+    const revision = Utilities.getUuid();
+    const records = qdpArchiveKvRecords_(snapshot, revision);
+    const base = 'https://api.cloudflare.com/client/v4/accounts/' + account +
+      '/storage/kv/namespaces/' + namespace;
+    const outcome = qdpArchiveCloudflareRequest_(base + '/bulk', token, 'put',
+      JSON.stringify(records), 'application/json');
+    if (outcome?.successful_key_count !== records.length || outcome.unsuccessful_keys?.length) {
+      throw new Error('Cloudflare did not confirm all archive records. The manifest was not updated.');
+    }
+    // Publish the manifest last. Readers detect a mismatched revision and use
+    // the live feed until all the new records have propagated to their region.
+    const manifest = {
+      schema: 1, revision, updatedAt: new Date().toISOString(),
+      artists: Object.keys(snapshot.artistEntries),
+      venues: Object.keys(snapshot.venueEntries),
+      months: Object.keys(snapshot.monthEntries)
+    };
+    qdpArchiveCloudflareRequest_(base + '/values/' +
+      encodeURIComponent(QDP_ARCHIVE_KV_PREFIX_ + 'manifest'), token, 'put',
+      JSON.stringify(manifest), 'application/octet-stream');
+    properties.setProperty('QDP_ARCHIVE_LAST_PUBLISHED', fingerprint);
+    Logger.log(JSON.stringify({ artistCount: manifest.artists.length,
+      venueCount: manifest.venues.length, archiveMonthCount: manifest.months.length,
+      archivedEventCount: snapshot.months.reduce((sum, item) => sum + item.count, 0),
+      recordCount: records.length, publishedAt: manifest.updatedAt }));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function qdpArchivePublish() { qdpArchivePublish_(false); }
+
+// Use this if the namespace was cleared or its binding changed without a
+// spreadsheet change. It rewrites the snapshot even when the data is the same.
+function qdpArchiveForcePublish() { qdpArchivePublish_(true); }
+
+// Run once to check for direct edits to the Sheet every 15 minutes.
+// Unchanged data costs zero KV writes. Calling this again creates no duplicate.
+function qdpArchiveInstallRefreshTrigger() {
+  const name = 'qdpArchivePublish';
+  if (ScriptApp.getProjectTriggers().some(trigger => trigger.getHandlerFunction() === name)) return;
+  ScriptApp.newTrigger(name).timeBased().everyMinutes(15).create();
 }

@@ -1,9 +1,13 @@
 # Install the archive feed in the existing QDP Apps Script project
 
-This folder contains a read-only extension based on the supplied v6.3 script.
+This folder contains the archive feed and prepared-data publisher for the
+existing v6.3 Apps Script project.
 The branch does not contain the full Apps Script, spreadsheet ID, sheet data,
-or script properties. The diagnostic run confirms the helpers are installed,
-but does not establish which version of the Web app is deployed.
+or script properties. The existing public Web app already serves the archive.
+
+The numbered steps below document the original feed installation. **For the
+speed update, leave the existing `doGet` alone and follow “Prepared archive
+for faster preview loads” below.**
 
 1. In the **existing** QDP Apps Script project, keep the archive helpers you
    already added from [`archive-feed.gs`](archive-feed.gs). They can be in
@@ -36,8 +40,9 @@ redeploying. The helper file you already added can remain in the project.
 ## Publication gates
 
 The extension reads `Artists`, `Venues`, `Archive 2024`, `Archive 2025`,
-`Events_Archive`, and published rows of `Events`. It reads sheet values but
-does not modify any sheet or Calendar entry.
+`Events_Archive`, and published rows of `Events`. It does not modify any sheet
+or Calendar entry. The publisher writes approved public fields to the
+configured Cloudflare KV namespace.
 
 - Artist and venue profiles require `Public_OK=Yes`. The temporary artist
   setting you made meets this gate. A nonpublic venue's address and profile
@@ -51,7 +56,51 @@ does not modify any sheet or Calendar entry.
 - The response contains selected public fields only. The Pages function
   applies a second public check before returning data to the browser.
 
-The existing Apps Script Web app is public. Once its new version is deployed,
-these approved fields are retrievable directly from that Web app as well as
-the `massive` Pages preview. `noindex` on the preview is not access control.
+The existing Apps Script Web app and `massive` Pages preview are public. These
+approved fields are retrievable from both; `noindex` is not access control.
 This branch does not change the Apps Script deployment itself.
+
+## Prepared archive for faster preview loads
+
+The updated `archive-feed.gs` also contains a publisher in **the same Apps
+Script project**. Replace the previous archive helpers with this updated file;
+do not paste a second copy of the functions. The existing `doGet` dispatch
+above remains the same. The publisher reads the sheets, applies the same
+public gates, and writes 13 grouped records to Cloudflare KV. It writes no
+sheet cells, Calendar entries, or public data into GitHub.
+
+1. In Cloudflare, create a Workers KV namespace named `qdp-archive-preview`.
+   In the `qdp-ali` Pages project's **Preview** environment, add a KV binding
+   with variable name `QDP_ARCHIVE_KV` pointing to that namespace. Leave the
+   Production environment unbound. Redeploy the `massive` preview after adding
+   the binding.
+2. Create a Cloudflare API token scoped to this account with **Workers KV
+   Storage Write** permission. In the **existing** Apps Script project,
+   Settings > Script properties, add:
+
+   | Property | Value |
+   | --- | --- |
+   | `QDP_ARCHIVE_CF_ACCOUNT_ID` | Cloudflare account ID (32 hex characters) |
+   | `QDP_ARCHIVE_CF_NAMESPACE_ID` | ID of `qdp-archive-preview` |
+   | `QDP_ARCHIVE_CF_API_TOKEN` | The private write token |
+
+   Do not put the token in this repository or the site's browser code.
+3. In the Apps Script editor, run `qdpArchivePublish` once and check that its
+   log reports about 230 artists, 130 venues, 23 months, and 3,849 archived
+   events. Then run `qdpArchiveInstallRefreshTrigger` once. The scheduled run
+   checks for changes every 15 minutes and skips the Cloudflare write when
+   the public data has not changed. Changes made by Pull/Push are picked up
+   on the next check; to publish immediately after a review batch, run
+   `qdpArchivePublish` again. If the namespace is reset without a Sheet edit,
+   run `qdpArchiveForcePublish`.
+4. Load `https://massive.qdp-ali.pages.dev/api/archive?resource=artists` and
+   check the response header `X-QDP-Archive-Source: prepared` in browser dev
+   tools. Test an artist, venue, and month view on the preview. If the binding
+   or data is missing, the existing live Apps Script feed still works, but
+   will remain slower. No main-branch deploy is needed for this preview.
+
+The site will still fetch profiles and months at their existing URLs and use
+the same popup and navigation. Until a successful publish, or briefly while
+Cloudflare's locations receive an update, a request uses the live feed. A
+removed profile is excluded by the new manifest. Refresh the browser page to
+see new data; the current page keeps loaded archive views in memory.
