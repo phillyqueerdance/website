@@ -129,24 +129,6 @@ async function preparedPayload(kv, resource, id) {
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const resource = url.searchParams.get("resource") || "";
-  // Temporary setup diagnostic. It reports connection state only, never
-  // stored records or credentials, and is removed after activation.
-  if (resource === "diagnostic") {
-    const kv = context.env.QDP_ARCHIVE_KV;
-    let manifest = null;
-    let artists = null;
-    let readError = false;
-    try {
-      if (kv) manifest = await kv.get(KV_PREFIX + "manifest", "json");
-      if (manifest?.revision) artists = await kv.get(KV_PREFIX + "artists", "json");
-    } catch (_) { readError = true; }
-    return Response.json({
-      binding: Boolean(kv),
-      published: manifest?.schema === 1,
-      artistsMatch: Boolean(manifest?.revision && artists?.revision === manifest.revision),
-      readError
-    }, { headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
-  }
   const id = resource === "month"
     ? url.searchParams.get("month") || ""
     : url.searchParams.get("id") || "";
