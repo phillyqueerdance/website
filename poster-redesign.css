@@ -247,6 +247,7 @@
 .event-card:hover .event-card-shape,
 .event-card:focus-visible .event-card-shape { filter: brightness(1.1); }
 .event-card:focus-visible { outline: none; }
+.event-card:any-link { text-decoration: none; }
 .event-card:focus-visible .event-title {
   text-decoration: underline;
   text-decoration-thickness: 2px;

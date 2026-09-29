@@ -284,20 +284,140 @@ function eventIdOf(event) {
   return String(event.eventId ?? event.EventID ?? "").trim();
 }
 
+function eventSlug(event) {
+  return eventIdOf(event).toLowerCase();
+}
+
+function eventPath(event) {
+  return `/event/${encodeURIComponent(eventSlug(event))}`;
+}
+
 function eventPermalink(eventId) {
-  const url = new URL("/", window.location.origin);
-  url.searchParams.set("event", eventId);
-  return url.toString();
+  return new URL(eventPath({ eventId }), window.location.origin).toString();
 }
 
 function homepageUrl() {
   const url = new URL(window.location.href);
+  url.pathname = "/";
   url.searchParams.delete("event");
   return url.toString();
 }
 
-function requestedEventId() {
-  return new URLSearchParams(window.location.search).get("event") || "";
+function requestedEventRef() {
+  const id = new URLSearchParams(window.location.search).get("event") || "";
+  const match = window.location.pathname.match(/^\/event\/([^/]+)\/?$/);
+  let slug = "";
+  if (match) {
+    try { slug = decodeURIComponent(match[1]); } catch { /* Invalid URL. */ }
+  }
+  return { id, slug };
+}
+
+const HOME_HEAD = {
+  title: "Queer Dance Philly",
+  description: "Find queer dance parties, DJs, venues, and nightlife in Philadelphia. Queer Dance Philly is your cheat sheet for finding the next move.",
+  ogDescription: "Your cheat sheet for queer dance parties, DJs, venues, and nightlife in Philadelphia.",
+  image: "https://queerdancephilly.com/qdp-share-card.jpg",
+  imageAlt: "Queer Dance Philly — find the next move"
+};
+
+function usableVenue(event) {
+  const venue = eventVenue(event);
+  return /^(?:location not disclosed|outdoor location|philadelphia, location tba)$/i.test(venue)
+    ? "" : venue;
+}
+
+function eventBrowserTitle(event) {
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric"
+  }).format(new Date(event.start));
+  const venue = usableVenue(event);
+  return `${displayTitle(event)} ${venue ? `at ${venue}` : "in Philadelphia"} – ${date} | Queer Dance Philly`;
+}
+
+function setHeadMeta(kind, key, content) {
+  let element = document.head.querySelector(`meta[${kind}="${key}"]`);
+  if (!content) {
+    element?.remove();
+    return;
+  }
+  if (!element) {
+    element = document.createElement("meta");
+    element.setAttribute(kind, key);
+    document.head.appendChild(element);
+  }
+  element.content = content;
+}
+
+function eventImage(event) {
+  const image = String(event.flyerUrl || "").trim();
+  try {
+    return /^https?:$/.test(new URL(image).protocol) ? image : "";
+  } catch {
+    return "";
+  }
+}
+
+function eventJsonLd(event) {
+  const data = {
+    "@context": "https://schema.org", "@type": "Event",
+    name: displayTitle(event), startDate: event.start,
+    url: `https://queerdancephilly.com${eventPath(event)}`
+  };
+  if (event.end) data.endDate = event.end;
+  const description = stripQdpFooter(event.description);
+  if (description) data.description = description;
+  const image = eventImage(event);
+  if (image) data.image = image;
+  const venue = usableVenue(event);
+  const address = eventAddress(event);
+  if (venue || (address && !/^see organizer for details\.?$/i.test(address))) {
+    data.location = { "@type": "Place" };
+    if (venue) data.location.name = venue;
+    if (address && !/^see organizer for details\.?$/i.test(address)) {
+      data.location.address = { "@type": "PostalAddress", streetAddress: address };
+    }
+  }
+  return data;
+}
+
+function updatePageMetadata(event = null) {
+  const canonical = event
+    ? `https://queerdancephilly.com${eventPath(event)}`
+    : "https://queerdancephilly.com/";
+  const title = event ? displayTitle(event) : HOME_HEAD.title;
+  const description = event ? stripQdpFooter(event.description) : HOME_HEAD.description;
+  const image = event ? eventImage(event) : HOME_HEAD.image;
+  const canonicalLink = document.head.querySelector('link[rel="canonical"]');
+  if (canonicalLink) canonicalLink.href = canonical;
+  document.title = event ? eventBrowserTitle(event) : HOME_HEAD.title;
+  setHeadMeta("name", "description", description);
+  setHeadMeta("property", "og:title", event
+    ? `Check out ${title} on Queer Dance Philly` : HOME_HEAD.title);
+  setHeadMeta("property", "og:url", canonical);
+  setHeadMeta("property", "og:description", event
+    ? description : HOME_HEAD.ogDescription);
+  setHeadMeta("property", "og:image", image);
+  setHeadMeta("name", "twitter:title", event
+    ? `Check out ${title} on Queer Dance Philly` : HOME_HEAD.title);
+  setHeadMeta("name", "twitter:image", image);
+  setHeadMeta("property", "og:image:type", event ? "" : "image/jpeg");
+  setHeadMeta("property", "og:image:width", event ? "" : "1200");
+  setHeadMeta("property", "og:image:height", event ? "" : "1200");
+  setHeadMeta("property", "og:image:alt", event ? "" : HOME_HEAD.imageAlt);
+
+  let structured = document.head.querySelector("script[data-qdp-event]");
+  if (!event) {
+    structured?.remove();
+  } else {
+    if (!structured) {
+      structured = document.createElement("script");
+      structured.type = "application/ld+json";
+      structured.setAttribute("data-qdp-event", "");
+      document.head.appendChild(structured);
+    }
+    structured.textContent = JSON.stringify(eventJsonLd(event));
+  }
 }
 
 function formatStartTime(event) {
@@ -805,8 +925,8 @@ function formatPosterDate(key) {
 }
 
 function createEventCard(event) {
-  const card = document.createElement("button");
-  card.type = "button";
+  const card = document.createElement("a");
+  card.href = eventPath(event);
   card.dataset.eventId = eventIdOf(event);
   card.className = "event-card " +
     (event.explicitQueer ? "explicit" : "default") +
@@ -846,7 +966,12 @@ function createEventCard(event) {
 
   content.append(title, venue, address);
   card.append(shape, content);
-  card.addEventListener("click", () => openEventDetail(event));
+  card.addEventListener("click", click => {
+    if (click.defaultPrevented || click.button !== 0 ||
+        click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
+    click.preventDefault();
+    openEventDetail(event);
+  });
   return card;
 }
 
@@ -1227,6 +1352,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   if (eventEntryPushed) {
     history.pushState({ qdpEvent: id, qdpPushed: true }, "", eventPermalink(id));
   }
+  updatePageMetadata(event);
 
   savedEventScrollTop = eventStack.scrollTop;
   eventStack.hidden = true;
@@ -1396,7 +1522,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   addToCalendar.title = "Add to Calendar";
   const calendarIcon = document.createElement("img");
   calendarIcon.className = "event-detail-action-icon";
-  calendarIcon.src = "icons8-ios-calendar-48.png";
+  calendarIcon.src = "/icons8-ios-calendar-48.png";
   calendarIcon.alt = "";
   addToCalendar.appendChild(calendarIcon);
   addToCalendar.addEventListener("click", () => downloadCalendarEvent(event));
@@ -1406,7 +1532,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   share.title = "Share";
   const shareIcon = document.createElement("img");
   shareIcon.className = "event-detail-action-icon";
-  shareIcon.src = "icons8-ios-share-48.png";
+  shareIcon.src = "/icons8-ios-share-48.png";
   shareIcon.alt = "";
   share.appendChild(shareIcon);
   const status = document.createElement("span");
@@ -1586,27 +1712,33 @@ function hideEventDetail({ restoreFocus = true } = {}) {
   activeEventId = "";
   activeEvent = null;
   eventEntryPushed = false;
+  updatePageMetadata();
 }
 
 function closeEventDetail() {
   if (eventDetail.hidden) return;
+  const requested = requestedEventRef();
   const shouldGoBack = eventEntryPushed && history.state?.qdpPushed &&
-    requestedEventId() === activeEventId;
-  const hasEventUrl = Boolean(requestedEventId());
+    (requested.id === activeEventId ||
+      (activeEvent && requested.slug === eventSlug(activeEvent)));
+  const hasEventUrl = Boolean(requested.id || requested.slug);
   hideEventDetail();
   if (shouldGoBack) history.back();
   else if (hasEventUrl) history.replaceState(null, "", homepageUrl());
 }
 
 function syncEventFromUrl({ final = freshEventsLoaded } = {}) {
-  const id = requestedEventId();
-  if (!id) {
+  const { id, slug } = requestedEventRef();
+  if (!id && !slug) {
     hideEventDetail();
     return;
   }
 
+  const matches = event => id
+    ? eventIdOf(event) === id
+    : eventSlug(event) === slug;
   const index = posterPages.findIndex(page =>
-    page.events.some(event => eventIdOf(event) === id));
+    page.events.some(matches));
   if (index < 0) {
     if (final) {
       hideEventDetail();
@@ -1615,15 +1747,16 @@ function syncEventFromUrl({ final = freshEventsLoaded } = {}) {
     return;
   }
 
-  if (activeEventId === id && !eventDetail.hidden) return;
+  const event = posterPages[index].events.find(matches);
+  const eventId = eventIdOf(event);
+  if (activeEventId === eventId && !eventDetail.hidden) return;
   if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
   scrollToPage(index, "auto");
-  const targetCard = eventCardsById.get(id);
+  const targetCard = eventCardsById.get(eventId);
   if (targetCard) {
     eventStack.scrollTo({ top: scrollOffset(targetCard), behavior: "auto" });
     updateScrollState();
   }
-  const event = posterPages[index].events.find(item => eventIdOf(item) === id);
   openEventDetail(event, { updateHistory: false });
   eventEntryPushed = Boolean(history.state?.qdpPushed);
 }
