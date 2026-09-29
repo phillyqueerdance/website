@@ -97,6 +97,14 @@ function cleanPayload(resource, input, id) {
 }
 
 export async function onRequestGet(context) {
+  // A branch push or Apps Script deployment alone must not expose the archive.
+  if (context.env.QDP_ARCHIVE_ENABLED !== "yes" ||
+      !context.env.QDP_ARCHIVE_READ_TOKEN) {
+    return Response.json({ error: "Archive preview is disabled." }, {
+      status: 503,
+      headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
+    });
+  }
   const url = new URL(context.request.url);
   const resource = url.searchParams.get("resource") || "";
   const id = resource === "month"
@@ -124,6 +132,7 @@ export async function onRequestGet(context) {
   try {
     const upstream = new URL(context.env.QDP_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL);
     upstream.searchParams.set("resource", RESOURCES[resource]);
+    upstream.searchParams.set("archiveToken", context.env.QDP_ARCHIVE_READ_TOKEN);
     if (id) upstream.searchParams.set(resource === "month" ? "month" : "id", id);
     const response = await fetch(upstream, { redirect: "follow", headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`Apps Script returned ${response.status}`);
