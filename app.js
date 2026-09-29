@@ -163,8 +163,10 @@ function stripIdentityEmojis(title) {
 }
 
 function eventLocationParts(event) {
-  const venue = String(event.venue || "").trim();
-  const address = String(event.address || "").trim();
+  const venue = event.hasVenueId === false
+    ? "Philadelphia, PA" : String(event.venue || "").trim();
+  const address = event.hasVenueId === false
+    ? "" : String(event.address || "").trim();
 
   return { venue, address };
 }
@@ -322,6 +324,7 @@ const HOME_HEAD = {
 };
 
 function usableVenue(event) {
+  if (event.hasVenueId === false) return "";
   const venue = eventVenue(event);
   return /^(?:location not disclosed|outdoor location|philadelphia, location tba)$/i.test(venue)
     ? "" : venue;
@@ -332,7 +335,9 @@ function eventBrowserTitle(event) {
     timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric"
   }).format(new Date(event.start));
   const venue = usableVenue(event);
-  return `${displayTitle(event)} ${venue ? `at ${venue}` : "in Philadelphia"} – ${date} | Queer Dance Philly`;
+  const location = venue ? `at ${venue}`
+    : event.hasVenueId === false ? "in Philadelphia, PA" : "in Philadelphia";
+  return `${displayTitle(event)} ${location} – ${date} | Queer Dance Philly`;
 }
 
 function setHeadMeta(kind, key, content) {

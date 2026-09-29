@@ -1,0 +1,8 @@
+--- a/Code.gs
++++ b/Code.gs
+@@ -3543,4 +3543,5 @@
+ return {
+ eventId: trim(row[eventIndex.EventID]),
++hasVenueId: Boolean(venueId),
+ title,
+ start,

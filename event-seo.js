@@ -24,6 +24,7 @@ export function publicEventTitle(event) {
 }
 
 export function usableVenue(event) {
+  if (event.hasVenueId === false) return "";
   const venue = String(event.venue || "").trim();
   return /^(?:location not disclosed|outdoor location|philadelphia, location tba)$/i.test(venue)
     ? "" : venue;
@@ -53,7 +54,9 @@ export function eventBrowserTitle(event) {
     timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric"
   }).format(date);
   const venue = usableVenue(event);
-  return `${publicEventTitle(event)} ${venue ? `at ${venue}` : "in Philadelphia"} – ${dateLabel} | Queer Dance Philly`;
+  const location = venue ? `at ${venue}`
+    : event.hasVenueId === false ? "in Philadelphia, PA" : "in Philadelphia";
+  return `${publicEventTitle(event)} ${location} – ${dateLabel} | Queer Dance Philly`;
 }
 
 export function eventJsonLd(event) {
@@ -70,7 +73,7 @@ export function eventJsonLd(event) {
   const image = eventImage(event);
   if (image) data.image = image;
   const venue = usableVenue(event);
-  const address = String(event.address || "").trim();
+  const address = event.hasVenueId === false ? "" : String(event.address || "").trim();
   if (venue || (address && !/^see organizer for details\.?$/i.test(address))) {
     data.location = { "@type": "Place" };
     if (venue) data.location.name = venue;
