@@ -163,10 +163,8 @@ function stripIdentityEmojis(title) {
 }
 
 function eventLocationParts(event) {
-  const venue = event.hasVenueId === false
-    ? "Philadelphia, PA" : String(event.venue || "").trim();
-  const address = event.hasVenueId === false
-    ? "" : String(event.address || "").trim();
+  const venue = String(event.venue || "").trim();
+  const address = String(event.address || "").trim();
 
   return { venue, address };
 }
@@ -375,7 +373,7 @@ function eventJsonLd(event) {
   const image = eventImage(event);
   if (image) data.image = image;
   const venue = usableVenue(event);
-  const address = eventAddress(event);
+  const address = event.hasVenueId === false ? "" : eventAddress(event);
   if (venue || (address && !/^see organizer for details\.?$/i.test(address))) {
     data.location = { "@type": "Place" };
     if (venue) data.location.name = venue;
