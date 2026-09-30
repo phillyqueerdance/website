@@ -20,7 +20,7 @@
   pointer-events: auto;
 }
 .archive-page.is-open { transform: translateY(0); }
-.archive-header { z-index: 3; cursor: default; }
+.archive-header { cursor: default; }
 .archive-header:hover, .archive-header:focus-visible { background: #fa2b5a; color: #ffeff2; }
 .archive-stack { z-index: 2; }
 .archive-mode #eventStack, .archive-mode #dateButton,
@@ -95,6 +95,28 @@
 .archive-menu-stem--artists { --stem-width: var(--archive-red-stem, 8px); background: #fa2b5a; }
 .archive-menu-stem--venues { --stem-width: var(--archive-orange-stem, 21px); background: #ff7945; }
 .archive-menu-stem--events { --stem-width: var(--archive-purple-stem, 34px); background: #922185; }
+.archive-menu-frame-line {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  left: var(--archive-frame-line-left, 0px);
+  width: var(--archive-frame-line-width, 6px);
+  z-index: 2;
+  display: none;
+  pointer-events: none;
+}
+.archive-menu-track[data-active-view="artists"] .archive-menu-frame-line {
+  display: block;
+  background: #fa2b5a;
+}
+.archive-menu-track[data-active-view="venues"] .archive-menu-frame-line {
+  display: block;
+  background: #ff6265;
+}
+.archive-menu-track[data-active-view="events"] .archive-menu-frame-line {
+  display: block;
+  background: #922185;
+}
 .archive-menu {
   position: absolute;
   top: var(--archive-nav-top, 0px);
@@ -124,7 +146,7 @@
   align-items: center;
   align-self: flex-start;
   box-sizing: border-box;
-  width: var(--archive-badge-compact-width, 130px);
+  width: calc(var(--archive-tab-length, 164px) - var(--stem-width));
   min-height: 36px;
   margin-left: -12px;
   padding: 5px 12px;
@@ -135,14 +157,13 @@
   transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
 }
 .archive-menu > .archive-menu-badge[aria-current="page"] { width: calc(100% + 12px); }
-.archive-menu-badge--artists { background: #fa2b5a; }
-.archive-menu-badge--venues { background: #ff7945; color: #241016 !important; }
+.archive-menu-badge--artists { --stem-width: var(--archive-red-stem, 8px); background: #fa2b5a; }
+.archive-menu-badge--venues { --stem-width: var(--archive-orange-stem, 21px); background: #ff7945; color: #241016 !important; }
 .archive-menu-badge--venues[aria-current="page"] {
   color: #fff1f4 !important;
   text-shadow: 0 1px 2px #551b14;
 }
-.archive-menu-badge--events { background: #922185; }
-.archive-menu-badge:not([aria-current="page"]) { filter: brightness(.83); }
+.archive-menu-badge--events { --stem-width: var(--archive-purple-stem, 34px); background: #922185; }
 .archive-menu-badge[aria-current="page"]::after {
   content: "✦";
   margin-left: auto;
@@ -170,6 +191,7 @@
     opacity var(--qdp-page-duration) ease;
 }
 .archive-menu-profile[hidden] { display: none; }
+.archive-menu-profile:not([hidden]) { margin-top: calc(12px - var(--archive-nav-gap, 45px)); }
 .archive-menu.has-profile .archive-menu-profile { max-height: min(65dvh, 800px); opacity: 1; overflow-y: auto; }
 .archive-profile-info { overflow-wrap: anywhere; }
 .archive-profile-heading {
@@ -214,8 +236,8 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   color: #ffeff2;
   text-align: center;
   font: 700 5.8cqw/1 "QDP Fraunces", Georgia, serif;
+  clip-path: inset(var(--archive-year-clip, 0px) 0 0 0);
 }
-.archive-year-heading.is-behind-header { visibility: hidden; }
 .archive-year-heading:not(:first-child) { margin-top: 4cqw; }
 .archive-profile-month .event-row {
   display: grid;
@@ -261,7 +283,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
     transform: translateY(-100%);
   }
   .archive-menu-track.is-open .archive-menu-panel { transform: translateY(0); }
-  .archive-menu-stems { display: none; }
+  .archive-menu-stems, .archive-menu-frame-line { display: none !important; }
   .archive-menu {
     position: relative;
     top: auto;
@@ -279,12 +301,14 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   .archive-menu > .archive-menu-badge {
     align-self: center;
     justify-content: center;
+    width: var(--archive-tab-label-width, 130px);
     margin-left: 0;
     border-radius: 14px;
   }
   .archive-menu > .archive-menu-badge[aria-current="page"] { width: 100%; }
   .archive-menu > .archive-menu-map { margin: -3px 0 5px; padding: 3px; }
   .archive-menu-profile { text-align: left; }
+  .archive-menu-profile:not([hidden]) { margin-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .archive-page, .poster-info-page, .archive-menu-panel { transition-duration: .01ms; }
