@@ -69,6 +69,8 @@ test('publisher builds only approved data and one source scan supports all views
   const snapshot = context.qdpArchivePublishSource_(ss);
   assert.equal(snapshot.artists.length, 1);
   assert.equal(snapshot.venues.length, 1);
+  assert.equal(snapshot.artists[0].queerArtist, true);
+  assert.equal(snapshot.artists[0].transArtist, false);
   assert.deepEqual(Array.from(snapshot.months, item => item.count), [1, 2]);
   assert.equal(snapshot.artistEntries.ALPHA.profile.count, 3);
   assert.equal(snapshot.artistEntries.ALPHA.events.some(event => event.eventId === 'E6'), true);
@@ -146,6 +148,8 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
     assert.equal(artist.status, 200);
     assert.equal(artist.headers.get('X-QDP-Archive-Source'), 'prepared');
     assert.equal((await artist.json()).events.length, 3);
+    const directory = await onRequestGet(request('resource=artists'));
+    assert.equal((await directory.json()).artists[0].queerArtist, true);
     const month = await onRequestGet(request('resource=month&month=2024-09'));
     assert.equal((await month.json()).events.length, 2);
     const removed = await onRequestGet(request('resource=artist&id=PRIVATE'));

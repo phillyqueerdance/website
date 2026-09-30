@@ -63,8 +63,6 @@
       menu.style.setProperty("--archive-nav-font-size", getComputedStyle(leftLink).fontSize);
       menu.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
       menu.style.setProperty("--archive-nav-width", getComputedStyle(document.querySelector(".side-nav")).width);
-      const gap = poster.getBoundingClientRect().left - leftLinks.getBoundingClientRect().right;
-      menu.style.setProperty("--archive-nav-offset", `${Math.max(0, gap)}px`);
     }
   }
 
@@ -233,11 +231,13 @@
         current = group(letter, "archive-directory");
         lastLetter = letter;
       }
-      const subtitle = kind === "venues" && item.address
-        ? item.address
-        : Number.isInteger(item.count) ? `${item.count} ${item.count === 1 ? "event" : "events"}` : "";
-      addCard(current, stripCard(item.name, subtitle,
-        archiveUrl(kind === "artists" ? "artist" : "venue", item.id).href));
+      const subtitle = kind === "venues" ? item.address || "" : "";
+      const card = stripCard(item.name, subtitle,
+        archiveUrl(kind === "artists" ? "artist" : "venue", item.id).href);
+      if (kind === "artists" && (item.queerArtist || item.transArtist)) {
+        card.classList.add("archive-identity-card");
+      }
+      addCard(current, card);
     }
     finishGroup(current);
     if (!profiles.length) message(`No ${kind} in the archive yet.`);
@@ -280,9 +280,6 @@
     info.appendChild(node("h2", "archive-profile-heading", person.name));
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
-    if (Number.isInteger(person.count)) {
-      info.appendChild(node("span", "archive-profile-count", `${person.count} ${person.count === 1 ? "event" : "events"}`));
-    }
     const links = node("div", "archive-profile-links");
     for (const [key, label] of [["maps", "Map"], ["website", "Website"],
       ["instagram", "Instagram"], ["music", "Music"]]) {
@@ -385,6 +382,7 @@
     loadingKey = params.key;
     document.body.classList.add("archive-mode");
     document.documentElement.classList.add("archive-open");
+    archiveStack.classList.toggle("profile-events", params.view === "artist" || params.view === "venue");
     setProfile("");
     archiveViewport.hidden = false;
     clearTimeout(pageExitTimer);

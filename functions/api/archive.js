@@ -38,7 +38,11 @@ function profile(input, kind) {
     website: safeUrl(input.website),
     instagram: safeUrl(input.instagram),
     ...(kind === "artists"
-      ? { music: safeUrl(input.music) }
+      ? {
+          queerArtist: yes(input.queerArtist),
+          transArtist: yes(input.transArtist),
+          music: safeUrl(input.music)
+        }
       : {
           neighborhood: value(input.neighborhood, 120),
           address: value(input.address, 260),

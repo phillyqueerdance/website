@@ -61,7 +61,7 @@ function qdpArchiveLink_(value, platform) {
   return '';
 }
 
-function qdpArchiveProfiles_(ss, kind) {
+function qdpArchiveProfiles_(ss, kind, artistFlags) {
   const name = kind === 'artists' ? CONFIG.SHEET_ARTISTS : CONFIG.SHEET_VENUES;
   const data = qdpArchiveSheet_(ss, name);
   if (!data) throw new Error('Missing ' + name + ' sheet.');
@@ -69,6 +69,7 @@ function qdpArchiveProfiles_(ss, kind) {
   if (data.index[idHeader] == null || data.index.public_ok == null) {
     throw new Error(name + ' requires its ID and Public_OK headers.');
   }
+  const flags = kind === 'artists' ? (artistFlags || qdpPublicArtistFlags_()) : null;
   const profiles = new Map();
   data.rows.forEach(row => {
     if (!qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['Public_OK']))) return;
@@ -85,6 +86,8 @@ function qdpArchiveProfiles_(ss, kind) {
     profiles.set(id, kind === 'artists'
       ? {
           ...shared,
+          queerArtist: flags.get(id)?.queer === true,
+          transArtist: flags.get(id)?.trans === true,
           music: qdpArchiveLink_(qdpArchiveFirstText_(row, data.index,
             ['Music_URL', 'Music', 'SoundCloud', 'Bandcamp', 'Mixcloud']))
         }
@@ -143,8 +146,7 @@ function qdpArchivePublicEvent_(row, index, source, artists, venues, flags) {
   };
 }
 
-function qdpArchiveEventSets_(ss, artists, venues, includeActive) {
-  const flags = qdpPublicArtistFlags_();
+function qdpArchiveEventSets_(ss, artists, venues, includeActive, flags = qdpPublicArtistFlags_()) {
   const archivedById = new Map();
   const allById = new Map();
   (includeActive ? [...QDP_ARCHIVE_TABS_, CONFIG.SHEET_EVENTS] : QDP_ARCHIVE_TABS_).forEach(name => {
@@ -163,15 +165,16 @@ function qdpArchiveEventSets_(ss, artists, venues, includeActive) {
   return { archived: [...archivedById.values()], all: [...allById.values()] };
 }
 
-function qdpArchiveEvents_(ss, includeActive, artists, venues) {
-  const sets = qdpArchiveEventSets_(ss, artists, venues, includeActive);
+function qdpArchiveEvents_(ss, includeActive, artists, venues, flags) {
+  const sets = qdpArchiveEventSets_(ss, artists, venues, includeActive, flags);
   return includeActive ? sets.all : sets.archived;
 }
 
 function qdpArchiveResource_(resource, parameters) {
   const params = parameters || {};
   const ss = ss_();
-  const artists = qdpArchiveProfiles_(ss, 'artists');
+  const flags = qdpPublicArtistFlags_();
+  const artists = qdpArchiveProfiles_(ss, 'artists', flags);
   const venues = qdpArchiveProfiles_(ss, 'venues');
   const sortByName = (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
   if (resource === 'archiveartists') {
@@ -182,7 +185,7 @@ function qdpArchiveResource_(resource, parameters) {
   }
   if (resource === 'archivemonths') {
     const counts = new Map();
-    qdpArchiveEvents_(ss, false, artists, venues).forEach(event => {
+    qdpArchiveEvents_(ss, false, artists, venues, flags).forEach(event => {
       const month = event.start.slice(0, 7);
       counts.set(month, (counts.get(month) || 0) + 1);
     });
@@ -195,14 +198,14 @@ function qdpArchiveResource_(resource, parameters) {
     const isArtist = resource === 'archiveartist';
     const profile = (isArtist ? artists : venues).get(id);
     if (!profile) throw new Error('Public profile not found.');
-    const events = qdpArchiveEvents_(ss, true, artists, venues)
+    const events = qdpArchiveEvents_(ss, true, artists, venues, flags)
       .filter(event => isArtist ? event.artistIds.includes(id) : event.venueId === id);
     return { profile: { ...profile, count: events.length }, events };
   }
   if (resource === 'archivemonth') {
     const month = trim(params.month);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Invalid archive month.');
-    return { events: qdpArchiveEvents_(ss, false, artists, venues)
+    return { events: qdpArchiveEvents_(ss, false, artists, venues, flags)
       .filter(event => event.start.slice(0, 7) === month) };
   }
   throw new Error('Unknown archive resource.');
@@ -245,10 +248,11 @@ function qdpArchivePublishSource_(ss) {
       throw new Error('Cannot publish: ' + name + ' is missing or has no Publish_To_Web header.');
     }
   }
-  const artists = qdpArchiveProfiles_(ss, 'artists');
+  const flags = qdpPublicArtistFlags_();
+  const artists = qdpArchiveProfiles_(ss, 'artists', flags);
   const venues = qdpArchiveProfiles_(ss, 'venues');
   if (!artists.size || !venues.size) throw new Error('Cannot publish an empty public directory.');
-  const sets = qdpArchiveEventSets_(ss, artists, venues, true);
+  const sets = qdpArchiveEventSets_(ss, artists, venues, true, flags);
   if (!sets.archived.length) throw new Error('Cannot publish an empty archive.');
   return qdpArchiveSnapshot_(artists, venues, sets);
 }

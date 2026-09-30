@@ -65,11 +65,11 @@
 .poster-info-page .melt-dialog-content { max-height: none; }
 .info-mode .poster-controls { visibility: hidden; }
 
-/* Its starting position is hidden behind the outside of the right border. */
+/* Reveal the tab from the outer right border; it stays put between archive pages. */
 .archive-menu-track {
   position: absolute;
   top: 0;
-  left: 100%;
+  left: 96%;
   z-index: 11;
   width: min(42vw, 520px);
   height: 100%;
@@ -80,14 +80,15 @@
 .archive-menu {
   position: absolute;
   top: 50%;
-  left: var(--archive-nav-offset, 68px);
+  left: 0;
   width: var(--archive-nav-width, 228px);
   height: auto;
   max-height: calc(100% - 8px);
   box-sizing: border-box;
   padding: 16px 12px;
   border: 2.5px solid #ffea86;
-  border-radius: 24px;
+  border-left: 0;
+  border-radius: 0 24px 24px 0;
   background: #000;
   display: flex;
   flex-direction: column;
@@ -95,7 +96,7 @@
   align-items: flex-start;
   gap: var(--archive-nav-gap, clamp(28px, 5vh, 45px));
   font: 700 var(--archive-nav-font-size, 18px)/1.2 "QDP Fraunces", Georgia, serif;
-  transform: translate(calc(-100% - var(--archive-nav-offset, 68px)), -50%);
+  transform: translate(-100%, -50%);
   transition: transform var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
   pointer-events: auto;
   overflow-y: auto;
@@ -130,11 +131,18 @@
   font-style: normal;
   white-space: pre-line;
 }
-.archive-profile-count { display: block; margin-top: .65em; font-weight: 700; }
 .archive-profile-links { display: flex; flex-wrap: wrap; gap: .35em .75em; margin-top: .75em; }
 .archive-profile-links a { color: #ffea86; text-decoration: underline; }
 
 .archive-stack { overscroll-behavior: contain; }
+.archive-stack.profile-events {
+  top: calc(var(--qdp-list-top) + var(--qdp-date-height) + 1.5cqw);
+}
+.archive-directory .archive-identity-card {
+  --event-color: #922185;
+  background: var(--event-color);
+  color: #ffeff2;
+}
 .archive-section + .archive-section { margin-top: var(--qdp-cards-next-time-gap); }
 .archive-group { margin-bottom: var(--qdp-cards-next-time-gap); }
 .archive-group .event-time { font: var(--qdp-time-font-weight) var(--qdp-time-font-size)/var(--qdp-time-line-height) "QDP Fraunces", Georgia, serif; }
@@ -207,6 +215,8 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
     align-items: center;
     text-align: center;
     max-height: none;
+    border-left: 2.5px solid #ffea86;
+    border-radius: 24px;
     transform: translateY(-100%);
   }
   .archive-menu-track.is-open .archive-menu { transform: translateY(0); }
