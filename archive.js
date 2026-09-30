@@ -86,7 +86,10 @@
         for (const view of ["artists", "venues", "events"]) {
           const badge = menu.querySelector(`.archive-menu-badge--${view}`);
           const stem = menuTrack.querySelector(`.archive-menu-stem--${view}`);
-          stem.style.top = `${badge.getBoundingClientRect().top - trackTop + badge.offsetHeight / 2 - stem.offsetHeight / 2}px`;
+          const labelWidth = badge.querySelector(".archive-menu-badge-label").getBoundingClientRect().width;
+          badge.style.setProperty("--archive-badge-compact-width", `${Math.ceil(labelWidth) + 24}px`);
+          stem.style.top = `${badge.getBoundingClientRect().top - trackTop}px`;
+          stem.style.height = `${badge.offsetHeight}px`;
         }
       }
     }
