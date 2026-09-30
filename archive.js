@@ -110,6 +110,7 @@
     if (restart) menuTrack.classList.remove("is-open");
     menuTrack.hidden = false;
     venueMap.hidden = view !== "venue" && view !== "venues";
+    menu.classList.toggle("has-venue-map", !venueMap.hidden);
     alphabet.hidden = view !== "artists" && view !== "venues";
     if (!alphabet.hidden) {
       alphabet.setAttribute("aria-label", `${view === "artists" ? "Artists" : "Venues"} alphabet`);
