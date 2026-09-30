@@ -135,9 +135,6 @@
 .archive-profile-links a { color: #ffea86; text-decoration: underline; }
 
 .archive-stack { overscroll-behavior: contain; }
-.archive-stack.profile-events {
-  top: calc(var(--qdp-list-top) + var(--qdp-date-height) + 1.5cqw);
-}
 .archive-directory .archive-identity-card {
   --event-color: #922185;
   background: var(--event-color);
