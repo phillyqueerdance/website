@@ -10,7 +10,7 @@
   content="Find queer dance parties, DJs, venues, and nightlife in Philadelphia. Queer Dance Philly is your cheat sheet for finding the next move."
 >
 
-  
+
 <meta name="theme-color" content="#000000">
 
 <link
@@ -38,13 +38,13 @@
  <link rel="stylesheet" href="style.css?v=20260928-01">
  <link rel="stylesheet" href="poster-theme.css?v=20260926-01">
  <link rel="stylesheet" href="poster-redesign.css?v=20260929-massive-2">
- <link rel="stylesheet" href="archive.css?v=massive-2">
+ <link rel="stylesheet" href="archive.css?v=massive-3">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
     href="layout-overrides.css?v=20260925-01"
   >
-  <link rel="stylesheet" href="menu-pointer-sparkles.css">
+  <link rel="stylesheet" href="menu-pointer-sparkles.css?v=massive-3">
   <link rel="icon" type="image/png" href="/favicon.png">
 </head>
 
@@ -91,6 +91,110 @@
           tabindex="0"
         ></div>
 
+        <div id="archiveViewport" class="archive-viewport" hidden>
+          <div id="archivePage" class="archive-page">
+            <div id="archiveHeader" class="poster-date archive-header" role="heading" aria-level="1"></div>
+            <div id="archiveStack" class="event-stack archive-stack" role="region"
+              aria-label="Archive listings" tabindex="0"></div>
+          </div>
+        </div>
+
+        <div id="infoViewport" class="info-viewport" hidden>
+  <section
+    id="aboutDialog"
+    class="poster-info-page about-dialog"
+    aria-labelledby="aboutDialogTitle"
+  >
+    <div class="about-dialog-content">
+      <h2 id="aboutDialogTitle">Hi gay!</h2>
+
+      <p>
+        Welcome to Queer Dance Philly, your cheat sheet for finding the next move.
+      </p>
+
+      <p>
+        Queer Dance Philly pieces together queer artists, parties, and venues
+        so you don’t have to scour the internet just to get your groove on.
+        It’s intended for discovery: to find a party you didn’t know about, an artist you
+        haven’t heard yet, or maybe meet someone new.
+      </p>
+
+      <p>
+        QDP is also the force behind Melt, a sexy, sapphic dance party built around the concepts of
+        groove, glimmer, and grind. See <a href="https://www.instagram.com/melt.phl/">@melt.phl</a> on Instagram for details.
+      </p>
+
+      <p>
+        Browse the calendar by swiping, using the arrows, or tapping the date in the upper-left corner. Tap on
+        an event to see more info.
+        </p>
+
+      <p>
+        See you out there!
+      </p>
+    </div>
+
+    <button
+      id="aboutCloseButton"
+      class="overlay-close about-dialog-close"
+      type="button"
+      aria-label="Close About"
+    >×</button>
+  </section>
+
+  <section
+  id="meltDialog"
+  class="poster-info-page about-dialog melt-dialog"
+  aria-label="Melt"
+>
+  <div class="about-dialog-content melt-dialog-content">
+    <img
+      class="melt-dialog-logo"
+      src="melt-logo.png"
+      alt=""
+      aria-hidden="true"
+    >
+
+    <p>
+      Melt is a warm, sensual, sapphic and trans-forward club night built
+      around groove, glimmer, and grind. Intimate without being slow and sexy
+      without being performative, it’s a space for giving yourself permission
+      to dance close, be bold, and see where the night takes you.
+    </p>
+
+    <p>
+      Expect funky house basslines, glitchy electronica, and physical club
+      rhythms in a high-energy night that’s sure to leave you spent.
+    </p>
+
+    <p>
+      The night is what you make it.
+    </p>
+
+    <p class="melt-instagram-line">
+      <a href="https://www.instagram.com/melt.phl/" target="_blank" rel="noopener noreferrer">@melt.phl on Instagram</a>
+    </p>
+
+
+    <p>
+      <a href="https://www.instagram.com/melt.phl/"><img
+        src="melt1017-wide.png"
+        width="100%"
+      ></a>
+    </p>
+
+  </div>
+
+  <button
+    id="meltCloseButton"
+    class="overlay-close about-dialog-close"
+    type="button"
+    aria-label="Close Melt"
+  >×</button>
+</section>
+
+        </div>
+
         <div id="eventDetail" class="event-detail" hidden></div>
 
       </div>
@@ -134,7 +238,6 @@
         <a
           id="aboutLink"
           href="#about"
-          aria-haspopup="dialog"
           aria-controls="aboutDialog"
         >About</a>
 
@@ -152,7 +255,6 @@
   class="melt-nav-link"
   href="#melt"
   aria-label="About Melt"
-  aria-haspopup="dialog"
   aria-controls="meltDialog"
 >
   <img
@@ -178,7 +280,8 @@
       </div>
     </nav>
 
-    <nav id="archiveMenu" class="archive-menu" aria-label="Archive" hidden>
+    <div id="archiveMenuTrack" class="archive-menu-track" hidden>
+    <nav id="archiveMenu" class="archive-menu" aria-label="Archive navigation">
       <a href="/?archive=artists" data-archive-link>Artists</a>
       <a href="/?archive=venues" data-archive-link>Venues</a>
       <a
@@ -187,104 +290,12 @@
         rel="noopener noreferrer"
       >Venue Map</a>
       <a href="/" data-archive-link>Back to Calendar</a>
-      <a href="/?archive=events" data-archive-link>Archive</a>
+      <section id="archiveMenuProfile" class="archive-menu-profile" aria-live="polite" hidden></section>
     </nav>
+    </div>
 
   </main>
 
-  <dialog
-    id="aboutDialog"
-    class="about-dialog"
-    aria-labelledby="aboutDialogTitle"
-  >
-    <div class="about-dialog-content">
-      <h2 id="aboutDialogTitle">Hi gay!</h2>
-
-      <p>
-        Welcome to Queer Dance Philly, your cheat sheet for finding the next move.
-      </p>
-
-      <p>
-        Queer Dance Philly pieces together queer artists, parties, and venues
-        so you don’t have to scour the internet just to get your groove on.
-        It’s intended for discovery: to find a party you didn’t know about, an artist you
-        haven’t heard yet, or maybe meet someone new.
-      </p>
-
-      <p>
-        QDP is also the force behind Melt, a sexy, sapphic dance party built around the concepts of
-        groove, glimmer, and grind. See <a href="https://www.instagram.com/melt.phl/">@melt.phl</a> on Instagram for details.
-      </p>
-
-      <p>
-        Browse the calendar by swiping, using the arrows, or tapping the date in the upper-left corner. Tap on
-        an event to see more info. 
-        </p>
-
-      <p>
-        See you out there!
-      </p>
-    </div>
-
-    <button
-      id="aboutCloseButton"
-      class="overlay-close about-dialog-close"
-      type="button"
-      aria-label="Close About"
-    >×</button>
-  </dialog>
-
-  <dialog
-  id="meltDialog"
-  class="about-dialog melt-dialog"
-  aria-label="Melt"
->
-  <div class="about-dialog-content melt-dialog-content">
-    <img
-      class="melt-dialog-logo"
-      src="melt-logo.png"
-      alt=""
-      aria-hidden="true"
-    >
-
-    <p>
-      Melt is a warm, sensual, sapphic and trans-forward club night built
-      around groove, glimmer, and grind. Intimate without being slow and sexy
-      without being performative, it’s a space for giving yourself permission
-      to dance close, be bold, and see where the night takes you.
-    </p>
-
-    <p>
-      Expect funky house basslines, glitchy electronica, and physical club
-      rhythms in a high-energy night that’s sure to leave you spent.
-    </p>
-
-    <p>
-      The night is what you make it.
-    </p>
-
-    <p class="melt-instagram-line">
-      <a href="https://www.instagram.com/melt.phl/" target="_blank" rel="noopener noreferrer">@melt.phl on Instagram</a>
-    </p>
-
-    
-    <p>
-      <a href="https://www.instagram.com/melt.phl/"><img
-        src="melt1017-wide.png"
-        width="100%"
-      ></a>
-    </p>
-    
-  </div>
-
-  <button
-    id="meltCloseButton"
-    class="overlay-close about-dialog-close"
-    type="button"
-    aria-label="Close Melt"
-  >×</button>
-</dialog>
-  
   <script>
     (() => {
       "use strict";
@@ -1220,9 +1231,9 @@
   </script>
 
   <template id="qdpInitialEvents"></template>
-  <script src="app.js?v=20260929-massive-2"></script>
-  <script src="archive.js?v=massive-2"></script>
-  <script src="menu-pointer-sparkles.js"></script>
+  <script src="app.js?v=20260930-massive-3"></script>
+  <script src="archive.js?v=massive-3"></script>
+  <script src="menu-pointer-sparkles.js?v=massive-3"></script>
 
 </body>
 </html>

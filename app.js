@@ -322,8 +322,8 @@ function displayTitle(event) {
     .trim() || String(event.title || "");
 }
 
-function fitPosterTitles() {
-  const titles = [...eventStack.querySelectorAll(".event-title")];
+function fitPosterTitles(stack = eventStack) {
+  const titles = [...stack.querySelectorAll(".event-title")];
   titles.forEach(title => { title.style.fontSize = ""; });
   const adjustments = titles.map(title => {
     const available = title.clientWidth;
@@ -1664,101 +1664,75 @@ document.addEventListener("click", event => {
   closeEventDetail();
 });
 
-function openAboutDialog(event) {
-  event?.preventDefault();
-
-  closeDatePopover();
-
-  if (!eventDetail.hidden) {
-    closeEventDetail();
-  }
-
-  if (!aboutDialog.open) {
-    aboutDialog.showModal();
-  }
-}
-
-function closeAboutDialog() {
-  if (aboutDialog.open) {
-    aboutDialog.close();
-  }
-}
-
-aboutLink.addEventListener(
-  "click",
-  openAboutDialog
-);
-
-aboutCloseButton.addEventListener(
-  "click",
-  closeAboutDialog
-);
-
-aboutDialog.addEventListener(
-  "click",
-  event => {
-    const bounds =
-      aboutDialog.getBoundingClientRect();
-
-    const clickedOutside =
-      event.clientX < bounds.left ||
-      event.clientX > bounds.right ||
-      event.clientY < bounds.top ||
-      event.clientY > bounds.bottom;
-
-    if (clickedOutside) {
-      closeAboutDialog();
+const infoViewport = document.getElementById("infoViewport");
+let infoExitTimer = 0;
+const infoViews = { about: aboutDialog, melt: meltDialog };
+const infoView = {
+  active: "",
+  show(kind, { historyEntry = true } = {}) {
+    if (!infoViews[kind]) return;
+    closeDatePopover();
+    if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
+    if (historyEntry) history.pushState({ qdpInfo: kind }, "", `/#${kind}`);
+    this.active = kind;
+    document.body.classList.add("info-mode");
+    window.QDPArchive?.route();
+    clearTimeout(infoExitTimer);
+    infoViewport.hidden = false;
+    for (const [key, view] of Object.entries(infoViews)) {
+      view.hidden = key !== kind;
+      view.style.transition = "none";
+      view.classList.remove("is-open");
     }
+    const menuTrack = document.getElementById("archiveMenuTrack");
+    window.QDPArchive?.showMenu("", menuTrack.hidden || !menuTrack.classList.contains("is-open"));
+    void infoViews[kind].offsetHeight;
+    for (const view of Object.values(infoViews)) view.style.transition = "";
+    requestAnimationFrame(() => {
+      if (this.active === kind) infoViews[kind].classList.add("is-open");
+    });
+    document.title = `${kind === "about" ? "About" : "Melt"} | Queer Dance Philly`;
+  },
+  close({ historyEntry = true, preserveMenu = false } = {}) {
+    if (!this.active) return;
+    if (historyEntry) history.pushState(null, "", "/");
+    this.active = "";
+    document.body.classList.remove("info-mode");
+    for (const view of Object.values(infoViews)) view.classList.remove("is-open");
+    clearTimeout(infoExitTimer);
+    infoExitTimer = setTimeout(() => {
+      if (!this.active) infoViewport.hidden = true;
+    }, 500);
+    if (!preserveMenu && !window.QDPArchive?.active) window.QDPArchive?.hideMenu();
+    if (!window.QDPArchive?.active) document.title = "Queer Dance Philly";
   }
-);
+};
+window.QDPInfoView = infoView;
 
-function openMeltDialog(event) {
-  event?.preventDefault();
-
-  closeDatePopover();
-
-  if (!eventDetail.hidden) {
-    closeEventDetail();
+aboutLink.addEventListener("click", event => {
+  event.preventDefault();
+  infoView.show("about");
+});
+meltLink.addEventListener("click", event => {
+  event.preventDefault();
+  infoView.show("melt");
+});
+aboutCloseButton.addEventListener("click", () => infoView.close());
+meltCloseButton.addEventListener("click", () => infoView.close());
+window.addEventListener("popstate", () => {
+  const kind = location.hash.slice(1);
+  if (!new URLSearchParams(location.search).has("archive") && infoViews[kind]) {
+    infoView.show(kind, { historyEntry: false });
+  } else {
+    infoView.close({ historyEntry: false, preserveMenu: Boolean(new URLSearchParams(location.search).has("archive")) });
   }
-
-  if (!meltDialog.open) {
-    meltDialog.showModal();
+});
+queueMicrotask(() => {
+  const kind = location.hash.slice(1);
+  if (!new URLSearchParams(location.search).has("archive") && infoViews[kind]) {
+    infoView.show(kind, { historyEntry: false });
   }
-}
-
-function closeMeltDialog() {
-  if (meltDialog.open) {
-    meltDialog.close();
-  }
-}
-
-meltLink.addEventListener(
-  "click",
-  openMeltDialog
-);
-
-meltCloseButton.addEventListener(
-  "click",
-  closeMeltDialog
-);
-
-meltDialog.addEventListener(
-  "click",
-  event => {
-    const bounds =
-      meltDialog.getBoundingClientRect();
-
-    const clickedOutside =
-      event.clientX < bounds.left ||
-      event.clientX > bounds.right ||
-      event.clientY < bounds.top ||
-      event.clientY > bounds.bottom;
-
-    if (clickedOutside) {
-      closeMeltDialog();
-    }
-  }
-);
+});
 
 function movePoster(direction) {
   if (window.QDPArchive?.active) {
@@ -1815,9 +1789,10 @@ eventStack.addEventListener("scroll", () => {
 
 poster.addEventListener("wheel", event => {
   if (window.QDPArchive?.active) {
-    if (!eventDetail.hidden || eventStack.contains(event.target)) return;
+    const archiveStack = document.getElementById("archiveStack");
+    if (!eventDetail.hidden || archiveStack.contains(event.target)) return;
     event.preventDefault();
-    eventStack.scrollBy({ top: event.deltaY, behavior: "auto" });
+    archiveStack.scrollBy({ top: event.deltaY, behavior: "auto" });
     return;
   }
   if (!eventDetail.hidden || !datePopover.hidden ||
@@ -1831,10 +1806,8 @@ window.addEventListener(
   "keydown",
   event => {
     if (event.key === "Escape") {
-      if (
-        aboutDialog.open ||
-        meltDialog.open
-      ) {
+      if (infoView.active) {
+        infoView.close();
         return;
       }
 
@@ -1846,6 +1819,8 @@ window.addEventListener(
 
       return;
     }
+
+    if (infoView.active) return;
 
     if (event.key === "ArrowLeft") {
       event.preventDefault();

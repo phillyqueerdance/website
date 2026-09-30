@@ -2,12 +2,21 @@
 // Data arrives only after entering the archive, through /api/archive.
 (function () {
   const menu = document.getElementById("archiveMenu");
+  const menuTrack = document.getElementById("archiveMenuTrack");
+  const menuProfile = document.getElementById("archiveMenuProfile");
+  const archiveViewport = document.getElementById("archiveViewport");
+  const archivePage = document.getElementById("archivePage");
+  const archiveStack = document.getElementById("archiveStack");
+  const archiveHeader = document.getElementById("archiveHeader");
+  let exitTimer = 0;
+  let menuMotionSerial = 0;
   const cache = new Map();
   const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
   const validViews = new Set(["artists", "venues", "artist", "venue", "events"]);
   let renderedKey = "";
   let loadingKey = "";
   let requestNumber = 0;
+  let pageExitTimer = 0;
   let cards = [];
   let corners = [];
 
@@ -35,7 +44,7 @@
   }
 
   function message(label) {
-    eventStack.replaceChildren(node("p", "event-feed-message", label));
+    archiveStack.replaceChildren(node("p", "event-feed-message", label));
     cards = [];
     corners = [];
     archive.events = [];
@@ -43,35 +52,62 @@
   }
 
   function header(label) {
-    dateLabel.textContent = label;
-    dateLabel.style.transform = "";
-    dateIncomingLabel.hidden = true;
-    dateButton.setAttribute("aria-label", label);
-    dateButton.setAttribute("aria-haspopup", "false");
-    dateButton.tabIndex = -1;
-    fitDateText(dateLabel, dateButton);
+    archiveHeader.textContent = label;
+    fitDateText(archiveHeader, archiveHeader);
   }
 
-  function setMenu(view) {
+  function positionMenu() {
     const leftLinks = document.getElementById("siteMenuLinks");
     const leftLink = leftLinks?.querySelector("a:not(.melt-nav-link)");
     if (leftLink) {
       menu.style.setProperty("--archive-nav-font-size", getComputedStyle(leftLink).fontSize);
       menu.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
-      const leftMenu = getComputedStyle(document.querySelector(".side-nav"));
-      menu.style.setProperty("--archive-nav-width", leftMenu.width);
-      menu.style.setProperty("--archive-nav-offset", leftMenu.getPropertyValue("--qdp-nav-gap"));
+      menu.style.setProperty("--archive-nav-width", getComputedStyle(document.querySelector(".side-nav")).width);
+      const gap = poster.getBoundingClientRect().left - leftLinks.getBoundingClientRect().right;
+      menu.style.setProperty("--archive-nav-offset", `${Math.max(0, gap)}px`);
     }
-    menu.hidden = false;
+  }
+
+  function showMenu(view = "", restart = false) {
+    const motion = ++menuMotionSerial;
+    clearTimeout(exitTimer);
+    positionMenu();
+    if (restart) menuTrack.classList.remove("is-open");
+    menuTrack.hidden = false;
     menu.querySelectorAll("a").forEach(link => {
-      const target = new URL(link.href).searchParams.get("archive");
-      if (target === view || (view === "artist" && target === "artists") ||
+      const target = new URL(link.href).searchParams.get("archive") || "";
+      if ((view && target === view) || (view === "artist" && target === "artists") ||
           (view === "venue" && target === "venues")) {
         link.setAttribute("aria-current", "page");
       } else {
         link.removeAttribute("aria-current");
       }
     });
+    if (restart) void menuTrack.offsetHeight;
+    requestAnimationFrame(() => {
+      if (motion === menuMotionSerial) menuTrack.classList.add("is-open");
+    });
+  }
+
+  function hideMenu() {
+    menuMotionSerial++;
+    menuTrack.classList.remove("is-open");
+    clearTimeout(exitTimer);
+    exitTimer = setTimeout(() => {
+      if (!menuTrack.classList.contains("is-open")) menuTrack.hidden = true;
+    }, 500);
+  }
+
+  function setProfile(kind, person = null) {
+    menu.classList.remove("has-profile");
+    menuProfile.replaceChildren();
+    menuProfile.hidden = !person;
+    if (person) {
+      menuProfile.appendChild(profileInfo(kind, person));
+      requestAnimationFrame(() => {
+        if (menuProfile.firstChild) menu.classList.add("has-profile");
+      });
+    }
   }
 
   function leave() {
@@ -87,11 +123,16 @@
     loadingKey = "";
     cards = [];
     corners = [];
+    archivePage.classList.remove("is-open");
+    clearTimeout(pageExitTimer);
+    pageExitTimer = setTimeout(() => {
+      if (!archive.active) archiveViewport.hidden = true;
+    }, 500);
+    setProfile("");
     document.body.classList.remove("archive-mode");
     document.documentElement.classList.remove("archive-open");
-    menu.hidden = true;
-    dateButton.tabIndex = 0;
-    dateButton.setAttribute("aria-haspopup", "dialog");
+    if (window.QDPInfoView?.active) showMenu();
+    else hideMenu();
     document.title = "Queer Dance Philly";
     if (posterPages.length) {
       renderPoster();
@@ -134,7 +175,7 @@
     return /^[A-Z]$/.test(first || "") ? first : "#";
   }
 
-  function group(label, extra = "", parent = eventStack) {
+  function group(label, extra = "", parent = archiveStack) {
     const section = node("section", "archive-section");
     section.setAttribute("aria-label", `${label} group`);
     const wrapper = node("div", `event-time-group archive-group ${extra}`.trim());
@@ -146,8 +187,9 @@
     return { badge, list, last: null, count: 0 };
   }
 
-  function addCard(grouping, card) {
+  function addCard(grouping, card, day = "") {
     const row = node("div", `event-row ${grouping.count ? "same-time" : "has-time"}`);
+    if (day) row.appendChild(node("span", "archive-day-chip", day));
     row.appendChild(card);
     grouping.list.appendChild(row);
     grouping.count++;
@@ -174,7 +216,7 @@
   function renderDirectory(kind, items) {
     if (!Array.isArray(items)) throw new Error("Invalid directory feed");
     archive.events = [];
-    eventStack.replaceChildren();
+    archiveStack.replaceChildren();
     cards = [];
     corners = [];
     const profiles = [...items].filter(item => item.id && item.name).sort((a, b) => {
@@ -211,7 +253,7 @@
   function renderMonths(months) {
     if (!Array.isArray(months)) throw new Error("Invalid archive index");
     archive.events = [];
-    eventStack.replaceChildren();
+    archiveStack.replaceChildren();
     cards = [];
     corners = [];
     let year = "";
@@ -235,13 +277,11 @@
   function profileInfo(kind, person) {
     const info = node("section", "archive-profile-info");
     info.setAttribute("aria-label", `${kind === "venue" ? "Venue" : "Artist"} information`);
-    info.appendChild(node("h1", "archive-profile-heading", person.name));
+    info.appendChild(node("h2", "archive-profile-heading", person.name));
+    if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
+    if (person.bio) info.appendChild(node("p", "", person.bio));
     if (Number.isInteger(person.count)) {
       info.appendChild(node("span", "archive-profile-count", `${person.count} ${person.count === 1 ? "event" : "events"}`));
-    }
-    if (person.bio) info.appendChild(node("p", "", person.bio));
-    if (kind === "venue") {
-      if (person.address) info.appendChild(node("address", "", person.address));
     }
     const links = node("div", "archive-profile-links");
     for (const [key, label] of [["maps", "Map"], ["website", "Website"],
@@ -259,21 +299,35 @@
 
   function renderEvents(items, person = null, kind = "", month = "") {
     if (!Array.isArray(items)) throw new Error("Invalid archive events");
-    eventStack.replaceChildren();
+    archiveStack.replaceChildren();
     cards = [];
     corners = [];
     archive.events = sortEvents(items.filter(item => item.eventId && !Number.isNaN(Date.parse(item.start)))).reverse();
-    if (person) eventStack.appendChild(profileInfo(kind, person));
+    setProfile(kind, person);
     if (month) {
       const heading = node("div", "date-heading", `${monthName(month)} ${month.slice(0, 4)}`);
-      eventStack.appendChild(heading);
+      archiveStack.appendChild(heading);
     }
 
     let day = "";
+    let year = "";
+    let currentMonth = "";
     let current = null;
     for (const event of archive.events) {
       const eventDay = dateKey(new Date(event.start));
-      if (eventDay !== day) {
+      if (person && eventDay.slice(0, 4) !== year) {
+        finishGroup(current);
+        current = null;
+        year = eventDay.slice(0, 4);
+        archiveStack.appendChild(node("h2", "archive-year-heading", year));
+      }
+      if (person && eventDay.slice(0, 7) !== currentMonth) {
+        finishGroup(current);
+        currentMonth = eventDay.slice(0, 7);
+        current = group(monthName(currentMonth).slice(0, 3), "archive-profile-month");
+        current.badge.setAttribute("aria-label", `${monthName(currentMonth)} ${year}`);
+      }
+      if (!person && eventDay !== day) {
         finishGroup(current);
         day = eventDay;
         current = group("", "archive-event-day");
@@ -292,18 +346,25 @@
       if (kind === "venue") {
         card.querySelectorAll(".event-venue, .event-address").forEach(part => part.remove());
       }
-      addCard(current, card);
+      const ordinalDay = Number(eventDay.slice(-2));
+      addCard(current, card, person ? `${ordinalDay}${ordinalSuffix(ordinalDay)}` : "");
     }
     finishGroup(current);
     if (!archive.events.length) {
-      eventStack.appendChild(node("p", "event-feed-message", "No archived events here yet."));
+      archiveStack.appendChild(node("p", "event-feed-message", "No archived events here yet."));
     }
     archive.updateLayout();
   }
 
   async function route() {
     const params = routeParams();
-    if (!params.view) { leave(); return; }
+    if (!params.view) {
+      if (!new Set(["#about", "#melt"]).has(location.hash)) {
+        window.QDPInfoView?.close({ historyEntry: false });
+      }
+      leave();
+      return;
+    }
     if (!validViews.has(params.view) ||
         (["artist", "venue"].includes(params.view) && !/^[\w-]{1,80}$/.test(params.id)) ||
         (params.view === "events" && params.month && !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(params.month))) {
@@ -318,17 +379,28 @@
     }
     const serial = ++requestNumber;
     if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
+    window.QDPInfoView?.close({ historyEntry: false, preserveMenu: true });
     archive.active = true;
     renderedKey = params.key;
     loadingKey = params.key;
     document.body.classList.add("archive-mode");
     document.documentElement.classList.add("archive-open");
-    setMenu(params.view);
+    setProfile("");
+    archiveViewport.hidden = false;
+    clearTimeout(pageExitTimer);
+    archivePage.style.transition = "none";
+    archivePage.classList.remove("is-open");
+    showMenu(params.view, menuTrack.hidden || !menuTrack.classList.contains("is-open"));
+    void archivePage.offsetHeight;
+    archivePage.style.transition = "";
+    requestAnimationFrame(() => {
+      if (serial === requestNumber) archivePage.classList.add("is-open");
+    });
     closeDatePopover();
-    eventStack.hidden = false;
+    archiveStack.hidden = false;
     header(params.view === "artist" ? "Artist" : params.view === "venue" ? "Venue" :
       params.view === "artists" ? "Artists" : params.view === "venues" ? "Venues" : "Archive");
-    document.title = `${dateLabel.textContent} | Queer Dance Philly`;
+    document.title = `${archiveHeader.textContent} | Queer Dance Philly`;
     message("Loading archive…");
 
     const resource = params.view === "events" ? (params.month ? "month" : "months") : params.view;
@@ -345,7 +417,7 @@
         header(data.profile.name);
         document.title = `${data.profile.name} | Queer Dance Philly`;
       }
-      eventStack.scrollTop = 0;
+      archiveStack.scrollTop = 0;
       loadingKey = "";
       archive.updateControls();
       syncPopup();
@@ -391,21 +463,21 @@
     },
     focusEvent(event) {
       const card = cards.find(item => item.dataset.eventId === eventIdOf(event));
-      if (card) eventStack.scrollTo({ top: scrollOffset(card), behavior: "auto" });
+      if (card) archiveStack.scrollTo({ top: offset(card), behavior: "auto" });
       this.updateControls();
     },
     move(direction) {
       if (!cards.length) return;
-      const top = eventStack.scrollTop + 2;
+      const top = archiveStack.scrollTop + 2;
       let index = 0;
       cards.forEach((card, candidate) => {
-        if (scrollOffset(card) <= top) index = candidate;
+        if (offset(card) <= top) index = candidate;
       });
       const target = cards[Math.max(0, Math.min(cards.length - 1, index + direction))];
-      if (target) eventStack.scrollTo({ top: scrollOffset(target), behavior: "smooth" });
+      if (target) archiveStack.scrollTo({ top: offset(target), behavior: "smooth" });
     },
     updateControls() {
-      if (!this.active || eventStack.hidden) return;
+      if (!this.active || archiveStack.hidden) return;
       if (corners.length) {
         const radius = parseFloat(getComputedStyle(corners[0].card).borderBottomRightRadius) || 0;
         for (const { time, card } of corners) {
@@ -414,22 +486,30 @@
           const progress = Math.max(0, Math.min(1,
             (bottom - (box.top + box.height / 2)) / (box.height / 2)));
           card.style.setProperty("--qdp-tail-radius", `${radius * (1 - progress)}px`);
+          card.parentElement.style.setProperty("--qdp-tail-radius", `${radius * (1 - progress)}px`);
         }
       }
-      const top = eventStack.scrollTop + 2;
+      const top = archiveStack.scrollTop + 2;
       let index = 0;
       cards.forEach((card, candidate) => {
-        if (scrollOffset(card) <= top) index = candidate;
+        if (offset(card) <= top) index = candidate;
       });
       previousPoster.disabled = !cards.length || index === 0;
       nextPoster.disabled = !cards.length || index === cards.length - 1;
     },
     updateLayout() {
-      fitPosterTitles();
+      fitPosterTitles(archiveStack);
       this.updateControls();
     }
   };
+  function offset(card) {
+    return card.getBoundingClientRect().top - archiveStack.getBoundingClientRect().top + archiveStack.scrollTop;
+  }
+  archive.showMenu = showMenu;
+  archive.hideMenu = hideMenu;
   window.QDPArchive = archive;
+
+  archiveStack.addEventListener("scroll", () => archive.updateControls(), { passive: true });
 
   document.addEventListener("click", event => {
     const anchor = event.target.closest?.("a[data-archive-link]");
@@ -443,8 +523,9 @@
   });
   window.addEventListener("popstate", route);
   window.addEventListener("resize", () => {
+    if (menuTrack.hidden) return;
+    positionMenu();
     if (!archive.active) return;
-    setMenu(routeParams().view);
     archive.updateLayout();
   });
   if (routeParams().view) route();
