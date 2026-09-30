@@ -129,6 +129,10 @@ test('publisher commits manifest last and skips writes when data has not changed
 test('Pages serves a prepared profile without calling Apps Script and denies removed IDs', async () => {
   const { ss, context } = appsScript();
   const snapshot = context.qdpArchivePublishSource_(ss);
+  snapshot.artists[0].name = '[DJ Alpha]';
+  snapshot.venues[0].name = '[The Room]';
+  snapshot.artistEntries.ALPHA.profile.name = '[DJ Alpha]';
+  snapshot.artistEntries.ALPHA.events[0].venue = '[The Room]';
   const records = context.qdpArchiveKvRecords_(snapshot, 'revision-1');
   assert.equal(records.length, 13);
   const values = new Map(records.map(({ key, value }) => [key, JSON.parse(value)]));
@@ -147,9 +151,16 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
     const artist = await onRequestGet(request('resource=artist&id=ALPHA'));
     assert.equal(artist.status, 200);
     assert.equal(artist.headers.get('X-QDP-Archive-Source'), 'prepared');
-    assert.equal((await artist.json()).events.length, 3);
+    const artistData = await artist.json();
+    assert.equal(artistData.events.length, 3);
+    assert.equal(artistData.profile.name, 'DJ Alpha');
+    assert.equal(artistData.events[0].venue, 'The Room');
     const directory = await onRequestGet(request('resource=artists'));
-    assert.equal((await directory.json()).artists[0].queerArtist, true);
+    const artistList = (await directory.json()).artists;
+    assert.equal(artistList[0].queerArtist, true);
+    assert.equal(artistList[0].name, 'DJ Alpha');
+    const venueList = await onRequestGet(request('resource=venues'));
+    assert.equal((await venueList.json()).venues[0].name, 'The Room');
     const month = await onRequestGet(request('resource=month&month=2024-09'));
     assert.equal((await month.json()).events.length, 2);
     const removed = await onRequestGet(request('resource=artist&id=PRIVATE'));

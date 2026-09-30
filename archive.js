@@ -58,11 +58,16 @@
 
   function positionMenu() {
     const leftLinks = document.getElementById("siteMenuLinks");
-    const leftLink = leftLinks?.querySelector("a:not(.melt-nav-link)");
+    const leftLink = leftLinks?.querySelector("a");
     if (leftLink) {
       menu.style.setProperty("--archive-nav-font-size", getComputedStyle(leftLink).fontSize);
       menu.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
       menu.style.setProperty("--archive-nav-width", getComputedStyle(document.querySelector(".side-nav")).width);
+      const shell = document.querySelector(".site-shell");
+      const menuStyle = getComputedStyle(menu);
+      const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;
+      const menuInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth);
+      menu.style.setProperty("--archive-nav-top", `${Math.max(0, linkTop - menuInset)}px`);
     }
   }
 
@@ -166,6 +171,14 @@
     return cache.get(url);
   }
 
+  function directorySortName(name, kind) {
+    let key = String(name || "").trim().replace(/^\[(.*)\]$/s, "$1").trim();
+    const fullName = key;
+    const prefix = kind === "artists" ? /^(?:DJ|The)\b[\s.:-]+/i : /^The\b[\s.:-]+/i;
+    while (prefix.test(key)) key = key.replace(prefix, "").trim();
+    return key || fullName;
+  }
+
   function initial(name) {
     const first = String(name || "").normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -218,14 +231,14 @@
     cards = [];
     corners = [];
     const profiles = [...items].filter(item => item.id && item.name).sort((a, b) => {
-      const aLetter = initial(a.name);
-      const bLetter = initial(b.name);
-      return collator.compare(aLetter, bLetter) || collator.compare(a.name, b.name);
+      const aKey = directorySortName(a.name, kind);
+      const bKey = directorySortName(b.name, kind);
+      return collator.compare(initial(aKey), initial(bKey)) || collator.compare(aKey, bKey);
     });
     let lastLetter = "";
     let current = null;
     for (const item of profiles) {
-      const letter = initial(item.name);
+      const letter = initial(directorySortName(item.name, kind));
       if (letter !== lastLetter) {
         finishGroup(current);
         current = group(letter, "archive-directory");

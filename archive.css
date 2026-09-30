@@ -79,11 +79,11 @@
 .archive-menu-track[hidden] { display: none; }
 .archive-menu {
   position: absolute;
-  top: 50%;
+  top: var(--archive-nav-top, 0px);
   left: 0;
   width: var(--archive-nav-width, 228px);
   height: auto;
-  max-height: calc(100% - 8px);
+  max-height: calc(100% - var(--archive-nav-top, 0px) - 8px);
   box-sizing: border-box;
   padding: 16px 12px;
   border: 2.5px solid #ffea86;
@@ -96,13 +96,13 @@
   align-items: flex-start;
   gap: var(--archive-nav-gap, clamp(28px, 5vh, 45px));
   font: 700 var(--archive-nav-font-size, 18px)/1.2 "QDP Fraunces", Georgia, serif;
-  transform: translate(-100%, -50%);
+  transform: translateX(-100%);
   transition: transform var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
   pointer-events: auto;
   overflow-y: auto;
   scrollbar-width: thin;
 }
-.archive-menu-track.is-open .archive-menu { transform: translate(0, -50%); }
+.archive-menu-track.is-open .archive-menu { transform: translateX(0); }
 .archive-menu > a { color: inherit; text-decoration: none !important; }
 .archive-menu > a:focus-visible, .side-nav a:focus-visible {
   outline: 2px solid #ffea86;

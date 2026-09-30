@@ -15,6 +15,7 @@ const KV_PREFIX = "qdp-archive:v1:";
 const SHARDS = { artist: 4, venue: 2, month: 4 };
 
 const value = (input, limit = 500) => String(input ?? "").trim().slice(0, limit);
+const publicName = input => value(input, 180).replace(/^\[(.*)\]$/s, "$1").trim();
 const yes = input => input === true || /^yes$/i.test(String(input));
 
 function safeUrl(input) {
@@ -29,7 +30,7 @@ function safeUrl(input) {
 function profile(input, kind) {
   if (!input || !yes(input.publicOk)) return null;
   const id = value(input.id, 80);
-  const name = value(input.name, 180);
+  const name = publicName(input.name);
   if (!/^[\w-]{1,80}$/.test(id) || !name) return null;
   return {
     id, name,
@@ -65,7 +66,7 @@ function publicEvent(input) {
     eventId, title, start,
     end: Number.isNaN(Date.parse(input.end)) ? "" : value(input.end, 60),
     description,
-    venue: value(input.venue, 180),
+    venue: publicName(input.venue),
     address: value(input.address, 260),
     venueId: value(input.venueId, 80),
     artistIds: Array.isArray(input.artistIds)
