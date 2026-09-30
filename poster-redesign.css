@@ -26,7 +26,8 @@
   --qdp-list-y: 0cqw;
   --qdp-list-top: calc(var(--qdp-date-top) + var(--qdp-date-height) + var(--qdp-date-y));
   --qdp-list-right: 9.5%;
-  --qdp-list-bottom: 11.2%;
+  /* The frame's inner bottom line begins at 93.25% of its height. */
+  --qdp-list-bottom: 6.85%;
   --qdp-list-left: 9.8%;
   --qdp-list-justify: flex-start;
 
