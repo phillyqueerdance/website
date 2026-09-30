@@ -66,17 +66,6 @@
     });
   }
 
-  function syncMenuStems() {
-    if (menuTrack.hidden) return;
-    const trackTop = menuTrack.getBoundingClientRect().top;
-    for (const view of ["artists", "venues", "events"]) {
-      const badge = menu.querySelector(`.archive-menu-badge--${view}`);
-      const stem = menuTrack.querySelector(`.archive-menu-stem--${view}`);
-      stem.style.top = `${badge.getBoundingClientRect().top - trackTop}px`;
-      stem.style.height = `${badge.offsetHeight}px`;
-    }
-  }
-
   function positionMenu() {
     const leftLinks = document.getElementById("siteMenuLinks");
     const leftLink = leftLinks?.querySelector("a");
@@ -85,27 +74,22 @@
       menuTrack.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
       menuTrack.style.setProperty("--archive-nav-width", getComputedStyle(document.querySelector(".side-nav")).width);
       const posterWidth = document.querySelector(".poster").getBoundingClientRect().width;
-      menuTrack.style.setProperty("--archive-menu-inset", `${posterWidth * .043}px`);
-      menuTrack.style.setProperty("--archive-red-stem", `${posterWidth * .010}px`);
-      menuTrack.style.setProperty("--archive-orange-stem", `${posterWidth * .026}px`);
-      menuTrack.style.setProperty("--archive-purple-stem", `${posterWidth * .043}px`);
-      const frameStripes = { artists: 1642, venues: 1614, events: 1586 };
-      const stripe = frameStripes[menuTrack.dataset.activeView];
-      if (stripe) {
-        menuTrack.style.setProperty("--archive-frame-line-left", `${posterWidth * (stripe / 1727 - .917)}px`);
-        menuTrack.style.setProperty("--archive-frame-line-width", `${posterWidth * 13 / 1727}px`);
-      }
+      const purpleBorder = 1586 / 1727;
+      const menuInset = posterWidth * (.96 - purpleBorder);
+      menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
+      menuTrack.style.setProperty("--archive-events-label-x", `${posterWidth * (1614 - 1586) / 1727}px`);
+      menuTrack.style.setProperty("--archive-venues-label-x", `${posterWidth * (1642 - 1586) / 1727}px`);
+      menuTrack.style.setProperty("--archive-artists-label-x", `${posterWidth * (1670 - 1586) / 1727}px`);
       const shell = document.querySelector(".site-shell");
       const menuStyle = getComputedStyle(menu);
       const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;
-      const menuInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth) + 5;
-      menuTrack.style.setProperty("--archive-nav-top", `${Math.max(0, linkTop - menuInset)}px`);
+      const textInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth) + 5;
+      menuTrack.style.setProperty("--archive-nav-top", `${Math.max(0, linkTop - textInset)}px`);
       if (!menuTrack.hidden) {
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.getBoundingClientRect().width))) + 24;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
-        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + posterWidth * .043}px`);
-        syncMenuStems();
+        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset}px`);
       }
     }
   }
@@ -115,7 +99,6 @@
     clearTimeout(exitTimer);
     if (restart) menuTrack.classList.remove("is-open");
     menuTrack.hidden = false;
-    menuTrack.dataset.activeView = view === "artist" ? "artists" : view === "venue" ? "venues" : view;
     venueMap.hidden = view !== "venue" && view !== "venues";
     menu.querySelectorAll("a").forEach(link => {
       const target = new URL(link.href).searchParams.get("archive") || "";
@@ -151,13 +134,9 @@
       (kind === "venue" && !venueMap.hidden ? venueMap : badge).after(menuProfile);
       menuProfile.appendChild(profileInfo(kind, person));
       requestAnimationFrame(() => {
-        if (menuProfile.firstChild) {
-          menu.classList.add("has-profile");
-          syncMenuStems();
-        }
+        if (menuProfile.firstChild) menu.classList.add("has-profile");
       });
     }
-    requestAnimationFrame(syncMenuStems);
   }
 
   function leave() {
@@ -568,8 +547,6 @@
   archive.showMenu = showMenu;
   archive.hideMenu = hideMenu;
   window.QDPArchive = archive;
-
-  new ResizeObserver(() => requestAnimationFrame(syncMenuStems)).observe(menu);
 
   archiveStack.addEventListener("scroll", () => {
     syncYearHeadings();

@@ -65,11 +65,11 @@
 .poster-info-page .melt-dialog-content { max-height: none; }
 .info-mode .poster-controls { visibility: hidden; }
 
-/* Reveal the tab from the outer right border; it stays put between archive pages. */
+/* The right tabs sit over the frame and slide out together. */
 .archive-menu-track {
   position: absolute;
   top: 0;
-  left: 91.7%;
+  left: 91.836%;
   z-index: 11;
   width: min(46vw, 555px);
   height: 100%;
@@ -86,50 +86,16 @@
   pointer-events: none;
 }
 .archive-menu-track.is-open .archive-menu-panel { transform: translateX(0); }
-.archive-menu-stem {
-  position: absolute;
-  left: calc(var(--archive-menu-inset, 34px) - var(--stem-width));
-  width: var(--stem-width);
-  height: 36px;
-}
-.archive-menu-stem--artists { --stem-width: var(--archive-red-stem, 8px); background: #fa2b5a; }
-.archive-menu-stem--venues { --stem-width: var(--archive-orange-stem, 21px); background: #ff7945; }
-.archive-menu-stem--events { --stem-width: var(--archive-purple-stem, 34px); background: #922185; }
-.archive-menu-frame-line {
-  position: absolute;
-  top: 8%;
-  bottom: 8%;
-  left: var(--archive-frame-line-left, 0px);
-  width: var(--archive-frame-line-width, 6px);
-  z-index: 2;
-  display: none;
-  pointer-events: none;
-}
-.archive-menu-track[data-active-view="artists"] .archive-menu-frame-line {
-  display: block;
-  background: #fa2b5a;
-}
-.archive-menu-track[data-active-view="venues"] .archive-menu-frame-line {
-  display: block;
-  background: #ff6265;
-}
-.archive-menu-track[data-active-view="events"] .archive-menu-frame-line {
-  display: block;
-  background: #922185;
-}
 .archive-menu {
   position: absolute;
   top: var(--archive-nav-top, 0px);
-  left: var(--archive-menu-inset, 34px);
-  width: var(--archive-nav-width, 228px);
+  left: 0;
+  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px));
   height: auto;
   max-height: calc(100% - var(--archive-nav-top, 0px) - 8px);
   box-sizing: border-box;
-  padding: 16px 12px;
-  border: 2.5px solid #ffea86;
-  border-left: 0;
-  border-radius: 0 24px 24px 0;
-  background: #000;
+  padding: 16px 12px 16px calc(var(--archive-menu-inset, 33px) + 12px);
+  background: transparent;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -140,30 +106,41 @@
   overflow-y: auto;
   scrollbar-width: thin;
 }
-.archive-menu > a { color: inherit; text-decoration: none !important; }
+.archive-menu::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 var(--archive-menu-inset, 33px);
+  z-index: 0;
+  border: 2.5px solid #ffea86;
+  border-left: 0;
+  border-radius: 0 24px 24px 0;
+  background: #000;
+  pointer-events: none;
+}
+.archive-menu > a { position: relative; z-index: 1; color: inherit; text-decoration: none !important; }
 .archive-menu > .archive-menu-badge {
   display: flex;
   align-items: center;
   align-self: flex-start;
   box-sizing: border-box;
-  width: calc(var(--archive-tab-length, 164px) - var(--stem-width));
+  width: var(--archive-tab-length, 164px);
   min-height: 36px;
-  margin-left: -12px;
-  padding: 5px 12px;
+  margin-left: calc(0px - var(--archive-menu-inset, 33px) - 12px);
+  padding: 5px 12px 5px var(--archive-badge-label-x, 12px);
   border-radius: 0 14px 14px 0;
   color: #fff1f4;
   white-space: nowrap;
   overflow: hidden;
-  transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
+  transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out),
+    padding-left var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
 }
-.archive-menu > .archive-menu-badge[aria-current="page"] { width: calc(100% + 12px); }
-.archive-menu-badge--artists { --stem-width: var(--archive-red-stem, 8px); background: #fa2b5a; }
-.archive-menu-badge--venues { --stem-width: var(--archive-orange-stem, 21px); background: #ff7945; color: #241016 !important; }
-.archive-menu-badge--venues[aria-current="page"] {
-  color: #fff1f4 !important;
-  text-shadow: 0 1px 2px #551b14;
+.archive-menu > .archive-menu-badge[aria-current="page"] {
+  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 14px);
+  padding-left: calc(var(--archive-menu-inset, 33px) + 12px);
 }
-.archive-menu-badge--events { --stem-width: var(--archive-purple-stem, 34px); background: #922185; }
+.archive-menu-badge--artists { --archive-badge-label-x: var(--archive-artists-label-x, 38px); background: #fa2b5a; }
+.archive-menu-badge--venues { --archive-badge-label-x: var(--archive-venues-label-x, 25px); background: #ff7945; color: #241016 !important; }
+.archive-menu-badge--events { --archive-badge-label-x: var(--archive-events-label-x, 13px); background: #922185; }
 .archive-menu-badge[aria-current="page"]::after {
   content: "✦";
   margin-left: auto;
@@ -182,6 +159,8 @@
 }
 .side-nav a:hover, .side-nav a:focus-visible { text-decoration: none; }
 .archive-menu-profile {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-height: 0;
   opacity: 0;
@@ -283,7 +262,6 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
     transform: translateY(-100%);
   }
   .archive-menu-track.is-open .archive-menu-panel { transform: translateY(0); }
-  .archive-menu-stems, .archive-menu-frame-line { display: none !important; }
   .archive-menu {
     position: relative;
     top: auto;
@@ -295,17 +273,20 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
     align-items: center;
     text-align: center;
     max-height: none;
-    border-left: 2.5px solid #ffea86;
+    border: 2.5px solid #ffea86;
     border-radius: 24px;
+    background: #000;
   }
+  .archive-menu::before { display: none; }
   .archive-menu > .archive-menu-badge {
     align-self: center;
     justify-content: center;
     width: var(--archive-tab-label-width, 130px);
     margin-left: 0;
+    padding-left: 12px;
     border-radius: 14px;
   }
-  .archive-menu > .archive-menu-badge[aria-current="page"] { width: 100%; }
+  .archive-menu > .archive-menu-badge[aria-current="page"] { width: 100%; padding-left: 12px; }
   .archive-menu > .archive-menu-map { margin: -3px 0 5px; padding: 3px; }
   .archive-menu-profile { text-align: left; }
   .archive-menu-profile:not([hidden]) { margin-top: 0; }
