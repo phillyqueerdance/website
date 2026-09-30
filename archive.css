@@ -137,6 +137,10 @@
 .archive-menu > .archive-menu-badge[aria-current="page"] { width: calc(100% + 12px); }
 .archive-menu-badge--artists { background: #fa2b5a; }
 .archive-menu-badge--venues { background: #ff7945; color: #241016 !important; }
+.archive-menu-badge--venues[aria-current="page"] {
+  color: #fff1f4 !important;
+  text-shadow: 0 1px 2px #551b14;
+}
 .archive-menu-badge--events { background: #922185; }
 .archive-menu-badge:not([aria-current="page"]) { filter: brightness(.83); }
 .archive-menu-badge[aria-current="page"]::after {
