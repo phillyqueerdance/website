@@ -3,6 +3,7 @@
 (function () {
   const menu = document.getElementById("archiveMenu");
   const menuTrack = document.getElementById("archiveMenuTrack");
+  const alphabet = document.getElementById("archiveAlphabet");
   const venueMap = document.getElementById("archiveVenueMap");
   const menuProfile = document.getElementById("archiveMenuProfile");
   const archiveViewport = document.getElementById("archiveViewport");
@@ -42,6 +43,14 @@
     if (className) result.className = className;
     if (label) result.textContent = label;
     return result;
+  }
+
+  for (const letter of "#ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+    const button = node("button", "archive-alphabet-letter", letter);
+    button.type = "button";
+    button.dataset.letter = letter;
+    button.disabled = true;
+    alphabet.appendChild(button);
   }
 
   function message(label) {
@@ -85,6 +94,7 @@
       const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;
       const textInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth) + 5;
       menuTrack.style.setProperty("--archive-nav-top", `${Math.max(0, linkTop - textInset)}px`);
+      menuTrack.style.setProperty("--archive-alphabet-top", `${menu.offsetTop + menu.offsetHeight + 8}px`);
       if (!menuTrack.hidden) {
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.getBoundingClientRect().width))) + 24;
@@ -100,6 +110,11 @@
     if (restart) menuTrack.classList.remove("is-open");
     menuTrack.hidden = false;
     venueMap.hidden = view !== "venue" && view !== "venues";
+    alphabet.hidden = view !== "artists" && view !== "venues";
+    if (!alphabet.hidden) {
+      alphabet.setAttribute("aria-label", `${view === "artists" ? "Artists" : "Venues"} alphabet`);
+      alphabet.querySelectorAll("button").forEach(button => { button.disabled = true; });
+    }
     menu.querySelectorAll("a").forEach(link => {
       const target = new URL(link.href).searchParams.get("archive") || "";
       if ((view && target === view) || (view === "artist" && target === "artists") ||
@@ -220,7 +235,7 @@
     wrapper.append(badge, list);
     section.appendChild(wrapper);
     parent.appendChild(section);
-    return { badge, list, last: null, count: 0 };
+    return { section, badge, list, last: null, count: 0 };
   }
 
   function addCard(grouping, card, day = "") {
@@ -267,6 +282,7 @@
       if (letter !== lastLetter) {
         finishGroup(current);
         current = group(letter, "archive-directory");
+        current.section.dataset.letter = letter;
         lastLetter = letter;
       }
       const subtitle = kind === "venues" ? item.address || "" : "";
@@ -278,6 +294,12 @@
       addCard(current, card);
     }
     finishGroup(current);
+    const available = new Set([...archiveStack.querySelectorAll(".archive-directory[data-letter]")]
+      .map(section => section.dataset.letter));
+    alphabet.querySelectorAll("button").forEach(button => {
+      button.disabled = !available.has(button.dataset.letter);
+      button.setAttribute("aria-label", `Jump to ${button.dataset.letter} in ${kind}`);
+    });
     if (!profiles.length) message(`No ${kind} in the archive yet.`);
     archive.updateLayout();
   }
@@ -551,6 +573,14 @@
     syncYearHeadings();
     archive.updateControls();
   }, { passive: true });
+
+  alphabet.addEventListener("click", event => {
+    const button = event.target.closest("button[data-letter]");
+    if (!button || button.disabled) return;
+    const section = [...archiveStack.querySelectorAll(".archive-directory[data-letter]")]
+      .find(item => item.dataset.letter === button.dataset.letter);
+    if (section) archiveStack.scrollTo({ top: offset(section), behavior: "smooth" });
+  });
 
   document.addEventListener("click", event => {
     const anchor = event.target.closest?.("a[data-archive-link]");

@@ -92,7 +92,7 @@
   left: 0;
   width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px));
   height: auto;
-  max-height: calc(100% - var(--archive-nav-top, 0px) - 8px);
+  max-height: calc(93.25% - var(--archive-nav-top, 0px));
   box-sizing: border-box;
   padding: 16px 12px 16px calc(var(--archive-menu-inset, 33px) + 12px);
   background: transparent;
@@ -100,7 +100,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  gap: var(--archive-nav-gap, clamp(28px, 5vh, 45px));
+  gap: 0;
   font: 700 var(--archive-nav-font-size, 18px)/1.2 "QDP Fraunces", Georgia, serif;
   pointer-events: auto;
   overflow-y: auto;
@@ -148,7 +148,7 @@
   font-size: .75em;
 }
 .archive-menu > .archive-menu-map {
-  margin-top: calc(7px - var(--archive-nav-gap, 45px));
+  margin: 7px 0;
   padding-left: 0;
   font-size: .78em;
 }
@@ -170,7 +170,7 @@
     opacity var(--qdp-page-duration) ease;
 }
 .archive-menu-profile[hidden] { display: none; }
-.archive-menu-profile:not([hidden]) { margin-top: calc(12px - var(--archive-nav-gap, 45px)); }
+.archive-menu-profile:not([hidden]) { margin: 12px 0; }
 .archive-menu.has-profile .archive-menu-profile { max-height: min(65dvh, 800px); opacity: 1; overflow-y: auto; }
 .archive-profile-info { overflow-wrap: anywhere; }
 .archive-profile-heading {
@@ -185,6 +185,42 @@
 }
 .archive-profile-links { display: flex; flex-wrap: wrap; gap: .35em .75em; margin-top: .75em; }
 .archive-profile-links a { color: #ffea86; text-decoration: underline; }
+
+/* The alphabet rail attaches to the same frame edge, below the directory tabs. */
+.archive-alphabet {
+  position: absolute;
+  top: var(--archive-alphabet-top, 320px);
+  bottom: 6.75%;
+  left: var(--archive-menu-inset, 33px);
+  width: 50px;
+  padding: 8px 4px;
+  display: grid;
+  grid-template-rows: repeat(27, minmax(16px, 1fr));
+  border: 2.5px solid #ffea86;
+  border-left: 0;
+  border-radius: 0 20px 20px 0;
+  background: #000;
+  pointer-events: auto;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.archive-alphabet[hidden] { display: none; }
+.archive-alphabet-letter {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #fff1f4;
+  font: 700 clamp(11px, 1.25dvh, 14px)/1 "QDP Fraunces", Georgia, serif;
+  cursor: pointer;
+}
+.archive-alphabet-letter:disabled { opacity: .38; cursor: default; }
+.archive-alphabet-letter:not(:disabled):hover,
+.archive-alphabet-letter:not(:disabled):focus-visible {
+  background: #922185;
+  outline: 1px solid #ffea86;
+}
 
 .archive-stack { overscroll-behavior: contain; }
 .archive-directory .archive-identity-card {
@@ -269,7 +305,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
     width: 100%;
     height: auto;
     padding: 16px;
-    gap: 8px;
+    gap: 0;
     align-items: center;
     text-align: center;
     max-height: none;
@@ -287,9 +323,23 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
     border-radius: 14px;
   }
   .archive-menu > .archive-menu-badge[aria-current="page"] { width: 100%; padding-left: 12px; }
-  .archive-menu > .archive-menu-map { margin: -3px 0 5px; padding: 3px; }
+  .archive-menu > .archive-menu-map { margin: 3px 0; padding: 3px; }
   .archive-menu-profile { text-align: left; }
-  .archive-menu-profile:not([hidden]) { margin-top: 0; }
+  .archive-menu-profile:not([hidden]) { margin: 8px 0; }
+  .archive-alphabet {
+    position: relative;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    width: 100%;
+    height: auto;
+    margin-top: 8px;
+    padding: 8px;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    grid-template-rows: repeat(3, 30px);
+    border-left: 2.5px solid #ffea86;
+    border-radius: 24px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .archive-page, .poster-info-page, .archive-menu-panel { transition-duration: .01ms; }
