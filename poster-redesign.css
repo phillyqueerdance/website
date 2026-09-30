@@ -473,7 +473,7 @@
   text-align: center;
   transform: translateX(var(--qdp-detail-action-offset, 0px));
 }
-.event-detail-actions button {
+.event-detail-actions > :is(a, button) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -486,6 +486,7 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
+  text-decoration: none;
 }
 .event-detail-action-icon {
   display: block;
@@ -493,8 +494,8 @@
   height: 40px;
   object-fit: contain;
 }
-.event-detail-actions button:hover .event-detail-action-icon { filter: brightness(1.15); }
-.event-detail-actions button:focus-visible {
+.event-detail-actions > :is(a, button):hover .event-detail-action-icon { filter: brightness(1.15); }
+.event-detail-actions > :is(a, button):focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 3px;
 }

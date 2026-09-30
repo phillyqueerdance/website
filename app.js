@@ -1093,73 +1093,24 @@ function schedulePosterLayout() {
   });
 }
 
-function escapeIcsText(value) {
-  return String(value || "")
-    .replace(/\\/g, "\\\\")
-    .replace(/\r\n?|\n/g, "\\n")
-    .replace(/;/g, "\\;")
-    .replace(/,/g, "\\,");
-}
-
-function foldIcsLine(value) {
-  const encoder = new TextEncoder();
-  const lines = [];
-  let line = "";
-  let bytes = 0;
-
-  for (const character of value) {
-    const size = encoder.encode(character).length;
-    if (bytes + size > 75) {
-      lines.push(line);
-      line = " ";
-      bytes = 1;
-    }
-    line += character;
-    bytes += size;
-  }
-
-  lines.push(line);
-  return lines.join("\r\n");
-}
-
-function calendarFile(event) {
+function googleCalendarEventUrl(event) {
   const start = new Date(event.start);
-  const end = event.end ? new Date(event.end) : null;
+  const providedEnd = event.end ? new Date(event.end) : null;
+  const end = providedEnd && providedEnd > start
+    ? providedEnd : new Date(start.getTime() + 60 * 60 * 1000);
   const utc = date => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  const uid = encodeURIComponent(eventIdOf(event) ||
-    `${event.start}-${displayTitle(event)}`);
   const location = [eventVenue(event), eventAddress(event)].filter(Boolean).join(", ");
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Queer Dance Philly//Events//EN",
-    "CALSCALE:GREGORIAN",
-    "BEGIN:VEVENT",
-    `UID:${uid}@queerdancephilly.com`,
-    `DTSTAMP:${utc(new Date())}`,
-    `DTSTART:${utc(start)}`
-  ];
-
-  if (end && !Number.isNaN(end.getTime())) lines.push(`DTEND:${utc(end)}`);
-  lines.push(`SUMMARY:${escapeIcsText(displayTitle(event))}`);
-  if (location) lines.push(`LOCATION:${escapeIcsText(location)}`);
-  if (event.description) lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
-  if (eventIdOf(event)) lines.push(`URL:${eventPermalink(eventIdOf(event))}`);
-  lines.push("END:VEVENT", "END:VCALENDAR");
-
-  return lines.map(foldIcsLine).join("\r\n") + "\r\n";
-}
-
-function downloadCalendarEvent(event) {
-  const blob = new Blob([calendarFile(event)], { type: "text/calendar;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${eventIdOf(event) || "qdp-event"}.ics`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  const url = new URL("https://calendar.google.com/calendar/r/eventedit");
+  url.searchParams.set("action", "TEMPLATE");
+  url.searchParams.set("text", displayTitle(event));
+  url.searchParams.set("dates", `${utc(start)}/${utc(end)}`);
+  url.searchParams.set("stz", "America/New_York");
+  url.searchParams.set("etz", "America/New_York");
+  if (location) url.searchParams.set("location", location);
+  const details = [event.description, eventIdOf(event) && eventPermalink(eventIdOf(event))]
+    .filter(Boolean).join("\n\n");
+  if (details) url.searchParams.set("details", details);
+  return url.href;
 }
 
 async function copyEventLink(url) {
@@ -1419,16 +1370,17 @@ function openEventDetail(event, { updateHistory = true } = {}) {
 
   const actions = document.createElement("div");
   actions.className = "event-detail-actions";
-  const addToCalendar = document.createElement("button");
-  addToCalendar.type = "button";
-  addToCalendar.setAttribute("aria-label", "Add to Calendar");
-  addToCalendar.title = "Add to Calendar";
+  const addToCalendar = document.createElement("a");
+  addToCalendar.href = googleCalendarEventUrl(event);
+  addToCalendar.target = "_blank";
+  addToCalendar.rel = "noopener noreferrer";
+  addToCalendar.setAttribute("aria-label", "Add to Google Calendar");
+  addToCalendar.title = "Add to Google Calendar";
   const calendarIcon = document.createElement("img");
   calendarIcon.className = "event-detail-action-icon";
   calendarIcon.src = "icons8-ios-calendar-48.png";
   calendarIcon.alt = "";
   addToCalendar.appendChild(calendarIcon);
-  addToCalendar.addEventListener("click", () => downloadCalendarEvent(event));
   const share = document.createElement("button");
   share.type = "button";
   share.setAttribute("aria-label", "Share");

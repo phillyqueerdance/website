@@ -53,6 +53,15 @@
   }
 
   function setMenu(view) {
+    const leftLinks = document.getElementById("siteMenuLinks");
+    const leftLink = leftLinks?.querySelector("a:not(.melt-nav-link)");
+    if (leftLink) {
+      menu.style.setProperty("--archive-nav-font-size", getComputedStyle(leftLink).fontSize);
+      menu.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
+      const leftMenu = getComputedStyle(document.querySelector(".side-nav"));
+      menu.style.setProperty("--archive-nav-width", leftMenu.width);
+      menu.style.setProperty("--archive-nav-offset", leftMenu.getPropertyValue("--qdp-nav-gap"));
+    }
     menu.hidden = false;
     menu.querySelectorAll("a").forEach(link => {
       const target = new URL(link.href).searchParams.get("archive");
@@ -182,8 +191,8 @@
         current = group(letter, "archive-directory");
         lastLetter = letter;
       }
-      const subtitle = kind === "venues" && item.neighborhood
-        ? item.neighborhood
+      const subtitle = kind === "venues" && item.address
+        ? item.address
         : Number.isInteger(item.count) ? `${item.count} ${item.count === 1 ? "event" : "events"}` : "";
       addCard(current, stripCard(item.name, subtitle,
         archiveUrl(kind === "artists" ? "artist" : "venue", item.id).href));
@@ -224,17 +233,14 @@
   }
 
   function profileInfo(kind, person) {
-    const info = node("div", "archive-profile-info");
-    const card = node("div", "archive-profile-card");
-    const name = node("h1", "", person.name);
-    card.appendChild(name);
+    const info = node("section", "archive-profile-info");
+    info.setAttribute("aria-label", `${kind === "venue" ? "Venue" : "Artist"} information`);
+    info.appendChild(node("h1", "archive-profile-heading", person.name));
     if (Number.isInteger(person.count)) {
-      card.appendChild(node("span", "event-venue", `${person.count} ${person.count === 1 ? "event" : "events"}`));
+      info.appendChild(node("span", "archive-profile-count", `${person.count} ${person.count === 1 ? "event" : "events"}`));
     }
-    info.appendChild(card);
     if (person.bio) info.appendChild(node("p", "", person.bio));
     if (kind === "venue") {
-      if (person.neighborhood) info.appendChild(node("p", "", person.neighborhood));
       if (person.address) info.appendChild(node("address", "", person.address));
     }
     const links = node("div", "archive-profile-links");
@@ -264,30 +270,28 @@
     }
 
     let day = "";
-    let time = "";
     let current = null;
-    let daySection = null;
     for (const event of archive.events) {
       const eventDay = dateKey(new Date(event.start));
       if (eventDay !== day) {
         finishGroup(current);
-        current = null;
-        time = "";
         day = eventDay;
-        const label = node("div", "date-heading", formatPosterDate(day));
-        daySection = node("section", "date-section archive-month");
-        daySection.setAttribute("aria-label", formatPosterDate(day));
-        daySection.appendChild(label);
-        eventStack.appendChild(daySection);
-      }
-      if (event.start !== time) {
-        finishGroup(current);
-        current = group(formatStartTime(event), "", daySection);
-        current.badge.replaceChildren();
-        appendStartTime(current.badge, event);
-        time = event.start;
+        current = group("", "archive-event-day");
+        current.badge.classList.add("archive-date-badge");
+        current.badge.setAttribute("aria-label", `${formatPosterDate(day)}, ${day.slice(0, 4)}`);
+        const weekday = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/New_York", weekday: "short"
+        }).format(dateFromKey(day));
+        current.badge.append(
+          node("span", "", weekday),
+          node("span", "archive-date-number", `${Number(day.slice(5, 7))}/${Number(day.slice(-2))}`),
+          node("span", "archive-date-year", day.slice(0, 4))
+        );
       }
       const card = createEventCard(event);
+      if (kind === "venue") {
+        card.querySelectorAll(".event-venue, .event-address").forEach(part => part.remove());
+      }
       addCard(current, card);
     }
     finishGroup(current);
@@ -338,6 +342,7 @@
       else {
         if (!data.profile || data.profile.id !== params.id) throw new Error("Profile not found");
         renderEvents(data.events, data.profile, resource);
+        header(data.profile.name);
         document.title = `${data.profile.name} | Queer Dance Philly`;
       }
       eventStack.scrollTop = 0;
@@ -437,6 +442,10 @@
     route();
   });
   window.addEventListener("popstate", route);
-  window.addEventListener("resize", () => archive.active && archive.updateLayout());
+  window.addEventListener("resize", () => {
+    if (!archive.active) return;
+    setMenu(routeParams().view);
+    archive.updateLayout();
+  });
   if (routeParams().view) route();
 })();
