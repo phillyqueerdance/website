@@ -294,7 +294,7 @@
       addCard(current, card);
     }
     finishGroup(current);
-    const available = new Set([...archiveStack.querySelectorAll(".archive-directory[data-letter]")]
+    const available = new Set([...archiveStack.querySelectorAll(".archive-section[data-letter]")]
       .map(section => section.dataset.letter));
     alphabet.querySelectorAll("button").forEach(button => {
       button.disabled = !available.has(button.dataset.letter);
@@ -577,7 +577,7 @@
   alphabet.addEventListener("click", event => {
     const button = event.target.closest("button[data-letter]");
     if (!button || button.disabled) return;
-    const section = [...archiveStack.querySelectorAll(".archive-directory[data-letter]")]
+    const section = [...archiveStack.querySelectorAll(".archive-section[data-letter]")]
       .find(item => item.dataset.letter === button.dataset.letter);
     if (section) archiveStack.scrollTo({ top: offset(section), behavior: "smooth" });
   });

@@ -212,7 +212,7 @@
   border-radius: 5px;
   background: transparent;
   color: #fff1f4;
-  font: 700 clamp(11px, 1.25dvh, 14px)/1 "QDP Fraunces", Georgia, serif;
+  font: 700 clamp(13px, 1.45dvh, 16px)/1 "QDP Fraunces", Georgia, serif;
   cursor: pointer;
 }
 .archive-alphabet-letter:disabled { opacity: .38; cursor: default; }
