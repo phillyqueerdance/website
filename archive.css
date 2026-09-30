@@ -209,6 +209,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   text-align: center;
   font: 700 5.8cqw/1 "QDP Fraunces", Georgia, serif;
 }
+.archive-year-heading.is-behind-header { visibility: hidden; }
 .archive-year-heading:not(:first-child) { margin-top: 4cqw; }
 .archive-profile-month .event-row {
   display: grid;

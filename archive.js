@@ -57,6 +57,13 @@
     fitDateText(archiveHeader, archiveHeader);
   }
 
+  function syncYearHeadings() {
+    const boundary = archiveHeader.getBoundingClientRect().bottom + 3;
+    archiveStack.querySelectorAll(".archive-year-heading").forEach(heading => {
+      heading.classList.toggle("is-behind-header", heading.getBoundingClientRect().top < boundary);
+    });
+  }
+
   function positionMenu() {
     const leftLinks = document.getElementById("siteMenuLinks");
     const leftLink = leftLinks?.querySelector("a");
@@ -444,6 +451,7 @@
         document.title = `${data.profile.name} | Queer Dance Philly`;
       }
       archiveStack.scrollTop = 0;
+      syncYearHeadings();
       loadingKey = "";
       archive.updateControls();
       syncPopup();
@@ -525,6 +533,7 @@
     },
     updateLayout() {
       fitPosterTitles(archiveStack);
+      syncYearHeadings();
       this.updateControls();
     }
   };
@@ -535,7 +544,10 @@
   archive.hideMenu = hideMenu;
   window.QDPArchive = archive;
 
-  archiveStack.addEventListener("scroll", () => archive.updateControls(), { passive: true });
+  archiveStack.addEventListener("scroll", () => {
+    syncYearHeadings();
+    archive.updateControls();
+  }, { passive: true });
 
   document.addEventListener("click", event => {
     const anchor = event.target.closest?.("a[data-archive-link]");
