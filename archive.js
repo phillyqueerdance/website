@@ -3,6 +3,7 @@
 (function () {
   const menu = document.getElementById("archiveMenu");
   const menuTrack = document.getElementById("archiveMenuTrack");
+  const venueMap = document.getElementById("archiveVenueMap");
   const menuProfile = document.getElementById("archiveMenuProfile");
   const archiveViewport = document.getElementById("archiveViewport");
   const archivePage = document.getElementById("archivePage");
@@ -60,23 +61,36 @@
     const leftLinks = document.getElementById("siteMenuLinks");
     const leftLink = leftLinks?.querySelector("a");
     if (leftLink) {
-      menu.style.setProperty("--archive-nav-font-size", getComputedStyle(leftLink).fontSize);
-      menu.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
-      menu.style.setProperty("--archive-nav-width", getComputedStyle(document.querySelector(".side-nav")).width);
+      menuTrack.style.setProperty("--archive-nav-font-size", getComputedStyle(leftLink).fontSize);
+      menuTrack.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
+      menuTrack.style.setProperty("--archive-nav-width", getComputedStyle(document.querySelector(".side-nav")).width);
+      const posterWidth = document.querySelector(".poster").getBoundingClientRect().width;
+      menuTrack.style.setProperty("--archive-menu-inset", `${posterWidth * .043}px`);
+      menuTrack.style.setProperty("--archive-red-stem", `${posterWidth * .010}px`);
+      menuTrack.style.setProperty("--archive-orange-stem", `${posterWidth * .026}px`);
+      menuTrack.style.setProperty("--archive-purple-stem", `${posterWidth * .043}px`);
       const shell = document.querySelector(".site-shell");
       const menuStyle = getComputedStyle(menu);
       const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;
-      const menuInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth);
-      menu.style.setProperty("--archive-nav-top", `${Math.max(0, linkTop - menuInset)}px`);
+      const menuInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth) + 5;
+      menuTrack.style.setProperty("--archive-nav-top", `${Math.max(0, linkTop - menuInset)}px`);
+      if (!menuTrack.hidden) {
+        const trackTop = menuTrack.getBoundingClientRect().top;
+        for (const view of ["artists", "venues", "events"]) {
+          const badge = menu.querySelector(`.archive-menu-badge--${view}`);
+          const stem = menuTrack.querySelector(`.archive-menu-stem--${view}`);
+          stem.style.top = `${badge.getBoundingClientRect().top - trackTop + badge.offsetHeight / 2 - stem.offsetHeight / 2}px`;
+        }
+      }
     }
   }
 
   function showMenu(view = "", restart = false) {
     const motion = ++menuMotionSerial;
     clearTimeout(exitTimer);
-    positionMenu();
     if (restart) menuTrack.classList.remove("is-open");
     menuTrack.hidden = false;
+    venueMap.hidden = view !== "venue" && view !== "venues";
     menu.querySelectorAll("a").forEach(link => {
       const target = new URL(link.href).searchParams.get("archive") || "";
       if ((view && target === view) || (view === "artist" && target === "artists") ||
@@ -86,6 +100,7 @@
         link.removeAttribute("aria-current");
       }
     });
+    positionMenu();
     if (restart) void menuTrack.offsetHeight;
     requestAnimationFrame(() => {
       if (motion === menuMotionSerial) menuTrack.classList.add("is-open");
@@ -410,7 +425,7 @@
     closeDatePopover();
     archiveStack.hidden = false;
     header(params.view === "artist" ? "Artist" : params.view === "venue" ? "Venue" :
-      params.view === "artists" ? "Artists" : params.view === "venues" ? "Venues" : "Archive");
+      params.view === "artists" ? "Artists" : params.view === "venues" ? "Venues" : "Past Events");
     document.title = `${archiveHeader.textContent} | Queer Dance Philly`;
     message("Loading archive…");
 

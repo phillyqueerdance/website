@@ -38,7 +38,7 @@
  <link rel="stylesheet" href="style.css?v=20260928-01">
  <link rel="stylesheet" href="poster-theme.css?v=20260926-01">
  <link rel="stylesheet" href="poster-redesign.css?v=20260930-massive-3">
- <link rel="stylesheet" href="archive.css?v=massive-7">
+ <link rel="stylesheet" href="archive.css?v=massive-8">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -236,14 +236,24 @@
 
       <div id="siteMenuLinks" class="side-nav-links">
         <a href="/" data-archive-link>Calendar</a>
+        <a href="/?archive=artists" data-archive-link>Artists</a>
+        <a href="/?archive=venues" data-archive-link>Venues</a>
+
+        <a
+          id="meltLink"
+          class="melt-nav-link"
+          href="#melt"
+          aria-label="Melt"
+          aria-controls="meltDialog"
+        >
+          <img class="melt-nav-logo" src="melt-logo.png" alt="Melt">
+        </a>
+
         <a
           id="aboutLink"
           href="#about"
           aria-controls="aboutDialog"
         >About</a>
-
-        <a href="/?archive=artists" data-archive-link>Artists</a>
-        <a href="/?archive=venues" data-archive-link>Venues</a>
 
         <a
           href="https://docs.google.com/forms/d/e/1FAIpQLScZijFfh9oe1puPByS2CZ4u1Wr3WJwYa7m79za-8wMvU24tgQ/viewform"
@@ -251,19 +261,11 @@
           rel="noopener noreferrer"
         >Submit Event</a>
 
-         <a
-  id="meltLink"
-  class="melt-nav-link"
-  href="#melt"
-  aria-label="About Melt"
-  aria-controls="meltDialog"
->
-  <img
-    class="melt-nav-logo"
-    src="melt-logo.png"
-    alt="Melt"
-  >
-</a>
+        <a
+          href="https://www.instagram.com/queerdancephilly/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Instagram</a>
 
         <a
           href="https://ra.co/promoters/189746"
@@ -271,27 +273,32 @@
           rel="noopener noreferrer"
         >QDP on RA</a>
 
-        <a
-          href="https://www.instagram.com/queerdancephilly/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >Instagram</a>
-
-        <a href="/?archive=events" data-archive-link>Archive</a>
+        <a href="/?archive=events" data-archive-link>Past Events</a>
       </div>
     </nav>
 
     <div id="archiveMenuTrack" class="archive-menu-track" hidden>
-    <nav id="archiveMenu" class="archive-menu" aria-label="Archive navigation">
-      <a href="/?archive=artists" data-archive-link>Artists</a>
-      <a href="/?archive=venues" data-archive-link>Venues</a>
-      <a
-        href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
-        target="_blank"
-        rel="noopener noreferrer"
-      >Venue Map</a>
-      <section id="archiveMenuProfile" class="archive-menu-profile" aria-live="polite" hidden></section>
-    </nav>
+      <div class="archive-menu-panel">
+        <div class="archive-menu-stems" aria-hidden="true">
+          <span class="archive-menu-stem archive-menu-stem--artists"></span>
+          <span class="archive-menu-stem archive-menu-stem--venues"></span>
+          <span class="archive-menu-stem archive-menu-stem--events"></span>
+        </div>
+        <nav id="archiveMenu" class="archive-menu" aria-label="Artists, venues, and past events">
+          <a class="archive-menu-badge archive-menu-badge--artists" href="/?archive=artists" data-archive-link>Artists</a>
+          <a class="archive-menu-badge archive-menu-badge--venues" href="/?archive=venues" data-archive-link>Venues</a>
+          <a
+            id="archiveVenueMap"
+            class="archive-menu-map"
+            href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
+            target="_blank"
+            rel="noopener noreferrer"
+            hidden
+          >Venue Map</a>
+          <a class="archive-menu-badge archive-menu-badge--events" href="/?archive=events" data-archive-link>Past Events</a>
+          <section id="archiveMenuProfile" class="archive-menu-profile" aria-live="polite" hidden></section>
+        </nav>
+      </div>
     </div>
 
   </main>
@@ -1232,7 +1239,7 @@
 
   <template id="qdpInitialEvents"></template>
   <script src="app.js?v=20260930-massive-3"></script>
-  <script src="archive.js?v=massive-6"></script>
+  <script src="archive.js?v=massive-7"></script>
   <script src="menu-pointer-sparkles.js?v=massive-3"></script>
 
 </body>
