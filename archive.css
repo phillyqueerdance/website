@@ -135,7 +135,7 @@
     padding-left var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
 }
 .archive-menu > .archive-menu-badge[aria-current="page"] {
-  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 14px);
+  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 38px);
   padding-left: calc(var(--archive-menu-inset, 33px) + 12px);
 }
 .archive-menu-badge--artists { --archive-badge-label-x: var(--archive-artists-label-x, 38px); background: #fa2b5a; }

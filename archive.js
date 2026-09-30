@@ -89,7 +89,7 @@
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.getBoundingClientRect().width))) + 24;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
-        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset}px`);
+        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset - 20}px`);
       }
     }
   }
@@ -160,8 +160,7 @@
     setProfile("");
     document.body.classList.remove("archive-mode");
     document.documentElement.classList.remove("archive-open");
-    if (window.QDPInfoView?.active) showMenu();
-    else hideMenu();
+    hideMenu();
     document.title = "Queer Dance Philly";
     if (posterPages.length) {
       renderPoster();

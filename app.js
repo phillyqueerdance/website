@@ -1684,8 +1684,7 @@ const infoView = {
       view.style.transition = "none";
       view.classList.remove("is-open");
     }
-    const menuTrack = document.getElementById("archiveMenuTrack");
-    window.QDPArchive?.showMenu("", menuTrack.hidden || !menuTrack.classList.contains("is-open"));
+    window.QDPArchive?.hideMenu();
     void infoViews[kind].offsetHeight;
     for (const view of Object.values(infoViews)) view.style.transition = "";
     requestAnimationFrame(() => {
