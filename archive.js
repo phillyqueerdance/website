@@ -471,7 +471,9 @@
     }
     const directoryPromise = directory ? load(directory).catch(() => null) : null;
     if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
-    window.QDPInfoView?.close({ historyEntry: false, preserveMenu: true });
+    if (!["#about", "#melt"].includes(location.hash)) {
+      window.QDPInfoView?.close({ historyEntry: false, preserveMenu: true });
+    }
     archive.active = true;
     renderedKey = params.key;
     loadingKey = params.key;
@@ -484,6 +486,7 @@
     archivePage.style.transition = "none";
     archivePage.classList.remove("is-open");
     showMenu(params.view, menuTrack.hidden || !menuTrack.classList.contains("is-open"));
+    if (window.QDPInfoView?.active) hideMenu();
     void archivePage.offsetHeight;
     archivePage.style.transition = "";
     requestAnimationFrame(() => {
