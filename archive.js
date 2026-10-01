@@ -97,10 +97,7 @@
       const overlap = posterWidth * (1 - purpleBorder);
       menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
       menuTrack.style.setProperty("--archive-overlap", `${overlap}px`);
-      menuTrack.style.setProperty("--archive-label-active-x", `${overlap + 12}px`);
-      menuTrack.style.setProperty("--archive-label-purple-x", `${overlap + 8}px`);
-      menuTrack.style.setProperty("--archive-label-orange-x", `${overlap + 20}px`);
-      menuTrack.style.setProperty("--archive-label-red-x", `${overlap + 32}px`);
+      menuTrack.style.setProperty("--archive-badge-label-x", `${menuInset + 14}px`);
       const shell = document.querySelector(".site-shell");
       const menuStyle = getComputedStyle(menu);
       const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;

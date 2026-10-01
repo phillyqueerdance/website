@@ -25,22 +25,25 @@
 .archive-back {
   position: absolute;
   z-index: 4;
-  top: calc(var(--qdp-date-top) + var(--qdp-date-height) + .8cqw);
-  left: 17%;
+  bottom: calc(var(--qdp-list-bottom) + 1cqw);
+  left: 50%;
   display: inline-flex;
   align-items: center;
-  min-height: var(--qdp-date-height);
-  padding: 0 1.5cqw;
-  border: 2px solid #ffea86;
-  border-radius: 999px;
-  background: #000;
+  justify-content: center;
+  min-height: 3cqw;
+  padding: 0;
   color: #fff1f4;
-  font: 700 2cqw/1 "QDP Fraunces", Georgia, serif;
-  text-decoration: none;
+  font: 700 clamp(13px, 2.4cqw, 20px)/1.2 "QDP Fraunces", Georgia, serif;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 .archive-back[hidden] { display: none; }
 .archive-back:hover, .archive-back:focus-visible { color: #ffea86; }
 .archive-stack { z-index: 2; }
+.archive-page:has(.archive-back:not([hidden])) .archive-stack {
+  bottom: calc(var(--qdp-list-bottom) + 6.4cqw);
+}
 .archive-mode #eventStack, .archive-mode #dateButton,
 .archive-mode .date-scroll-label { visibility: hidden; }
 .archive-mode .today-button { display: none; }
@@ -83,8 +86,18 @@
 .poster-info-page .melt-dialog-content { max-height: none; }
 .info-mode .poster-controls { visibility: hidden; }
 
-/* The poster artwork covers the left end of the menu as it slides out. */
-.poster-stage { z-index: 12; }
+/* Keep the frame lines above the menu, without hiding the tabs behind the
+   solid black margin outside those lines in the source artwork. */
+.poster-stage { z-index: auto; }
+.poster-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  background: url("frame.png?v=20260926-01") center / 100% 100% no-repeat;
+  clip-path: inset(0 3.9% 0 91.75%);
+  pointer-events: none;
+}
 .archive-menu-track {
   position: absolute;
   top: 0;
@@ -148,6 +161,7 @@
   padding: 5px 12px 5px var(--archive-badge-label-x, 12px);
   border-radius: 0 14px 14px 0;
   color: #fff1f4;
+  justify-content: flex-start;
   white-space: nowrap;
   overflow: hidden;
   transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out),
@@ -155,24 +169,23 @@
 }
 .archive-menu > .archive-menu-badge[aria-current="page"] {
   width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 12px);
-  padding-left: var(--archive-label-active-x, 76px);
+  justify-content: center;
+  padding-left: 12px;
 }
 .archive-menu-badge[data-tab-color="red"] {
-  --archive-badge-label-x: var(--archive-label-red-x, 38px);
   background: #fa2b5a;
 }
 .archive-menu-badge[data-tab-color="orange"] {
-  --archive-badge-label-x: var(--archive-label-orange-x, 25px);
   background: #ff7945;
   color: #241016 !important;
 }
 .archive-menu-badge[data-tab-color="purple"] {
-  --archive-badge-label-x: var(--archive-label-purple-x, 13px);
   background: #922185;
 }
 .archive-menu-badge[aria-current="page"]::after {
   content: "✦";
-  margin-left: auto;
+  position: absolute;
+  right: 12px;
   color: #fff1f4;
   font-size: .75em;
 }
@@ -307,7 +320,8 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 
 @media (max-width: 760px) {
   .poster-stage { z-index: auto; }
-  .archive-back { left: 8%; min-height: 4.5cqw; padding: 0 1cqw; font-size: clamp(10px, 2.5cqw, 14px); }
+  .poster-stage::after { display: none; }
+  .archive-back { min-height: 4.5cqw; font-size: clamp(12px, 2.5cqw, 16px); }
   html.archive-open { height: auto; min-height: 100%; overflow-y: auto; }
   body.archive-mode { height: auto; min-height: 100dvh; overflow: visible; }
   .archive-mode .site-shell { max-height: none; }
@@ -347,7 +361,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   .archive-menu::before { display: none; }
   .archive-menu > .archive-menu-badge {
     align-self: center;
-    justify-content: center;
+    justify-content: flex-start;
     width: var(--archive-tab-label-width, 130px);
     margin-left: 0;
     padding-left: 12px;

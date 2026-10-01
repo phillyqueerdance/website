@@ -506,6 +506,7 @@
   border: 2px solid #ffea86;
   border-radius: 2.5cqw;
   background: #000;
+  text-align: center;
 }
 .event-detail-see-more[hidden] { display: none; }
 .event-detail-see-more h3 {
@@ -513,7 +514,12 @@
   color: #fff1f4;
   font: 700 3cqw/1.1 "QDP Fraunces", Georgia, serif;
 }
-.event-detail-see-more-links { display: flex; flex-wrap: wrap; gap: 1cqw; }
+.event-detail-see-more-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1cqw;
+}
 .event-detail-related-bubble {
   display: inline-flex;
   align-items: center;
@@ -527,6 +533,7 @@
 .event-detail-related-bubble--red { background: #fa2b5a; }
 .event-detail-related-bubble--orange { background: #ff7945; color: #241016; }
 .event-detail-related-bubble--purple { background: #922185; }
+.event-detail-see-more a:any-link { text-decoration: none; }
 .event-detail-related-bubble:hover { filter: brightness(1.12); }
 .event-detail-related-bubble:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
 .event-share-status:not(:empty) {

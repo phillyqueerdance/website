@@ -1400,7 +1400,6 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   else detailCard.classList.add("without-flyer");
   detailCard.appendChild(titleLocation);
   if (more.childNodes.length) detailCard.appendChild(more);
-  detailCard.appendChild(actions);
 
   const seeMore = document.createElement("section");
   seeMore.className = "event-detail-see-more";
@@ -1412,6 +1411,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   seeMoreLinks.className = "event-detail-see-more-links";
   seeMore.append(seeMoreHeading, seeMoreLinks);
   detailCard.appendChild(seeMore);
+  detailCard.appendChild(actions);
 
   eventDetail.appendChild(detailCard);
   fitDetailContent();
