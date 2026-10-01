@@ -93,7 +93,9 @@
       menuTrack.style.setProperty("--archive-nav-width", getComputedStyle(document.querySelector(".side-nav")).width);
       const posterWidth = document.querySelector(".poster").getBoundingClientRect().width;
       const purpleBorder = 1586 / 1727;
-      const menuInset = posterWidth * (.96 - purpleBorder);
+      // Begin behind the last pixels of the outer red line, so both rails
+      // emerge directly from the frame once the artwork is layered above them.
+      const menuInset = posterWidth * (1653 - 1586) / 1727;
       const overlap = posterWidth * (1 - purpleBorder);
       menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
       menuTrack.style.setProperty("--archive-overlap", `${overlap}px`);
@@ -451,6 +453,9 @@
     }
 
     if (archive.active && renderedKey === params.key) {
+      if (window.QDPInfoView?.active && !["#about", "#melt"].includes(location.hash)) {
+        window.QDPInfoView.close({ historyEntry: false });
+      }
       if (loadingKey !== params.key) syncPopup();
       return;
     }
@@ -488,7 +493,7 @@
     archiveStack.hidden = false;
     header(params.view === "events" ? "Past Events" :
       params.view[0].toUpperCase() + params.view.slice(1));
-    document.title = `${archiveHeader.textContent} | Queer Dance Philly`;
+    if (!window.QDPInfoView?.active) document.title = `${archiveHeader.textContent} | Queer Dance Philly`;
     message("Loading archive…");
 
     const resource = params.view === "events" ? (params.month ? "month" : "months") : params.view;
@@ -503,7 +508,7 @@
         if (!data.profile || data.profile.id !== params.id) throw new Error("Profile not found");
         renderEvents(data.events, data.profile, resource);
         header(data.profile.name);
-        document.title = `${data.profile.name} | Queer Dance Philly`;
+        if (!window.QDPInfoView?.active) document.title = `${data.profile.name} | Queer Dance Philly`;
       }
       archiveStack.scrollTop = 0;
       syncYearHeadings();

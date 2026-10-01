@@ -1413,10 +1413,27 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   detailCard.appendChild(seeMore);
   detailCard.appendChild(actions);
 
-  eventDetail.appendChild(detailCard);
+  const back = document.createElement("a");
+  back.className = "event-detail-back";
+  back.href = homepageUrl();
+  back.textContent = `← Back to ${window.QDPArchive?.active
+    ? document.getElementById("archiveHeader")?.textContent || "Past Events"
+    : "Calendar"}`;
+  back.addEventListener("click", click => {
+    if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
+    click.preventDefault();
+    closeEventDetail();
+  });
+
+  eventDetail.append(detailCard, back);
   fitDetailContent();
   updateDetailNavigationState();
-  eventDetail.focus({ preventScroll: true });
+  if (infoView.active) {
+    eventDetail.inert = true;
+    eventDetail.setAttribute("aria-hidden", "true");
+  } else {
+    eventDetail.focus({ preventScroll: true });
+  }
   loadEventRelations(id, detailCard, seeMore, seeMoreLinks);
 }
 
@@ -1673,7 +1690,8 @@ window.addEventListener("popstate", () => syncEventFromUrl());
 eventDetail.addEventListener("keydown", event => {
   if (event.key !== "Tab") return;
   const liveCard = eventDetail.querySelector(".event-detail-card:not([aria-hidden])");
-  const controls = [...(liveCard?.querySelectorAll("a[href], button:not([disabled])") || [])];
+  const controls = [...(liveCard?.querySelectorAll("a[href], button:not([disabled])") || []),
+    ...eventDetail.querySelectorAll(".event-detail-back")];
   const first = controls[0];
   const last = controls[controls.length - 1];
   if (document.activeElement === eventDetail) {
@@ -1698,7 +1716,7 @@ eventDetail.addEventListener(
 );
 
 document.addEventListener("click", event => {
-  if (!event.isTrusted || eventDetail.hidden || eventDetail.contains(event.target)) return;
+  if (!event.isTrusted || infoView.active || eventDetail.hidden || eventDetail.contains(event.target)) return;
   if (event.target instanceof Element &&
       event.target.closest("#previousPoster, #nextPoster, .event-card, a[data-archive-link]")) return;
   closeEventDetail();
@@ -1711,12 +1729,19 @@ const infoView = {
   active: "",
   show(kind, { historyEntry = true } = {}) {
     if (!infoViews[kind]) return;
+    if (this.active === kind) return;
     closeDatePopover();
-    if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
-    if (historyEntry) history.pushState({ qdpInfo: kind }, "", `/#${kind}`);
+    if (historyEntry) {
+      const url = new URL(location.href);
+      url.hash = kind;
+      history.pushState({ qdpInfo: kind }, "", url);
+    }
     this.active = kind;
     document.body.classList.add("info-mode");
-    window.QDPArchive?.route();
+    if (!eventDetail.hidden) {
+      eventDetail.inert = true;
+      eventDetail.setAttribute("aria-hidden", "true");
+    }
     clearTimeout(infoExitTimer);
     infoViewport.hidden = false;
     for (const [key, view] of Object.entries(infoViews)) {
@@ -1734,16 +1759,32 @@ const infoView = {
   },
   close({ historyEntry = true, preserveMenu = false } = {}) {
     if (!this.active) return;
-    if (historyEntry) history.pushState(null, "", "/");
+    if (historyEntry && history.state?.qdpInfo === this.active) {
+      history.back();
+      return;
+    }
+    if (historyEntry) {
+      const url = new URL(location.href);
+      url.hash = "";
+      history.replaceState(history.state, "", url);
+    }
     this.active = "";
     document.body.classList.remove("info-mode");
+    eventDetail.inert = false;
+    eventDetail.removeAttribute("aria-hidden");
     for (const view of Object.values(infoViews)) view.classList.remove("is-open");
     clearTimeout(infoExitTimer);
     infoExitTimer = setTimeout(() => {
       if (!this.active) infoViewport.hidden = true;
     }, 500);
-    if (!preserveMenu && !window.QDPArchive?.active) window.QDPArchive?.hideMenu();
-    if (!window.QDPArchive?.active) document.title = "Queer Dance Philly";
+    if (!preserveMenu) {
+      const view = new URLSearchParams(location.search).get("archive");
+      if (view && window.QDPArchive?.active) window.QDPArchive.showMenu(view);
+      else window.QDPArchive?.hideMenu();
+    }
+    document.title = window.QDPArchive?.active
+      ? `${document.getElementById("archiveHeader").textContent} | Queer Dance Philly`
+      : "Queer Dance Philly";
   }
 };
 window.QDPInfoView = infoView;
@@ -1760,15 +1801,15 @@ aboutCloseButton.addEventListener("click", () => infoView.close());
 meltCloseButton.addEventListener("click", () => infoView.close());
 window.addEventListener("popstate", () => {
   const kind = location.hash.slice(1);
-  if (!new URLSearchParams(location.search).has("archive") && infoViews[kind]) {
+  if (infoViews[kind]) {
     infoView.show(kind, { historyEntry: false });
   } else {
-    infoView.close({ historyEntry: false, preserveMenu: Boolean(new URLSearchParams(location.search).has("archive")) });
+    infoView.close({ historyEntry: false });
   }
 });
 queueMicrotask(() => {
   const kind = location.hash.slice(1);
-  if (!new URLSearchParams(location.search).has("archive") && infoViews[kind]) {
+  if (infoViews[kind]) {
     infoView.show(kind, { historyEntry: false });
   }
 });

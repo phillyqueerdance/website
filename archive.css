@@ -95,7 +95,7 @@
   inset: 0;
   z-index: 12;
   background: url("frame.png?v=20260926-01") center / 100% 100% no-repeat;
-  clip-path: inset(0 3.9% 0 91.75%);
+  clip-path: inset(0 4.25% 0 91.75%);
   pointer-events: none;
 }
 .archive-menu-track {
@@ -233,7 +233,7 @@
   position: absolute;
   top: var(--archive-alphabet-top, 320px);
   bottom: 6.75%;
-  left: var(--archive-overlap, 64px);
+  left: var(--archive-menu-inset, 30px);
   width: 50px;
   padding: 8px 4px;
   display: grid;

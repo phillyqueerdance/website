@@ -387,7 +387,7 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: calc(100% - 5cqw);
   max-height: none;
   padding: 0 1cqw 3cqw 0;
   overflow-y: auto;
@@ -395,6 +395,24 @@
   touch-action: pan-y;
 }
 .event-detail-card > * { flex-shrink: 0; }
+.event-detail-content-viewport { max-height: calc(100% - 5cqw); }
+.event-detail-back {
+  position: absolute;
+  right: 0;
+  bottom: 1.2cqw;
+  left: 0;
+  z-index: 3;
+  display: block;
+  width: fit-content;
+  margin: auto;
+  padding: 0;
+  color: #fff1f4;
+  font: 700 clamp(13px, 2.4cqw, 20px)/1.2 "QDP Fraunces", Georgia, serif;
+  text-align: center;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+.event-detail-back:hover, .event-detail-back:focus-visible { color: #ffea86; }
 .event-detail-flyer-slot {
   display: flex;
   align-items: flex-start;
