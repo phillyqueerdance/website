@@ -10,6 +10,7 @@
   const archivePage = document.getElementById("archivePage");
   const archiveStack = document.getElementById("archiveStack");
   const archiveHeader = document.getElementById("archiveHeader");
+  const archiveBack = document.getElementById("archiveBack");
   let exitTimer = 0;
   let menuMotionSerial = 0;
   const cache = new Map();
@@ -24,6 +25,7 @@
   let pageExitTimer = 0;
   let cards = [];
   let corners = [];
+  let profileNavigation = null;
 
   function routeParams() {
     const params = new URLSearchParams(location.search);
@@ -92,10 +94,13 @@
       const posterWidth = document.querySelector(".poster").getBoundingClientRect().width;
       const purpleBorder = 1586 / 1727;
       const menuInset = posterWidth * (.96 - purpleBorder);
+      const overlap = posterWidth * (1 - purpleBorder);
       menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
-      menuTrack.style.setProperty("--archive-label-purple-x", `${posterWidth * (1614 - 1586) / 1727}px`);
-      menuTrack.style.setProperty("--archive-label-orange-x", `${posterWidth * (1642 - 1586) / 1727}px`);
-      menuTrack.style.setProperty("--archive-label-red-x", `${posterWidth * (1670 - 1586) / 1727}px`);
+      menuTrack.style.setProperty("--archive-overlap", `${overlap}px`);
+      menuTrack.style.setProperty("--archive-label-active-x", `${overlap + 12}px`);
+      menuTrack.style.setProperty("--archive-label-purple-x", `${overlap + 8}px`);
+      menuTrack.style.setProperty("--archive-label-orange-x", `${overlap + 20}px`);
+      menuTrack.style.setProperty("--archive-label-red-x", `${overlap + 32}px`);
       const shell = document.querySelector(".site-shell");
       const menuStyle = getComputedStyle(menu);
       const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;
@@ -106,7 +111,7 @@
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.getBoundingClientRect().width))) + 24;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
-        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset - 20}px`);
+        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + overlap + 14}px`);
       }
     }
   }
@@ -177,6 +182,8 @@
     loadingKey = "";
     cards = [];
     corners = [];
+    profileNavigation = null;
+    archiveBack.hidden = true;
     archivePage.classList.remove("is-open");
     clearTimeout(pageExitTimer);
     pageExitTimer = setTimeout(() => {
@@ -227,6 +234,14 @@
     const prefix = kind === "artists" ? /^(?:DJ|The)\b[\s.:-]+/i : /^The\b[\s.:-]+/i;
     while (prefix.test(key)) key = key.replace(prefix, "").trim();
     return key || fullName;
+  }
+
+  function sortProfiles(items, kind) {
+    return [...items].filter(item => item.id && item.name).sort((a, b) => {
+      const aKey = directorySortName(a.name, kind);
+      const bKey = directorySortName(b.name, kind);
+      return collator.compare(initial(aKey), initial(bKey)) || collator.compare(aKey, bKey);
+    });
   }
 
   function initial(name) {
@@ -280,11 +295,7 @@
     archiveStack.replaceChildren();
     cards = [];
     corners = [];
-    const profiles = [...items].filter(item => item.id && item.name).sort((a, b) => {
-      const aKey = directorySortName(a.name, kind);
-      const bKey = directorySortName(b.name, kind);
-      return collator.compare(initial(aKey), initial(bKey)) || collator.compare(aKey, bKey);
-    });
+    const profiles = sortProfiles(items, kind);
     let lastLetter = "";
     let current = null;
     for (const item of profiles) {
@@ -447,6 +458,16 @@
       return;
     }
     const serial = ++requestNumber;
+    profileNavigation = null;
+    const directory = profileViews[params.view];
+    archiveBack.hidden = !directory && !(params.view === "events" && params.month);
+    if (!archiveBack.hidden) {
+      const destination = directory || "events";
+      archiveBack.href = archiveUrl(destination).href;
+      archiveBack.textContent = `← Back to ${destination === "events" ? "Past Events" :
+        destination[0].toUpperCase() + destination.slice(1)}`;
+    }
+    const directoryPromise = directory ? load(directory).catch(() => null) : null;
     if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
     window.QDPInfoView?.close({ historyEntry: false, preserveMenu: true });
     archive.active = true;
@@ -492,6 +513,16 @@
       loadingKey = "";
       archive.updateControls();
       syncPopup();
+      if (directoryPromise) {
+        directoryPromise.then(directoryData => {
+          if (serial !== requestNumber || !Array.isArray(directoryData?.[directory])) return;
+          const profiles = sortProfiles(directoryData[directory], directory);
+          const index = profiles.findIndex(item => item.id === params.id);
+          if (index < 0) return;
+          profileNavigation = { kind: params.view, profiles, index };
+          archive.updateControls();
+        });
+      }
     } catch (error) {
       if (serial !== requestNumber) return;
       loadingKey = "";
@@ -540,6 +571,15 @@
       this.updateControls();
     },
     move(direction) {
+      if (profileViews[routeParams().view]) {
+        if (!profileNavigation) return;
+        const target = profileNavigation.profiles[profileNavigation.index + direction];
+        if (target) {
+          history.pushState({ qdpArchive: true }, "", archiveUrl(profileNavigation.kind, target.id));
+          route();
+        }
+        return;
+      }
       if (!cards.length) return;
       const top = archiveStack.scrollTop + 2;
       let index = 0;
@@ -562,6 +602,17 @@
           card.parentElement.style.setProperty("--qdp-tail-radius", `${radius * (1 - progress)}px`);
         }
       }
+      if (profileViews[routeParams().view]) {
+        const label = routeParams().view[0].toUpperCase() + routeParams().view.slice(1);
+        previousPoster.setAttribute("aria-label", `Previous ${label}`);
+        nextPoster.setAttribute("aria-label", `Next ${label}`);
+        previousPoster.disabled = !profileNavigation || profileNavigation.index === 0;
+        nextPoster.disabled = !profileNavigation ||
+          profileNavigation.index === profileNavigation.profiles.length - 1;
+        return;
+      }
+      previousPoster.setAttribute("aria-label", "Previous listing");
+      nextPoster.setAttribute("aria-label", "Next listing");
       const top = archiveStack.scrollTop + 2;
       let index = 0;
       cards.forEach((card, candidate) => {

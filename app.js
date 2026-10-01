@@ -1402,10 +1402,50 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   if (more.childNodes.length) detailCard.appendChild(more);
   detailCard.appendChild(actions);
 
+  const seeMore = document.createElement("section");
+  seeMore.className = "event-detail-see-more";
+  seeMore.setAttribute("aria-label", "See More");
+  seeMore.hidden = true;
+  const seeMoreHeading = document.createElement("h3");
+  seeMoreHeading.textContent = "See More";
+  const seeMoreLinks = document.createElement("div");
+  seeMoreLinks.className = "event-detail-see-more-links";
+  seeMore.append(seeMoreHeading, seeMoreLinks);
+  detailCard.appendChild(seeMore);
+
   eventDetail.appendChild(detailCard);
   fitDetailContent();
   updateDetailNavigationState();
   eventDetail.focus({ preventScroll: true });
+  loadEventRelations(id, detailCard, seeMore, seeMoreLinks);
+}
+
+const eventRelations = new Map();
+
+function loadEventRelations(id, card, section, links) {
+  if (!id) return;
+  if (!eventRelations.has(id)) {
+    eventRelations.set(id, fetch(`/api/event-relations?event=${encodeURIComponent(id)}`)
+      .then(response => response.ok ? response.json() : { related: [] })
+      .catch(() => ({ related: [] })));
+  }
+  eventRelations.get(id).then(data => {
+    if (!card.isConnected || activeEventId !== id || !Array.isArray(data.related)) return;
+    const colors = { artist: "red", venue: "orange", party: "purple", collective: "red" };
+    for (const item of data.related) {
+      if (!colors[item.kind] || !/^[\w-]{1,80}$/.test(item.id) || !item.name) continue;
+      const url = new URL("/", location.origin);
+      url.searchParams.set("archive", item.kind);
+      url.searchParams.set("id", item.id);
+      const link = document.createElement("a");
+      link.className = `event-detail-related-bubble event-detail-related-bubble--${colors[item.kind]}`;
+      link.href = url.href;
+      link.setAttribute("data-archive-link", "");
+      link.textContent = item.name;
+      links.appendChild(link);
+    }
+    section.hidden = !links.childElementCount;
+  });
 }
 
 function orderedEvents() {

@@ -205,7 +205,8 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
   assert.equal(records.length, 19);
   const values = new Map(records.map(({ key, value }) => [key, JSON.parse(value)]));
   values.set('qdp-archive:v1:manifest', {
-    schema: 1, revision: 'revision-1', artists: ['ALPHA'], venues: ['ROOM'],
+    schema: 1, revision: 'revision-1', partyPublicGate: true,
+    artists: ['ALPHA'], venues: ['ROOM'],
     parties: ['NIGHT'], collectives: ['CREW'],
     months: ['2024-09', '2025-01']
   });
@@ -288,6 +289,23 @@ test('unpublished new directories answer immediately without a slow live fallbac
       });
       assert.equal(response.status, 503);
       assert.match((await response.json()).error, /waiting for the sheet/);
+    }
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('party pages stay unpublished until the snapshot declares a Public_OK gate', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('Unexpected live Apps Script request'); };
+  try {
+    const kv = { get: async key => key.endsWith('manifest')
+      ? { schema: 1, revision: 'old', artists: ['ALPHA'], venues: ['ROOM'], parties: ['NIGHT'] }
+      : { revision: 'old', payload: { parties: [{ id: 'NIGHT', name: 'Night', publicOk: true }] } } };
+    for (const resource of ['parties', 'party&id=NIGHT']) {
+      const response = await onRequestGet({
+        request: new Request(`https://massive.example/api/archive?resource=${resource}`),
+        env: { QDP_ARCHIVE_KV: kv }
+      });
+      assert.equal(response.status, 503);
     }
   } finally { globalThis.fetch = originalFetch; }
 });

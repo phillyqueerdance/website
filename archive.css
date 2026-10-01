@@ -22,6 +22,24 @@
 .archive-page.is-open { transform: translateY(0); }
 .archive-header { cursor: default; }
 .archive-header:hover, .archive-header:focus-visible { background: #fa2b5a; color: #ffeff2; }
+.archive-back {
+  position: absolute;
+  z-index: 4;
+  top: var(--qdp-date-top);
+  right: 9.8%;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--qdp-date-height);
+  padding: 0 1.5cqw;
+  border: 2px solid #ffea86;
+  border-radius: 999px;
+  background: #000;
+  color: #fff1f4;
+  font: 700 2cqw/1 "QDP Fraunces", Georgia, serif;
+  text-decoration: none;
+}
+.archive-back[hidden] { display: none; }
+.archive-back:hover, .archive-back:focus-visible { color: #ffea86; }
 .archive-stack { z-index: 2; }
 .archive-mode #eventStack, .archive-mode #dateButton,
 .archive-mode .date-scroll-label { visibility: hidden; }
@@ -65,7 +83,8 @@
 .poster-info-page .melt-dialog-content { max-height: none; }
 .info-mode .poster-controls { visibility: hidden; }
 
-/* The right tabs sit over the frame and slide out together. */
+/* The poster artwork covers the left end of the menu as it slides out. */
+.poster-stage { z-index: 12; }
 .archive-menu-track {
   position: absolute;
   top: 0;
@@ -94,7 +113,7 @@
   height: auto;
   max-height: calc(93.25% - var(--archive-nav-top, 0px));
   box-sizing: border-box;
-  padding: 16px 12px 16px calc(var(--archive-menu-inset, 33px) + 12px);
+  padding: 16px 12px 16px calc(var(--archive-overlap, 64px) + 12px);
   background: transparent;
   display: flex;
   flex-direction: column;
@@ -125,7 +144,7 @@
   box-sizing: border-box;
   width: var(--archive-tab-length, 164px);
   min-height: 36px;
-  margin-left: calc(0px - var(--archive-menu-inset, 33px) - 12px);
+  margin-left: calc(0px - var(--archive-overlap, 64px) - 12px);
   padding: 5px 12px 5px var(--archive-badge-label-x, 12px);
   border-radius: 0 14px 14px 0;
   color: #fff1f4;
@@ -135,8 +154,8 @@
     padding-left var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
 }
 .archive-menu > .archive-menu-badge[aria-current="page"] {
-  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 38px);
-  padding-left: calc(var(--archive-menu-inset, 33px) + 12px);
+  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 12px);
+  padding-left: var(--archive-label-active-x, 76px);
 }
 .archive-menu-badge[data-tab-color="red"] {
   --archive-badge-label-x: var(--archive-label-red-x, 38px);
@@ -201,7 +220,7 @@
   position: absolute;
   top: var(--archive-alphabet-top, 320px);
   bottom: 6.75%;
-  left: var(--archive-menu-inset, 33px);
+  left: var(--archive-overlap, 64px);
   width: 50px;
   padding: 8px 4px;
   display: grid;
@@ -228,7 +247,7 @@
 .archive-alphabet-letter:disabled { opacity: .38; cursor: default; }
 .archive-alphabet-letter:not(:disabled):hover,
 .archive-alphabet-letter:not(:disabled):focus-visible {
-  background: #922185;
+  background: transparent;
   outline: 1px solid #ffea86;
 }
 
@@ -287,6 +306,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 .archive-stack .event-feed-message { padding: 0 3cqw; text-align: center; }
 
 @media (max-width: 760px) {
+  .poster-stage { z-index: auto; }
   html.archive-open { height: auto; min-height: 100%; overflow-y: auto; }
   body.archive-mode { height: auto; min-height: 100dvh; overflow: visible; }
   .archive-mode .site-shell { max-height: none; }

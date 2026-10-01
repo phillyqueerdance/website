@@ -500,6 +500,35 @@
   outline: 2px solid currentColor;
   outline-offset: 3px;
 }
+.event-detail-see-more {
+  margin: 3cqw 4cqw 0;
+  padding: 2cqw;
+  border: 2px solid #ffea86;
+  border-radius: 2.5cqw;
+  background: #000;
+}
+.event-detail-see-more[hidden] { display: none; }
+.event-detail-see-more h3 {
+  margin: 0 0 1.6cqw;
+  color: #fff1f4;
+  font: 700 3cqw/1.1 "QDP Fraunces", Georgia, serif;
+}
+.event-detail-see-more-links { display: flex; flex-wrap: wrap; gap: 1cqw; }
+.event-detail-related-bubble {
+  display: inline-flex;
+  align-items: center;
+  min-height: 4cqw;
+  padding: .7cqw 1.6cqw;
+  border-radius: 999px;
+  color: #fff1f4;
+  font: 700 2.4cqw/1.2 "QDP Fraunces", Georgia, serif;
+  text-decoration: none;
+}
+.event-detail-related-bubble--red { background: #fa2b5a; }
+.event-detail-related-bubble--orange { background: #ff7945; color: #241016; }
+.event-detail-related-bubble--purple { background: #922185; }
+.event-detail-related-bubble:hover { filter: brightness(1.12); }
+.event-detail-related-bubble:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
 .event-share-status:not(:empty) {
   flex-basis: 100%;
   font-size: 0.85em;

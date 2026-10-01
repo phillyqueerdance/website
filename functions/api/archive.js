@@ -123,6 +123,9 @@ async function preparedPayload(kv, resource, id) {
   if (!kv) return null;
   const manifest = await kv.get(KV_PREFIX + "manifest", "json");
   if (manifest?.schema !== 1 || !manifest.revision) return null;
+  if (["parties", "party"].includes(resource) && manifest.partyPublicGate !== true) {
+    return { unpublished: true };
+  }
   if (["parties", "party", "collectives", "collective"].includes(resource) &&
       !Array.isArray(manifest[["party", "parties"].includes(resource) ? "parties" : "collectives"])) {
     return { unpublished: true };
