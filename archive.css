@@ -307,6 +307,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 
 @media (max-width: 760px) {
   .poster-stage { z-index: auto; }
+  .archive-back { left: 8%; min-height: 4.5cqw; padding: 0 1cqw; font-size: clamp(10px, 2.5cqw, 14px); }
   html.archive-open { height: auto; min-height: 100%; overflow-y: auto; }
   body.archive-mode { height: auto; min-height: 100dvh; overflow: visible; }
   .archive-mode .site-shell { max-height: none; }
