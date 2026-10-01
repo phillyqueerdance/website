@@ -248,6 +248,45 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test('prepared profile links use public IDs and party and collective queer flags', async () => {
+  const { ss, context } = appsScript();
+  const snapshot = context.qdpArchivePublishSource_(ss);
+  const related = [
+    { kind: 'party', id: 'NIGHT', name: 'The Night' },
+    { kind: 'collective', id: 'CREW', name: 'The Crew' },
+    { kind: 'artist', id: 'PRIVATE', name: 'Private Artist' },
+    { kind: 'party', id: 'NIGHT', name: 'Duplicate' }
+  ];
+  snapshot.artistEntries.ALPHA.profile.related = related;
+  snapshot.parties.find(item => item.id === 'NIGHT').queerParty = true;
+  snapshot.partyEntries.NIGHT.profile.queerParty = true;
+  snapshot.collectives[0].queerCollective = true;
+  snapshot.collectiveEntries.CREW.profile.queerCollective = true;
+  const values = new Map(context.qdpArchiveKvRecords_(snapshot, 'revision-2')
+    .map(({ key, value }) => [key, JSON.parse(value)]));
+  values.set('qdp-archive:v1:manifest', {
+    schema: 1, revision: 'revision-2', partyPublicGate: true,
+    artists: ['ALPHA'], venues: ['ROOM'], parties: ['NIGHT', 'OTHER'],
+    collectives: ['CREW'], months: ['2024-09', '2025-01']
+  });
+  const kv = { get: async key => values.get(key) ?? null };
+  const request = resource => ({
+    request: new Request(`https://massive.example/api/archive?${resource}`),
+    env: { QDP_ARCHIVE_KV: kv }
+  });
+  const artists = await (await onRequestGet(request('resource=artist&id=ALPHA'))).json();
+  assert.deepEqual(artists.profile.related.map(item => [item.kind, item.id]),
+    [['party', 'NIGHT'], ['collective', 'CREW']]);
+  values.get('qdp-archive:v1:manifest').partyPublicGate = false;
+  const beforePartyApproval = await (await onRequestGet(request('resource=artist&id=ALPHA'))).json();
+  assert.deepEqual(beforePartyApproval.profile.related.map(item => item.kind), ['collective']);
+  values.get('qdp-archive:v1:manifest').partyPublicGate = true;
+  const parties = await (await onRequestGet(request('resource=parties'))).json();
+  assert.equal(parties.parties.find(item => item.id === 'NIGHT').queerParty, true);
+  const collectives = await (await onRequestGet(request('resource=collectives'))).json();
+  assert.equal(collectives.collectives[0].queerCollective, true);
+});
+
 test('mixed Cloudflare revisions fall back to the live public feed', async () => {
   const originalFetch = globalThis.fetch;
   const originalCaches = globalThis.caches;
@@ -307,5 +346,21 @@ test('party pages stay unpublished until the snapshot declares a Public_OK gate'
       });
       assert.equal(response.status, 503);
     }
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('a propagating party snapshot never falls back to the old Apps Script response', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('Unexpected ungated live response'); };
+  try {
+    const kv = { get: async key => key.endsWith('manifest')
+      ? { schema: 1, revision: 'new', partyPublicGate: true, parties: ['NIGHT'] }
+      : { revision: 'old', payload: { parties: [{ id: 'NIGHT', name: 'Night', publicOk: true }] } } };
+    const response = await onRequestGet({
+      request: new Request('https://massive.example/api/archive?resource=parties'),
+      env: { QDP_ARCHIVE_KV: kv }
+    });
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
   } finally { globalThis.fetch = originalFetch; }
 });

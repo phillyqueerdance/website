@@ -310,7 +310,9 @@
         collectives: "collective" }[kind];
       const card = stripCard(item.name, subtitle,
         archiveUrl(singular, item.id).href);
-      if (kind === "artists" && (item.queerArtist || item.transArtist)) {
+      if ((kind === "artists" && (item.queerArtist || item.transArtist)) ||
+          (kind === "parties" && item.queerParty) ||
+          (kind === "collectives" && item.queerCollective)) {
         card.classList.add("archive-identity-card");
       }
       addCard(current, card);
@@ -362,6 +364,23 @@
     info.appendChild(node("h2", "archive-profile-heading", person.name));
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
+    if (Array.isArray(person.related) && person.related.length) {
+      const colors = { artist: "red", venue: "orange", party: "purple", collective: "red" };
+      const more = node("section", "archive-profile-related");
+      more.appendChild(node("h3", "", "See More"));
+      const bubbles = node("div", "archive-profile-related-links");
+      for (const item of person.related) {
+        if (!colors[item.kind] || !/^[\w-]{1,80}$/.test(item.id) || !item.name) continue;
+        const link = node("a", `event-detail-related-bubble event-detail-related-bubble--${colors[item.kind]}`, item.name);
+        link.href = archiveUrl(item.kind, item.id).href;
+        link.setAttribute("data-archive-link", "");
+        bubbles.appendChild(link);
+      }
+      if (bubbles.childElementCount) {
+        more.appendChild(bubbles);
+        info.appendChild(more);
+      }
+    }
     const links = node("div", "archive-profile-links");
     for (const [key, label] of [["maps", "Map"], ["website", "Website"],
       ["instagram", "Instagram"], ["music", "Music"]]) {

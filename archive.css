@@ -225,6 +225,34 @@
   font-style: normal;
   white-space: pre-line;
 }
+.archive-profile-related {
+  margin-top: .8em;
+  padding: 8px;
+  border: 2px solid #ffea86;
+  border-radius: 12px;
+  background: #000;
+  text-align: center;
+}
+.archive-profile-related h3 {
+  margin: 0 0 8px;
+  color: #fff1f4;
+  font: 700 1.05em/1.1 "QDP Fraunces", Georgia, serif;
+}
+.archive-profile-related-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.archive-profile-related .event-detail-related-bubble {
+  min-height: 0;
+  max-width: 100%;
+  padding: 5px 9px;
+  font-size: clamp(12px, 1.3cqw, 15px);
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-decoration: none !important;
+}
 .archive-profile-links { display: flex; flex-wrap: wrap; gap: .35em .75em; margin-top: .75em; }
 .archive-profile-links a { color: #ffea86; text-decoration: underline; }
 

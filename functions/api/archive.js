@@ -21,6 +21,8 @@ const SHARDS = { artist: 4, venue: 2, party: 2, collective: 2, month: 4 };
 const value = (input, limit = 500) => String(input ?? "").trim().slice(0, limit);
 const publicName = input => value(input, 180).replace(/^\[(.*)\]$/s, "$1").trim();
 const yes = input => input === true || /^yes$/i.test(String(input));
+const RELATED_KINDS = { artist: "artists", venue: "venues", party: "parties",
+  collective: "collectives" };
 
 function safeUrl(input) {
   try {
@@ -31,7 +33,7 @@ function safeUrl(input) {
   }
 }
 
-function profile(input, kind) {
+function profile(input, kind, publicIds = null, details = false) {
   if (!input || !yes(input.publicOk)) return null;
   const id = value(input.id, 80);
   const name = publicName(input.name);
@@ -52,7 +54,16 @@ function profile(input, kind) {
           neighborhood: value(input.neighborhood, 120),
           address: value(input.address, 260),
           maps: safeUrl(input.maps)
-        } : {})
+        } : kind === "parties" ? { queerParty: yes(input.queerParty) }
+          : kind === "collectives" ? { queerCollective: yes(input.queerCollective) } : {}),
+    ...(details ? { related: Array.isArray(input.related) ? input.related
+      .filter(item => item && Object.hasOwn(RELATED_KINDS, item.kind))
+      .map(item => ({ kind: item.kind, id: value(item.id, 80), name: publicName(item.name) }))
+      .filter(item => /^[\w-]{1,80}$/.test(item.id) && item.name &&
+        (!publicIds || (item.kind !== "party" || publicIds.partyPublicGate === true) &&
+          publicIds[RELATED_KINDS[item.kind]]?.includes(item.id)))
+      .filter((item, index, all) => all.findIndex(other =>
+        other.kind === item.kind && other.id === item.id) === index).slice(0, 60) : [] } : {})
   };
 }
 
@@ -87,7 +98,7 @@ function publicEvent(input) {
   };
 }
 
-function cleanPayload(resource, input, id) {
+function cleanPayload(resource, input, id, publicIds = null) {
   if (!input || typeof input !== "object") return null;
   if (["artists", "venues", "parties", "collectives"].includes(resource)) {
     if (!Array.isArray(input[resource])) return null;
@@ -103,7 +114,7 @@ function cleanPayload(resource, input, id) {
   if (resource === "month") return { events: events.filter(event => event.start.slice(0, 7) === id) };
   const profileKind = { artist: "artists", venue: "venues", party: "parties",
     collective: "collectives" }[resource];
-  const person = profile(input.profile, profileKind);
+  const person = profile(input.profile, profileKind, publicIds, true);
   if (!person || person.id !== id) return null;
   return {
     profile: person,
@@ -144,7 +155,7 @@ async function preparedPayload(kv, resource, id) {
   if (record?.revision !== manifest.revision) return null;
   const raw = directory ? record.payload : record.entries?.[id];
   if (!raw || (!directory && !Object.hasOwn(record.entries, id))) return null;
-  const payload = cleanPayload(resource, raw, id);
+  const payload = cleanPayload(resource, raw, id, manifest);
   return payload ? { payload } : null;
 }
 
