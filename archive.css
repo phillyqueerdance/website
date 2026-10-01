@@ -170,7 +170,7 @@
 .archive-menu > .archive-menu-badge[aria-current="page"] {
   width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 12px);
   justify-content: center;
-  padding-left: 12px;
+  padding-left: calc(var(--archive-menu-inset, 33px) + 12px);
 }
 .archive-menu-badge[data-tab-color="red"] {
   background: #fa2b5a;
