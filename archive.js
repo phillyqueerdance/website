@@ -120,7 +120,10 @@
     alphabet.hidden = !directoryViews.has(view);
     if (!alphabet.hidden) {
       alphabet.setAttribute("aria-label", `${view[0].toUpperCase() + view.slice(1)} alphabet`);
-      alphabet.querySelectorAll("button").forEach(button => { button.disabled = true; });
+      alphabet.querySelectorAll("button").forEach(button => {
+        button.disabled = true;
+        button.setAttribute("aria-label", `Jump to ${button.dataset.letter} in ${view}`);
+      });
     }
     menu.querySelectorAll("a").forEach(link => {
       const target = new URL(link.href).searchParams.get("archive") || "";
@@ -493,7 +496,9 @@
       if (serial !== requestNumber) return;
       loadingKey = "";
       console.error("Could not load QDP archive:", error);
-      message("Archive feed is not connected yet. The calendar remains available.");
+      message(directoryViews.has(params.view) && ["parties", "collectives"].includes(params.view)
+        ? `${params.view[0].toUpperCase() + params.view.slice(1)} are waiting for the sheet to be published.`
+        : "Archive feed is not connected yet. The calendar remains available.");
     }
   }
 
