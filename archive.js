@@ -90,13 +90,16 @@
     if (leftLink) {
       menuTrack.style.setProperty("--archive-nav-font-size", getComputedStyle(leftLink).fontSize);
       menuTrack.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
-      menuTrack.style.setProperty("--archive-nav-width", getComputedStyle(document.querySelector(".side-nav")).width);
+      const sideWidth = parseFloat(getComputedStyle(document.querySelector(".side-nav")).width);
       const posterWidth = document.querySelector(".poster").getBoundingClientRect().width;
       const purpleBorder = 1586 / 1727;
       // Begin behind the last pixels of the outer red line, so both rails
       // emerge directly from the frame once the artwork is layered above them.
       const menuInset = posterWidth * (1653 - 1586) / 1727;
       const overlap = posterWidth * (1 - purpleBorder);
+      const room = window.innerWidth - menuTrack.getBoundingClientRect().left - menuInset - 20;
+      menuTrack.style.setProperty("--archive-nav-width", `${Math.max(sideWidth,
+        Math.min(sideWidth + 64, room))}px`);
       menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
       menuTrack.style.setProperty("--archive-overlap", `${overlap}px`);
       menuTrack.style.setProperty("--archive-badge-label-x", `${menuInset + 14}px`);
