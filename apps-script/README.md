@@ -68,7 +68,7 @@ The updated `archive-feed.gs` also contains a publisher in **the same Apps
 Script project**. Replace the previous archive helpers with this updated file;
 do not paste a second copy of the functions. The existing `doGet` dispatch
 above remains the same. The publisher reads the sheets, applies the same
-public gates, and writes 19 grouped records to Cloudflare KV. It writes no
+public gates, and writes 19 grouped records to Cloudflare KV in request-size-limited batches. It writes no
 sheet cells, Calendar entries, or public data into GitHub.
 
 1. In Cloudflare, create a Workers KV namespace named `qdp-archive-preview`.
@@ -95,6 +95,12 @@ sheet cells, Calendar entries, or public data into GitHub.
    on the next check; to publish immediately after a review batch, run
    `qdpArchivePublish` again. If the namespace is reset without a Sheet edit,
    run `qdpArchiveForcePublish`.
+
+   If Apps Script reports `Address unavailable` during a bulk write, replace
+   the helper with the current version and run `qdpArchivePublish` again. It
+   retries temporary connection failures and sends smaller bulk requests.
+   The manifest is updated only after every batch is confirmed; a failed run
+   can be retried with the same function. No new token is needed.
 4. Load `https://massive.qdp-ali.pages.dev/api/archive?resource=artists` and
    check the response header `X-QDP-Archive-Source: prepared` in browser dev
    tools. Test an artist, venue, and month view on the preview. If the binding

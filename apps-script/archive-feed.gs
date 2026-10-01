@@ -400,19 +400,56 @@ function qdpArchiveKvRecords_(snapshot, revision) {
   return records;
 }
 
-function qdpArchiveCloudflareRequest_(url, token, method, payload, contentType) {
-  const response = UrlFetchApp.fetch(url, {
-    method, contentType,
-    headers: { Authorization: 'Bearer ' + token },
-    payload, muteHttpExceptions: true
+// Keep each Apps Script URL Fetch request comfortably below its 50 MiB body limit.
+function qdpArchiveBulkBatches_(records, maxBytes = 24 * 1024 * 1024) {
+  const batches = [];
+  let batch = [];
+  let bytes = 2; // JSON array brackets
+  records.forEach(record => {
+    const recordBytes = Utilities.newBlob(JSON.stringify(record)).getBytes().length;
+    if (recordBytes + 2 > 50 * 1024 * 1024) {
+      throw new Error('Archive record exceeds the Apps Script URL Fetch request limit.');
+    }
+    if (batch.length && bytes + recordBytes + 1 > maxBytes) {
+      batches.push(batch);
+      batch = [];
+      bytes = 2;
+    }
+    bytes += recordBytes + (batch.length ? 1 : 0);
+    batch.push(record);
   });
-  let result;
-  try { result = JSON.parse(response.getContentText()); } catch (_) { result = null; }
-  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || !result?.success) {
-    // Never log the token or a response that might include archive content.
-    throw new Error('Cloudflare archive write failed (HTTP ' + response.getResponseCode() + ').');
+  if (batch.length) batches.push(batch);
+  return batches;
+}
+
+function qdpArchiveCloudflareRequest_(url, token, method, payload, contentType) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let response;
+    try {
+      response = UrlFetchApp.fetch(url, {
+        method, contentType,
+        headers: { Authorization: 'Bearer ' + token },
+        payload, muteHttpExceptions: true
+      });
+    } catch (error) {
+      if (!/Address unavailable/i.test(String(error))) throw error;
+      if (attempt === 2) throw new Error('Cloudflare connection unavailable after 3 attempts.');
+      Utilities.sleep(1000 * (attempt + 1));
+      continue;
+    }
+    const status = response.getResponseCode();
+    if ((status === 429 || status >= 500) && attempt < 2) {
+      Utilities.sleep(1000 * (attempt + 1));
+      continue;
+    }
+    let result;
+    try { result = JSON.parse(response.getContentText()); } catch (_) { result = null; }
+    if (status < 200 || status >= 300 || !result?.success) {
+      // Never log the token or a response that might include archive content.
+      throw new Error('Cloudflare archive write failed (HTTP ' + status + ').');
+    }
+    return result.result;
   }
-  return result.result;
 }
 
 function qdpArchivePublish_(force) {
@@ -436,13 +473,16 @@ function qdpArchivePublish_(force) {
     }
     const revision = Utilities.getUuid();
     const records = qdpArchiveKvRecords_(snapshot, revision);
+    const batches = qdpArchiveBulkBatches_(records);
     const base = 'https://api.cloudflare.com/client/v4/accounts/' + account +
       '/storage/kv/namespaces/' + namespace;
-    const outcome = qdpArchiveCloudflareRequest_(base + '/bulk', token, 'put',
-      JSON.stringify(records), 'application/json');
-    if (outcome?.successful_key_count !== records.length || outcome.unsuccessful_keys?.length) {
-      throw new Error('Cloudflare did not confirm all archive records. The manifest was not updated.');
-    }
+    batches.forEach(batch => {
+      const outcome = qdpArchiveCloudflareRequest_(base + '/bulk', token, 'put',
+        JSON.stringify(batch), 'application/json');
+      if (outcome?.successful_key_count !== batch.length || outcome.unsuccessful_keys?.length) {
+        throw new Error('Cloudflare did not confirm all archive records. The manifest was not updated.');
+      }
+    });
     // Publish the manifest last. Readers detect a mismatched revision and use
     // the live feed until all the new records have propagated to their region.
     const manifest = {
@@ -461,7 +501,7 @@ function qdpArchivePublish_(force) {
       venueCount: manifest.venues.length, partyCount: manifest.parties.length,
       collectiveCount: manifest.collectives.length, archiveMonthCount: manifest.months.length,
       archivedEventCount: snapshot.months.reduce((sum, item) => sum + item.count, 0),
-      recordCount: records.length, publishedAt: manifest.updatedAt }));
+      recordCount: records.length, batchCount: batches.length, publishedAt: manifest.updatedAt }));
   } finally {
     lock.releaseLock();
   }

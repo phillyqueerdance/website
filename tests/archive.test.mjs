@@ -135,8 +135,11 @@ test('publisher commits manifest last and skips writes when data has not changed
   context.Utilities.DigestAlgorithm = { SHA_256: 'SHA_256' };
   context.Utilities.base64EncodeWebSafe = value => Buffer.from(value).toString('base64url');
   context.Utilities.getUuid = () => 'revision-1';
+  const sleeps = [];
+  context.Utilities.sleep = ms => sleeps.push(ms);
   context.UrlFetchApp = { fetch: (url, options) => {
     calls.push({ url, options });
+    if (calls.length === 1) throw new Error('Address unavailable: Cloudflare');
     const bulk = url.endsWith('/bulk');
     return { getResponseCode: () => 200, getContentText: () => JSON.stringify({
       success: true, result: bulk
@@ -145,12 +148,50 @@ test('publisher commits manifest last and skips writes when data has not changed
   } };
   context.Logger = { log() {} };
   context.qdpArchivePublish();
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.equal(calls[0].url.endsWith('/bulk'), true);
-  assert.equal(calls[1].url.includes('/values/'), true);
-  assert.equal(calls[1].options.payload.includes('revision-1'), true);
+  assert.equal(calls[1].url.endsWith('/bulk'), true);
+  assert.equal(calls[2].url.includes('/values/'), true);
+  assert.equal(calls[2].options.payload.includes('revision-1'), true);
+  assert.deepEqual(sleeps, [1000]);
   context.qdpArchivePublish();
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
+});
+
+test('publisher splits larger requests and never advances the manifest after a failed batch', () => {
+  const { context } = appsScript();
+  const synthetic = Array.from({ length: 4 }, (_, index) =>
+    ({ key: `test:${index}`, value: 'x'.repeat(120) }));
+  const batches = context.qdpArchiveBulkBatches_(synthetic, 300);
+  assert.deepEqual(Array.from(batches, batch => batch.length), [2, 2]);
+  assert.equal(batches.every(batch => Buffer.byteLength(JSON.stringify(batch)) <= 300), true);
+
+  const properties = new Map([
+    ['QDP_ARCHIVE_CF_ACCOUNT_ID', 'a'.repeat(32)],
+    ['QDP_ARCHIVE_CF_NAMESPACE_ID', 'b'.repeat(32)],
+    ['QDP_ARCHIVE_CF_API_TOKEN', 'private-token']
+  ]);
+  context.PropertiesService = { getScriptProperties: () => ({
+    getProperty: key => properties.get(key), setProperty: (key, value) => properties.set(key, value)
+  }) };
+  context.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
+  context.Utilities.computeDigest = () => Buffer.from('digest');
+  context.Utilities.DigestAlgorithm = { SHA_256: 'SHA_256' };
+  context.Utilities.base64EncodeWebSafe = value => Buffer.from(value).toString('base64url');
+  context.Utilities.getUuid = () => 'revision-1';
+  context.qdpArchiveBulkBatches_ = records => [records.slice(0, 1), records.slice(1)];
+  const urls = [];
+  context.UrlFetchApp = { fetch: (url, options) => {
+    urls.push(url);
+    const count = urls.length === 2 ? 0 : JSON.parse(options.payload).length;
+    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({
+      success: true, result: { successful_key_count: count, unsuccessful_keys: [] }
+    }) };
+  } };
+  context.Logger = { log() {} };
+  assert.throws(() => context.qdpArchivePublish(), /manifest was not updated/);
+  assert.equal(urls.length, 2);
+  assert.equal(properties.has('QDP_ARCHIVE_LAST_PUBLISHED'), false);
 });
 
 test('Pages serves a prepared profile without calling Apps Script and denies removed IDs', async () => {
