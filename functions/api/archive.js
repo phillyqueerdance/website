@@ -187,6 +187,14 @@ export async function onRequestGet(context) {
     console.error("Prepared QDP archive unavailable; using live feed:", error);
   }
 
+  // The Apps Script deployment may still predate the Parties approval column.
+  // Wait for a prepared, gated snapshot instead of serving an ungated fallback.
+  if (["parties", "party"].includes(resource)) {
+    return Response.json({ error: "Directory is waiting for the sheet to be published." }, {
+      status: 503, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
+    });
+  }
+
   const key = new URL("/api/archive", url);
   key.searchParams.set("resource", resource);
   if (id) key.searchParams.set(resource === "month" ? "month" : "id", id);

@@ -25,8 +25,8 @@
 .archive-back {
   position: absolute;
   z-index: 4;
-  top: var(--qdp-date-top);
-  right: 9.8%;
+  top: calc(var(--qdp-date-top) + var(--qdp-date-height) + .8cqw);
+  left: 17%;
   display: inline-flex;
   align-items: center;
   min-height: var(--qdp-date-height);
