@@ -123,6 +123,10 @@ async function preparedPayload(kv, resource, id) {
   if (!kv) return null;
   const manifest = await kv.get(KV_PREFIX + "manifest", "json");
   if (manifest?.schema !== 1 || !manifest.revision) return null;
+  if (["parties", "party", "collectives", "collective"].includes(resource) &&
+      !Array.isArray(manifest[["party", "parties"].includes(resource) ? "parties" : "collectives"])) {
+    return { unpublished: true };
+  }
 
   const directory = ["artists", "venues", "parties", "collectives", "months"].includes(resource);
   if (!directory) {
@@ -160,6 +164,11 @@ export async function onRequestGet(context) {
   };
   try {
     const prepared = await preparedPayload(context.env.QDP_ARCHIVE_KV, resource, id);
+    if (prepared?.unpublished) {
+      return Response.json({ error: "Directory is waiting for the sheet to be published." }, {
+        status: 503, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
+      });
+    }
     if (prepared?.missing) {
       return Response.json({ error: "Public archive entry not found." }, {
         status: 404, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }

@@ -229,3 +229,21 @@ test('mixed Cloudflare revisions fall back to the live public feed', async () =>
     globalThis.caches = originalCaches;
   }
 });
+
+test('unpublished new directories answer immediately without a slow live fallback', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('Unexpected live Apps Script request'); };
+  try {
+    const kv = { get: async key => key.endsWith('manifest')
+      ? { schema: 1, revision: 'old', artists: ['ALPHA'], venues: ['ROOM'] }
+      : null };
+    for (const resource of ['parties', 'collectives', 'party&id=NIGHT', 'collective&id=CREW']) {
+      const response = await onRequestGet({
+        request: new Request(`https://massive.example/api/archive?resource=${resource}`),
+        env: { QDP_ARCHIVE_KV: kv }
+      });
+      assert.equal(response.status, 503);
+      assert.match((await response.json()).error, /waiting for the sheet/);
+    }
+  } finally { globalThis.fetch = originalFetch; }
+});
