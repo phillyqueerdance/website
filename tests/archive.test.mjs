@@ -16,12 +16,23 @@ const sheets = {
     ['ROOM', 'Room', 'Yes', 'Public address'],
     ['HIDDEN', 'Hidden Room', 'No', 'Private address']
   ],
+  Parties: [
+    ['PartyID', 'PartyName', 'PartyInsta', 'PartyDesc'],
+    ['NIGHT', 'The Night', '@night', 'Public party description']
+  ],
+  Collectives: [
+    ['CollectiveID', 'CollectiveName', 'Public_Name', 'CollInsta', 'CollBio', 'Public_OK'],
+    ['CREW', 'Internal crew name', 'The Crew', '@crew', 'Public collective bio', 'Yes'],
+    ['SECRET', 'Secret crew', 'Secret crew', '@secret', 'Do not publish', 'No']
+  ],
   'Archive 2024': [
     ['EventID', 'Title_Public', 'Publish_To_Web', 'Status', 'StartDate', 'StartTime',
-      'ArtistIDs', 'VenueID', 'Description'],
-    ['E1', 'Public night', 'Yes', '', '2024-09-01', '20:00:00', 'ALPHA,PRIVATE', 'ROOM', 'Public description'],
+      'ArtistIDs', 'VenueID', 'Description', 'PartyID', 'HostCollectiveIDs (comma-separated)'],
+    ['E1', 'Public night', 'Yes', '', '2024-09-01', '20:00:00', 'ALPHA,PRIVATE', 'ROOM',
+      'Public description', 'NIGHT', 'CREW,SECRET'],
     ['E2', 'Private night', 'No', '', '2024-09-02', '20:00:00', 'ALPHA', 'HIDDEN', 'Secret description'],
-    ['E3', 'Undisclosed room', 'Yes', '', '2024-09-03', '20:00:00', 'ALPHA', 'HIDDEN', 'No address']
+    ['E3', 'Undisclosed room', 'Yes', '', '2024-09-03', '20:00:00', 'ALPHA', 'HIDDEN',
+      'No address', '', 'SECRET']
   ],
   'Archive 2025': [
     ['EventID', 'Title_Public', 'Publish_To_Web', 'Status', 'StartDate', 'StartTime'],
@@ -32,8 +43,9 @@ const sheets = {
     ['E5', 'Another past night', 'Yes', '', '2025-01-02', '20:00:00']
   ],
   Events: [
-    ['EventID', 'Title_Public', 'Publish_To_Web', 'Status', 'StartDate', 'StartTime', 'ArtistIDs'],
-    ['E6', 'Upcoming night', 'Yes', '', '2026-11-01', '20:00:00', 'ALPHA']
+    ['EventID', 'Title_Public', 'Publish_To_Web', 'Status', 'StartDate', 'StartTime',
+      'ArtistIDs', 'PartyID', 'HostCollectiveIDs (comma-separated)'],
+    ['E6', 'Upcoming night', 'Yes', '', '2026-11-01', '20:00:00', 'ALPHA', 'NIGHT', 'CREW']
   ]
 };
 
@@ -50,7 +62,8 @@ function appsScript() {
   } };
   const context = vm.createContext({
     Map, Set, Date, JSON, Object, Array, RegExp, String,
-    CONFIG: { SHEET_ARTISTS: 'Artists', SHEET_VENUES: 'Venues', SHEET_EVENTS: 'Events' },
+    CONFIG: { SHEET_ARTISTS: 'Artists', SHEET_VENUES: 'Venues',
+      SHEET_PARTIES: 'Parties', SHEET_COLLECTIVES: 'Collectives', SHEET_EVENTS: 'Events' },
     ss_: () => ss,
     trim: value => String(value ?? '').trim(),
     qdpPublicArtistFlags_: () => new Map([['ALPHA', { queer: true, trans: false }]]),
@@ -69,11 +82,18 @@ test('publisher builds only approved data and one source scan supports all views
   const snapshot = context.qdpArchivePublishSource_(ss);
   assert.equal(snapshot.artists.length, 1);
   assert.equal(snapshot.venues.length, 1);
+  assert.equal(snapshot.parties.length, 1);
+  assert.equal(snapshot.collectives.length, 1);
+  assert.equal(snapshot.parties[0].bio, 'Public party description');
+  assert.equal(snapshot.collectives[0].name, 'The Crew');
   assert.equal(snapshot.artists[0].queerArtist, true);
   assert.equal(snapshot.artists[0].transArtist, false);
   assert.deepEqual(Array.from(snapshot.months, item => item.count), [1, 2]);
   assert.equal(snapshot.artistEntries.ALPHA.profile.count, 3);
   assert.equal(snapshot.artistEntries.ALPHA.events.some(event => event.eventId === 'E6'), true);
+  assert.equal(snapshot.partyEntries.NIGHT.events.length, 2);
+  assert.equal(snapshot.collectiveEntries.CREW.events.length, 2);
+  assert.equal(snapshot.partyEntries.NIGHT.events[0].collectiveIds.includes('SECRET'), false);
   assert.equal(snapshot.monthEntries['2024-09'].events.length, 2);
   const hidden = snapshot.monthEntries['2024-09'].events.find(event => event.eventId === 'E3');
   assert.equal(hidden.venue, 'Location not disclosed');
@@ -82,11 +102,15 @@ test('publisher builds only approved data and one source scan supports all views
   assert.equal(JSON.stringify(snapshot).includes('Secret description'), false);
   assert.equal(JSON.stringify(snapshot).includes('Private address'), false);
   assert.equal(JSON.stringify(snapshot).includes('Private Artist'), false);
+  assert.equal(JSON.stringify(snapshot).includes('Secret crew'), false);
+  assert.equal(JSON.stringify(snapshot).includes('Do not publish'), false);
   assert.equal(snapshot.artistEntries.ALPHA.events[0].queerArtist, true);
   const liveProfile = context.qdpArchiveResource_('archiveartist', { id: 'ALPHA' });
   assert.deepEqual(Array.from(snapshot.artistEntries.ALPHA.events, item => item.eventId),
     Array.from(liveProfile.events, item => item.eventId));
   assert.equal(snapshot.artistEntries.ALPHA.profile.count, liveProfile.profile.count);
+  assert.equal(context.qdpArchiveResource_('archiveparty', { id: 'NIGHT' }).events.length, 2);
+  assert.equal(context.qdpArchiveResource_('archivecollective', { id: 'CREW' }).events.length, 2);
   const liveMonths = context.qdpArchiveResource_('archivemonths', {});
   assert.deepEqual(Array.from(snapshot.months, item => `${item.month}:${item.count}`),
     Array.from(liveMonths.months, item => `${item.month}:${item.count}`));
@@ -134,10 +158,11 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
   snapshot.artistEntries.ALPHA.profile.name = '[DJ Alpha]';
   snapshot.artistEntries.ALPHA.events[0].venue = '[The Room]';
   const records = context.qdpArchiveKvRecords_(snapshot, 'revision-1');
-  assert.equal(records.length, 13);
+  assert.equal(records.length, 19);
   const values = new Map(records.map(({ key, value }) => [key, JSON.parse(value)]));
   values.set('qdp-archive:v1:manifest', {
     schema: 1, revision: 'revision-1', artists: ['ALPHA'], venues: ['ROOM'],
+    parties: ['NIGHT'], collectives: ['CREW'],
     months: ['2024-09', '2025-01']
   });
   const kv = { get: async key => values.get(key) ?? null };
@@ -161,10 +186,20 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
     assert.equal(artistList[0].name, 'DJ Alpha');
     const venueList = await onRequestGet(request('resource=venues'));
     assert.equal((await venueList.json()).venues[0].name, 'The Room');
+    const partyList = await onRequestGet(request('resource=parties'));
+    assert.equal((await partyList.json()).parties[0].name, 'The Night');
+    const collectiveList = await onRequestGet(request('resource=collectives'));
+    assert.equal((await collectiveList.json()).collectives[0].name, 'The Crew');
+    const party = await onRequestGet(request('resource=party&id=NIGHT'));
+    assert.equal((await party.json()).events.length, 2);
+    const collective = await onRequestGet(request('resource=collective&id=CREW'));
+    assert.equal((await collective.json()).events.length, 2);
     const month = await onRequestGet(request('resource=month&month=2024-09'));
     assert.equal((await month.json()).events.length, 2);
     const removed = await onRequestGet(request('resource=artist&id=PRIVATE'));
     assert.equal(removed.status, 404);
+    const hiddenCollective = await onRequestGet(request('resource=collective&id=SECRET'));
+    assert.equal(hiddenCollective.status, 404);
   } finally { globalThis.fetch = originalFetch; }
 });
 

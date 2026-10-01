@@ -14,7 +14,10 @@
   let menuMotionSerial = 0;
   const cache = new Map();
   const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
-  const validViews = new Set(["artists", "venues", "artist", "venue", "events"]);
+  const profileViews = { artist: "artists", venue: "venues", party: "parties",
+    collective: "collectives" };
+  const directoryViews = new Set(["artists", "venues", "parties", "collectives"]);
+  const validViews = new Set([...directoryViews, ...Object.keys(profileViews), "events"]);
   let renderedKey = "";
   let loadingKey = "";
   let requestNumber = 0;
@@ -33,7 +36,7 @@
   function archiveUrl(view, value = "") {
     const url = new URL("/", location.origin);
     url.searchParams.set("archive", view);
-    if (["artist", "venue"].includes(view)) url.searchParams.set("id", value);
+    if (profileViews[view]) url.searchParams.set("id", value);
     if (view === "events" && value) url.searchParams.set("month", value);
     return url;
   }
@@ -52,6 +55,10 @@
     button.disabled = true;
     alphabet.appendChild(button);
   }
+  const tabColors = ["red", "orange", "purple"];
+  [...menu.querySelectorAll(".archive-menu-badge")].forEach((badge, index) => {
+    badge.dataset.tabColor = tabColors[index % tabColors.length];
+  });
 
   function message(label) {
     archiveStack.replaceChildren(node("p", "event-feed-message", label));
@@ -86,9 +93,9 @@
       const purpleBorder = 1586 / 1727;
       const menuInset = posterWidth * (.96 - purpleBorder);
       menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
-      menuTrack.style.setProperty("--archive-events-label-x", `${posterWidth * (1614 - 1586) / 1727}px`);
-      menuTrack.style.setProperty("--archive-venues-label-x", `${posterWidth * (1642 - 1586) / 1727}px`);
-      menuTrack.style.setProperty("--archive-artists-label-x", `${posterWidth * (1670 - 1586) / 1727}px`);
+      menuTrack.style.setProperty("--archive-label-purple-x", `${posterWidth * (1614 - 1586) / 1727}px`);
+      menuTrack.style.setProperty("--archive-label-orange-x", `${posterWidth * (1642 - 1586) / 1727}px`);
+      menuTrack.style.setProperty("--archive-label-red-x", `${posterWidth * (1670 - 1586) / 1727}px`);
       const shell = document.querySelector(".site-shell");
       const menuStyle = getComputedStyle(menu);
       const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;
@@ -110,16 +117,14 @@
     if (restart) menuTrack.classList.remove("is-open");
     menuTrack.hidden = false;
     venueMap.hidden = view !== "venue" && view !== "venues";
-    menu.classList.toggle("has-venue-map", !venueMap.hidden);
-    alphabet.hidden = view !== "artists" && view !== "venues";
+    alphabet.hidden = !directoryViews.has(view);
     if (!alphabet.hidden) {
-      alphabet.setAttribute("aria-label", `${view === "artists" ? "Artists" : "Venues"} alphabet`);
+      alphabet.setAttribute("aria-label", `${view[0].toUpperCase() + view.slice(1)} alphabet`);
       alphabet.querySelectorAll("button").forEach(button => { button.disabled = true; });
     }
     menu.querySelectorAll("a").forEach(link => {
       const target = new URL(link.href).searchParams.get("archive") || "";
-      if ((view && target === view) || (view === "artist" && target === "artists") ||
-          (view === "venue" && target === "venues")) {
+      if ((view && target === view) || profileViews[view] === target) {
         link.setAttribute("aria-current", "page");
       } else {
         link.removeAttribute("aria-current");
@@ -146,8 +151,9 @@
     menuProfile.replaceChildren();
     menuProfile.hidden = !person;
     if (person) {
-      const badge = menu.querySelector(`.archive-menu-badge--${kind === "venue" ? "venues" : "artists"}`);
+      const badge = menu.querySelector(`.archive-menu-badge--${profileViews[kind]}`);
       (kind === "venue" && !venueMap.hidden ? venueMap : badge).after(menuProfile);
+      menuProfile.style.setProperty("--archive-profile-accent", getComputedStyle(badge).backgroundColor);
       menuProfile.appendChild(profileInfo(kind, person));
       requestAnimationFrame(() => {
         if (menuProfile.firstChild) menu.classList.add("has-profile");
@@ -192,7 +198,7 @@
   function endpoint(resource, value = "") {
     const url = new URL("/api/archive", location.origin);
     url.searchParams.set("resource", resource);
-    if (["artist", "venue"].includes(resource)) url.searchParams.set("id", value);
+    if (profileViews[resource]) url.searchParams.set("id", value);
     if (resource === "month") url.searchParams.set("month", value);
     return url.toString();
   }
@@ -287,8 +293,10 @@
         lastLetter = letter;
       }
       const subtitle = kind === "venues" ? item.address || "" : "";
+      const singular = { artists: "artist", venues: "venue", parties: "party",
+        collectives: "collective" }[kind];
       const card = stripCard(item.name, subtitle,
-        archiveUrl(kind === "artists" ? "artist" : "venue", item.id).href);
+        archiveUrl(singular, item.id).href);
       if (kind === "artists" && (item.queerArtist || item.transArtist)) {
         card.classList.add("archive-identity-card");
       }
@@ -337,7 +345,7 @@
 
   function profileInfo(kind, person) {
     const info = node("section", "archive-profile-info");
-    info.setAttribute("aria-label", `${kind === "venue" ? "Venue" : "Artist"} information`);
+    info.setAttribute("aria-label", `${kind[0].toUpperCase() + kind.slice(1)} information`);
     info.appendChild(node("h2", "archive-profile-heading", person.name));
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
@@ -409,7 +417,7 @@
     }
     finishGroup(current);
     if (!archive.events.length) {
-      archiveStack.appendChild(node("p", "event-feed-message", "No archived events here yet."));
+      archiveStack.appendChild(node("p", "event-feed-message", "No events here yet."));
     }
     archive.updateLayout();
   }
@@ -424,7 +432,7 @@
       return;
     }
     if (!validViews.has(params.view) ||
-        (["artist", "venue"].includes(params.view) && !/^[\w-]{1,80}$/.test(params.id)) ||
+        (profileViews[params.view] && !/^[\w-]{1,80}$/.test(params.id)) ||
         (params.view === "events" && params.month && !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(params.month))) {
       history.replaceState(null, "", "/");
       leave();
@@ -443,7 +451,7 @@
     loadingKey = params.key;
     document.body.classList.add("archive-mode");
     document.documentElement.classList.add("archive-open");
-    archiveStack.classList.toggle("profile-events", params.view === "artist" || params.view === "venue");
+    archiveStack.classList.toggle("profile-events", Boolean(profileViews[params.view]));
     setProfile("");
     archiveViewport.hidden = false;
     clearTimeout(pageExitTimer);
@@ -457,8 +465,8 @@
     });
     closeDatePopover();
     archiveStack.hidden = false;
-    header(params.view === "artist" ? "Artist" : params.view === "venue" ? "Venue" :
-      params.view === "artists" ? "Artists" : params.view === "venues" ? "Venues" : "Past Events");
+    header(params.view === "events" ? "Past Events" :
+      params.view[0].toUpperCase() + params.view.slice(1));
     document.title = `${archiveHeader.textContent} | Queer Dance Philly`;
     message("Loading archive…");
 
@@ -467,7 +475,7 @@
     try {
       const data = await load(resource, value);
       if (serial !== requestNumber) return;
-      if (resource === "artists" || resource === "venues") renderDirectory(resource, data[resource]);
+      if (directoryViews.has(resource)) renderDirectory(resource, data[resource]);
       else if (resource === "months") renderMonths(data.months);
       else if (resource === "month") renderEvents(data.events, null, "", params.month);
       else {

@@ -138,9 +138,19 @@
   width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 38px);
   padding-left: calc(var(--archive-menu-inset, 33px) + 12px);
 }
-.archive-menu-badge--artists { --archive-badge-label-x: var(--archive-artists-label-x, 38px); background: #fa2b5a; }
-.archive-menu-badge--venues { --archive-badge-label-x: var(--archive-venues-label-x, 25px); background: #ff7945; color: #241016 !important; }
-.archive-menu-badge--events { --archive-badge-label-x: var(--archive-events-label-x, 13px); background: #922185; }
+.archive-menu-badge[data-tab-color="red"] {
+  --archive-badge-label-x: var(--archive-label-red-x, 38px);
+  background: #fa2b5a;
+}
+.archive-menu-badge[data-tab-color="orange"] {
+  --archive-badge-label-x: var(--archive-label-orange-x, 25px);
+  background: #ff7945;
+  color: #241016 !important;
+}
+.archive-menu-badge[data-tab-color="purple"] {
+  --archive-badge-label-x: var(--archive-label-purple-x, 13px);
+  background: #922185;
+}
 .archive-menu-badge[aria-current="page"]::after {
   content: "✦";
   margin-left: auto;
@@ -148,20 +158,10 @@
   font-size: .75em;
 }
 .archive-menu > .archive-menu-map {
-  display: flex;
-  align-items: center;
-  align-self: flex-start;
-  box-sizing: border-box;
-  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 38px);
-  min-height: 22px;
-  margin-left: calc(0px - var(--archive-menu-inset, 33px) - 12px);
-  padding: 0 12px 4px calc(var(--archive-menu-inset, 33px) + 12px);
-  border-radius: 0 0 14px 0;
-  background: #ff7945;
-  color: #241016;
+  margin: 7px 0;
+  padding-left: 0;
   font-size: .78em;
 }
-.archive-menu.has-venue-map > .archive-menu-badge--venues { border-bottom-right-radius: 0; }
 .archive-menu > .archive-menu-map[hidden] { display: none; }
 .archive-menu > a:focus-visible, .side-nav a:focus-visible {
   outline: 2px solid #ffea86;
@@ -185,7 +185,7 @@
 .archive-profile-info { overflow-wrap: anywhere; }
 .archive-profile-heading {
   margin: 0 0 .55em;
-  color: #fa2b5a;
+  color: var(--archive-profile-accent, #fa2b5a);
   font: 700 1.2em/1.1 "QDP Fraunces", Georgia, serif;
 }
 .archive-profile-info p, .archive-profile-info address {
@@ -334,14 +334,9 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   }
   .archive-menu > .archive-menu-badge[aria-current="page"] { width: 100%; padding-left: 12px; }
   .archive-menu > .archive-menu-map {
-    align-self: center;
-    justify-content: center;
-    width: 100%;
-    margin-left: 0;
-    padding: 2px 12px 5px;
-    border-radius: 0 0 14px 14px;
+    margin: 3px 0;
+    padding: 3px;
   }
-  .archive-menu.has-venue-map > .archive-menu-badge--venues { border-radius: 14px 14px 0 0; }
   .archive-menu-profile { text-align: left; }
   .archive-menu-profile:not([hidden]) { margin: 8px 0; }
   .archive-alphabet {

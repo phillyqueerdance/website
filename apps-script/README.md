@@ -18,8 +18,9 @@ for faster preview loads” below.**
 
    ```javascript
    if ([
-     'archiveartists', 'archivevenues', 'archivemonths',
-     'archiveartist', 'archivevenue', 'archivemonth'
+     'archiveartists', 'archivevenues', 'archiveparties',
+     'archivecollectives', 'archivemonths', 'archiveartist',
+     'archivevenue', 'archiveparty', 'archivecollective', 'archivemonth'
    ].includes(resource)) {
      return respond(qdpArchiveResource_(resource, e && e.parameter));
    }
@@ -39,14 +40,15 @@ redeploying. The helper file you already added can remain in the project.
 
 ## Publication gates
 
-The extension reads `Artists`, `Venues`, `Archive 2024`, `Archive 2025`,
+The extension reads `Artists`, `Venues`, `Parties`, `Collectives`, `Archive 2024`, `Archive 2025`,
 `Events_Archive`, and published rows of `Events`. It does not modify any sheet
 or Calendar entry. The publisher writes approved public fields to the
 configured Cloudflare KV namespace.
 
-- Artist and venue profiles require `Public_OK=Yes`. The temporary artist
-  setting you made meets this gate. A nonpublic venue's address and profile
-  are never returned.
+- Artist, venue, and collective profiles require `Public_OK=Yes`. A nonpublic
+  venue's address or collective's bio and ID are never returned. The `Parties`
+  tab has no `Public_OK` column; its name, description, and Instagram fields
+  form the party directory.
 - **Every event row** requires `Publish_To_Web=Yes`, including legacy archive
   tabs. If a tab has no `Publish_To_Web` header, all its rows are excluded.
   This is the sheet preparation needed to make legacy events appear. Review
@@ -66,7 +68,7 @@ The updated `archive-feed.gs` also contains a publisher in **the same Apps
 Script project**. Replace the previous archive helpers with this updated file;
 do not paste a second copy of the functions. The existing `doGet` dispatch
 above remains the same. The publisher reads the sheets, applies the same
-public gates, and writes 13 grouped records to Cloudflare KV. It writes no
+public gates, and writes 19 grouped records to Cloudflare KV. It writes no
 sheet cells, Calendar entries, or public data into GitHub.
 
 1. In Cloudflare, create a Workers KV namespace named `qdp-archive-preview`.
@@ -104,6 +106,26 @@ the same popup and navigation. Until a successful publish, or briefly while
 Cloudflare's locations receive an update, a request uses the live feed. A
 removed profile is excluded by the new manifest. Refresh the browser page to
 see new data; the current page keeps loaded archive views in memory.
+
+## Parties and Collectives in the preview
+
+1. Replace the archive helper code in your **existing** Apps Script project
+   with the updated `archive-feed.gs`. Keep one copy of each function. Add
+   `archiveparties`, `archivecollectives`, `archiveparty`, and
+   `archivecollective` to your existing `doGet` dispatch as shown above,
+   then save and redeploy that Web app. This keeps the live fallback working
+   if a prepared record is temporarily unavailable.
+2. In the `Collectives` sheet, mark each collective you want public with
+   `Public_OK=Yes`. Rows left blank or marked No stay private. The `Parties`
+   sheet has no public gate; review its `PartyName`, `PartyDesc`, and
+   `PartyInsta` fields before publishing.
+3. Run `qdpArchivePublish` in the Apps Script editor. The existing archive
+   trigger will then keep Parties and Collectives current with the other
+   directories and events. The log now includes `partyCount` and
+   `collectiveCount`. No new token or Cloudflare binding is needed.
+4. Open the branch preview's `/?archive=parties` and
+   `/?archive=collectives` pages. Individual pages use published events'
+   `PartyID` and `HostCollectiveIDs` respectively.
 
 ## Prepared live listings for first-time visitors
 

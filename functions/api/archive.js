@@ -5,14 +5,18 @@ import { DEFAULT_APPS_SCRIPT_URL } from "./events.js";
 const RESOURCES = {
   artists: "archiveArtists",
   venues: "archiveVenues",
+  parties: "archiveParties",
+  collectives: "archiveCollectives",
   months: "archiveMonths",
   artist: "archiveArtist",
   venue: "archiveVenue",
+  party: "archiveParty",
+  collective: "archiveCollective",
   month: "archiveMonth"
 };
 const CACHE_SECONDS = 300;
 const KV_PREFIX = "qdp-archive:v1:";
-const SHARDS = { artist: 4, venue: 2, month: 4 };
+const SHARDS = { artist: 4, venue: 2, party: 2, collective: 2, month: 4 };
 
 const value = (input, limit = 500) => String(input ?? "").trim().slice(0, limit);
 const publicName = input => value(input, 180).replace(/^\[(.*)\]$/s, "$1").trim();
@@ -44,11 +48,11 @@ function profile(input, kind) {
           transArtist: yes(input.transArtist),
           music: safeUrl(input.music)
         }
-      : {
+      : kind === "venues" ? {
           neighborhood: value(input.neighborhood, 120),
           address: value(input.address, 260),
           maps: safeUrl(input.maps)
-        })
+        } : {})
   };
 }
 
@@ -72,6 +76,10 @@ function publicEvent(input) {
     artistIds: Array.isArray(input.artistIds)
       ? input.artistIds.map(id => value(id, 80)).filter(Boolean).slice(0, 40)
       : [],
+    partyId: value(input.partyId, 80),
+    collectiveIds: Array.isArray(input.collectiveIds)
+      ? input.collectiveIds.map(id => value(id, 80)).filter(Boolean).slice(0, 40)
+      : [],
     flyerUrl: safeUrl(input.flyerUrl),
     explicitQueer: yes(input.explicitQueer),
     queerArtist: yes(input.queerArtist),
@@ -81,7 +89,7 @@ function publicEvent(input) {
 
 function cleanPayload(resource, input, id) {
   if (!input || typeof input !== "object") return null;
-  if (resource === "artists" || resource === "venues") {
+  if (["artists", "venues", "parties", "collectives"].includes(resource)) {
     if (!Array.isArray(input[resource])) return null;
     return { [resource]: input[resource].map(item => profile(item, resource)).filter(Boolean) };
   }
@@ -93,13 +101,15 @@ function cleanPayload(resource, input, id) {
   if (!Array.isArray(input.events)) return null;
   const events = input.events.map(publicEvent).filter(Boolean);
   if (resource === "month") return { events: events.filter(event => event.start.slice(0, 7) === id) };
-  const person = profile(input.profile, resource === "artist" ? "artists" : "venues");
+  const profileKind = { artist: "artists", venue: "venues", party: "parties",
+    collective: "collectives" }[resource];
+  const person = profile(input.profile, profileKind);
   if (!person || person.id !== id) return null;
   return {
     profile: person,
-    events: events.filter(event => resource === "artist"
-      ? event.artistIds.includes(id)
-      : event.venueId === id)
+    events: events.filter(event => resource === "artist" ? event.artistIds.includes(id)
+      : resource === "venue" ? event.venueId === id
+        : resource === "party" ? event.partyId === id : event.collectiveIds.includes(id))
   };
 }
 
@@ -114,10 +124,10 @@ async function preparedPayload(kv, resource, id) {
   const manifest = await kv.get(KV_PREFIX + "manifest", "json");
   if (manifest?.schema !== 1 || !manifest.revision) return null;
 
-  const directory = ["artists", "venues", "months"].includes(resource);
+  const directory = ["artists", "venues", "parties", "collectives", "months"].includes(resource);
   if (!directory) {
-    const list = manifest[resource === "artist" ? "artists" :
-      resource === "venue" ? "venues" : "months"];
+    const list = manifest[{ artist: "artists", venue: "venues", party: "parties",
+      collective: "collectives", month: "months" }[resource]];
     if (!Array.isArray(list)) return null;
     // A removed public profile must not be reachable by its old direct URL.
     if (!list.includes(id)) return { missing: true };
@@ -138,7 +148,7 @@ export async function onRequestGet(context) {
     ? url.searchParams.get("month") || ""
     : url.searchParams.get("id") || "";
   if (!Object.hasOwn(RESOURCES, resource) ||
-      (["artist", "venue"].includes(resource) && !/^[\w-]{1,80}$/.test(id)) ||
+      (["artist", "venue", "party", "collective"].includes(resource) && !/^[\w-]{1,80}$/.test(id)) ||
       (resource === "month" && !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(id))) {
     return Response.json({ error: "Invalid archive request." }, { status: 400 });
   }
