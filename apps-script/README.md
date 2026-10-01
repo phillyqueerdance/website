@@ -124,8 +124,10 @@ see new data; the current page keeps loaded archive views in memory.
    directories and events. The log now includes `partyCount` and
    `collectiveCount`. No new token or Cloudflare binding is needed.
 4. Open the branch preview's `/?archive=parties` and
-   `/?archive=collectives` pages. Individual pages use published events'
-   `PartyID` and `HostCollectiveIDs` respectively.
+   `/?archive=collectives` pages. Individual party pages use published
+   events' `PartyID`. Collective pages use published events'
+   `HostCollectiveIDs` and public party links from `PartyColls` or
+   `CollParty`, so events for a collective's party also appear there.
 
 ## Prepared live listings for first-time visitors
 

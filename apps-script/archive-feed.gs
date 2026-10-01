@@ -41,6 +41,10 @@ function qdpArchiveYes_(value) {
   return /^yes$/i.test(trim(value));
 }
 
+function qdpArchiveIds_(value) {
+  return [...new Set(trim(value).split(',').map(id => id.trim()).filter(Boolean))];
+}
+
 function qdpArchiveSheet_(ss, name) {
   const sheet = ss.getSheetByName(name);
   if (!sheet || sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) return null;
@@ -103,9 +107,28 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
           neighborhood: qdpArchiveText_(row, data.index, ['Neighborhood']),
           address: qdpArchiveText_(row, data.index, ['Address']),
           maps: qdpArchiveLink_(qdpArchiveValue_(row, data.index, ['GMaps_URL']))
-        } : shared);
+        } : kind === 'parties' ? {
+          ...shared,
+          collectiveIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['PartyColls']))
+        } : {
+          ...shared,
+          partyIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['CollParty']))
+        });
   });
   return profiles;
+}
+
+function qdpArchiveRelateProfiles_(parties, collectives) {
+  parties.forEach(profile => {
+    profile.collectiveIds = profile.collectiveIds.filter(id => collectives.has(id));
+  });
+  collectives.forEach((profile, collectiveId) => {
+    profile.partyIds.forEach(partyId => {
+      const party = parties.get(partyId);
+      if (party && !party.collectiveIds.includes(collectiveId)) party.collectiveIds.push(collectiveId);
+    });
+    delete profile.partyIds;
+  });
 }
 
 function qdpArchivePublicEvent_(row, index, source, artists, venues, parties, collectives, flags) {
@@ -127,14 +150,12 @@ function qdpArchivePublicEvent_(row, index, source, artists, venues, parties, co
     qdpArchiveValue_(row, index, ['EndTime', 'End Time']), timezone);
   const venueId = qdpArchiveText_(row, index, ['VenueID', 'Venue Id', 'Venue ID']);
   const publicVenue = venues.get(venueId);
-  const rawArtistIds = qdpArchiveText_(row, index,
-    ['ArtistIDs (comma-separated)', 'ArtistIDs', 'Artist IDs'])
-    .split(',').map(id => id.trim()).filter(Boolean);
+  const rawArtistIds = qdpArchiveIds_(qdpArchiveValue_(row, index,
+    ['ArtistIDs (comma-separated)', 'ArtistIDs', 'Artist IDs']));
   const publicArtistIds = rawArtistIds.filter(id => artists.has(id));
   const rawPartyId = qdpArchiveText_(row, index, ['PartyID']);
-  const rawCollectiveIds = qdpArchiveText_(row, index,
-    ['HostCollectiveIDs (comma-separated)', 'HostCollectiveIDs'])
-    .split(',').map(id => id.trim()).filter(Boolean);
+  const rawCollectiveIds = qdpArchiveIds_(qdpArchiveValue_(row, index,
+    ['HostCollectiveIDs (comma-separated)', 'HostCollectiveIDs']));
   const rawDescription = qdpArchiveText_(row, index, ['Description']);
   const flyerCandidate = qdpArchiveText_(row, index, ['Flyer_URL', 'Flyer URL', 'FlyerURL']) ||
     extractFlyerUrl_(rawDescription);
@@ -148,7 +169,8 @@ function qdpArchivePublicEvent_(row, index, source, artists, venues, parties, co
     venueId: publicVenue ? venueId : '',
     artistIds: [...new Set(publicArtistIds)],
     partyId: parties.has(rawPartyId) ? rawPartyId : '',
-    collectiveIds: [...new Set(rawCollectiveIds.filter(id => collectives.has(id)))],
+    collectiveIds: [...new Set([...rawCollectiveIds, ...(parties.get(rawPartyId)?.collectiveIds || [])]
+      .filter(id => collectives.has(id)))],
     flyerUrl: qdpArchiveLink_(flyerCandidate),
     explicitQueer: qdpArchiveYes_(qdpArchiveValue_(row, index,
       ['ExplicitQueer (Yes/No)', 'ExplicitQueer'])),
@@ -193,6 +215,7 @@ function qdpArchiveResource_(resource, parameters) {
   const venues = qdpArchiveProfiles_(ss, 'venues');
   const parties = qdpArchiveProfiles_(ss, 'parties');
   const collectives = qdpArchiveProfiles_(ss, 'collectives');
+  qdpArchiveRelateProfiles_(parties, collectives);
   const sortByName = (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
   const directories = { archiveartists: ['artists', artists], archivevenues: ['venues', venues],
     archiveparties: ['parties', parties], archivecollectives: ['collectives', collectives] };
@@ -277,6 +300,7 @@ function qdpArchivePublishSource_(ss) {
   const venues = qdpArchiveProfiles_(ss, 'venues');
   const parties = qdpArchiveProfiles_(ss, 'parties');
   const collectives = qdpArchiveProfiles_(ss, 'collectives');
+  qdpArchiveRelateProfiles_(parties, collectives);
   if (!artists.size || !venues.size) throw new Error('Cannot publish an empty public directory.');
   const sets = qdpArchiveEventSets_(ss, artists, venues, parties, collectives, true, flags);
   if (!sets.archived.length) throw new Error('Cannot publish an empty archive.');
