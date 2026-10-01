@@ -140,6 +140,7 @@
   gap: 0;
   font: 700 var(--archive-nav-font-size, 18px)/1.2 "QDP Fraunces", Georgia, serif;
   pointer-events: auto;
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
   transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
