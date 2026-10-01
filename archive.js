@@ -110,7 +110,7 @@
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.getBoundingClientRect().width))) + 24;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
-        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + overlap + 14}px`);
+        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset + 8}px`);
       }
     }
   }
