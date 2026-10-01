@@ -1448,7 +1448,7 @@ function loadEventRelations(id, card, section, links) {
   }
   eventRelations.get(id).then(data => {
     if (!card.isConnected || activeEventId !== id || !Array.isArray(data.related)) return;
-    const colors = { artist: "red", venue: "orange", party: "purple", collective: "orange" };
+    const colors = { artist: "red", venue: "orange", party: "purple", collective: "red" };
     for (const item of data.related) {
       if (!colors[item.kind] || !/^[\w-]{1,80}$/.test(item.id) || !item.name) continue;
       const url = new URL("/", location.origin);

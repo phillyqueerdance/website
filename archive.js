@@ -12,7 +12,6 @@
   const archiveHeader = document.getElementById("archiveHeader");
   const archiveBack = document.getElementById("archiveBack");
   let exitTimer = 0;
-  let tabTimer = 0;
   let menuMotionSerial = 0;
   const cache = new Map();
   const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
@@ -58,10 +57,9 @@
     button.disabled = true;
     alphabet.appendChild(button);
   }
-  const tabColors = { artists: "red", venues: "orange", parties: "purple",
-    collectives: "orange", events: "red" };
-  menu.querySelectorAll(".archive-menu-badge").forEach(badge => {
-    badge.dataset.tabColor = tabColors[new URL(badge.href).searchParams.get("archive")];
+  const tabColors = ["red", "orange", "purple"];
+  [...menu.querySelectorAll(".archive-menu-badge")].forEach((badge, index) => {
+    badge.dataset.tabColor = tabColors[index % tabColors.length];
   });
 
   function message(label) {
@@ -116,7 +114,6 @@
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.scrollWidth))) + 24;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
         menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset + 8}px`);
-        menuTrack.style.setProperty("--archive-compact-width", `${labelWidth + 26}px`);
       }
     }
   }
@@ -124,7 +121,6 @@
   function showMenu(view = "", restart = false) {
     const motion = ++menuMotionSerial;
     clearTimeout(exitTimer);
-    clearTimeout(tabTimer);
     if (restart) menuTrack.classList.remove("is-open");
     menuTrack.hidden = false;
     venueMap.hidden = view !== "venue" && view !== "venues";
@@ -136,18 +132,14 @@
         button.setAttribute("aria-label", `Jump to ${button.dataset.letter} in ${view}`);
       });
     }
-    const previous = menu.querySelector('.archive-menu-badge[aria-current="page"]');
-    const next = menu.querySelector(`.archive-menu-badge--${profileViews[view] || view}`);
-    if (previous && previous !== next) previous.removeAttribute("aria-current");
-    if (previous && next && previous !== next && !restart &&
-        menuTrack.classList.contains("is-open") &&
-        !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      tabTimer = setTimeout(() => {
-        if (motion === menuMotionSerial) next.setAttribute("aria-current", "page");
-      }, 190);
-    } else if (next) {
-      next.setAttribute("aria-current", "page");
-    }
+    menu.querySelectorAll("a").forEach(link => {
+      const target = new URL(link.href).searchParams.get("archive") || "";
+      if ((view && target === view) || profileViews[view] === target) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
     positionMenu();
     if (restart) void menuTrack.offsetHeight;
     requestAnimationFrame(() => {
@@ -157,7 +149,6 @@
 
   function hideMenu() {
     menuMotionSerial++;
-    clearTimeout(tabTimer);
     menuTrack.classList.remove("is-open");
     clearTimeout(exitTimer);
     exitTimer = setTimeout(() => {
@@ -167,7 +158,6 @@
 
   function setProfile(kind, person = null) {
     menu.classList.remove("has-profile");
-    menuTrack.classList.toggle("has-description", Boolean(String(person?.bio || "").trim()));
     menuProfile.replaceChildren();
     menuProfile.hidden = !person;
     if (person) {
@@ -378,7 +368,7 @@
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
     if (Array.isArray(person.related) && person.related.length) {
-      const colors = { artist: "red", venue: "orange", party: "purple", collective: "orange" };
+      const colors = { artist: "red", venue: "orange", party: "purple", collective: "red" };
       const more = node("section", "archive-profile-related");
       more.appendChild(node("h3", "", "See More"));
       const bubbles = node("div", "archive-profile-related-links");
