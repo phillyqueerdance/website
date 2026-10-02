@@ -414,6 +414,12 @@
     corners = [];
     archive.events = sortEvents(items.filter(item => item.eventId && !Number.isNaN(Date.parse(item.start)))).reverse();
     setProfile(kind, person);
+    if (person) {
+      const summary = node("section", "mobile-profile-summary");
+      summary.style.setProperty("--archive-profile-accent", menuProfile.style.getPropertyValue("--archive-profile-accent"));
+      summary.appendChild(profileInfo(kind, person));
+      archiveStack.appendChild(summary);
+    }
     if (month) {
       const heading = node("div", "date-heading", `${monthName(month)} ${month.slice(0, 4)}`);
       archiveStack.appendChild(heading);

@@ -12,7 +12,8 @@
   const menu = document.getElementById("archiveMenu");
   const profile = document.getElementById("archiveMenuProfile");
   const context = document.getElementById("mobileContext");
-  const profileButton = document.getElementById("mobileProfileInfo");
+  const archiveBack = document.getElementById("archiveBack");
+  const archiveBackHome = archiveBack.parentElement;
   const alphabet = document.getElementById("archiveAlphabet");
   const alphabetHome = alphabet.parentElement;
   const stage = document.querySelector(".poster-stage");
@@ -21,7 +22,6 @@
   const backdrop = document.getElementById("mobileSheetBackdrop");
   const calendar = document.getElementById("mobileCalendarLink");
   const directoryViews = new Set(["artists", "venues", "parties", "collectives"]);
-  const profileViews = new Set(["artist", "venue", "party", "collective"]);
   let returnFocus = null;
   let syncFrame = 0;
   let alphabetFrame = 0;
@@ -95,15 +95,14 @@
     const panelOpen = discoverOpen();
     const moreOpen = nav.classList.contains("menu-open");
     const isDirectory = directoryViews.has(currentView) && window.QDPArchive?.active;
-    const isProfile = profileViews.has(currentView) && window.QDPArchive?.active;
     toggleClass(document.body, "mobile-detail-open", detailOpen);
     toggleClass(document.body, "mobile-more-open", moreOpen);
-    context.hidden = !(isDirectory || isProfile) || detailOpen || infoOpen;
-    profileButton.hidden = !isProfile;
-    profileButton.disabled = isProfile && profile.hidden;
-    const name = document.querySelector(".archive-profile-heading")?.textContent;
-    profileButton.setAttribute("aria-label", name ? `Info and links for ${name}` : "Info and links");
-    for (const button of [discoverButton, discoverLink, profileButton]) button.setAttribute("aria-expanded", String(panelOpen));
+    context.hidden = !isDirectory || detailOpen || infoOpen;
+    if (archiveStack.lastElementChild !== archiveBack) archiveStack.append(archiveBack);
+    const detailCard = detail.querySelector(".event-detail-card");
+    const detailBack = detail.querySelector(".event-detail-back");
+    if (detailCard && detailBack && detailBack.parentElement !== detailCard) detailCard.append(detailBack);
+    for (const button of [discoverButton, discoverLink]) button.setAttribute("aria-expanded", String(panelOpen));
     calendar.dataset.active = String(!currentView && !infoOpen);
     discoverButton.dataset.active = String(Boolean(currentView) && !infoOpen);
     moreButton.dataset.active = String(infoOpen);
@@ -140,6 +139,9 @@
       toggleClass(document.body, "mobile-detail-open", false);
       closeMore();
       alphabetHome.append(alphabet);
+      archiveBackHome.prepend(archiveBack);
+      const detailBack = detail.querySelector(".event-detail-back");
+      if (detailBack) detail.append(detailBack);
       context.hidden = true;
       backdrop.hidden = true;
       for (const element of [stage, primary, moreLinks, track]) element.inert = false;
@@ -156,7 +158,6 @@
 
   window.QDPMobile = { get active() { return media.matches; }, openDiscover, closeDiscover };
   discoverButton.addEventListener("click", event => { event.stopPropagation(); openDiscover(); });
-  profileButton.addEventListener("click", event => { event.stopPropagation(); openDiscover(); });
   discoverClose.addEventListener("click", event => { event.stopPropagation(); closeDiscover({ restoreFocus: true, historyEntry: true }); });
   moreClose.addEventListener("click", event => { event.stopPropagation(); closeMore({ restoreFocus: true, historyEntry: true }); });
   moreButton.addEventListener("click", () => {
@@ -227,7 +228,7 @@
   const observer = new MutationObserver(scheduleSync);
   observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
   observer.observe(nav, { attributes: true, attributeFilter: ["class"] });
-  observer.observe(detail, { attributes: true, attributeFilter: ["hidden"] });
+  observer.observe(detail, { childList: true, attributes: true, attributeFilter: ["hidden"] });
   observer.observe(profile, { childList: true, attributes: true, attributeFilter: ["hidden"] });
   observer.observe(archiveStack, { childList: true });
   media.addEventListener("change", setMode);

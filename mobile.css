@@ -1,6 +1,6 @@
 /* Phone layouts use the original artwork, typography and navigation hierarchy. */
 .mobile-primary, .mobile-context, .mobile-more-heading,
-.mobile-menu-close, .mobile-sheet-backdrop { display: none; }
+.mobile-menu-close, .mobile-sheet-backdrop, .mobile-profile-summary { display: none; }
 
 @media (max-width: 760px) {
   html, html.archive-open, html.discover-open {
@@ -37,28 +37,28 @@
     height: auto;
     min-height: 340px;
     aspect-ratio: auto;
-    --qdp-date-top: 29cqw;
-    --qdp-date-left: 9.8%;
-    --qdp-date-width: 80.7%;
-    --qdp-date-height: 36px;
-    --qdp-date-font-size: clamp(14px, 3.6cqw, 18px);
+    --qdp-date-top: 26.267cqw;
+    --qdp-date-left: 39.6%;
+    --qdp-date-width: 46.9%;
+    --qdp-date-height: 5cqw;
+    --qdp-date-font-size: 3.1cqw;
     --qdp-list-top: calc(var(--qdp-date-top) + var(--qdp-date-height));
     --qdp-list-bottom: 8.12cqw;
     --qdp-time-font-size: clamp(14px, 3.6cqw, 18px);
     --qdp-time-card-gap: 4px;
     --qdp-cards-next-time-gap: 10px;
     --qdp-card-width: 100%;
-    --qdp-card-height: clamp(88px, 22cqw, 98px);
+    --qdp-card-height: clamp(80px, 20cqw, 86px);
     --qdp-card-padding-x: 12px;
-    --qdp-card-padding-y: 6px;
+    --qdp-card-padding-y: 4px;
     --qdp-card-radius: 22px;
     --qdp-same-time-card-gap: 5px;
-    --qdp-card-line-gap: 3px;
-    --qdp-title-font-size: clamp(16px, 4.2cqw, 20px);
-    --qdp-title-line-height: 1.12;
-    --qdp-venue-font-size: 13px;
+    --qdp-card-line-gap: 2px;
+    --qdp-title-font-size: clamp(16px, 4cqw, 18px);
+    --qdp-title-line-height: 1.1;
+    --qdp-venue-font-size: 12px;
     --qdp-venue-line-height: 1.2;
-    --qdp-address-font-size: 12px;
+    --qdp-address-font-size: 11.5px;
     --qdp-address-line-height: 1.2;
     --qdp-detail-top: 8.06cqw;
     --qdp-detail-bottom: 8cqw;
@@ -87,7 +87,7 @@
   }
   .poster-date { border-radius: 22px 22px 0 0; padding-bottom: 0; }
   .poster-date span, .date-scroll-label { padding-bottom: 0; }
-  .date-heading { width: 100%; margin-left: 0; padding-bottom: 0; }
+  .date-heading { width: 46.9cqw; margin-left: 29.8cqw; padding-bottom: 0; }
   .event-time-group { grid-template-columns: 46px minmax(0, 1fr); column-gap: 4px; }
   .event-card { padding: 0; }
   .event-time { border-radius: 22px 0 0 22px; }
@@ -100,13 +100,13 @@
   }
   .event-venue { -webkit-line-clamp: 1; }
   .event-feed-message { padding: 12px; font-size: 15px; line-height: 1.5; }
-  .archive-directory { --qdp-card-height: 62px; }
+  .archive-directory { --qdp-card-height: 52px; }
   .archive-profile-month .event-row { grid-template-columns: 34px minmax(0, 1fr); }
   .archive-day-chip { font-size: 13px; }
   .archive-year-heading { font-size: 28px; margin: 14px 0 16px; }
   .archive-viewport, .info-viewport { clip-path: inset(8.06cqw 8.25% 8cqw); }
-  .archive-back { bottom: var(--qdp-list-bottom); min-height: 44px; max-width: 76%; font-size: 16px; white-space: normal; text-align: center; }
-  .archive-page:has(.archive-back:not([hidden])) .archive-stack { bottom: calc(var(--qdp-list-bottom) + 48px); }
+  .archive-back { position: static; transform: none; display: flex; margin: 20px auto 8px; flex-shrink: 0; min-height: 44px; max-width: 76%; font-size: 16px; white-space: normal; text-align: center; }
+  .archive-page:has(.archive-back:not([hidden])) .archive-stack { bottom: var(--qdp-list-bottom); }
 
   .poster-controls {
     position: relative;
@@ -130,20 +130,6 @@
     min-height: 0;
     margin: 2px 0;
   }
-  .mobile-profile-info {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    min-height: 44px;
-    padding: 0 20px;
-    border: 1.5px solid #ffea86;
-    border-radius: 16px;
-    background: #000;
-    color: #fff1f4;
-    font: 700 16px/1.2 "QDP Fraunces", Georgia, serif;
-  }
-  .mobile-profile-info[hidden] { display: none; }
   .mobile-context .archive-alphabet {
     position: relative;
     inset: auto;
@@ -285,6 +271,8 @@
   .archive-menu-badge[aria-current="page"] .archive-menu-badge-label { left: 50%; }
   .archive-menu > .archive-menu-past-events { min-height: 48px; margin: 12px 0 0; padding: 4px 0; font-size: 18px; }
   .archive-menu > .archive-menu-map { min-height: 44px; margin: 4px 0 0; padding: 12px 0; font-size: 16px; }
+  .archive-menu .archive-menu-profile { display: none; }
+  .mobile-profile-summary { display: block; flex-shrink: 0; padding: 16px 12px 24px; color: #fff1f4; font-size: 15px; line-height: 1.6; }
   .archive-menu-profile { flex-shrink: 0; font-size: 15px; line-height: 1.6; }
   .archive-menu.has-profile .archive-menu-profile { max-height: none; overflow: visible; }
   .archive-menu-profile:not([hidden]) { margin: 18px 0 28px; }
@@ -300,9 +288,9 @@
   .date-popover-day { min-height: 36px; border-radius: 10px; font-size: 14px; }
   .date-popover-day.selected { background: #fa2b5a; color: #fff1f4; }
 
-  .event-detail-card { height: calc(100% - 44px); padding: 0 0 20px; scrollbar-gutter: auto; font-size: 15px; line-height: 1.55; }
-  .event-detail-content-viewport { max-height: calc(100% - 44px); }
-  .event-detail-back { bottom: 0; display: flex; align-items: center; justify-content: center; min-height: 44px; max-width: calc(100% - 24px); font-size: 16px; white-space: normal; }
+  .event-detail-card { height: 100%; padding: 0 0 20px; scrollbar-gutter: auto; font-size: 15px; line-height: 1.55; }
+  .event-detail-content-viewport { max-height: 100%; }
+  .event-detail-back { position: static; flex-shrink: 0; margin: 24px auto 0; display: flex; align-items: center; justify-content: center; min-height: 44px; max-width: calc(100% - 24px); font-size: 16px; white-space: normal; }
   .event-detail-date-badge { width: calc(100% - 68px); height: 36px; padding: 0 6px; border-radius: 0 0 20px 20px; }
   .event-detail-date-text { padding: 0 6px; }
   .event-detail-flag { width: 32px; height: 32px; }
