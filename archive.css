@@ -390,13 +390,24 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 .archive-date-badge .archive-date-number { font-size: .86em; }
 .archive-date-badge .archive-date-year { font-size: .7em; }
 .archive-year-heading {
-  margin: 1.4cqw 0 2.2cqw;
+  margin: 0 0 2.2cqw 33.03cqw;
   color: #ffeff2;
   text-align: center;
-  font: 700 5.8cqw/1 "QDP Fraunces", Georgia, serif;
-  clip-path: inset(var(--archive-year-clip, 0px) 0 0 0);
+  font: 700 var(--qdp-date-font-size)/1 "QDP Fraunces", Georgia, serif;
 }
-.archive-year-heading:not(:first-child) { margin-top: 4cqw; }
+.archive-period-heading {
+  margin: 2cqw 0 3cqw;
+  color: #fff1f4;
+  font: 700 var(--qdp-date-font-size)/1.2 "QDP Fraunces", Georgia, serif;
+  text-align: center;
+}
+.archive-period-divider {
+  height: .45cqw;
+  margin: 4cqw 0;
+  border: 0;
+  border-radius: .25cqw;
+  background: #ffea86;
+}
 .archive-profile-month .event-row {
   display: grid;
   grid-template-columns: 8.1cqw minmax(0, 1fr);

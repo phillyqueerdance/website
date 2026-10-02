@@ -12,6 +12,14 @@
   const archiveStack = document.getElementById("archiveStack");
   const archiveHeader = document.getElementById("archiveHeader");
   const archiveBack = document.getElementById("archiveBack");
+  const headerLabel = node("span", "archive-header-label");
+  const incomingYear = node("span", "archive-header-incoming");
+  incomingYear.hidden = true;
+  incomingYear.setAttribute("aria-hidden", "true");
+  archiveHeader.append(headerLabel, incomingYear);
+  let profileName = "";
+  let yearHeadings = [];
+  let yearEndSpacer = null;
   let exitTimer = 0;
   let menuMotionSerial = 0;
   const cache = new Map();
@@ -65,6 +73,9 @@
 
   function message(label) {
     archiveStack.replaceChildren(node("p", "event-feed-message", label));
+    profileName = "";
+    yearHeadings = [];
+    yearEndSpacer = null;
     cards = [];
     corners = [];
     archive.events = [];
@@ -72,17 +83,64 @@
   }
 
   function header(label) {
-    archiveHeader.textContent = label;
-    fitDateText(archiveHeader, archiveHeader);
+    headerLabel.textContent = label;
+    headerLabel.style.transform = "";
+    incomingYear.textContent = "";
+    incomingYear.hidden = true;
+    archiveHeader.setAttribute("aria-label", label);
+    fitDateText(headerLabel, archiveHeader);
+  }
+
+  function fitProfileHeaders() {
+    if (!profileName) return;
+    const current = headerLabel.textContent;
+    headerLabel.textContent = profileName;
+    fitDateText(headerLabel, archiveHeader);
+    headerLabel.textContent = current;
+    incomingYear.style.fontSize = headerLabel.style.fontSize;
+    yearHeadings.forEach(({ marker }) => {
+      marker.style.fontSize = headerLabel.style.fontSize;
+    });
+  }
+
+  function measureYearEndSpacer() {
+    if (!yearEndSpacer || !yearHeadings.length) return;
+    yearEndSpacer.style.height = "0px";
+    const naturalEnd = offset(yearEndSpacer);
+    if (naturalEnd <= archiveStack.clientHeight) return;
+    const last = yearHeadings[yearHeadings.length - 1].marker;
+    const target = offset(last) + archiveHeader.getBoundingClientRect().height;
+    yearEndSpacer.style.height = Math.max(0,
+      target + archiveStack.clientHeight - naturalEnd + 2) + "px";
   }
 
   function syncYearHeadings() {
-    const boundary = archiveHeader.getBoundingClientRect().bottom + 2;
-    archiveStack.querySelectorAll(".archive-year-heading").forEach(heading => {
-      const box = heading.getBoundingClientRect();
-      const clipped = Math.max(0, Math.min(box.height, boundary - box.top));
-      heading.style.setProperty("--archive-year-clip", `${clipped}px`);
+    if (!profileName) return;
+    const top = archiveStack.getBoundingClientRect().top;
+    const height = archiveHeader.getBoundingClientRect().height - 2;
+    if (height <= 0) return;
+    let active = profileName;
+    let transition = null;
+    yearHeadings.forEach(({ year, marker }) => {
+      const markerTop = marker.getBoundingClientRect().top - top;
+      marker.style.opacity = markerTop <= 0 ? "0" : "";
+      if (markerTop <= -height) active = year;
+      else if (markerTop <= 0 && !transition && year !== active) {
+        transition = { previous: active, next: year, progress: -markerTop / height };
+      }
     });
+    if (!transition) {
+      header(active);
+      fitProfileHeaders();
+      return;
+    }
+    const { previous, next, progress } = transition;
+    headerLabel.textContent = previous;
+    incomingYear.textContent = next;
+    incomingYear.hidden = false;
+    headerLabel.style.transform = `translateY(${-progress * height}px)`;
+    incomingYear.style.transform = `translateY(${(1 - progress) * height}px)`;
+    archiveHeader.setAttribute("aria-label", progress < .5 ? previous : next);
   }
 
   function positionMenu() {
@@ -415,7 +473,21 @@
     archiveStack.replaceChildren();
     cards = [];
     corners = [];
-    archive.events = sortEvents(items.filter(item => item.eventId && !Number.isNaN(Date.parse(item.start)))).reverse();
+    profileName = person?.name || "";
+    yearHeadings = [];
+    yearEndSpacer = null;
+    const events = sortEvents(items.filter(item => item.eventId && !Number.isNaN(Date.parse(item.start))));
+    const now = Date.now();
+    const upcoming = [];
+    const past = [];
+    events.forEach(event => {
+      const start = Date.parse(event.start);
+      const end = Date.parse(event.end);
+      const cutoff = Number.isFinite(end) && end >= start ? end : start;
+      (cutoff >= now ? upcoming : past).push(event);
+    });
+    past.reverse();
+    archive.events = person ? [...upcoming, ...past] : [...events].reverse();
     setProfile(kind, person);
     if (person) {
       const summary = node("section", "mobile-profile-summary");
@@ -428,49 +500,73 @@
       archiveStack.appendChild(heading);
     }
 
-    let day = "";
-    let year = "";
-    let currentMonth = "";
-    let current = null;
-    for (const event of archive.events) {
-      const eventDay = dateKey(new Date(event.start));
-      if (person && eventDay.slice(0, 4) !== year) {
-        finishGroup(current);
-        current = null;
-        year = eventDay.slice(0, 4);
-        archiveStack.appendChild(node("h2", "archive-year-heading", year));
+    function renderRows(events, parent) {
+      let day = "";
+      let year = "";
+      let currentMonth = "";
+      let current = null;
+      for (const event of events) {
+        const eventDay = dateKey(new Date(event.start));
+        if (person && eventDay.slice(0, 4) !== year) {
+          finishGroup(current);
+          current = null;
+          year = eventDay.slice(0, 4);
+          const marker = node("h2", "date-heading archive-year-heading", year);
+          parent.appendChild(marker);
+          yearHeadings.push({ year, marker });
+        }
+        if (person && eventDay.slice(0, 7) !== currentMonth) {
+          finishGroup(current);
+          currentMonth = eventDay.slice(0, 7);
+          current = group(monthName(currentMonth).slice(0, 3), "archive-profile-month", parent);
+          current.badge.setAttribute("aria-label", `${monthName(currentMonth)} ${year}`);
+        }
+        if (!person && eventDay !== day) {
+          finishGroup(current);
+          day = eventDay;
+          current = group("", "archive-event-day", parent);
+          current.badge.classList.add("archive-date-badge");
+          current.badge.setAttribute("aria-label", `${formatPosterDate(day)}, ${day.slice(0, 4)}`);
+          const weekday = new Intl.DateTimeFormat("en-US", {
+            timeZone: "America/New_York", weekday: "short"
+          }).format(dateFromKey(day));
+          current.badge.append(
+            node("span", "", weekday),
+            node("span", "archive-date-number", `${Number(day.slice(5, 7))}/${Number(day.slice(-2))}`),
+            node("span", "archive-date-year", day.slice(0, 4))
+          );
+        }
+        const card = createEventCard(event);
+        if (kind === "venue") {
+          card.querySelectorAll(".event-venue, .event-address").forEach(part => part.remove());
+        }
+        const ordinalDay = Number(eventDay.slice(-2));
+        addCard(current, card, person ? `${ordinalDay}${ordinalSuffix(ordinalDay)}` : "");
       }
-      if (person && eventDay.slice(0, 7) !== currentMonth) {
-        finishGroup(current);
-        currentMonth = eventDay.slice(0, 7);
-        current = group(monthName(currentMonth).slice(0, 3), "archive-profile-month");
-        current.badge.setAttribute("aria-label", `${monthName(currentMonth)} ${year}`);
-      }
-      if (!person && eventDay !== day) {
-        finishGroup(current);
-        day = eventDay;
-        current = group("", "archive-event-day");
-        current.badge.classList.add("archive-date-badge");
-        current.badge.setAttribute("aria-label", `${formatPosterDate(day)}, ${day.slice(0, 4)}`);
-        const weekday = new Intl.DateTimeFormat("en-US", {
-          timeZone: "America/New_York", weekday: "short"
-        }).format(dateFromKey(day));
-        current.badge.append(
-          node("span", "", weekday),
-          node("span", "archive-date-number", `${Number(day.slice(5, 7))}/${Number(day.slice(-2))}`),
-          node("span", "archive-date-year", day.slice(0, 4))
-        );
-      }
-      const card = createEventCard(event);
-      if (kind === "venue") {
-        card.querySelectorAll(".event-venue, .event-address").forEach(part => part.remove());
-      }
-      const ordinalDay = Number(eventDay.slice(-2));
-      addCard(current, card, person ? `${ordinalDay}${ordinalSuffix(ordinalDay)}` : "");
+      finishGroup(current);
     }
-    finishGroup(current);
-    if (!archive.events.length) {
-      archiveStack.appendChild(node("p", "event-feed-message", "No events here yet."));
+    if (person) {
+      for (const [period, label, events] of [["upcoming", "Upcoming Events", upcoming],
+        ["past", "Past Events", past]]) {
+        if (period === "past") archiveStack.appendChild(node("hr", "archive-period-divider"));
+        const section = node("section", "archive-event-period");
+        section.dataset.period = period;
+        const heading = node("h2", "archive-period-heading", label);
+        heading.id = `archive-${period}-heading`;
+        section.setAttribute("aria-labelledby", heading.id);
+        section.appendChild(heading);
+        archiveStack.appendChild(section);
+        if (events.length) renderRows(events, section);
+        else section.appendChild(node("p", "event-feed-message", `No ${period} events.`));
+      }
+      yearEndSpacer = node("div", "date-end-spacer");
+      yearEndSpacer.setAttribute("aria-hidden", "true");
+      archiveStack.appendChild(yearEndSpacer);
+    } else {
+      renderRows(archive.events, archiveStack);
+      if (!archive.events.length) {
+        archiveStack.appendChild(node("p", "event-feed-message", "No events here yet."));
+      }
     }
     archive.updateLayout();
   }
@@ -549,8 +645,8 @@
       else if (resource === "month") renderEvents(data.events, null, "", params.month);
       else {
         if (!data.profile || data.profile.id !== params.id) throw new Error("Profile not found");
-        renderEvents(data.events, data.profile, resource);
         header(data.profile.name);
+        renderEvents(data.events, data.profile, resource);
         if (!window.QDPInfoView?.active) document.title = `${data.profile.name} | Queer Dance Philly`;
       }
       archiveStack.scrollTop = 0;
@@ -664,6 +760,8 @@
     },
     updateLayout() {
       fitPosterTitles(archiveStack);
+      fitProfileHeaders();
+      measureYearEndSpacer();
       syncYearHeadings();
       this.updateControls();
     }
