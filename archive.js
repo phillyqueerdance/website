@@ -93,13 +93,11 @@
 
   function fitProfileHeaders() {
     if (!profileName) return;
-    const current = headerLabel.textContent;
-    headerLabel.textContent = profileName;
     fitDateText(headerLabel, archiveHeader);
-    headerLabel.textContent = current;
-    incomingYear.style.fontSize = headerLabel.style.fontSize;
+    const size = getComputedStyle(dateButton).fontSize;
+    incomingYear.style.fontSize = size;
     yearHeadings.forEach(({ marker }) => {
-      marker.style.fontSize = headerLabel.style.fontSize;
+      marker.style.fontSize = size;
     });
   }
 
@@ -168,10 +166,10 @@
       menuTrack.style.setProperty("--archive-alphabet-top", `${menu.offsetTop + menu.offsetHeight + 8}px`);
       if (!menuTrack.hidden) {
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
-        const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.scrollWidth))) + 24;
+        const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.scrollWidth))) + 22.8;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
-        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset + 8}px`);
-        menuTrack.style.setProperty("--archive-nav-compact-width", `${Math.min(expandedWidth, labelWidth + 32)}px`);
+        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset + 7.6}px`);
+        menuTrack.style.setProperty("--archive-nav-compact-width", `${Math.min(expandedWidth, labelWidth + 30.4)}px`);
       }
     }
   }
@@ -434,7 +432,6 @@
     const info = node("section", "archive-profile-info");
     info.setAttribute("aria-label", `${kind[0].toUpperCase() + kind.slice(1)} information`);
     info.appendChild(node("h2", "archive-profile-heading", person.name));
-    if (kind === "venue" && person.queerVenue) info.appendChild(node("span", "archive-profile-identity", "Queer venue"));
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
     if (Array.isArray(person.related) && person.related.length) {
@@ -501,7 +498,7 @@
     }
 
     let renderedYear = "";
-    function renderRows(events, parent) {
+    function renderRows(events, parent, periodHeader = null) {
       let day = "";
       let currentMonth = "";
       let current = null;
@@ -513,7 +510,7 @@
           current = null;
           renderedYear = year;
           const marker = node("h2", "date-heading archive-year-heading", year);
-          parent.appendChild(marker);
+          (periodHeader && event === events[0] ? periodHeader : parent).appendChild(marker);
           yearHeadings.push({ year, marker });
         }
         if (person && eventDay.slice(0, 7) !== currentMonth) {
@@ -558,9 +555,11 @@
         const heading = node("h2", "archive-period-heading", label);
         heading.id = `archive-${period}-heading`;
         section.setAttribute("aria-labelledby", heading.id);
-        section.appendChild(heading);
+        const periodHeader = node("div", "archive-period-header");
+        periodHeader.appendChild(heading);
+        section.appendChild(periodHeader);
         archiveStack.appendChild(section);
-        renderRows(events, section);
+        renderRows(events, section, periodHeader);
       }
       if (!archive.events.length) {
         archiveStack.appendChild(node("p", "event-feed-message", "No events here yet."));
