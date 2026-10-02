@@ -151,6 +151,7 @@
   }
 
   function hideMenu() {
+    window.QDPMobile?.closeDiscover({ restoreFocus: false });
     menuMotionSerial++;
     menuTrack.classList.remove("is-open");
     document.documentElement.classList.remove("discover-open");
@@ -673,6 +674,10 @@
   discoverLink.addEventListener("click", event => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
+    if (window.QDPMobile?.active) {
+      window.QDPMobile.openDiscover();
+      return;
+    }
     if (window.QDPInfoView?.active) {
       const url = new URL(location.href);
       url.hash = "";

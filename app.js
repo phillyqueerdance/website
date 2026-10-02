@@ -326,6 +326,8 @@ function fitPosterTitles(stack = eventStack) {
   const titles = [...stack.querySelectorAll(".event-title")];
   titles.forEach(title => { title.style.fontSize = ""; });
   const adjustments = titles.map(title => {
+    // Phone titles wrap at a readable size instead of shrinking to one line.
+    if (window.matchMedia("(max-width: 760px)").matches) return null;
     const available = title.clientWidth;
     const fullWidth = title.scrollWidth;
     if (available > 0 && fullWidth > available) {
@@ -1187,9 +1189,11 @@ function fitDetailContent() {
   const topMargin = parseFloat(slotStyle.marginTop) || 0;
   const leftMargin = parseFloat(slotStyle.marginLeft) || 0;
   slot.style.marginRight = `${Math.max(0, leftMargin - rightPadding - scrollbarWidth)}px`;
-  const availableHeight = card.clientHeight -
-    topMargin - 2;
-  flyer.style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
+  const availableHeight = card.clientHeight - topMargin - 2;
+  const flyerHeight = window.matchMedia("(max-width: 760px)").matches
+    ? Math.min(availableHeight, card.clientHeight * .62)
+    : availableHeight;
+  flyer.style.maxHeight = `${Math.max(0, Math.floor(flyerHeight))}px`;
 }
 
 function openEventDetail(event, { updateHistory = true } = {}) {
@@ -1717,6 +1721,8 @@ eventDetail.addEventListener(
 
 document.addEventListener("click", event => {
   if (!event.isTrusted || infoView.active || eventDetail.hidden || eventDetail.contains(event.target)) return;
+  if (window.QDPMobile?.active && event.target instanceof Element &&
+      event.target.closest(".side-nav, #archiveMenuTrack, #mobileContext, #mobileSheetBackdrop")) return;
   if (event.target instanceof Element &&
       event.target.closest("#previousPoster, #nextPoster, .event-card, a[data-archive-link], a[data-discover-link]")) return;
   closeEventDetail();

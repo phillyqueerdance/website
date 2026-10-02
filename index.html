@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
  <title>Queer Dance Philly</title>
 
 <meta
@@ -39,6 +39,7 @@
  <link rel="stylesheet" href="poster-theme.css?v=20260926-01">
  <link rel="stylesheet" href="poster-redesign.css?v=20261002-discover-2">
  <link rel="stylesheet" href="archive.css?v=20261002-discover-spacing-2">
+ <link rel="stylesheet" href="mobile.css?v=20261002-mobile-ux-1">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -200,6 +201,10 @@
 
       </div>
 
+      <div id="mobileContext" class="mobile-context" hidden>
+        <button id="mobileProfileInfo" class="mobile-profile-info" type="button" aria-controls="archiveMenuTrack" aria-expanded="false" hidden>Info &amp; links <span aria-hidden="true">↗</span></button>
+      </div>
+
       <div class="poster-controls" aria-label="Event navigation">
         <button
           id="previousPoster"
@@ -227,15 +232,24 @@
       aria-label="Site links"
       data-layout-target="nav"
     >
-      <button
-        id="mobileMenuButton"
-        class="mobile-menu-toggle"
-        type="button"
-        aria-controls="siteMenuLinks"
-        aria-expanded="false"
-      >More</button>
+      <div class="mobile-primary">
+        <a id="mobileCalendarLink" href="/" data-archive-link>Calendar</a>
+        <button id="mobileDiscoverButton" type="button" aria-controls="archiveMenuTrack" aria-expanded="false" aria-haspopup="dialog">Discover</button>
+        <button
+          id="mobileMenuButton"
+          class="mobile-menu-toggle"
+          type="button"
+          aria-controls="siteMenuLinks"
+          aria-expanded="false"
+          aria-haspopup="dialog"
+        >More</button>
+      </div>
 
       <div id="siteMenuLinks" class="side-nav-links">
+        <div class="mobile-more-heading">
+          <span id="mobileMoreHeading">More</span>
+          <button id="mobileMoreClose" class="mobile-menu-close" type="button" aria-label="Close menu">×</button>
+        </div>
         <a id="aboutLink" href="#about" aria-controls="aboutDialog">Start Here</a>
         <a href="/" data-archive-link>Calendar</a>
         <a id="discoverLink" href="#discover" data-discover-link aria-controls="archiveMenuTrack" aria-expanded="false">Discover</a>
@@ -277,6 +291,7 @@
       <div class="archive-menu-panel">
         <nav id="archiveMenu" class="archive-menu" aria-labelledby="discoverHeading">
           <h2 id="discoverHeading" class="archive-menu-heading">Discover</h2>
+          <button id="mobileDiscoverClose" class="mobile-menu-close" type="button" aria-label="Close Discover">×</button>
           <a class="archive-menu-badge archive-menu-badge--artists" href="/?archive=artists" data-archive-link><span class="archive-menu-badge-label">Artists</span></a>
           <a class="archive-menu-badge archive-menu-badge--venues" href="/?archive=venues" data-archive-link><span class="archive-menu-badge-label">Venues</span></a>
           <a
@@ -297,6 +312,8 @@
     </div>
 
   </main>
+
+  <div id="mobileSheetBackdrop" class="mobile-sheet-backdrop" aria-hidden="true" hidden></div>
 
   <script>
     (() => {
@@ -1233,8 +1250,9 @@
   </script>
 
   <template id="qdpInitialEvents"></template>
-  <script src="app.js?v=20261002-discover-1"></script>
-  <script src="archive.js?v=20261002-discover-spacing-2"></script>
+  <script src="app.js?v=20261002-mobile-ux-1"></script>
+  <script src="archive.js?v=20261002-mobile-ux-1"></script>
+  <script src="mobile.js?v=20261002-mobile-ux-1"></script>
   <script src="menu-pointer-sparkles.js?v=20261002-discover-1"></script>
 
 </body>
