@@ -398,15 +398,18 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 .archive-period-heading {
   margin: 2cqw 0 3cqw;
   color: #fff1f4;
-  font: 700 var(--qdp-date-font-size)/1.2 "QDP Fraunces", Georgia, serif;
+  font: 700 calc(var(--qdp-date-font-size) * 1.5)/1.2 "QDP Fraunces", Georgia, serif;
   text-align: center;
 }
 .archive-period-divider {
-  height: .45cqw;
-  margin: 4cqw 0;
-  border: 0;
-  border-radius: .25cqw;
-  background: #ffea86;
+  width: 36cqw;
+  max-width: 50%;
+  height: 1.2cqw;
+  margin: 4cqw auto;
+  border: .22cqw solid #ffea86;
+  border-radius: 999px;
+  background: #000;
+  box-sizing: border-box;
 }
 .archive-profile-month .event-row {
   display: grid;

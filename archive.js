@@ -500,17 +500,18 @@
       archiveStack.appendChild(heading);
     }
 
+    let renderedYear = "";
     function renderRows(events, parent) {
       let day = "";
-      let year = "";
       let currentMonth = "";
       let current = null;
       for (const event of events) {
         const eventDay = dateKey(new Date(event.start));
-        if (person && eventDay.slice(0, 4) !== year) {
+        const year = eventDay.slice(0, 4);
+        if (person && year !== renderedYear) {
           finishGroup(current);
           current = null;
-          year = eventDay.slice(0, 4);
+          renderedYear = year;
           const marker = node("h2", "date-heading archive-year-heading", year);
           parent.appendChild(marker);
           yearHeadings.push({ year, marker });
@@ -546,9 +547,12 @@
       finishGroup(current);
     }
     if (person) {
-      for (const [period, label, events] of [["upcoming", "Upcoming Events", upcoming],
-        ["past", "Past Events", past]]) {
-        if (period === "past") archiveStack.appendChild(node("hr", "archive-period-divider"));
+      for (const [period, label, events] of [["upcoming", "Upcoming", upcoming],
+        ["past", "Older", past]]) {
+        if (!events.length) continue;
+        if (period === "past" && upcoming.length) {
+          archiveStack.appendChild(node("hr", "archive-period-divider"));
+        }
         const section = node("section", "archive-event-period");
         section.dataset.period = period;
         const heading = node("h2", "archive-period-heading", label);
@@ -556,8 +560,10 @@
         section.setAttribute("aria-labelledby", heading.id);
         section.appendChild(heading);
         archiveStack.appendChild(section);
-        if (events.length) renderRows(events, section);
-        else section.appendChild(node("p", "event-feed-message", `No ${period} events.`));
+        renderRows(events, section);
+      }
+      if (!archive.events.length) {
+        archiveStack.appendChild(node("p", "event-feed-message", "No events here yet."));
       }
       yearEndSpacer = node("div", "date-end-spacer");
       yearEndSpacer.setAttribute("aria-hidden", "true");
