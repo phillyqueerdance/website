@@ -92,7 +92,8 @@
       menuTrack.style.setProperty("--archive-nav-font-size", getComputedStyle(leftLink).fontSize);
       menuTrack.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
       const sideWidth = parseFloat(getComputedStyle(document.querySelector(".side-nav")).width);
-      const posterWidth = document.querySelector(".poster").getBoundingClientRect().width;
+      const posterBox = document.querySelector(".poster").getBoundingClientRect();
+      const posterWidth = posterBox.width;
       const purpleBorder = 1586 / 1727;
       // Begin behind the last pixels of the outer red line, so both rails
       // emerge directly from the frame once the artwork is layered above them.
@@ -104,11 +105,8 @@
       menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
       menuTrack.style.setProperty("--archive-overlap", `${overlap}px`);
       menuTrack.style.setProperty("--archive-badge-label-x", `${menuInset + 14}px`);
-      const shell = document.querySelector(".site-shell");
-      const menuStyle = getComputedStyle(menu);
-      const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;
-      const textInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth);
-      menuTrack.style.setProperty("--archive-nav-top", `${Math.max(0, linkTop - textInset)}px`);
+      // Anchor Discover to the frame; shorter site navigation must not lower it.
+      menuTrack.style.setProperty("--archive-nav-top", `${posterBox.height * .068}px`);
       menuTrack.style.setProperty("--archive-alphabet-top", `${menu.offsetTop + menu.offsetHeight + 8}px`);
       if (!menuTrack.hidden) {
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
