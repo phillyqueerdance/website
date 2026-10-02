@@ -410,7 +410,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   align-items: center;
   justify-content: flex-start;
   height: var(--qdp-date-height);
-  margin: 0 0 0 20cqw;
+  margin: 0 0 0 calc(10.9cqw + var(--qdp-time-card-gap));
   padding: 0 0 .45cqw;
   color: #fff1f4;
   font: 700 var(--qdp-date-font-size)/1 "QDP Fraunces", Georgia, serif;
