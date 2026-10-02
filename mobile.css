@@ -253,7 +253,10 @@
     margin: 0 -20px 0 0;
     border-radius: 14px 0 0 14px;
   }
-  .archive-menu-badge-label { left: 20px; }
+  .archive-menu-badge-label { left: 50%; }
+  .archive-menu:not(.has-profile) > .archive-menu-badge[aria-current="page"] {
+    width: calc(100% + 28px);
+  }
   .archive-menu-badge[aria-current="page"] .archive-menu-badge-label { left: 50%; }
   .archive-menu > .archive-menu-past-events {
     grid-column: 1 / -1;
