@@ -2155,6 +2155,7 @@ const initialArchiveView = new URLSearchParams(location.search).get("archive");
 (() => {
   const back = document.getElementById("mobileBack");
   const archiveBack = document.getElementById("archiveBack");
+  const mobileNavigation = window.matchMedia("(max-width: 760px)");
   let target = null;
   let frame = 0;
   function sync() {
@@ -2163,7 +2164,10 @@ const initialArchiveView = new URLSearchParams(location.search).get("archive");
     target = !eventDetail.hidden && !infoOpen ? eventDetail.querySelector(".event-detail-back")
       : window.QDPArchive?.active && !archiveBack.hidden && !infoOpen ? archiveBack : null;
     back.hidden = !target;
-    if (target) { back.textContent = target.textContent; back.href = target.href; }
+    if (target) {
+      back.textContent = mobileNavigation.matches ? target.textContent.replace(/^←\s*/, "") : target.textContent;
+      back.href = target.href;
+    }
     for (const button of [previousPoster, nextPoster]) {
       const label = button.getAttribute("aria-label") || "";
       button.dataset.navLabel = /^(Previous|Next) (letter|group): /.test(label)
@@ -2187,6 +2191,7 @@ const initialArchiveView = new URLSearchParams(location.search).get("archive");
   observer.observe(eventDetail, { childList: true, attributes: true, attributeFilter: ["hidden"] });
   observer.observe(archiveBack, { childList: true, attributes: true, attributeFilter: ["hidden", "href"] });
   for (const button of [previousPoster, nextPoster]) observer.observe(button, { attributes: true, attributeFilter: ["aria-label", "disabled"] });
+  mobileNavigation.addEventListener("change", schedule);
   sync();
   // A mouse drag on the flyer/header mirrors the touch gesture on desktop.
   let drag = null;

@@ -518,6 +518,12 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 
 /* Desktop return text stays inside the poster; arrows clear the outer rails. */
 @media (min-width: 761px) {
+  .poster-stage {
+    --qdp-arrow-gap: 52px;
+    --qdp-arrow-bottom: 7.75%;
+    --qdp-arrow-height: 56px;
+    --qdp-menu-arrow-gap: 16px;
+  }
   .poster { --qdp-return-gap: 6.4cqw; }
   .poster-controls {
     inset: 0;
@@ -529,10 +535,24 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   }
   .poster-controls > button {
     position: absolute;
-    bottom: 7.75%;
+    bottom: var(--qdp-arrow-bottom);
+    height: var(--qdp-arrow-height);
   }
-  #previousPoster { right: calc(100% + 28px); left: auto; }
-  #nextPoster { left: calc(100% + 76px); right: auto; }
+  #previousPoster { right: calc(100% + var(--qdp-arrow-gap)); left: auto; }
+  #nextPoster { left: calc(100% + var(--qdp-arrow-gap)); right: auto; }
+  .archive-menu {
+    max-height: calc(100% - var(--qdp-arrow-bottom) - var(--qdp-arrow-height) - var(--qdp-menu-arrow-gap) - var(--archive-nav-top, 0px));
+    justify-content: flex-start;
+  }
+  .archive-menu > a, .archive-menu-heading { flex-shrink: 0; }
+  .archive-menu-profile {
+    width: calc(100% + var(--archive-overlap, 64px) - var(--archive-menu-inset, 33px));
+    min-height: 0;
+    scrollbar-width: none;
+  }
+  .archive-menu-profile:not([hidden]) {
+    margin-left: calc(var(--archive-menu-inset, 33px) - var(--archive-overlap, 64px));
+  }
   .poster-controls > .mobile-back:not([hidden]) {
     bottom: 6.85%;
     width: 76%;
