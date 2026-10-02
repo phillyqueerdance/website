@@ -124,7 +124,7 @@
   position: absolute;
   top: var(--archive-nav-top, 0px);
   left: 0;
-  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px));
+  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) + var(--archive-feed-extension, 0px));
   height: auto;
   max-height: calc(93.25% - var(--archive-nav-top, 0px));
   box-sizing: border-box;
@@ -158,7 +158,7 @@
   position: relative;
   z-index: 1;
   box-sizing: border-box;
-  width: var(--archive-nav-width, 228px);
+  width: calc(var(--archive-nav-width, 228px) + var(--archive-feed-extension, 0px));
   margin: 0 0 12px calc(var(--archive-menu-inset, 33px) - var(--archive-overlap, 64px) - 12px);
   padding: 0 12px;
   color: #fff1f4;
@@ -185,7 +185,7 @@
   transition-timing-function: var(--qdp-page-ease, ease-out);
 }
 .archive-menu > .archive-menu-badge[aria-current="page"] {
-  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 12px);
+  width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) + var(--archive-feed-extension, 0px) - 12px);
   min-height: 36px;
   border-radius: 0 14px 14px 0;
   justify-content: center;
@@ -545,8 +545,8 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
     justify-content: flex-start;
   }
   .archive-menu > a, .archive-menu-heading { flex-shrink: 0; }
-  .archive-menu:not(.has-profile) > .archive-menu-badge[aria-current="page"] {
-    width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) + 4px);
+  .archive-menu:not(.has-profile):has(> .archive-menu-badge[aria-current="page"]) {
+    --archive-feed-extension: 16px;
   }
   .archive-menu-profile {
     width: calc(100% + var(--archive-overlap, 64px) - var(--archive-menu-inset, 33px));
