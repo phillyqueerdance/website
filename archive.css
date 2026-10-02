@@ -496,3 +496,31 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   .archive-page, .poster-info-page, .archive-menu-panel { transition-duration: .01ms; }
   .archive-menu > .archive-menu-badge, .archive-menu-badge-label { transition-duration: .01ms; }
 }
+
+/* Desktop return text stays inside the poster; arrows clear the outer rails. */
+@media (min-width: 761px) {
+  .poster-controls {
+    inset: 0;
+    z-index: 30;
+    width: auto;
+    height: auto;
+    pointer-events: none;
+  }
+  .poster-controls > button {
+    position: absolute;
+    bottom: 7.75%;
+  }
+  #previousPoster { right: calc(100% + 28px); left: auto; }
+  #nextPoster { left: calc(100% + 76px); right: auto; }
+  .poster-controls > .mobile-back:not([hidden]) {
+    bottom: calc(6.85% + 1cqw);
+    width: 76%;
+    min-height: 3cqw;
+    font-size: clamp(13px, 2.4cqw, 20px);
+  }
+  .archive-page:has(.archive-back:not([hidden])) .archive-stack {
+    bottom: calc(var(--qdp-list-bottom) + 6.4cqw);
+  }
+  .event-detail-card { height: calc(100% - 5cqw); }
+  .event-detail-content-viewport { max-height: calc(100% - 5cqw); }
+}
