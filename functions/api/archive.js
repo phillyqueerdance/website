@@ -51,6 +51,7 @@ function profile(input, kind, publicIds = null, details = false) {
           music: safeUrl(input.music)
         }
       : kind === "venues" ? {
+          queerVenue: yes(input.queerVenue ?? input.queer),
           neighborhood: value(input.neighborhood, 120),
           address: value(input.address, 260),
           maps: safeUrl(input.maps)

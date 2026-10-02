@@ -23,6 +23,7 @@
 .archive-header { cursor: default; }
 .archive-header:hover, .archive-header:focus-visible { background: #fa2b5a; color: #ffeff2; }
 .archive-back {
+  display: none !important;
   position: absolute;
   z-index: 4;
   bottom: calc(var(--qdp-list-bottom) + 1cqw);
@@ -42,7 +43,7 @@
 .archive-back:hover, .archive-back:focus-visible { color: #ffea86; }
 .archive-stack { z-index: 2; }
 .archive-page:has(.archive-back:not([hidden])) .archive-stack {
-  bottom: calc(var(--qdp-list-bottom) + 6.4cqw);
+  bottom: var(--qdp-list-bottom);
 }
 .archive-mode #eventStack, .archive-mode #dateButton,
 .archive-mode .date-scroll-label { visibility: hidden; }
@@ -294,7 +295,11 @@
 }
 .archive-profile-related {
   margin-top: 1.6em;
-  text-align: left;
+  padding: 14px 12px;
+  border: 2px solid #ffea86;
+  border-radius: 18px;
+  background: #000;
+  text-align: center;
 }
 .archive-profile-related h3 {
   margin: 0 0 8px;
@@ -304,7 +309,7 @@
 .archive-profile-related-links {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 6px;
 }
 .archive-profile-related .event-detail-related-bubble {
@@ -313,11 +318,12 @@
   padding: 5px 9px;
   font-size: clamp(12px, 1.3cqw, 15px);
   overflow-wrap: anywhere;
-  text-align: left;
+  text-align: center;
   text-decoration: none !important;
 }
-.archive-profile-links { display: flex; flex-wrap: wrap; gap: .35em .75em; margin-top: 1.6em; }
-.archive-profile-links a { color: #ffea86; text-decoration: underline; }
+.archive-profile-links { display: flex; flex-wrap: wrap; justify-content: center; text-align: center; gap: .35em .75em; margin-top: 1.6em; }
+.archive-profile-links a { color: #ffea86; text-decoration: none !important; }
+.archive-profile-identity { display: inline-block; margin: 0 0 .5em; padding: 5px 10px; border-radius: 12px; background: #922185; color: #fff1f4; font: 700 .85em/1.2 "QDP Fraunces", Georgia, serif; }
 
 /* The alphabet rail attaches to the same frame edge, below the directory tabs. */
 .archive-alphabet {

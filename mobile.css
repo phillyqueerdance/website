@@ -1,6 +1,6 @@
 /* Phone layouts use the original artwork, typography and navigation hierarchy. */
 .mobile-primary, .mobile-context, .mobile-more-heading,
-.mobile-menu-close, .mobile-sheet-backdrop, .mobile-profile-summary, .mobile-back { display: none; }
+.mobile-menu-close, .mobile-sheet-backdrop, .mobile-profile-summary { display: none; }
 
 @media (max-width: 760px) {
   html, html.archive-open, html.discover-open {
@@ -73,7 +73,8 @@
     height: 44px;
     align-items: center;
   }
-  .poster-controls button { width: 64px; height: 44px; font-size: 30px; border-radius: 16px; }
+  .poster-controls button { width: 88px; height: 44px; font-size: 26px; border-radius: 16px; }
+  .poster-controls button::after { font-size: 11px; line-height: 1.1; }
   .poster-controls button:active { background: #241016; }
   .today-button { bottom: 0; min-width: 88px; min-height: 44px; padding: 0 12px; font-size: 16px; text-decoration: none; text-transform: capitalize; }
   .info-mode .today-button, .mobile-detail-open .today-button { display: none; }
@@ -85,7 +86,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: calc(100% - 128px);
+    width: calc(100% - 176px);
     min-height: 44px;
     color: #fff1f4;
     font: 700 15px/1.2 "QDP Fraunces", Georgia, serif;
@@ -157,8 +158,8 @@
     text-decoration: none;
     cursor: pointer;
   }
-  .mobile-primary > [data-active="true"] { background: #241016; color: #ffea86; }
-  .mobile-primary > [aria-expanded="true"] { background: #241016; }
+  .mobile-primary > [data-active="true"] { color: #ffea86; }
+
   .mobile-primary > :is(a, button):focus-visible { outline: 2px solid #fff1f4; outline-offset: -2px; }
   .side-nav-links {
     position: absolute;

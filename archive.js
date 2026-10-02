@@ -323,6 +323,7 @@
       const card = stripCard(item.name, subtitle,
         archiveUrl(singular, item.id).href);
       if ((kind === "artists" && (item.queerArtist || item.transArtist)) ||
+          (kind === "venues" && item.queerVenue) ||
           (kind === "parties" && item.queerParty) ||
           (kind === "collectives" && item.queerCollective)) {
         card.classList.add("archive-identity-card");
@@ -374,6 +375,7 @@
     const info = node("section", "archive-profile-info");
     info.setAttribute("aria-label", `${kind[0].toUpperCase() + kind.slice(1)} information`);
     info.appendChild(node("h2", "archive-profile-heading", person.name));
+    if (kind === "venue" && person.queerVenue) info.appendChild(node("span", "archive-profile-identity", "Queer venue"));
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
     if (Array.isArray(person.related) && person.related.length) {
@@ -622,13 +624,8 @@
         }
         return;
       }
-      if (!cards.length) return;
-      const top = archiveStack.scrollTop + 2;
-      let index = 0;
-      cards.forEach((card, candidate) => {
-        if (offset(card) <= top) index = candidate;
-      });
-      const target = cards[Math.max(0, Math.min(cards.length - 1, index + direction))];
+      const { groups, index } = navigationGroups();
+      const target = groups[index + direction];
       if (target) archiveStack.scrollTo({ top: offset(target), behavior: "smooth" });
     },
     updateControls() {
@@ -644,24 +641,25 @@
           card.parentElement.style.setProperty("--qdp-tail-radius", `${radius * (1 - progress)}px`);
         }
       }
+      // Popup arrows belong to the open event, even while its feed scrolls.
+      if (!eventDetail.hidden) return;
       if (profileViews[routeParams().view]) {
-        const label = routeParams().view[0].toUpperCase() + routeParams().view.slice(1);
-        previousPoster.setAttribute("aria-label", `Previous ${label}`);
-        nextPoster.setAttribute("aria-label", `Next ${label}`);
-        previousPoster.disabled = !profileNavigation || profileNavigation.index === 0;
-        nextPoster.disabled = !profileNavigation ||
-          profileNavigation.index === profileNavigation.profiles.length - 1;
+        const label = routeParams().view;
+        const previous = profileNavigation?.profiles[profileNavigation.index - 1];
+        const next = profileNavigation?.profiles[profileNavigation.index + 1];
+        previousPoster.setAttribute("aria-label", `Previous ${label}${previous ? ": " + previous.name : ""}`);
+        nextPoster.setAttribute("aria-label", `Next ${label}${next ? ": " + next.name : ""}`);
+        previousPoster.disabled = !previous;
+        nextPoster.disabled = !next;
         return;
       }
-      previousPoster.setAttribute("aria-label", "Previous listing");
-      nextPoster.setAttribute("aria-label", "Next listing");
-      const top = archiveStack.scrollTop + 2;
-      let index = 0;
-      cards.forEach((card, candidate) => {
-        if (offset(card) <= top) index = candidate;
-      });
-      previousPoster.disabled = !cards.length || index === 0;
-      nextPoster.disabled = !cards.length || index === cards.length - 1;
+      const { groups, index } = navigationGroups();
+      const kind = directoryViews.has(routeParams().view) ? "letter" : "group";
+      const label = section => section?.querySelector(".event-time")?.textContent || "";
+      previousPoster.setAttribute("aria-label", `Previous ${kind}${groups[index - 1] ? ": " + label(groups[index - 1]) : ""}`);
+      nextPoster.setAttribute("aria-label", `Next ${kind}${groups[index + 1] ? ": " + label(groups[index + 1]) : ""}`);
+      previousPoster.disabled = !groups.length || index === 0;
+      nextPoster.disabled = !groups.length || index === groups.length - 1;
     },
     updateLayout() {
       fitPosterTitles(archiveStack);
@@ -669,6 +667,15 @@
       this.updateControls();
     }
   };
+  function navigationGroups() {
+    const groups = [...archiveStack.querySelectorAll(".archive-section")];
+    const top = archiveStack.scrollTop + 2;
+    let index = 0;
+    groups.forEach((section, candidate) => {
+      if (offset(section) <= top) index = candidate;
+    });
+    return { groups, index };
+  }
   function offset(card) {
     return card.getBoundingClientRect().top - archiveStack.getBoundingClientRect().top + archiveStack.scrollTop;
   }

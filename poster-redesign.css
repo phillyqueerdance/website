@@ -600,3 +600,31 @@
     --qdp-nav-font-size: 13px;
   }
 }
+
+/* Shared navigation makes the destination distinct from returning to the feed. */
+.poster-controls button { flex-direction: column; width: 88px; height: 56px; }
+.poster-controls button::after {
+  content: attr(data-nav-label);
+  color: #fff1f4;
+  font: 700 12px/1.2 "QDP Fraunces", Georgia, serif;
+  white-space: nowrap;
+}
+.mobile-back:not([hidden]) {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - 176px);
+  min-height: 44px;
+  color: #fff1f4;
+  font: 700 16px/1.2 "QDP Fraunces", Georgia, serif;
+  text-align: center;
+  text-decoration: none !important;
+  pointer-events: auto;
+}
+.event-detail-back { display: none !important; }
+.event-detail-card { height: 100%; }
+.event-detail-content-viewport { max-height: 100%; }

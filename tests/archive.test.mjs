@@ -199,6 +199,8 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
   const snapshot = context.qdpArchivePublishSource_(ss);
   snapshot.artists[0].name = '[DJ Alpha]';
   snapshot.venues[0].name = '[The Room]';
+  snapshot.venues[0].queerVenue = true;
+  snapshot.venueEntries.ROOM.profile.queerVenue = true;
   snapshot.artistEntries.ALPHA.profile.name = '[DJ Alpha]';
   snapshot.artistEntries.ALPHA.events[0].venue = '[The Room]';
   const records = context.qdpArchiveKvRecords_(snapshot, 'revision-1');
@@ -229,8 +231,12 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
     const artistList = (await directory.json()).artists;
     assert.equal(artistList[0].queerArtist, true);
     assert.equal(artistList[0].name, 'DJ Alpha');
+    const venueProfile = await onRequestGet(request('resource=venue&id=ROOM'));
+    assert.equal((await venueProfile.json()).profile.queerVenue, true);
     const venueList = await onRequestGet(request('resource=venues'));
-    assert.equal((await venueList.json()).venues[0].name, 'The Room');
+    const venueData = (await venueList.json()).venues[0];
+    assert.equal(venueData.name, 'The Room');
+    assert.equal(venueData.queerVenue, true);
     const partyList = await onRequestGet(request('resource=parties'));
     assert.equal((await partyList.json()).parties.find(item => item.id === 'NIGHT').name, 'The Night');
     const collectiveList = await onRequestGet(request('resource=collectives'));

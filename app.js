@@ -43,6 +43,7 @@ let currentPosterIndex = 0;
 let pickerMonth = null;
 let touchStartX = null;
 let touchStartY = null;
+let touchDetailAtTop = false;
 let pageCards = [];
 let eventCardsById = new Map();
 let dateSections = [];
@@ -1029,6 +1030,8 @@ function updateScrollState() {
   if (window.QDPArchive?.active) return;
   if (!posterPages.length || !pageCards.length || eventStack.hidden) return;
   updateTimeGroupCorners();
+  previousPoster.setAttribute("aria-label", "Previous date");
+  nextPoster.setAttribute("aria-label", "Next date");
   const position = eventStack.scrollTop + 2;
   let pageIndex = 0;
   pageCards.forEach((card, index) => {
@@ -1477,6 +1480,8 @@ function updateDetailNavigationState() {
   nextPoster.disabled = index < 0 || index === events.length - 1;
   previousPoster.setAttribute("aria-label", "Previous event");
   nextPoster.setAttribute("aria-label", "Next event");
+  previousPoster.title = events[index - 1] ? displayTitle(events[index - 1]) : "Previous event";
+  nextPoster.title = events[index + 1] ? displayTitle(events[index + 1]) : "Next event";
 }
 
 function finishDetailSlide() {
@@ -1633,8 +1638,10 @@ function hideEventDetail({ restoreFocus = true } = {}) {
     eventStack.scrollTop = savedEventScrollTop;
     if (window.QDPArchive?.active) window.QDPArchive.updateControls();
     else updateScrollState();
-    previousPoster.setAttribute("aria-label", "Previous events");
-    nextPoster.setAttribute("aria-label", "Next events");
+    if (!window.QDPArchive?.active) {
+      previousPoster.setAttribute("aria-label", "Previous date");
+      nextPoster.setAttribute("aria-label", "Next date");
+    }
     if (restoreFocus) detailReturnFocus?.isConnected &&
       detailReturnFocus.focus({ preventScroll: true });
   }
@@ -1692,7 +1699,7 @@ eventDetail.addEventListener("keydown", event => {
   const liveCard = eventDetail.querySelector(".event-detail-card:not([aria-hidden])");
   const controls = [...(liveCard?.querySelectorAll("a[href], button:not([disabled])") || []),
     ...eventDetail.querySelectorAll(".event-detail-back")];
-  if (window.matchMedia("(max-width: 760px)").matches) {
+  {
     for (let i = controls.length - 1; i >= 0; i--) {
       if (controls[i].classList.contains("event-detail-back")) controls.splice(i, 1);
     }
@@ -1933,6 +1940,8 @@ poster.addEventListener(
       return;
     }
 
+    touchDetailAtTop = !eventDetail.hidden && !infoView.active && eventDetail.contains(event.target) &&
+      (eventDetail.querySelector(".event-detail-card:not([aria-hidden])")?.scrollTop || 0) <= 2;
     touchStartX =
       event.changedTouches[0].clientX;
     touchStartY =
@@ -1959,7 +1968,9 @@ poster.addEventListener(
       event.changedTouches[0].clientY -
       touchStartY;
 
-    if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+    if (touchDetailAtTop && deltaY > 72 && deltaY > Math.abs(deltaX) * 1.2) {
+      closeEventDetail();
+    } else if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
       movePoster(
         deltaX < 0 ? 1 : -1
       );
@@ -1967,6 +1978,7 @@ poster.addEventListener(
 
     touchStartX = null;
     touchStartY = null;
+    touchDetailAtTop = false;
   },
   { passive: true }
 );
@@ -2139,3 +2151,59 @@ const initialArchiveView = new URLSearchParams(location.search).get("archive");
       .initializeComprehensiveLayoutEditor();
   }
 });
+
+(() => {
+  const back = document.getElementById("mobileBack");
+  const archiveBack = document.getElementById("archiveBack");
+  let target = null;
+  let frame = 0;
+  function sync() {
+    frame = 0;
+    const infoOpen = Boolean(window.QDPInfoView?.active);
+    target = !eventDetail.hidden && !infoOpen ? eventDetail.querySelector(".event-detail-back")
+      : window.QDPArchive?.active && !archiveBack.hidden && !infoOpen ? archiveBack : null;
+    back.hidden = !target;
+    if (target) { back.textContent = target.textContent; back.href = target.href; }
+    for (const button of [previousPoster, nextPoster]) {
+      const label = button.getAttribute("aria-label") || "";
+      button.dataset.navLabel = /^(Previous|Next) (letter|group): /.test(label)
+        ? label.replace(/^(Previous|Next) (letter|group): /, (_, direction) => direction === "Previous" ? "Prev: " : "Next: ")
+        : label.replace(/: .*$/, "").replace(/^Previous /, "Prev ");
+      if (!/event$/.test(label)) button.title = label;
+    }
+  }
+  function schedule() { if (!frame) frame = requestAnimationFrame(sync); }
+  back.addEventListener("click", event => {
+    if (!target || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); event.stopPropagation(); target.click();
+  });
+  back.addEventListener("keydown", event => {
+    if (event.key !== "Tab" || event.shiftKey || eventDetail.hidden) return;
+    const first = eventDetail.querySelector(".event-detail-card:not([aria-hidden]) a[href], .event-detail-card:not([aria-hidden]) button:not(:disabled)");
+    if (first) { event.preventDefault(); first.focus(); }
+  });
+  const observer = new MutationObserver(schedule);
+  observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  observer.observe(eventDetail, { childList: true, attributes: true, attributeFilter: ["hidden"] });
+  observer.observe(archiveBack, { childList: true, attributes: true, attributeFilter: ["hidden", "href"] });
+  for (const button of [previousPoster, nextPoster]) observer.observe(button, { attributes: true, attributeFilter: ["aria-label", "disabled"] });
+  sync();
+  // A mouse drag on the flyer/header mirrors the touch gesture on desktop.
+  let drag = null;
+  eventDetail.addEventListener("pointerdown", event => {
+    if (event.pointerType !== "mouse" || event.button !== 0 || infoView.active ||
+        !event.target.closest(".event-detail-flyer-slot, .event-detail-date-badge") ||
+        (eventDetail.querySelector(".event-detail-card:not([aria-hidden])")?.scrollTop || 0) > 2) return;
+    drag = { x: event.clientX, y: event.clientY };
+  });
+  eventDetail.addEventListener("dragstart", event => {
+    if (event.target.closest(".event-detail-flyer-slot")) event.preventDefault();
+  });
+  window.addEventListener("pointerup", event => {
+    if (!drag) return;
+    const dy = event.clientY - drag.y, dx = event.clientX - drag.x;
+    drag = null;
+    if (dy > 72 && dy > Math.abs(dx) * 1.2) closeEventDetail();
+  });
+  window.addEventListener("pointercancel", () => { drag = null; });
+})();

@@ -12,9 +12,6 @@
   const menu = document.getElementById("archiveMenu");
   const profile = document.getElementById("archiveMenuProfile");
   const context = document.getElementById("mobileContext");
-  const archiveBack = document.getElementById("archiveBack");
-  const mobileBack = document.getElementById("mobileBack");
-  let backTarget = null;
   const alphabet = document.getElementById("archiveAlphabet");
   const alphabetHome = alphabet.parentElement;
   const stage = document.querySelector(".poster-stage");
@@ -99,13 +96,6 @@
     toggleClass(document.body, "mobile-detail-open", detailOpen);
     toggleClass(document.body, "mobile-more-open", moreOpen);
     context.hidden = !isDirectory || detailOpen || infoOpen;
-    backTarget = detailOpen ? detail.querySelector(".event-detail-back")
-      : window.QDPArchive?.active && !archiveBack.hidden ? archiveBack : null;
-    mobileBack.hidden = !backTarget || infoOpen;
-    if (backTarget) {
-      mobileBack.textContent = backTarget.textContent;
-      mobileBack.href = backTarget.href;
-    }
     for (const button of [discoverButton, discoverLink]) button.setAttribute("aria-expanded", String(panelOpen));
     calendar.dataset.active = String(!currentView && !infoOpen);
     discoverButton.dataset.active = String(Boolean(currentView) && !infoOpen);
@@ -143,8 +133,6 @@
       toggleClass(document.body, "mobile-detail-open", false);
       closeMore();
       alphabetHome.append(alphabet);
-      mobileBack.hidden = true;
-      backTarget = null;
       context.hidden = true;
       backdrop.hidden = true;
       for (const element of [stage, primary, moreLinks, track]) element.inert = false;
@@ -160,12 +148,6 @@
   }
 
   window.QDPMobile = { get active() { return media.matches; }, openDiscover, closeDiscover };
-  mobileBack.addEventListener("click", event => {
-    if (!media.matches || !backTarget || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    event.stopPropagation();
-    backTarget.click();
-  });
   discoverButton.addEventListener("click", event => { event.stopPropagation(); openDiscover(); });
   discoverClose.addEventListener("click", event => { event.stopPropagation(); closeDiscover({ restoreFocus: true, historyEntry: true }); });
   moreClose.addEventListener("click", event => { event.stopPropagation(); closeMore({ restoreFocus: true, historyEntry: true }); });
