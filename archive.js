@@ -678,7 +678,8 @@
     if (window.QDPInfoView?.active) {
       const url = new URL(location.href);
       url.hash = "";
-      history.replaceState({ qdpArchive: archive.active }, "", url);
+      const { qdpInfo, ...returnState } = history.state || {};
+      history.replaceState(returnState, "", url);
       window.QDPInfoView.close({ historyEntry: false, preserveMenu: true });
     }
     showMenu(routeParams().view, !archive.isMenuOpen());
@@ -710,9 +711,9 @@
     const url = new URL(anchor.href);
     if (url.origin !== location.origin) return;
     event.preventDefault();
-    if (!url.searchParams.has("archive")) hideMenu();
     if (url.href !== location.href) history.pushState({ qdpArchive: true }, "", url);
     route();
+    if (!url.searchParams.has("archive")) hideMenu();
   });
   window.addEventListener("popstate", route);
   window.addEventListener("resize", () => {
