@@ -166,23 +166,38 @@
   align-items: center;
   align-self: flex-start;
   box-sizing: border-box;
-  width: max(calc(var(--archive-tab-length, 164px) * .75),
-    calc(var(--archive-tab-text-width, 98px) + var(--archive-badge-label-x, 12px) + 12px + var(--archive-tab-outline, 0px)));
-  min-height: 36px;
+  width: calc(var(--archive-tab-length, 164px) * .75);
+  min-height: 27px;
   margin-left: calc(0px - var(--archive-overlap, 64px) - 12px);
-  padding: 5px 12px 5px var(--archive-badge-label-x, 12px);
-  border-radius: 0 14px 14px 0;
+  padding: 3.75px 9px 3.75px calc(var(--archive-badge-label-x, 12px) * .75);
+  border-radius: 0 10.5px 10.5px 0;
   color: #fff1f4;
   justify-content: flex-start;
   white-space: nowrap;
   overflow: hidden;
-  transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out),
-    padding-left var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
+  transition-property: width, min-height, padding, border-radius, border-width;
+  transition-duration: var(--qdp-page-duration, 460ms);
+  transition-timing-function: var(--qdp-page-ease, ease-out);
 }
 .archive-menu > .archive-menu-badge[aria-current="page"] {
   width: calc(var(--archive-menu-inset, 33px) + var(--archive-nav-width, 228px) - 12px);
+  min-height: 36px;
+  border-radius: 0 14px 14px 0;
   justify-content: center;
-  padding-left: calc(var(--archive-menu-inset, 33px) + 12px);
+  padding: 5px 12px 5px calc(var(--archive-menu-inset, 33px) + 12px);
+}
+.archive-menu-badge-label {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--archive-badge-label-x, 12px) * .75);
+  transform: translate(0, -50%) scale(.75);
+  transform-origin: left center;
+  transition: left var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out),
+    transform var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
+}
+.archive-menu-badge[aria-current="page"] .archive-menu-badge-label {
+  left: calc(50% + var(--archive-menu-inset, 33px) / 2);
+  transform: translate(-50%, -50%) scale(1);
 }
 .archive-menu-badge[data-tab-color="red"] {
   background: #fa2b5a;
@@ -195,11 +210,11 @@
   background: #922185;
 }
 .archive-menu-badge[data-tab-color="collective"] {
-  --archive-tab-outline: 4px;
-  border: 2px solid #fff1f4;
+  border: 1.5px solid #fff1f4;
   background: #000;
   color: #fff1f4;
 }
+.archive-menu-badge[data-tab-color="collective"][aria-current="page"] { border-width: 2px; }
 .archive-menu-badge[aria-current="page"]::after {
   content: "✦";
   position: absolute;
@@ -441,13 +456,14 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   .archive-menu > .archive-menu-badge {
     align-self: center;
     justify-content: flex-start;
-    width: max(calc(var(--archive-tab-label-width, 130px) * .75),
-      calc(var(--archive-tab-text-width, 98px) + 24px + var(--archive-tab-outline, 0px)));
+    width: calc((var(--archive-tab-label-width, 130px) + 4px) * .75);
     margin-left: 0;
-    padding-left: 12px;
-    border-radius: 14px;
+    padding-left: 9px;
+    border-radius: 10.5px;
   }
-  .archive-menu > .archive-menu-badge[aria-current="page"] { width: 100%; padding-left: 12px; }
+  .archive-menu > .archive-menu-badge[aria-current="page"] { width: 100%; padding-left: 12px; border-radius: 14px; }
+  .archive-menu-badge-label { left: 9px; }
+  .archive-menu-badge[aria-current="page"] .archive-menu-badge-label { left: 50%; }
   .archive-menu > .archive-menu-past-events { margin-left: 0; }
   .archive-menu > .archive-menu-map {
     margin: 3px 0;
@@ -472,5 +488,5 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 }
 @media (prefers-reduced-motion: reduce) {
   .archive-page, .poster-info-page, .archive-menu-panel { transition-duration: .01ms; }
-  .archive-menu > .archive-menu-badge { transition-duration: .01ms; }
+  .archive-menu > .archive-menu-badge, .archive-menu-badge-label { transition-duration: .01ms; }
 }
