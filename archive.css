@@ -518,7 +518,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 
 /* Desktop return text stays inside the poster; arrows clear the outer rails. */
 @media (min-width: 761px) {
-  .poster-stage {
+  .site-shell {
     --qdp-arrow-gap: 52px;
     --qdp-arrow-bottom: 7.75%;
     --qdp-arrow-height: 56px;
