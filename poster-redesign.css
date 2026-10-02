@@ -551,7 +551,7 @@
 .event-detail-related-bubble--red { background: #fa2b5a; }
 .event-detail-related-bubble--orange { background: #ff7945; color: #241016; }
 .event-detail-related-bubble--purple { background: #922185; }
-.event-detail-related-bubble--collective {
+.event-detail-related-bubble--collective:any-link {
   border: 2px solid #fff1f4;
   background: #000;
   color: #fff1f4;
