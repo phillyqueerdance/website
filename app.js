@@ -326,8 +326,6 @@ function fitPosterTitles(stack = eventStack) {
   const titles = [...stack.querySelectorAll(".event-title")];
   titles.forEach(title => { title.style.fontSize = ""; });
   const adjustments = titles.map(title => {
-    // Phone titles wrap at a readable size instead of shrinking to one line.
-    if (window.matchMedia("(max-width: 760px)").matches) return null;
     const available = title.clientWidth;
     const fullWidth = title.scrollWidth;
     if (available > 0 && fullWidth > available) {
@@ -1190,9 +1188,7 @@ function fitDetailContent() {
   const leftMargin = parseFloat(slotStyle.marginLeft) || 0;
   slot.style.marginRight = `${Math.max(0, leftMargin - rightPadding - scrollbarWidth)}px`;
   const availableHeight = card.clientHeight - topMargin - 2;
-  const flyerHeight = window.matchMedia("(max-width: 760px)").matches
-    ? Math.min(availableHeight, card.clientHeight * .62)
-    : availableHeight;
+  const flyerHeight = availableHeight;
   flyer.style.maxHeight = `${Math.max(0, Math.floor(flyerHeight))}px`;
 }
 
@@ -1696,6 +1692,13 @@ eventDetail.addEventListener("keydown", event => {
   const liveCard = eventDetail.querySelector(".event-detail-card:not([aria-hidden])");
   const controls = [...(liveCard?.querySelectorAll("a[href], button:not([disabled])") || []),
     ...eventDetail.querySelectorAll(".event-detail-back")];
+  if (window.matchMedia("(max-width: 760px)").matches) {
+    for (let i = controls.length - 1; i >= 0; i--) {
+      if (controls[i].classList.contains("event-detail-back")) controls.splice(i, 1);
+    }
+    const mobileBack = document.getElementById("mobileBack");
+    if (mobileBack && !mobileBack.hidden) controls.push(mobileBack);
+  }
   const first = controls[0];
   const last = controls[controls.length - 1];
   if (document.activeElement === eventDetail) {
@@ -1724,7 +1727,7 @@ document.addEventListener("click", event => {
   if (window.QDPMobile?.active && event.target instanceof Element &&
       event.target.closest(".side-nav, #archiveMenuTrack, #mobileContext, #mobileSheetBackdrop")) return;
   if (event.target instanceof Element &&
-      event.target.closest("#previousPoster, #nextPoster, .event-card, a[data-archive-link], a[data-discover-link]")) return;
+      event.target.closest("#mobileBack, #previousPoster, #nextPoster, .event-card, a[data-archive-link], a[data-discover-link]")) return;
   closeEventDetail();
 });
 

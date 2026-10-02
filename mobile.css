@@ -1,6 +1,6 @@
 /* Phone layouts use the original artwork, typography and navigation hierarchy. */
 .mobile-primary, .mobile-context, .mobile-more-heading,
-.mobile-menu-close, .mobile-sheet-backdrop, .mobile-profile-summary { display: none; }
+.mobile-menu-close, .mobile-sheet-backdrop, .mobile-profile-summary, .mobile-back { display: none; }
 
 @media (max-width: 760px) {
   html, html.archive-open, html.discover-open {
@@ -38,36 +38,10 @@
     min-height: 340px;
     aspect-ratio: auto;
     --qdp-date-top: 26.267cqw;
-    --qdp-date-left: 39.6%;
-    --qdp-date-width: 46.9%;
-    --qdp-date-height: 5cqw;
-    --qdp-date-font-size: 3.1cqw;
     --qdp-list-top: calc(var(--qdp-date-top) + var(--qdp-date-height));
     --qdp-list-bottom: 8.12cqw;
-    --qdp-time-font-size: clamp(14px, 3.6cqw, 18px);
-    --qdp-time-card-gap: 4px;
-    --qdp-cards-next-time-gap: 10px;
-    --qdp-card-width: 100%;
-    --qdp-card-height: clamp(80px, 20cqw, 86px);
-    --qdp-card-padding-x: 12px;
-    --qdp-card-padding-y: 4px;
-    --qdp-card-radius: 22px;
-    --qdp-same-time-card-gap: 5px;
-    --qdp-card-line-gap: 2px;
-    --qdp-title-font-size: clamp(16px, 4cqw, 18px);
-    --qdp-title-line-height: 1.1;
-    --qdp-venue-font-size: 12px;
-    --qdp-venue-line-height: 1.2;
-    --qdp-address-font-size: 11.5px;
-    --qdp-address-line-height: 1.2;
-    --qdp-detail-top: 8.06cqw;
-    --qdp-detail-bottom: 8cqw;
-    --qdp-detail-padding: 8px;
-    --qdp-detail-border: 0px;
-    --qdp-detail-radius: 12px;
-    --qdp-detail-font-size: 15px;
-    --qdp-detail-line-height: 1.55;
-    --qdp-detail-title-size: 22px;
+    --qdp-detail-top: 7.542cqw;
+    --qdp-detail-bottom: 7.234cqw;
   }
   /* Nine-slicing stretches only the straight sides and empty center. The
      logo, key, corners and line spacing keep their original proportions. */
@@ -85,28 +59,11 @@
     border-image-repeat: stretch;
     pointer-events: none;
   }
-  .poster-date { border-radius: 22px 22px 0 0; padding-bottom: 0; }
-  .poster-date span, .date-scroll-label { padding-bottom: 0; }
-  .date-heading { width: 46.9cqw; margin-left: 29.8cqw; padding-bottom: 0; }
-  .event-time-group { grid-template-columns: 46px minmax(0, 1fr); column-gap: 4px; }
-  .event-card { padding: 0; }
-  .event-time { border-radius: 22px 0 0 22px; }
-  .event-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-  .event-venue { -webkit-line-clamp: 1; }
-  .event-feed-message { padding: 12px; font-size: 15px; line-height: 1.5; }
-  .archive-directory { --qdp-card-height: 52px; }
-  .archive-profile-month .event-row { grid-template-columns: 34px minmax(0, 1fr); }
-  .archive-day-chip { font-size: 13px; }
-  .archive-year-heading { font-size: 28px; margin: 14px 0 16px; }
   .archive-viewport, .info-viewport { clip-path: inset(8.06cqw 8.25% 8cqw); }
-  .archive-back { position: static; transform: none; display: flex; margin: 20px auto 8px; flex-shrink: 0; min-height: 44px; max-width: 76%; font-size: 16px; white-space: normal; text-align: center; }
+  .archive-back, .event-detail-back { display: none; }
   .archive-page:has(.archive-back:not([hidden])) .archive-stack { bottom: var(--qdp-list-bottom); }
+  .event-detail-card { height: 100%; }
+  .event-detail-content-viewport { max-height: 100%; }
 
   .poster-controls {
     position: relative;
@@ -120,6 +77,22 @@
   .poster-controls button:active { background: #241016; }
   .today-button { bottom: 0; min-width: 88px; min-height: 44px; padding: 0 12px; font-size: 16px; text-decoration: none; text-transform: capitalize; }
   .info-mode .today-button, .mobile-detail-open .today-button { display: none; }
+  .mobile-back:not([hidden]) {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(100% - 128px);
+    min-height: 44px;
+    color: #fff1f4;
+    font: 700 15px/1.2 "QDP Fraunces", Georgia, serif;
+    text-align: center;
+    text-decoration: none;
+    pointer-events: auto;
+  }
 
   .mobile-context:not([hidden]) {
     display: flex;
@@ -239,6 +212,9 @@
   .mobile-discover-open .archive-menu-track { visibility: visible; pointer-events: auto; transition-delay: 0s; }
   .mobile-discover-open .archive-menu-track.is-open .archive-menu-panel { transform: translateY(0); }
   .archive-menu {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 12px;
     position: relative;
     inset: auto;
     width: 100%;
@@ -255,22 +231,38 @@
     font-size: 20px;
     text-align: left;
   }
-  .archive-menu-heading { width: 100%; margin: 0 0 20px; padding: 4px 44px; font-size: 24px; }
+  .archive-menu-heading { grid-column: 1 / -1; width: 100%; margin: 0 0 20px; padding: 4px 44px; font-size: 24px; }
   #mobileDiscoverClose { position: absolute; top: 14px; right: 12px; z-index: 2; }
-  .archive-menu > .archive-menu-badge {
-    flex: 0 0 auto;
-    align-self: flex-start;
-    width: calc((100% + 20px) * .75);
-    min-height: 44px;
-    margin-left: -20px;
-    padding-left: 18px;
+  .archive-menu > .archive-menu-badge,
+  .archive-menu > .archive-menu-badge[aria-current="page"] {
+    width: calc(100% + 20px);
+    min-height: 48px;
+    margin: 0 0 0 -20px;
+    padding: 0;
     border-radius: 0 14px 14px 0;
+    font-size: 20px;
   }
-  .archive-menu > .archive-menu-badge[aria-current="page"] { width: calc(100% + 20px); min-height: 48px; padding-left: 20px; border-radius: 0 18px 18px 0; }
+  .archive-menu-badge--artists { grid-column: 1; grid-row: 2; }
+  .archive-menu-badge--venues { grid-column: 1; grid-row: 3; }
+  .archive-menu-badge--parties { grid-column: 2; grid-row: 2; }
+  .archive-menu-badge--collectives { grid-column: 2; grid-row: 3; }
+  .archive-menu > :is(.archive-menu-badge--parties, .archive-menu-badge--collectives),
+  .archive-menu > :is(.archive-menu-badge--parties, .archive-menu-badge--collectives)[aria-current="page"] {
+    margin: 0 -20px 0 0;
+    border-radius: 14px 0 0 14px;
+  }
   .archive-menu-badge-label { left: 20px; }
   .archive-menu-badge[aria-current="page"] .archive-menu-badge-label { left: 50%; }
-  .archive-menu > .archive-menu-past-events { min-height: 48px; margin: 12px 0 0; padding: 4px 0; font-size: 18px; }
-  .archive-menu > .archive-menu-map { min-height: 44px; margin: 4px 0 0; padding: 12px 0; font-size: 16px; }
+  .archive-menu > .archive-menu-past-events {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    justify-content: center;
+    min-height: 48px;
+    margin: 18px 0 0;
+    padding: 4px 0;
+    font-size: 18px;
+  }
+  .archive-menu > .archive-menu-map { grid-column: 1; grid-row: 4; min-height: 44px; margin: 4px 0 0; padding: 12px 0; font-size: 16px; }
   .archive-menu .archive-menu-profile { display: none; }
   .mobile-profile-summary { display: block; flex-shrink: 0; padding: 16px 12px 24px; color: #fff1f4; font-size: 15px; line-height: 1.6; }
   .archive-menu-profile { flex-shrink: 0; font-size: 15px; line-height: 1.6; }
@@ -281,28 +273,6 @@
   .archive-profile-links { gap: 4px 18px; }
   .archive-profile-links a { display: inline-flex; align-items: center; min-height: 44px; }
 
-  .date-popover { top: calc(var(--qdp-date-top) + 40px); width: calc(80.7% - 8px); max-height: calc(100% - var(--qdp-date-top) - 80px); overflow-y: auto; padding: 10px; border: 2px solid #ffea86; border-radius: 18px; background: #000; }
-  .date-popover-header { grid-template-columns: 44px 1fr 44px; }
-  .date-popover-month-button { width: 44px; height: 44px; }
-  .date-popover-month-label { font-size: 16px; }
-  .date-popover-day { min-height: 36px; border-radius: 10px; font-size: 14px; }
-  .date-popover-day.selected { background: #fa2b5a; color: #fff1f4; }
-
-  .event-detail-card { height: 100%; padding: 0 0 20px; scrollbar-gutter: auto; font-size: 15px; line-height: 1.55; }
-  .event-detail-content-viewport { max-height: 100%; }
-  .event-detail-back { position: static; flex-shrink: 0; margin: 24px auto 0; display: flex; align-items: center; justify-content: center; min-height: 44px; max-width: calc(100% - 24px); font-size: 16px; white-space: normal; }
-  .event-detail-date-badge { width: calc(100% - 68px); height: 36px; padding: 0 6px; border-radius: 0 0 20px 20px; }
-  .event-detail-date-text { padding: 0 6px; }
-  .event-detail-flag { width: 32px; height: 32px; }
-  .event-detail-flyer-slot { margin: 40px 0 16px 8px; }
-  .event-detail-title-location { padding: 0 10px 8px; }
-  .event-detail-title-location h2 { font-size: 23px; line-height: 1.12; margin-bottom: 10px; }
-  .event-detail-card.without-flyer .event-detail-title-location { padding-top: 44px; }
-  .event-detail-more { padding: 12px 10px 0; }
-  .event-detail-see-more { margin: 24px 8px 0; padding: 16px 12px; border-radius: 18px; }
-  .event-detail-see-more h3 { font-size: 18px; }
-  .event-detail-related-bubble { min-height: 40px; padding: 10px 12px; font-size: 14px; }
-  .event-detail-actions { padding-top: 22px; }
   .poster-info-page { inset: 8.06cqw 8.25% 8cqw; padding: 58px 18px 20px; }
   .poster-info-page .about-dialog-content { padding: 0; }
   .poster-info-page h2 { font-size: 30px; }
