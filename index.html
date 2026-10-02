@@ -37,8 +37,8 @@
 <meta name="twitter:image" content="https://queerdancephilly.com/qdp-share-card.jpg">
  <link rel="stylesheet" href="style.css?v=20260928-01">
  <link rel="stylesheet" href="poster-theme.css?v=20260926-01">
- <link rel="stylesheet" href="poster-redesign.css?v=20261001-massive-3">
- <link rel="stylesheet" href="archive.css?v=massive-26">
+ <link rel="stylesheet" href="poster-redesign.css?v=20261002-discover-1">
+ <link rel="stylesheet" href="archive.css?v=20261002-discover-1">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -236,9 +236,9 @@
       >More</button>
 
       <div id="siteMenuLinks" class="side-nav-links">
+        <a id="aboutLink" href="#about" aria-controls="aboutDialog">Start Here</a>
         <a href="/" data-archive-link>Calendar</a>
-        <a href="/?archive=artists" data-archive-link>Artists</a>
-        <a href="/?archive=venues" data-archive-link>Venues</a>
+        <a id="discoverLink" href="#discover" data-discover-link aria-controls="archiveMenuTrack" aria-expanded="false">Discover</a>
 
         <a
           id="meltLink"
@@ -251,36 +251,32 @@
         </a>
 
         <a
-          id="aboutLink"
-          href="#about"
-          aria-controls="aboutDialog"
-        >About</a>
-
-        <a
           href="https://docs.google.com/forms/d/e/1FAIpQLScZijFfh9oe1puPByS2CZ4u1Wr3WJwYa7m79za-8wMvU24tgQ/viewform"
           target="_blank"
           rel="noopener noreferrer"
         >Submit Event</a>
 
-        <a
-          href="https://www.instagram.com/queerdancephilly/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >Instagram</a>
-
-        <a
-          href="https://ra.co/promoters/189746"
-          target="_blank"
-          rel="noopener noreferrer"
-        >QDP on RA</a>
-
-        <a href="/?archive=events" data-archive-link>Past Events</a>
+        <div class="side-nav-socials">
+          <a href="https://www.instagram.com/queerdancephilly/" target="_blank" rel="noopener noreferrer" aria-label="QDP on Instagram" title="Instagram">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false">
+              <rect x="3" y="3" width="18" height="18" rx="5"></rect>
+              <circle cx="12" cy="12" r="4.2"></circle>
+              <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"></circle>
+            </svg>
+          </a>
+          <a href="https://ra.co/promoters/189746" target="_blank" rel="noopener noreferrer" aria-label="QDP on Resident Advisor" title="Resident Advisor">
+            <svg class="side-nav-ra-icon" viewBox="18 15 54 28" fill="currentColor" aria-hidden="true" focusable="false">
+              <path d="M34.1125 32.925L41.325 40.1375C42.075 40.8875 43.0375 41.3625 44.175 41.35H64.075C64.925 41.35 65.675 41 66.25 40.425L70.2875 36.3625C70.6125 36 70.8625 35.575 70.8625 35.075C70.8625 34.575 70.65 34.075 70.325 33.75L55.6 19.075L51.1375 23.5L62.75 35.125H46.3125C45.4875 35.125 44.8875 34.8 44.35 34.2625L36.9625 26.9C36.2125 26.1875 35.175 25.725 34.0375 25.725H25V22.65H34.3375C36.1875 22.65 37.8375 23.4 39.05 24.6125L44.55 30.1125L49.0125 25.6875L43.4 20.075C41.0375 17.725 37.9 16.3625 34.325 16.3625H18.75V32H31.9375C32.7875 32 33.5375 32.35 34.1125 32.925Z"></path>
+            </svg>
+          </a>
+        </div>
       </div>
     </nav>
 
     <div id="archiveMenuTrack" class="archive-menu-track" hidden>
       <div class="archive-menu-panel">
-        <nav id="archiveMenu" class="archive-menu" aria-label="Artists, venues, parties, collectives, and past events">
+        <nav id="archiveMenu" class="archive-menu" aria-labelledby="discoverHeading">
+          <h2 id="discoverHeading" class="archive-menu-heading">Discover</h2>
           <a class="archive-menu-badge archive-menu-badge--artists" href="/?archive=artists" data-archive-link><span class="archive-menu-badge-label">Artists</span></a>
           <a class="archive-menu-badge archive-menu-badge--venues" href="/?archive=venues" data-archive-link><span class="archive-menu-badge-label">Venues</span></a>
           <a
@@ -293,7 +289,7 @@
           >Venue Map</a>
           <a class="archive-menu-badge archive-menu-badge--parties" href="/?archive=parties" data-archive-link><span class="archive-menu-badge-label">Parties</span></a>
           <a class="archive-menu-badge archive-menu-badge--collectives" href="/?archive=collectives" data-archive-link><span class="archive-menu-badge-label">Collectives</span></a>
-          <a class="archive-menu-badge archive-menu-badge--events" href="/?archive=events" data-archive-link><span class="archive-menu-badge-label">Past Events</span></a>
+          <a class="archive-menu-past-events" href="/?archive=events" data-archive-link>Past Events</a>
           <section id="archiveMenuProfile" class="archive-menu-profile" aria-live="polite" hidden></section>
         </nav>
         <nav id="archiveAlphabet" class="archive-alphabet" aria-label="Directory alphabet" hidden></nav>
@@ -1237,9 +1233,9 @@
   </script>
 
   <template id="qdpInitialEvents"></template>
-  <script src="app.js?v=20261001-massive-3"></script>
-  <script src="archive.js?v=massive-25"></script>
-  <script src="menu-pointer-sparkles.js?v=massive-3"></script>
+  <script src="app.js?v=20261002-discover-1"></script>
+  <script src="archive.js?v=20261002-discover-1"></script>
+  <script src="menu-pointer-sparkles.js?v=20261002-discover-1"></script>
 
 </body>
 </html>

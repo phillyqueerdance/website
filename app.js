@@ -1448,7 +1448,7 @@ function loadEventRelations(id, card, section, links) {
   }
   eventRelations.get(id).then(data => {
     if (!card.isConnected || activeEventId !== id || !Array.isArray(data.related)) return;
-    const colors = { artist: "red", venue: "orange", party: "purple", collective: "red" };
+    const colors = { artist: "red", venue: "orange", party: "purple", collective: "collective" };
     for (const item of data.related) {
       if (!colors[item.kind] || !/^[\w-]{1,80}$/.test(item.id) || !item.name) continue;
       const url = new URL("/", location.origin);
@@ -1718,7 +1718,7 @@ eventDetail.addEventListener(
 document.addEventListener("click", event => {
   if (!event.isTrusted || infoView.active || eventDetail.hidden || eventDetail.contains(event.target)) return;
   if (event.target instanceof Element &&
-      event.target.closest("#previousPoster, #nextPoster, .event-card, a[data-archive-link]")) return;
+      event.target.closest("#previousPoster, #nextPoster, .event-card, a[data-archive-link], a[data-discover-link]")) return;
   closeEventDetail();
 });
 
@@ -1727,9 +1727,11 @@ let infoExitTimer = 0;
 const infoViews = { about: aboutDialog, melt: meltDialog };
 const infoView = {
   active: "",
+  restoreDiscover: false,
   show(kind, { historyEntry = true } = {}) {
     if (!infoViews[kind]) return;
     if (this.active === kind) return;
+    if (!this.active) this.restoreDiscover = window.QDPArchive?.isMenuOpen() || false;
     closeDatePopover();
     if (historyEntry) {
       const url = new URL(location.href);
@@ -1780,6 +1782,7 @@ const infoView = {
     if (!preserveMenu) {
       const view = new URLSearchParams(location.search).get("archive");
       if (view && window.QDPArchive?.active) window.QDPArchive.showMenu(view);
+      else if (this.restoreDiscover) window.QDPArchive?.showMenu();
       else window.QDPArchive?.hideMenu();
     }
     document.title = window.QDPArchive?.active

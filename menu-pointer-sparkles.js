@@ -8,7 +8,7 @@
   document.querySelectorAll(".side-nav-links, .archive-menu").forEach(attachSparkles);
 
   function attachSparkles(menu) {
-  const links = menu.querySelectorAll(":scope > a");
+  const links = menu.querySelectorAll(":scope > a, :scope > .side-nav-socials > a");
   const fields = ["back", "front"].map(layer => {
     const field = document.createElement("span");
     field.className = "menu-sparkle-field menu-sparkle-field--" + layer;

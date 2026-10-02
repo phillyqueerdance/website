@@ -551,6 +551,11 @@
 .event-detail-related-bubble--red { background: #fa2b5a; }
 .event-detail-related-bubble--orange { background: #ff7945; color: #241016; }
 .event-detail-related-bubble--purple { background: #922185; }
+.event-detail-related-bubble--collective {
+  border: 2px solid #fff1f4;
+  background: #000;
+  color: #fff1f4;
+}
 .event-detail-see-more a:any-link { text-decoration: none; }
 .event-detail-related-bubble:hover { filter: brightness(1.12); }
 .event-detail-related-bubble:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }

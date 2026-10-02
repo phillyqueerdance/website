@@ -150,6 +150,15 @@
   pointer-events: none;
 }
 .archive-menu > a { position: relative; z-index: 1; color: inherit; text-decoration: none !important; }
+.archive-menu-heading {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0 0 12px;
+  color: #fff1f4;
+  font: inherit;
+  text-align: center;
+}
 .archive-menu > .archive-menu-badge {
   display: flex;
   align-items: center;
@@ -182,6 +191,11 @@
 .archive-menu-badge[data-tab-color="purple"] {
   background: #922185;
 }
+.archive-menu-badge[data-tab-color="collective"] {
+  border: 2px solid #fff1f4;
+  background: #000;
+  color: #fff1f4;
+}
 .archive-menu-badge[aria-current="page"]::after {
   content: "✦";
   position: absolute;
@@ -195,11 +209,45 @@
   font-size: .78em;
 }
 .archive-menu > .archive-menu-map[hidden] { display: none; }
+.archive-menu > .archive-menu-past-events {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  box-sizing: border-box;
+  margin-top: 8px;
+  margin-left: calc(var(--archive-menu-inset, 33px) - var(--archive-overlap, 64px) + 2px);
+  padding: 5px 0;
+  color: #ffea86;
+}
+.archive-menu-past-events[aria-current="page"]::after {
+  content: "✦";
+  margin-left: .5em;
+  font-size: .75em;
+}
 .archive-menu > a:focus-visible, .side-nav a:focus-visible {
   outline: 2px solid #ffea86;
   outline-offset: 3px;
 }
 .side-nav a:hover, .side-nav a:focus-visible { text-decoration: none; }
+.side-nav-socials {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+.side-nav .side-nav-socials a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+.side-nav-socials svg { display: block; width: 26px; height: 26px; }
+.side-nav-socials .side-nav-ra-icon { width: 46px; }
 .archive-menu-profile {
   position: relative;
   z-index: 1;
@@ -346,9 +394,11 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   .poster-stage { z-index: auto; }
   .poster-stage::after { display: none; }
   .archive-back { min-height: 4.5cqw; font-size: clamp(12px, 2.5cqw, 16px); }
-  html.archive-open { height: auto; min-height: 100%; overflow-y: auto; }
-  body.archive-mode { height: auto; min-height: 100dvh; overflow: visible; }
-  .archive-mode .site-shell { max-height: none; }
+  html.archive-open, html.discover-open { height: auto; min-height: 100%; overflow-y: auto; }
+  body.archive-mode, body.discover-open { height: auto; min-height: 100dvh; overflow: visible; }
+  .archive-mode .site-shell, .discover-open .site-shell { max-height: none; }
+  .side-nav-socials { justify-content: center; padding: 5px 0; }
+  .side-nav .side-nav-socials a { min-width: 44px; min-height: 44px; }
   .archive-menu-track {
     position: relative;
     order: 2;
@@ -392,6 +442,7 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
     border-radius: 14px;
   }
   .archive-menu > .archive-menu-badge[aria-current="page"] { width: 100%; padding-left: 12px; }
+  .archive-menu > .archive-menu-past-events { margin-left: 0; }
   .archive-menu > .archive-menu-map {
     margin: 3px 0;
     padding: 3px;

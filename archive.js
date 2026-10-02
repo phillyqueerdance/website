@@ -3,6 +3,7 @@
 (function () {
   const menu = document.getElementById("archiveMenu");
   const menuTrack = document.getElementById("archiveMenuTrack");
+  const discoverLink = document.getElementById("discoverLink");
   const alphabet = document.getElementById("archiveAlphabet");
   const venueMap = document.getElementById("archiveVenueMap");
   const menuProfile = document.getElementById("archiveMenuProfile");
@@ -57,9 +58,9 @@
     button.disabled = true;
     alphabet.appendChild(button);
   }
-  const tabColors = ["red", "orange", "purple"];
-  [...menu.querySelectorAll(".archive-menu-badge")].forEach((badge, index) => {
-    badge.dataset.tabColor = tabColors[index % tabColors.length];
+  const tabColors = { artists: "red", venues: "orange", parties: "purple", collectives: "collective" };
+  menu.querySelectorAll(".archive-menu-badge").forEach(badge => {
+    badge.dataset.tabColor = tabColors[new URL(badge.href).searchParams.get("archive")];
   });
 
   function message(label) {
@@ -106,7 +107,7 @@
       const shell = document.querySelector(".site-shell");
       const menuStyle = getComputedStyle(menu);
       const linkTop = leftLink.getBoundingClientRect().top - shell.getBoundingClientRect().top;
-      const textInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth) + 5;
+      const textInset = parseFloat(menuStyle.paddingTop) + parseFloat(menuStyle.borderTopWidth);
       menuTrack.style.setProperty("--archive-nav-top", `${Math.max(0, linkTop - textInset)}px`);
       menuTrack.style.setProperty("--archive-alphabet-top", `${menu.offsetTop + menu.offsetHeight + 8}px`);
       if (!menuTrack.hidden) {
@@ -123,14 +124,18 @@
     clearTimeout(exitTimer);
     if (restart) menuTrack.classList.remove("is-open");
     menuTrack.hidden = false;
+    document.documentElement.classList.add("discover-open");
+    document.body.classList.add("discover-open");
+    discoverLink.setAttribute("aria-expanded", "true");
     venueMap.hidden = view !== "venue" && view !== "venues";
     alphabet.hidden = !directoryViews.has(view);
     if (!alphabet.hidden) {
       alphabet.setAttribute("aria-label", `${view[0].toUpperCase() + view.slice(1)} alphabet`);
       alphabet.querySelectorAll("button").forEach(button => {
-        button.disabled = true;
+        if (alphabet.dataset.view !== view) button.disabled = true;
         button.setAttribute("aria-label", `Jump to ${button.dataset.letter} in ${view}`);
       });
+      alphabet.dataset.view = view;
     }
     menu.querySelectorAll("a").forEach(link => {
       const target = new URL(link.href).searchParams.get("archive") || "";
@@ -150,6 +155,9 @@
   function hideMenu() {
     menuMotionSerial++;
     menuTrack.classList.remove("is-open");
+    document.documentElement.classList.remove("discover-open");
+    document.body.classList.remove("discover-open");
+    discoverLink.setAttribute("aria-expanded", "false");
     clearTimeout(exitTimer);
     exitTimer = setTimeout(() => {
       if (!menuTrack.classList.contains("is-open")) menuTrack.hidden = true;
@@ -163,7 +171,9 @@
     if (person) {
       const badge = menu.querySelector(`.archive-menu-badge--${profileViews[kind]}`);
       (kind === "venue" && !venueMap.hidden ? venueMap : badge).after(menuProfile);
-      menuProfile.style.setProperty("--archive-profile-accent", getComputedStyle(badge).backgroundColor);
+      const badgeStyle = getComputedStyle(badge);
+      menuProfile.style.setProperty("--archive-profile-accent",
+        kind === "collective" ? badgeStyle.color : badgeStyle.backgroundColor);
       menuProfile.appendChild(profileInfo(kind, person));
       requestAnimationFrame(() => {
         if (menuProfile.firstChild) menu.classList.add("has-profile");
@@ -368,7 +378,7 @@
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
     if (Array.isArray(person.related) && person.related.length) {
-      const colors = { artist: "red", venue: "orange", party: "purple", collective: "red" };
+      const colors = { artist: "red", venue: "orange", party: "purple", collective: "collective" };
       const more = node("section", "archive-profile-related");
       more.appendChild(node("h3", "", "See More"));
       const bubbles = node("div", "archive-profile-related-links");
@@ -659,7 +669,26 @@
   }
   archive.showMenu = showMenu;
   archive.hideMenu = hideMenu;
+  archive.isMenuOpen = () => discoverLink.getAttribute("aria-expanded") === "true";
   window.QDPArchive = archive;
+
+  discoverLink.addEventListener("click", event => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (window.QDPInfoView?.active) {
+      const url = new URL(location.href);
+      url.hash = "";
+      history.replaceState({ qdpArchive: archive.active }, "", url);
+      window.QDPInfoView.close({ historyEntry: false, preserveMenu: true });
+    }
+    showMenu(routeParams().view, !archive.isMenuOpen());
+    requestAnimationFrame(() => {
+      positionMenu();
+      if (window.matchMedia("(max-width: 760px)").matches) {
+        menuTrack.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    });
+  });
 
   archiveStack.addEventListener("scroll", () => {
     syncYearHeadings();
@@ -681,6 +710,7 @@
     const url = new URL(anchor.href);
     if (url.origin !== location.origin) return;
     event.preventDefault();
+    if (!url.searchParams.has("archive")) hideMenu();
     if (url.href !== location.href) history.pushState({ qdpArchive: true }, "", url);
     route();
   });
