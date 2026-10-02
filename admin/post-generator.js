@@ -317,6 +317,22 @@
     ctx.fillText(text, DATE_X + DATE_WIDTH / 2, top + DATE_HEIGHT / 2 - .25 * Q);
   }
 
+  function popupDateBox(ctx, key, inner) {
+    const x = inner.x + (inner.w - DATE_WIDTH) / 2;
+    roundedPath(ctx, x, inner.y, DATE_WIDTH, DATE_HEIGHT,
+      [0, 0, 5 * Q, 5 * Q]);
+    ctx.fillStyle = COLORS.red;
+    ctx.fill();
+    ctx.fillStyle = COLORS.text;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const text = posterDate(key);
+    fitText(ctx, text, DATE_WIDTH - 2 * Q, 2.55 * Q, 1.8 * Q,
+      700, '"QDP Fraunces", Georgia, serif');
+    ctx.fillText(text, x + DATE_WIDTH / 2,
+      inner.y + DATE_HEIGHT / 2 - .225 * Q);
+  }
+
   function stripes(ctx, x, y, width, height, colors) {
     colors.forEach((stripe, index) => {
       ctx.fillStyle = stripe;
@@ -488,6 +504,8 @@
       ctx.restore();
     }
 
+    popupDateBox(ctx, dateKey(event.start), inner);
+
     const padding = 2.7 * Q;
     const textX = inner.x + padding;
     const textW = inner.w - 2 * padding;
@@ -498,24 +516,33 @@
     fitText(ctx, title, textW, 4 * Q, 2.6 * Q, "bold", "Verdana, sans-serif");
     const titleFont = ctx.font;
     const titleSize = parseFloat(titleFont.match(/[\d.]+px/)?.[0]) || 4 * Q;
+    const titleLines = wrapped(ctx, title, textW, Infinity);
     ctx.font = `${2.8 * Q}px Verdana, sans-serif`;
-    const venue = wrapped(ctx, event.venue, textW, 2);
-    const address = wrapped(ctx, event.address, textW, 2);
+    const venue = wrapped(ctx, event.venue, textW, Infinity);
+    const address = wrapped(ctx, event.address, textW, Infinity);
+    const titleLineHeight = titleSize * 1.2;
     const lineHeight = 3.2 * Q;
-    const blockHeight = titleSize * 1.2 + (venue.length + address.length) * lineHeight + 1.6 * Q;
+    const blockHeight = titleLines.length * titleLineHeight +
+      (venue.length + address.length) * lineHeight + 1.6 * Q;
     const textTop = inner.y + inner.h - padding - blockHeight;
     ctx.font = titleFont;
-    ctx.fillText(ellipsis(ctx, title, textW), textX, textTop);
+    titleLines.forEach((line, index) => {
+      ctx.fillText(line, textX, textTop + index * titleLineHeight);
+    });
     ctx.font = `${2.8 * Q}px Verdana, sans-serif`;
-    let lineY = textTop + titleSize * 1.2 + .5 * Q;
+    let lineY = textTop + titleLines.length * titleLineHeight + .5 * Q;
     [...venue, ...address].forEach(line => {
       ctx.fillText(line, textX, lineY);
       lineY += lineHeight;
     });
 
-    const slot = { x: inner.x + padding, y: inner.y + padding,
+    // Keep the full flyer below the date and the triangular flag indicators.
+    const headerHeight = Math.max(DATE_HEIGHT,
+      event.queerArtist || event.transArtist ? flagSize : 0);
+    const flyerTop = inner.y + headerHeight + padding;
+    const slot = { x: inner.x + padding, y: flyerTop,
       w: inner.w - 2 * padding,
-      h: textTop - inner.y - 2 * padding };
+      h: Math.max(0, textTop - padding - flyerTop) };
     if (flyer) {
       const scale = Math.min(slot.w / flyer.naturalWidth,
         slot.h / flyer.naturalHeight);
