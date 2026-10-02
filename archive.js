@@ -110,6 +110,8 @@
       menuTrack.style.setProperty("--archive-alphabet-top", `${menu.offsetTop + menu.offsetHeight + 8}px`);
       if (!menuTrack.hidden) {
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
+        labels.forEach(label => label.parentElement.style.setProperty(
+          "--archive-tab-text-width", `${Math.ceil(label.scrollWidth)}px`));
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.scrollWidth))) + 24;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
         menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset + 8}px`);
