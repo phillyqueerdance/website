@@ -113,13 +113,14 @@
 .archive-menu-panel {
   position: absolute;
   inset: 0 auto 0 0;
-  width: calc(var(--archive-menu-inset, 34px) + var(--archive-nav-width, 228px));
+  width: calc(var(--archive-menu-inset, 34px) + var(--archive-nav-expanded-width, 228px));
   transform: translateX(-100%);
   transition: transform var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
   pointer-events: none;
 }
 .archive-menu-track.is-open .archive-menu-panel { transform: translateX(0); }
 .archive-menu {
+  --archive-nav-width: var(--archive-nav-compact-width, 164px);
   position: absolute;
   top: var(--archive-nav-top, 0px);
   left: 0;
@@ -138,7 +139,9 @@
   pointer-events: auto;
   overflow-y: auto;
   scrollbar-width: thin;
+  transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
 }
+.archive-menu.has-profile { --archive-nav-width: var(--archive-nav-expanded-width, 228px); }
 .archive-menu::before {
   content: "";
   position: absolute;
@@ -161,6 +164,7 @@
   color: #fff1f4;
   font: inherit;
   text-align: center;
+  transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
 }
 .archive-menu > .archive-menu-badge {
   display: flex;
@@ -495,16 +499,19 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 @media (prefers-reduced-motion: reduce) {
   .archive-page, .poster-info-page, .archive-menu-panel { transition-duration: .01ms; }
   .archive-menu > .archive-menu-badge, .archive-menu-badge-label { transition-duration: .01ms; }
+  .archive-menu, .archive-menu-heading { transition-duration: .01ms; }
 }
 
 /* Desktop return text stays inside the poster; arrows clear the outer rails. */
 @media (min-width: 761px) {
+  .poster { --qdp-return-gap: 6.4cqw; }
   .poster-controls {
     inset: 0;
     z-index: 30;
     width: auto;
     height: auto;
     pointer-events: none;
+    container-type: inline-size;
   }
   .poster-controls > button {
     position: absolute;
@@ -513,14 +520,20 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
   #previousPoster { right: calc(100% + 28px); left: auto; }
   #nextPoster { left: calc(100% + 76px); right: auto; }
   .poster-controls > .mobile-back:not([hidden]) {
-    bottom: calc(6.85% + .35cqw);
+    bottom: 6.85%;
     width: 76%;
-    min-height: 3cqw;
-    font-size: clamp(12px, 1.8cqw, 16px);
+    height: 6.4cqw;
+    min-height: 0;
+    font-size: clamp(12px, 1.8vw, 16px);
   }
   .archive-page:has(.archive-back:not([hidden])) .archive-stack {
-    bottom: calc(var(--qdp-list-bottom) + 6.4cqw);
+    bottom: calc(var(--qdp-list-bottom) + var(--qdp-return-gap));
   }
-  .event-detail-card { height: calc(100% - 5cqw); }
-  .event-detail-content-viewport { max-height: calc(100% - 5cqw); }
+  .event-detail { bottom: var(--qdp-list-bottom); }
+  .event-detail-card {
+    height: calc(100% - var(--qdp-return-gap) + var(--qdp-detail-padding) + var(--qdp-detail-border));
+  }
+  .event-detail-content-viewport {
+    max-height: calc(100% - var(--qdp-return-gap) + var(--qdp-detail-padding) + var(--qdp-detail-border));
+  }
 }

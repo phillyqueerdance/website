@@ -100,8 +100,8 @@
       const menuInset = posterWidth * (1653 - 1586) / 1727;
       const overlap = posterWidth * (1 - purpleBorder);
       const room = window.innerWidth - menuTrack.getBoundingClientRect().left - menuInset - 20;
-      menuTrack.style.setProperty("--archive-nav-width", `${Math.max(sideWidth,
-        Math.min(sideWidth + 64, room))}px`);
+      const expandedWidth = Math.max(sideWidth, Math.min(sideWidth + 64, room));
+      menuTrack.style.setProperty("--archive-nav-expanded-width", `${expandedWidth}px`);
       menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
       menuTrack.style.setProperty("--archive-overlap", `${overlap}px`);
       menuTrack.style.setProperty("--archive-badge-label-x", `${menuInset + 14}px`);
@@ -113,6 +113,7 @@
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.scrollWidth))) + 24;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
         menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset + 8}px`);
+        menuTrack.style.setProperty("--archive-nav-compact-width", `${Math.min(expandedWidth, labelWidth + 32)}px`);
       }
     }
   }
