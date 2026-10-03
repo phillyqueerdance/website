@@ -270,14 +270,20 @@
     width: calc(95% + 26.6px);
   }
   .archive-menu-badge[aria-current="page"] .archive-menu-badge-label { left: 50%; }
-  .archive-menu > .archive-menu-past-events {
+  .archive-menu > .archive-menu-past-events,
+  .archive-menu > .archive-menu-past-events[aria-current="page"] {
     grid-column: 1 / -1;
     grid-row: 5;
+    justify-self: center;
+    width: 80%;
     justify-content: center;
     min-height: 45.6px;
     margin: 18px 0 0;
     padding: 4px 0;
     font-size: 17.1px;
+  }
+  .archive-menu:not(.has-profile) > .archive-menu-past-events[aria-current="page"] {
+    width: calc(80% + 7.6px);
   }
   .archive-menu > .archive-menu-map { grid-column: 1; grid-row: 4; min-height: 44px; margin: 4px 0 0; padding: 12px 0; font-size: 16px; }
   .archive-menu .archive-menu-profile { display: none; }

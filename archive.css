@@ -235,20 +235,8 @@
 }
 .archive-menu > .archive-menu-map[hidden] { display: none; }
 .archive-menu > .archive-menu-past-events {
-  display: flex;
-  align-items: center;
-  min-height: 34.2px;
-  box-sizing: border-box;
   margin-top: 8px;
-  margin-left: calc(var(--archive-menu-inset, 33px) - var(--archive-overlap, 64px) + 2px);
-  padding: 4.75px 0;
   color: #ffea86;
-  font-size: calc(var(--archive-nav-font-size, 18px) * .95);
-}
-.archive-menu-past-events[aria-current="page"]::after {
-  content: "✦";
-  margin-left: .5em;
-  font-size: .75em;
 }
 .archive-menu > a:focus-visible, .side-nav a:focus-visible {
   outline: 2px solid #ffea86;
@@ -390,7 +378,6 @@ a.event-card.archive-card:focus-visible .event-title { text-decoration: underlin
 .archive-month .date-section + .date-section { margin-top: var(--qdp-cards-next-time-gap); }
 .archive-date-badge { font-size: calc(var(--qdp-time-font-size) * .78); }
 .archive-date-badge .archive-date-number { font-size: .86em; }
-.archive-date-badge .archive-date-year { font-size: .7em; }
 .archive-year-heading {
   margin: 0 0 0 33.03cqw;
   color: #ffeff2;

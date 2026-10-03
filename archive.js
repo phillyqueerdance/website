@@ -66,7 +66,7 @@
     button.disabled = true;
     alphabet.appendChild(button);
   }
-  const tabColors = { artists: "red", venues: "orange", parties: "purple", collectives: "collective" };
+  const tabColors = { artists: "red", venues: "orange", parties: "purple", collectives: "collective", events: "past" };
   menu.querySelectorAll(".archive-menu-badge").forEach(badge => {
     badge.dataset.tabColor = tabColors[new URL(badge.href).searchParams.get("archive")];
   });
@@ -465,7 +465,7 @@
     return info;
   }
 
-  function renderEvents(items, person = null, kind = "", month = "") {
+  function renderEvents(items, person = null, kind = "") {
     if (!Array.isArray(items)) throw new Error("Invalid archive events");
     archiveStack.replaceChildren();
     cards = [];
@@ -492,11 +492,6 @@
       summary.appendChild(profileInfo(kind, person));
       archiveStack.appendChild(summary);
     }
-    if (month) {
-      const heading = node("div", "date-heading", `${monthName(month)} ${month.slice(0, 4)}`);
-      archiveStack.appendChild(heading);
-    }
-
     let renderedYear = "";
     function renderRows(events, parent, periodHeader = null) {
       let day = "";
@@ -528,10 +523,11 @@
           const weekday = new Intl.DateTimeFormat("en-US", {
             timeZone: "America/New_York", weekday: "short"
           }).format(dateFromKey(day));
+          const date = `${Number(day.slice(5, 7))}/${Number(day.slice(-2))}`;
+          current.badge.dataset.navigationLabel = `${weekday} ${date}`;
           current.badge.append(
             node("span", "", weekday),
-            node("span", "archive-date-number", `${Number(day.slice(5, 7))}/${Number(day.slice(-2))}`),
-            node("span", "archive-date-year", day.slice(0, 4))
+            node("span", "archive-date-number", date)
           );
         }
         const card = createEventCard(event);
@@ -635,7 +631,8 @@
     });
     closeDatePopover();
     archiveStack.hidden = false;
-    header(params.view === "events" ? "Past Events" :
+    header(params.view === "events" ?
+      (params.month ? `${monthName(params.month)} ${params.month.slice(0, 4)}` : "Past Events") :
       params.view[0].toUpperCase() + params.view.slice(1));
     if (!window.QDPInfoView?.active) document.title = `${archiveHeader.textContent} | Queer Dance Philly`;
     message("Loading archive…");
@@ -647,7 +644,7 @@
       if (serial !== requestNumber) return;
       if (directoryViews.has(resource)) renderDirectory(resource, data[resource]);
       else if (resource === "months") renderMonths(data.months);
-      else if (resource === "month") renderEvents(data.events, null, "", params.month);
+      else if (resource === "month") renderEvents(data.events);
       else {
         if (!data.profile || data.profile.id !== params.id) throw new Error("Profile not found");
         header(data.profile.name);
@@ -757,7 +754,10 @@
       }
       const { groups, index } = navigationGroups();
       const kind = directoryViews.has(routeParams().view) ? "letter" : "group";
-      const label = section => section?.querySelector(".event-time")?.textContent || "";
+      const label = section => {
+        const badge = section?.querySelector(".event-time");
+        return badge?.dataset.navigationLabel || badge?.textContent || "";
+      };
       previousPoster.setAttribute("aria-label", `Previous ${kind}${groups[index - 1] ? ": " + label(groups[index - 1]) : ""}`);
       nextPoster.setAttribute("aria-label", `Next ${kind}${groups[index + 1] ? ": " + label(groups[index + 1]) : ""}`);
       previousPoster.disabled = !groups.length || index === 0;
