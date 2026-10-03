@@ -62,6 +62,7 @@
     regularPopup: color("--qdp-regular-popup") || "#202125",
     queerCard: color("--qdp-queer-card") || "#922185",
     standardCard: "#ff7945",
+    standardCardText: "#2A1220",
     red: "#fa2b5a",
     text: "#ffeff2"
   };
@@ -376,7 +377,7 @@
     const x = CARD_X + 2.2 * Q;
     const width = CARD_WIDTH - (flagged ? 7.7 : 4.4) * Q;
     const title = stripFlags(event.title);
-    ctx.fillStyle = COLORS.text;
+    ctx.fillStyle = event.explicitQueer ? COLORS.text : COLORS.standardCardText;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     const titleSize = fitText(ctx, title, width, 3.3 * Q, 2.25 * Q,
