@@ -152,6 +152,14 @@
       if (!dates.has(key)) dates.set(key, []);
       dates.get(key).push(event);
     });
+    // Keep dates separate when the entire post fits within 20 images,
+    // including the title slide and one individual slide per event.
+    const separateDatePages = [...dates.keys()].sort().flatMap(key =>
+      splitEvents(dates.get(key)).map(slice => [{ key, events: slice }]));
+    if (1 + separateDatePages.length + events.length <= 20) {
+      return separateDatePages;
+    }
+
     // Choose breaks after seeing the whole run. Greedy filling can leave a
     // single event on the last image even when moving the preceding day
     // would make two balanced images (Sun 3 / Mon 2 / Tue 1, for example).
