@@ -80,6 +80,17 @@
   padding-right: 1.3cqw;
   overflow: auto;
 }
+#aboutDialog .about-dialog-content {
+  padding-right: 0;
+  scrollbar-gutter: stable both-edges;
+}
+.about-dialog-logo {
+  display: block;
+  width: min(32cqw, 200px);
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 4cqw;
+}
 .poster-info-page h2 { font-family: "QDP Fraunces", Georgia, serif; font-size: 5cqw; }
 .poster-info-page p { font-size: clamp(13px, 2.25cqw, 18px); }
 .poster-info-page .about-dialog-close { position: absolute; top: 2cqw; right: 2cqw; z-index: 2; }
