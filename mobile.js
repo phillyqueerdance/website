@@ -183,6 +183,7 @@
     const root = discoverOpen() ? track : nav.classList.contains("menu-open") ? moreLinks : null;
     if (!root) return;
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       event.stopImmediatePropagation();
       return;
     }

@@ -1919,7 +1919,9 @@ window.addEventListener(
       return;
     }
 
-    if (infoView.active) return;
+    // Modified arrows belong to browser history and native text navigation.
+    if (infoView.active || event.defaultPrevented || event.metaKey ||
+        event.ctrlKey || event.altKey || event.shiftKey) return;
 
     if (event.key === "ArrowLeft") {
       event.preventDefault();
