@@ -93,6 +93,7 @@
 }
 .poster-info-page h2 { font-family: "QDP Fraunces", Georgia, serif; font-size: 5cqw; }
 .poster-info-page p { font-size: clamp(13px, 2.25cqw, 18px); }
+#aboutDialog p { font-size: clamp(16px, 2.8cqw, 22px); }
 .poster-info-page .about-dialog-close { position: absolute; top: 2cqw; right: 2cqw; z-index: 2; }
 .poster-info-page .melt-dialog-logo { width: min(46cqw, 280px); }
 .poster-info-page .melt-dialog-content { max-height: none; }

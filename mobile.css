@@ -300,6 +300,7 @@
   .poster-info-page .about-dialog-content { padding: 0; }
   .poster-info-page h2 { font-size: 30px; }
   .poster-info-page p { font-size: 16px; line-height: 1.6; }
+  #aboutDialog p { font-size: 18px; }
   .poster-info-page .about-dialog-close { top: 8px; right: 8px; width: 44px; height: 44px; }
   .poster-info-page .melt-dialog-logo { width: min(68cqw, 280px); }
 }

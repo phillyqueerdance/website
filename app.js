@@ -1887,6 +1887,8 @@ eventStack.addEventListener("scroll", () => {
 }, { passive: true });
 
 poster.addEventListener("wheel", event => {
+  // Let Start Here and Melt scroll without moving the feed behind them.
+  if (infoView.active) return;
   if (window.QDPArchive?.active) {
     const archiveStack = document.getElementById("archiveStack");
     if (!eventDetail.hidden || archiveStack.contains(event.target)) return;
