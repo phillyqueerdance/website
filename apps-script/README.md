@@ -1,4 +1,4 @@
-# QDP public-data publisher and event pages
+# QDP public-data publisher, event pages, and profiles
 
 This folder contains the archive feed and prepared-data publisher for the
 existing v6.3 Apps Script project.
@@ -64,6 +64,28 @@ as well as the live record), verify production event responses have no
 Console. Valid markup makes an event eligible; Google decides whether to index
 it or display a rich result. Main and production are not changed by the preview
 commit.
+
+## Profile pages and canonical URLs
+
+Individual artist, venue, party, and collective URLs now include their approved
+name, bio, public links, and event history in the initial HTML. Each has its own
+title, description, and canonical URL, for example
+`https://queerdancephilly.com/?archive=artist&id=ARTIST-ID`. Extra query parameters
+do not change that canonical. An event opened from a profile still canonicalizes
+to its standalone event URL; closing it restores the profile metadata.
+
+The sitemap includes all four sets of approved profile IDs from the existing
+public archive manifest, with the party approval gate preserved. Removed IDs
+return 404; temporary data failures return 503 and are not cached. Profile HTML
+and API responses share the existing sixty-second cache policy. The browser
+uses the embedded profile payload on first load instead of requesting it twice.
+
+This profile update uses the existing prepared archive and does not require an
+Apps Script replacement, a new namespace, or a new trigger. The archive reader,
+event reader, and sitemap all accept `QDP_ARCHIVE_KV` or `QDP_PUBLIC_FEED_KV`.
+Massive remains `noindex`; ordinary Google search indexing becomes possible
+after the separate production rollout described above. These directory profiles
+are not promised a Google profile rich result.
 
 
 The numbered steps below document the original feed installation. **For the

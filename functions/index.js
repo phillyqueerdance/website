@@ -2,6 +2,7 @@ import { readPreparedEvents } from "./api/events.js";
 import { renderLivePoster } from "./live-poster.js";
 import { resolveEvent } from "./event-records.js";
 import { renderEventPage } from "./event-page.js";
+import { profilePage } from "./profile-page.js";
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
@@ -13,6 +14,10 @@ export async function onRequestGet(context) {
   if (url.searchParams.has("event")) {
     const id = url.searchParams.get("event") || "";
     return renderEventPage(context, page, await resolveEvent(context, id), id);
+  }
+  const kind = url.searchParams.get("archive");
+  if (Object.hasOwn(globalThis.QDPProfileMetadata.kinds, kind || "")) {
+    return profilePage(context, page, kind, url.searchParams.get("id") || "");
   }
   if (url.searchParams.has("archive")) return page;
   const cached = await cache?.match(cacheKey);

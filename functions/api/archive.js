@@ -186,7 +186,7 @@ export async function onRequestGet(context) {
   if (hit) return hit;
 
   try {
-    const prepared = await preparedPayload(context.env.QDP_ARCHIVE_KV, resource, id);
+    const prepared = await preparedPayload(context.env.QDP_ARCHIVE_KV || context.env.QDP_PUBLIC_FEED_KV, resource, id);
     if (prepared?.unpublished) {
       return Response.json({ error: "Directory is waiting for the sheet to be published." }, {
         status: 503, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }

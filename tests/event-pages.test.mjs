@@ -152,6 +152,7 @@ test('the event page writes event metadata and JSON-LD before scripts load and p
     assert.equal(response.headers.get('Content-Security-Policy'), "default-src 'self'");
     assert.equal(response.headers.get('ETag'), null);
     assert.equal(recorded.get('link[rel="canonical"]:href'), meta.url(event.eventId));
+    assert.equal(recorded.get('meta[name="twitter:description"]:content'), meta.description(event));
     assert.match(recorded.get('#eventDetail'), /Dance &amp; Go/);
     assert.match(recorded.get('head:append'), /"@type":"Event"/);
     assert.equal(JSON.parse(recorded.get('#qdpInitialEvent')).event.eventId, event.eventId);
@@ -167,7 +168,7 @@ test('sitemap contains unique canonical event URLs and excludes invalid or withd
   assert.equal(response.status, 200);
   assert.match(response.headers.get('Content-Type'), /application\/xml/);
   const xml = await response.text();
-  assert.equal((xml.match(/<loc>/g) || []).length, 2);
+  assert.equal((xml.match(/<loc>/g) || []).length, 6);
   assert.match(xml, /https:\/\/queerdancephilly.com\/\?event=PAST-1/);
   assert.doesNotMatch(xml, /PRIVATE|bad|massive.example/);
 });

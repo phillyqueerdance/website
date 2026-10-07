@@ -1,5 +1,6 @@
 import { readPreparedEvents, onRequestGet as getLiveFeed } from "./api/events.js";
 import { publicEvent } from "./api/archive.js";
+import "../profile-metadata.js";
 
 const PREFIX = "qdp-archive:v1:";
 const TTL = 60;
@@ -133,10 +134,7 @@ export async function resolveEvent(context, id) {
   }
 }
 
-export async function eventSitemapEntries(context) {
-  const kv = kvFor(context);
-  const manifest = kv && await kv.get(`${PREFIX}manifest`, "json");
-  if (manifest?.schema !== 1 || !manifest.revision) throw new Error("Event index unavailable");
+async function eventsFromManifest(context, manifest) {
   if (manifest.eventIndexVersion === 1 && Array.isArray(manifest.eventIds)) {
     return manifest.eventIds.filter(id => validEventId(id) && !manifest.excludedEventIds?.includes(id))
       .map(eventId => ({ eventId }));
@@ -146,4 +144,21 @@ export async function eventSitemapEntries(context) {
   const found = new Map(events.map(event => [event.eventId, event]));
   for (const event of feed?.events || []) if (validEventId(event.eventId)) found.set(event.eventId, event);
   return [...found.values()];
+}
+
+export async function publicSitemapEntries(context) {
+  const kv = kvFor(context);
+  const manifest = kv && await kv.get(`${PREFIX}manifest`, "json");
+  if (manifest?.schema !== 1 || !manifest.revision) throw new Error("Public index unavailable");
+  const meta = globalThis.QDPProfileMetadata;
+  const profiles = Object.entries(meta.kinds).flatMap(([kind, directory]) => {
+    if (kind === "party" && manifest.partyPublicGate !== true) return [];
+    return (Array.isArray(manifest[directory]) ? manifest[directory] : [])
+      .filter(meta.validId).map(id => ({ kind, id }));
+  });
+  return { events: await eventsFromManifest(context, manifest), profiles };
+}
+
+export async function eventSitemapEntries(context) {
+  return (await publicSitemapEntries(context)).events;
 }

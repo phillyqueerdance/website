@@ -70,6 +70,7 @@ export function renderEventPage(context, page, result, id) {
       ['meta[property="og:title"]', meta.title(event)],
       ['meta[name="twitter:title"]', meta.title(event)],
       ['meta[property="og:description"]', meta.description(event)],
+      ['meta[name="twitter:description"]', meta.description(event)],
       ['meta[property="og:url"]', meta.url(id, origin)],
       ['meta[property="og:image"]', meta.image(event) || new URL("/qdp-share-card.jpg", origin).href],
       ['meta[property="og:image:alt"]', meta.image(event) ? `Flyer for ${meta.cleanTitle(event)}` : 'Queer Dance Philly — find the next move'],

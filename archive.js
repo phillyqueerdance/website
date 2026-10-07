@@ -1,5 +1,5 @@
-// The archive is a view inside the existing poster, not a set of HTML pages.
-// Data arrives only after entering the archive, through /api/archive.
+// Discover stays inside the poster. Direct profile responses already include
+// their public data; navigation and later refreshes use /api/archive.
 (function () {
   const menu = document.getElementById("archiveMenu");
   const menuTrack = document.getElementById("archiveMenuTrack");
@@ -16,7 +16,7 @@
   const incomingYear = node("span", "archive-header-incoming");
   incomingYear.hidden = true;
   incomingYear.setAttribute("aria-hidden", "true");
-  archiveHeader.append(headerLabel, incomingYear);
+  archiveHeader.replaceChildren(headerLabel, incomingYear);
   let profileName = "";
   let yearHeadings = [];
   let yearEndSpacer = null;
@@ -27,6 +27,17 @@
   const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
   const profileViews = { artist: "artists", venue: "venues", party: "parties",
     collective: "collectives" };
+  try {
+    const text = document.getElementById("qdpInitialArchive")?.content.textContent.trim();
+    const initial = text ? JSON.parse(text) : null;
+    if (initial?.status === 200 && Object.hasOwn(profileViews, initial.kind) &&
+        /^[\w-]{1,80}$/.test(initial.id) && initial.payload?.profile?.id === initial.id &&
+        Array.isArray(initial.payload.events)) {
+      cache.set(endpoint(initial.kind, initial.id), {
+        at: Date.now(), pending: false, promise: Promise.resolve(initial.payload)
+      });
+    }
+  } catch (error) { console.warn("Initial profile unavailable:", error); }
   const directoryViews = new Set(["artists", "venues", "parties", "collectives"]);
   const validViews = new Set([...directoryViews, ...Object.keys(profileViews), "events"]);
   let renderedKey = "";
@@ -246,6 +257,7 @@
   }
 
   function setProfile(kind, person = null) {
+    archive.profile = person ? { kind, person } : null;
     menu.classList.remove("has-profile");
     menuProfile.replaceChildren();
     menuProfile.hidden = !person;
@@ -283,6 +295,7 @@
       if (!archive.active) archiveViewport.hidden = true;
     }, 500);
     setProfile("");
+    window.QDPEventLinks?.clear();
     document.body.classList.remove("archive-mode");
     document.documentElement.classList.remove("archive-open");
     hideMenu();
@@ -624,7 +637,7 @@
       }
       header(data.profile.name);
       renderEvents(data.events, data.profile, resource);
-      if (!window.QDPInfoView?.active) document.title = `${data.profile.name} | Queer Dance Philly`;
+      if (!requestedEventId()) archive.restoreMetadata();
     }
     renderedPayload = JSON.stringify(data);
     renderedAt = Date.now();
@@ -712,6 +725,7 @@
     document.documentElement.classList.add("archive-open");
     archiveStack.classList.toggle("profile-events", Boolean(profileViews[params.view]));
     setProfile("");
+    window.QDPEventLinks?.clear();
     archiveViewport.hidden = false;
     clearTimeout(pageExitTimer);
     archivePage.style.transition = "none";
@@ -784,7 +798,20 @@
   const archive = {
     active: false,
     events: [],
+    profile: null,
     route,
+    restoreMetadata() {
+      const current = this.profile;
+      const params = routeParams();
+      const meta = window.QDPProfileMetadata;
+      if (!this.active || !current || !meta || params.view !== current.kind || params.id !== current.person.id) return;
+      if (!window.QDPInfoView?.active) document.title = meta.title(current.person);
+      document.querySelector('link[rel="canonical"]')?.setAttribute("href", meta.url(current.kind, current.person.id));
+      for (const [selector, content] of meta.tags(current.kind, current.person)) {
+        const element = document.querySelector(selector);
+        if (element) element.content = content;
+      }
+    },
     baseUrl() {
       const url = new URL(location.href);
       url.searchParams.delete("event");

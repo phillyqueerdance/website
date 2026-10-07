@@ -32,11 +32,11 @@ function formatDate(key) {
   return `${weekdayFormat.format(date)}, ${monthFormat.format(date)} ${day}${suffix}`;
 }
 
-function card(event) {
+export function renderEventCard(event, { href, hideLocation = false } = {}) {
   const id = String(event.eventId ?? event.EventID ?? "").trim();
   const flags = `${event.queerArtist ? '<span class="card-flag card-flag-queer" aria-label="Features a queer artist" role="img"></span>' : ""}${event.transArtist ? '<span class="card-flag card-flag-trans" aria-label="Features a trans artist" role="img"></span>' : ""}`;
   const location = (field, value) => `<div class="${field}"${value ? "" : " hidden"}>${escapeHtml(value)}</div>`;
-  return `<a class="event-card ${event.explicitQueer ? "explicit" : "default"}${event.queerArtist || event.transArtist ? " has-flags" : ""}" data-event-id="${escapeHtml(id)}" href="/?event=${encodeURIComponent(id)}">${flags}<span class="event-card-shape" aria-hidden="true"></span><span class="event-card-content"><div class="event-title">${escapeHtml(displayTitle(event))}</div>${location("event-venue", String(event.venue || "").trim())}${location("event-address", String(event.address || "").trim())}</span></a>`;
+  return `<a class="event-card ${event.explicitQueer ? "explicit" : "default"}${event.queerArtist || event.transArtist ? " has-flags" : ""}" data-event-id="${escapeHtml(id)}" href="${escapeHtml(href || `/?event=${encodeURIComponent(id)}`)}">${flags}<span class="event-card-shape" aria-hidden="true"></span><span class="event-card-content"><div class="event-title">${escapeHtml(displayTitle(event))}</div>${hideLocation ? "" : location("event-venue", String(event.venue || "").trim()) + location("event-address", String(event.address || "").trim())}</span></a>`;
 }
 
 export function renderLivePoster(events, now = new Date()) {
@@ -71,7 +71,7 @@ export function renderLivePoster(events, now = new Date()) {
       const number = formatted.replace(/[AP]M$/, "");
       const meridiem = formatted.match(/[AP]M$/)?.[0] || "";
       const rows = eventsAtTime.map((event, rowIndex) =>
-        `<div class="event-row ${rowIndex ? "same-time" : "has-time"}">${card(event)}</div>`
+        `<div class="event-row ${rowIndex ? "same-time" : "has-time"}">${renderEventCard(event)}</div>`
       ).join("");
       return `<div class="event-time-group"><div class="event-time"><span>${escapeHtml(number)}</span><span class="event-time-meridiem">${escapeHtml(meridiem)}</span></div><div class="event-group-cards">${rows}</div></div>`;
     }).join("");

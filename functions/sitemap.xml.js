@@ -1,4 +1,4 @@
-import { eventSitemapEntries } from "./event-records.js";
+import { publicSitemapEntries } from "./event-records.js";
 import "../event-metadata.js";
 
 export async function onRequestGet(context) {
@@ -9,9 +9,10 @@ export async function onRequestGet(context) {
   const cached = await cache?.match(key);
   if (cached) return cached;
   try {
-    const events = await eventSitemapEntries(context);
+    const { events, profiles } = await publicSitemapEntries(context);
     const escape = value => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-    const urls = [new URL("/", origin).href, ...events.map(event => meta.url(event.eventId, origin))];
+    const urls = [new URL("/", origin).href, ...events.map(event => meta.url(event.eventId, origin)),
+      ...profiles.map(({ kind, id }) => globalThis.QDPProfileMetadata.url(kind, id, origin))];
     const xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
       [...new Set(urls)].map(url => `<url><loc>${escape(url)}</loc></url>`).join("") + '</urlset>';
     const response = new Response(xml, { headers: { "Content-Type": "application/xml; charset=utf-8",
