@@ -445,6 +445,20 @@ a.event-card.archive-card { text-decoration: none; }
   white-space: nowrap;
 }
 .archive-stack .event-feed-message { padding: 0 3cqw; text-align: center; }
+.archive-retry,
+.archive-refresh-error .archive-retry {
+  display: block;
+  margin: 1.5cqw auto;
+  padding: .8cqw 2cqw;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff1f4;
+  font: 700 clamp(14px, 2.5cqw, 20px)/1.2 "QDP Fraunces", Georgia, serif;
+  cursor: pointer;
+}
+.archive-refresh-error { padding: 1.5cqw; text-align: center; color: #fff1f4; }
+.archive-retry:focus-visible { outline: 2px solid #ffea86; outline-offset: 3px; }
 
 @media (max-width: 760px) {
   .poster-stage { z-index: auto; }

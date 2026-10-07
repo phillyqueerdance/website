@@ -14,7 +14,7 @@ const RESOURCES = {
   collective: "archiveCollective",
   month: "archiveMonth"
 };
-const CACHE_SECONDS = 300;
+const CACHE_SECONDS = 60;
 const KV_PREFIX = "qdp-archive:v1:";
 const SHARDS = { artist: 4, venue: 2, party: 2, collective: 2, month: 4 };
 
@@ -177,6 +177,14 @@ export async function onRequestGet(context) {
     "X-Robots-Tag": "noindex, nofollow",
     "X-Content-Type-Options": "nosniff"
   };
+  const key = new URL("/api/archive", url);
+  key.searchParams.set("resource", resource);
+  if (id) key.searchParams.set(resource === "month" ? "month" : "id", id);
+  const cacheKey = new Request(key.href);
+  const cache = typeof caches === "undefined" ? null : caches.default;
+  const hit = await cache?.match(cacheKey);
+  if (hit) return hit;
+
   try {
     const prepared = await preparedPayload(context.env.QDP_ARCHIVE_KV, resource, id);
     if (prepared?.unpublished) {
@@ -190,10 +198,15 @@ export async function onRequestGet(context) {
       });
     }
     if (prepared?.payload) {
-      return Response.json(prepared.payload, {
+      const result = Response.json(prepared.payload, {
         headers: { ...headers, "Cache-Control": "public, max-age=60",
           "X-QDP-Archive-Source": "prepared" }
       });
+      if (cache) {
+        const write = cache.put(cacheKey, result.clone());
+        if (context.waitUntil) context.waitUntil(write); else await write;
+      }
+      return result;
     }
   } catch (error) {
     console.error("Prepared QDP archive unavailable; using live feed:", error);
@@ -207,14 +220,6 @@ export async function onRequestGet(context) {
     });
   }
 
-  const key = new URL("/api/archive", url);
-  key.searchParams.set("resource", resource);
-  if (id) key.searchParams.set(resource === "month" ? "month" : "id", id);
-  const cacheKey = new Request(key.href);
-  const cache = caches.default;
-  const hit = await cache.match(cacheKey);
-  if (hit) return hit;
-
   try {
     const upstream = new URL(context.env.QDP_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL);
     upstream.searchParams.set("resource", RESOURCES[resource]);
@@ -224,7 +229,10 @@ export async function onRequestGet(context) {
     const payload = cleanPayload(resource, await response.json(), id);
     if (!payload) throw new Error("Apps Script archive resource is unavailable or has an invalid shape");
     const result = Response.json(payload, { headers });
-    context.waitUntil(cache.put(cacheKey, result.clone()));
+    if (cache) {
+      const write = cache.put(cacheKey, result.clone());
+      if (context.waitUntil) context.waitUntil(write); else await write;
+    }
     return result;
   } catch (error) {
     console.error("QDP archive feed unavailable:", error);

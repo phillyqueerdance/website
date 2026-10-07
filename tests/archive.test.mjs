@@ -331,6 +331,32 @@ test('mixed Cloudflare revisions fall back to the live public feed', async () =>
   }
 });
 
+test('warm prepared archive reads share a normalized edge response', async () => {
+  const originalCaches = globalThis.caches;
+  const edge = new Map();
+  let reads = 0;
+  globalThis.caches = { default: {
+    match: async key => edge.get(key.url)?.clone() ?? null,
+    put: async (key, response) => edge.set(key.url, response.clone())
+  } };
+  const kv = { get: async key => {
+    reads++;
+    return key.endsWith('manifest')
+      ? { schema: 1, revision: 'one', artists: ['A'] }
+      : { revision: 'one', payload: { artists: [{ id: 'A', name: 'Artist', publicOk: true }] } };
+  } };
+  try {
+    const request = noise => ({ request: new Request(`https://massive.example/api/archive?resource=artists&noise=${noise}`),
+      env: { QDP_ARCHIVE_KV: kv }, waitUntil: async promise => promise });
+    const first = await onRequestGet(request('one'));
+    assert.equal(first.status, 200);
+    const warm = await onRequestGet(request('two'));
+    assert.equal(warm.status, 200);
+    assert.equal(warm.headers.get('X-QDP-Archive-Source'), 'prepared');
+    assert.equal(reads, 2, 'only the cold request should read manifest and directory');
+  } finally { globalThis.caches = originalCaches; }
+});
+
 test('unpublished new directories answer immediately without a slow live fallback', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = () => { throw new Error('Unexpected live Apps Script request'); };

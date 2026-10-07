@@ -620,6 +620,16 @@ function qdpLivePublish() {
         flyerUrl: qdpArchiveLink_(event.flyerUrl)
       };
     });
+    const fingerprint = account + ':' + namespace + ':' +
+      Utilities.base64EncodeWebSafe(Utilities.computeDigest(
+        Utilities.DigestAlgorithm.SHA_256, JSON.stringify(events)));
+    const lastPublished = Number(properties.getProperty('QDP_LIVE_LAST_PUBLISHED_AT'));
+    const elapsed = Date.now() - lastPublished;
+    if (properties.getProperty('QDP_LIVE_LAST_PUBLISHED') === fingerprint &&
+        Number.isFinite(elapsed) && elapsed >= 0 && elapsed < 10 * 60 * 1000) {
+      Logger.log('Public events are unchanged; the live feed remains fresh.');
+      return;
+    }
     const publishedAt = new Date().toISOString();
     const record = JSON.stringify({ schema: 1, publishedAt,
       payload: { generatedAt: source.generatedAt || publishedAt, events } });
@@ -630,6 +640,8 @@ function qdpLivePublish() {
       '/storage/kv/namespaces/' + namespace + '/values/' +
       encodeURIComponent('qdp-live:v1:feed');
     qdpArchiveCloudflareRequest_(url, token, 'put', record, 'application/octet-stream');
+    properties.setProperty('QDP_LIVE_LAST_PUBLISHED', fingerprint);
+    properties.setProperty('QDP_LIVE_LAST_PUBLISHED_AT', String(Date.now()));
     Logger.log(JSON.stringify({ liveEventCount: events.length, publishedAt }));
   } finally {
     lock.releaseLock();

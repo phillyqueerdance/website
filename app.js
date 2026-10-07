@@ -1464,20 +1464,31 @@ function openEventDetail(event, { updateHistory = true } = {}) {
 }
 
 const eventRelations = new Map();
+const RELATIONS_CACHE_MS = 60 * 1000;
 
 function loadEventRelations(id, card, section, links, preparedRelated) {
   if (!id) return;
   if (Array.isArray(preparedRelated)) {
-    eventRelations.set(id, Promise.resolve({ related: preparedRelated }));
-  } else if (!eventRelations.has(id)) {
-    eventRelations.set(id, fetch(`/api/event-relations?event=${encodeURIComponent(id)}`)
+    eventRelations.set(id, { at: Date.now(), promise: Promise.resolve({ related: preparedRelated }) });
+  } else if (!eventRelations.has(id) || Date.now() - eventRelations.get(id).at >= RELATIONS_CACHE_MS) {
+    const entry = { at: Date.now(), promise: null };
+    entry.promise = fetch(`/api/event-relations?event=${encodeURIComponent(id)}`, { cache: "no-cache" })
       .then(response => {
         if (!response.ok) throw new Error("Related links unavailable");
         return response.json();
-      }).catch(() => { eventRelations.delete(id); return { related: [] }; }));
+      }).then(data => {
+        if (!Array.isArray(data.related)) throw new Error("Invalid related links");
+        entry.at = Date.now();
+        return data;
+      }).catch(error => {
+        if (eventRelations.get(id) === entry) eventRelations.delete(id);
+        throw error;
+      });
+    eventRelations.set(id, entry);
   }
-  eventRelations.get(id).then(data => {
-    if (!card.isConnected || activeEventId !== id || !Array.isArray(data.related)) return;
+  eventRelations.get(id).promise.then(data => {
+    if (!card.isConnected || activeEventId !== id) return;
+    links.replaceChildren();
     const colors = { artist: "red", venue: "orange", party: "purple", collective: "collective" };
     for (const item of data.related) {
       if (!colors[item.kind] || !/^[\w-]{1,80}$/.test(item.id) || !item.name) continue;
@@ -1492,6 +1503,16 @@ function loadEventRelations(id, card, section, links, preparedRelated) {
       links.appendChild(link);
     }
     section.hidden = !links.childElementCount;
+  }).catch(() => {
+    if (!card.isConnected || activeEventId !== id) return;
+    links.replaceChildren();
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "event-detail-related-retry";
+    retry.textContent = "Related links unavailable. Try again";
+    retry.addEventListener("click", () => loadEventRelations(id, card, section, links));
+    links.appendChild(retry);
+    section.hidden = false;
   });
 }
 
@@ -2147,55 +2168,51 @@ function renderEventCollection(
   }
 }
 
+let displayedPublicEvents = null;
+let lastLiveRefreshAt = 0;
+let liveRefreshPromise = null;
+
+function refreshPublicEvents() {
+  if (liveRefreshPromise) return liveRefreshPromise;
+  liveRefreshPromise = (async () => {
+    try {
+      const freshEvents = await loadPublicEvents();
+      writeCachedPublicEvents(freshEvents);
+      if (!displayedPublicEvents || JSON.stringify(freshEvents) !== JSON.stringify(displayedPublicEvents)) {
+        renderEventCollection(freshEvents);
+      }
+      displayedPublicEvents = freshEvents;
+      lastLiveRefreshAt = Date.now();
+    } catch (error) {
+      console.error(error);
+      if (!displayedPublicEvents && !window.QDPArchive?.active) {
+        showEventFeedMessage("Listings could not load. Please refresh.");
+      }
+    } finally {
+      liveRefreshPromise = null;
+      freshEventsLoaded = true;
+      requestAnimationFrame(() => syncEventFromUrl({ final: true }));
+    }
+  })();
+  return liveRefreshPromise;
+}
+
 async function initialize() {
-  // The first response already includes current events when the prepared feed
-  // is available. Make the cards interactive before refreshing in background.
-  const cachedEvents = readInitialPublicEvents() ?? readCachedPublicEvents();
+  // The HTML already contains the prepared feed. Re-fetching it immediately
+  // transfers the same listings again and can repeat a KV read at a cold edge.
+  const initialEvents = readInitialPublicEvents();
+  displayedPublicEvents = initialEvents ?? readCachedPublicEvents();
+  if (displayedPublicEvents) renderEventCollection(displayedPublicEvents);
+  else showEventFeedMessage("Loading listings…");
 
-  if (cachedEvents) {
-    renderEventCollection(
-      cachedEvents
-    );
-  } else {
-    showEventFeedMessage(
-      "Loading listings…"
-    );
-  }
-
-  try {
-    const freshEvents =
-      await loadPublicEvents();
-
-    writeCachedPublicEvents(
-      freshEvents
-    );
-
-    const listingsChanged =
-      !cachedEvents ||
-      JSON.stringify(
-        freshEvents
-      ) !==
-      JSON.stringify(
-        cachedEvents
-      );
-
-    if (listingsChanged) {
-      renderEventCollection(
-        freshEvents
-      );
-    }
-  } catch (error) {
-    console.error(error);
-
-    if (!cachedEvents && !window.QDPArchive?.active) {
-      showEventFeedMessage(
-        "Listings could not load. Please refresh."
-      );
-    }
-  } finally {
+  if (initialEvents) {
+    writeCachedPublicEvents(initialEvents);
+    lastLiveRefreshAt = Date.now();
     freshEventsLoaded = true;
     requestAnimationFrame(() => syncEventFromUrl({ final: true }));
+    return;
   }
+  await refreshPublicEvents();
 }
 
 initializeMobileMenu();
@@ -2219,9 +2236,16 @@ if (layoutEditorEnabled) {
 let liveInitializationPromise = null;
 function ensureLiveEvents() {
   if (!liveInitializationPromise) liveInitializationPromise = initialize();
+  else if (Date.now() - lastLiveRefreshAt >= 60 * 1000) refreshPublicEvents();
   return liveInitializationPromise;
 }
 window.QDPEnsureLiveEvents = ensureLiveEvents;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !window.QDPArchive?.active) ensureLiveEvents();
+});
+setInterval(() => {
+  if (document.visibilityState === "visible" && !window.QDPArchive?.active) ensureLiveEvents();
+}, 60 * 1000);
 
 const initialArchiveView = new URLSearchParams(location.search).get("archive");
 if (!initialArchiveView && window.QDPEventLinks?.initial?.event) {

@@ -227,8 +227,8 @@ needed.
    have `X-QDP-Initial-Events: PREPARED`, and its page source should contain
    event cards inside `id="eventStack"`. Test a fresh private window and an
    archive link.
-   If the record is missing or older than six minutes, the endpoint uses its
-   existing five-minute cached Google path and marks it `HIT` or `MISS`.
+   If the record is missing or older than sixteen minutes, the endpoint uses its
+   live Google path and marks it `HIT` or `MISS`.
 4. After reviewing the preview, bring the speed changes to `main`. In the
    `qdp` Pages project's **Production** environment, bind the **same** KV
    namespace under `QDP_PUBLIC_FEED_KV`, then redeploy production. The
@@ -237,9 +237,11 @@ needed.
    the code and production binding are present, the live site remains on the
    old feed path.
 
-The prepared feed is refreshed every five minutes. Cloudflare's local KV
-copies and the browser can add roughly another minute before a visitor sees a
-change. A missed trigger or stale record switches back to the current Google
-path. The trigger consumes Apps Script execution time and writes one KV record
-per run (about 288 per day); check your Apps Script executions and Cloudflare
-plan's daily limits after enabling it.
+The trigger still checks for edits every five minutes. An edited feed is written
+on that run; an unchanged feed receives a heartbeat write after ten minutes,
+roughly halving its KV writes. Cloudflare's edge cache adds at most thirty
+seconds per location, and a long-open Discover tab rechecks its current view
+after sixty seconds when revisited. A missing or stale live record switches
+back to the Google path. Install the updated `archive-feed.gs` in the existing
+Apps Script project to activate the reduced-write publisher; the deployed
+website caching changes work independently until that replacement is saved.

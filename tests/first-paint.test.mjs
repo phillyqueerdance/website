@@ -59,6 +59,34 @@ test('the prepared page displays current event cards in HTML before app.js loads
   }
 });
 
+test('a warm homepage uses prepared HTML without a second KV read', async () => {
+  const previousCaches = globalThis.caches;
+  const previousRewriter = globalThis.HTMLRewriter;
+  const edge = new Map();
+  let reads = 0;
+  globalThis.caches = { default: {
+    match: async key => edge.get(key.url)?.clone() ?? null,
+    put: async (key, response) => edge.set(key.url, response.clone())
+  } };
+  globalThis.HTMLRewriter = class {
+    on() { return this; }
+    transform(response) { return response; }
+  };
+  const context = noise => ({
+    request: new Request(`https://massive.example/?noise=${noise}`),
+    env: { ASSETS: { fetch: async () => new Response(html, { headers: { 'Content-Type': 'text/html' } }) },
+      QDP_ARCHIVE_KV: { get: async () => {
+        reads++;
+        return { schema: 1, publishedAt: new Date().toISOString(), payload: { events: [] } };
+      } } }
+  });
+  try {
+    assert.equal((await onRequestGet(context('one'))).headers.get('X-QDP-Initial-Events'), 'PREPARED');
+    assert.equal((await onRequestGet(context('two'))).headers.get('X-QDP-Initial-Events'), 'PREPARED');
+    assert.equal(reads, 1);
+  } finally { globalThis.caches = previousCaches; globalThis.HTMLRewriter = previousRewriter; }
+});
+
 test('poster renderer groups same-time cards and escapes untrusted fields', () => {
   const result = renderLivePoster([
     { eventId: 'A"><script>', title: 'First', start: '2030-09-29T20:00:00-04:00' },

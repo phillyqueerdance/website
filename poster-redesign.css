@@ -558,6 +558,14 @@
   color: #fff1f4;
 }
 .event-detail-see-more a:any-link { text-decoration: none; }
+.event-detail-related-retry {
+  border: 0;
+  background: transparent;
+  color: #ffea86;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .event-detail-related-bubble:hover { filter: brightness(1.12); }
 .event-detail-related-bubble:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
 .event-share-status:not(:empty) {

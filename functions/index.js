@@ -5,6 +5,8 @@ import { renderEventPage } from "./event-page.js";
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
+  const cache = typeof caches === "undefined" ? null : caches.default;
+  const cacheKey = new Request(new URL("/_qdp/prepared-home", url));
   const page = await context.env.ASSETS.fetch(new URL("/", url));
   if (!page.ok) return page;
   // Event content and metadata also apply to contextual archive URLs.
@@ -13,6 +15,8 @@ export async function onRequestGet(context) {
     return renderEventPage(context, page, await resolveEvent(context, id), id);
   }
   if (url.searchParams.has("archive")) return page;
+  const cached = await cache?.match(cacheKey);
+  if (cached) return cached;
   try {
     const prepared = await readPreparedEvents(context);
     if (!prepared) return page;
@@ -27,7 +31,12 @@ export async function onRequestGet(context) {
     headers.set("X-QDP-Initial-Events", "PREPARED");
     headers.delete("ETag");
     headers.delete("Content-Length");
-    return new Response(rewritten.body, { headers });
+    const result = new Response(rewritten.body, { headers });
+    if (cache) {
+      const write = cache.put(cacheKey, result.clone());
+      if (context.waitUntil) context.waitUntil(write); else await write;
+    }
+    return result;
   } catch (error) {
     console.error("QDP initial events unavailable:", error);
     return page;

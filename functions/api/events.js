@@ -3,9 +3,11 @@ export const DEFAULT_APPS_SCRIPT_URL =
 
 const GOOGLE_EVENTS_URL = `${DEFAULT_APPS_SCRIPT_URL}?resource=events`;
 
-const EDGE_CACHE_SECONDS = 300;
+const EDGE_CACHE_SECONDS = 30;
 const PREPARED_CACHE_SECONDS = 30;
-const PREPARED_MAX_AGE_MS = 6 * 60 * 1000;
+// The publisher still checks for edits every five minutes, but an unchanged
+// feed only needs a heartbeat write every ten minutes.
+const PREPARED_MAX_AGE_MS = 16 * 60 * 1000;
 const PREPARED_KEY = "qdp-live:v1:feed";
 
 function phillyDateKey(date) {
@@ -41,7 +43,8 @@ function createJsonResponse(
   {
     status = 200,
     cacheStatus = "MISS",
-    maxAge = EDGE_CACHE_SECONDS
+    maxAge = EDGE_CACHE_SECONDS,
+    publishedAt = ""
   } = {}
 ) {
   return new Response(
@@ -59,6 +62,8 @@ function createJsonResponse(
 
         "X-QDP-Cache":
           cacheStatus,
+
+        ...(publishedAt ? { "X-QDP-Published-At": publishedAt } : {}),
 
         "X-Content-Type-Options":
           "nosniff"
@@ -78,6 +83,7 @@ export async function readPreparedEvents(context) {
   const today = phillyDateKey(new Date());
   return {
     generatedAt: record.payload.generatedAt,
+    publishedAt: record.publishedAt,
     events: record.payload.events.filter(event =>
       event && event.eventId && event.title && isCurrentOrFutureEvent(event, today))
   };
@@ -86,58 +92,38 @@ export async function readPreparedEvents(context) {
 export async function onRequestGet(
   context
 ) {
+  const cache = typeof caches === "undefined" ? null : caches.default;
+  const cacheUrl = new URL("/api/events", context.request.url);
+  const cacheKey = new Request(cacheUrl.href);
+  const cachedResponse = await cache?.match(cacheKey);
+  if (cachedResponse) {
+    const publishedAt = cachedResponse.headers.get("X-QDP-Published-At");
+    const age = publishedAt ? Date.now() - Date.parse(publishedAt) : 0;
+    if (!publishedAt || Number.isFinite(age) && age >= 0 && age <= PREPARED_MAX_AGE_MS) {
+      const headers = new Headers(cachedResponse.headers);
+      headers.set("X-QDP-Cache", "HIT");
+      return new Response(cachedResponse.body, {
+        status: cachedResponse.status, statusText: cachedResponse.statusText, headers
+      });
+    }
+  }
+
   try {
     const prepared = await readPreparedEvents(context);
     if (prepared) {
-      return createJsonResponse(prepared, {
+      const response = createJsonResponse(prepared, {
         cacheStatus: "PREPARED",
-        maxAge: PREPARED_CACHE_SECONDS
+        maxAge: PREPARED_CACHE_SECONDS,
+        publishedAt: prepared.publishedAt
       });
+      if (cache) {
+        const write = cache.put(cacheKey, response.clone());
+        if (context.waitUntil) context.waitUntil(write); else await write;
+      }
+      return response;
     }
   } catch (error) {
     console.error("Prepared QDP events unavailable; using live feed:", error);
-  }
-
-  const cache =
-    caches.default;
-
-  const cacheUrl =
-    new URL(context.request.url);
-
-  cacheUrl.search = "";
-
-  const cacheKey =
-    new Request(
-      cacheUrl.toString(),
-      { method: "GET" }
-    );
-
-  const cachedResponse =
-    await cache.match(cacheKey);
-
-  if (cachedResponse) {
-    const headers =
-      new Headers(
-        cachedResponse.headers
-      );
-
-    headers.set(
-      "X-QDP-Cache",
-      "HIT"
-    );
-
-    return new Response(
-      cachedResponse.body,
-      {
-        status:
-          cachedResponse.status,
-
-        statusText:
-          cachedResponse.statusText,
-
-        headers
-      }
-    );
   }
 
   try {
@@ -196,12 +182,10 @@ export async function onRequestGet(
         filteredPayload
       );
 
-    context.waitUntil(
-      cache.put(
-        cacheKey,
-        response.clone()
-      )
-    );
+    if (cache) {
+      const write = cache.put(cacheKey, response.clone());
+      if (context.waitUntil) context.waitUntil(write); else await write;
+    }
 
     return response;
   } catch (error) {

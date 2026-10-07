@@ -23,6 +23,7 @@
   let exitTimer = 0;
   let menuMotionSerial = 0;
   const cache = new Map();
+  const CLIENT_CACHE_MS = 60 * 1000;
   const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
   const profileViews = { artist: "artists", venue: "venues", party: "parties",
     collective: "collectives" };
@@ -30,6 +31,8 @@
   const validViews = new Set([...directoryViews, ...Object.keys(profileViews), "events"]);
   let renderedKey = "";
   let loadingKey = "";
+  let renderedAt = 0;
+  let renderedPayload = "";
   let requestNumber = 0;
   let pageExitTimer = 0;
   let cards = [];
@@ -80,6 +83,28 @@
     corners = [];
     archive.events = [];
     archive.updateControls();
+  }
+
+  function errorLabel(error) {
+    if (error.status === 404) return "This page is no longer available.";
+    if (error.status === 503 && /waiting for the sheet to be published/i.test(error.serverMessage || "")) {
+      return "This directory is waiting for its next publish.";
+    }
+    if (error.invalid) return "These listings could not be read right now.";
+    return "Could not load these listings right now.";
+  }
+
+  function retryButton(action) {
+    const button = node("button", "archive-retry", "Try again");
+    button.type = "button";
+    button.addEventListener("click", action);
+    return button;
+  }
+
+  function loadError(error) {
+    message(errorLabel(error));
+    archiveStack.appendChild(retryButton(() => route()));
+    archive.updateLayout();
   }
 
   function header(label) {
@@ -283,17 +308,32 @@
 
   async function load(resource, value) {
     const url = endpoint(resource, value);
-    if (!cache.has(url)) {
-      cache.set(url, fetch(url).then(async response => {
-        const payload = await response.json();
-        if (!response.ok || payload.error) throw new Error(payload.error || `Archive returned ${response.status}`);
+    const existing = cache.get(url);
+    if (existing && (existing.pending || Date.now() - existing.at < CLIENT_CACHE_MS)) {
+      return existing.promise;
+    }
+    const entry = { at: 0, pending: true, promise: null };
+    entry.promise = fetch(url, { cache: "no-cache" }).then(async response => {
+        let payload;
+        try { payload = await response.json(); }
+        catch { throw Object.assign(new Error("Invalid archive response"), { invalid: true }); }
+        if (!response.ok || payload?.error) {
+          throw Object.assign(new Error("Archive request failed"), {
+            status: response.status, serverMessage: payload?.error
+          });
+        }
+        if (!payload || typeof payload !== "object") {
+          throw Object.assign(new Error("Invalid archive response"), { invalid: true });
+        }
+        entry.at = Date.now();
+        entry.pending = false;
         return payload;
       }).catch(error => {
-        cache.delete(url);
+        if (cache.get(url) === entry) cache.delete(url);
         throw error;
-      }));
-    }
-    return cache.get(url);
+      });
+    cache.set(url, entry);
+    return entry.promise;
   }
 
   function directorySortName(name, kind) {
@@ -572,6 +612,55 @@
     archive.updateLayout();
   }
 
+  function displayRouteData(params, resource, data) {
+    if (directoryViews.has(resource)) {
+      if (!Array.isArray(data[resource])) throw Object.assign(new Error("Invalid directory"), { invalid: true });
+      renderDirectory(resource, data[resource]);
+    } else if (resource === "months") renderMonths(data.months);
+    else if (resource === "month") renderEvents(data.events);
+    else {
+      if (!data.profile || data.profile.id !== params.id || !Array.isArray(data.events)) {
+        throw Object.assign(new Error("Invalid profile"), { invalid: true });
+      }
+      header(data.profile.name);
+      renderEvents(data.events, data.profile, resource);
+      if (!window.QDPInfoView?.active) document.title = `${data.profile.name} | Queer Dance Philly`;
+    }
+    renderedPayload = JSON.stringify(data);
+    renderedAt = Date.now();
+    syncYearHeadings();
+    archive.updateControls();
+  }
+
+  async function refreshCurrentRoute(params) {
+    if (loadingKey === params.key) return;
+    const serial = ++requestNumber;
+    loadingKey = params.key;
+    const resource = params.view === "events" ? (params.month ? "month" : "months") : params.view;
+    try {
+      const data = await load(resource, params.id || params.month);
+      if (serial !== requestNumber || !archive.active || renderedKey !== params.key) return;
+      archiveStack.querySelector(".archive-refresh-error")?.remove();
+      if (JSON.stringify(data) !== renderedPayload) {
+        const scrollTop = archiveStack.scrollTop;
+        displayRouteData(params, resource, data);
+        archiveStack.scrollTop = scrollTop;
+      }
+      renderedAt = Date.now();
+      syncPopup();
+    } catch (error) {
+      if (serial !== requestNumber || !archive.active || renderedKey !== params.key) return;
+      console.error("Could not refresh QDP archive:", error);
+      archiveStack.querySelector(".archive-refresh-error")?.remove();
+      const notice = node("div", "archive-refresh-error", errorLabel(error));
+      notice.setAttribute("role", "status");
+      notice.appendChild(retryButton(() => refreshCurrentRoute(params)));
+      archiveStack.prepend(notice);
+    } finally {
+      if (serial === requestNumber) loadingKey = "";
+    }
+  }
+
   async function route() {
     const params = routeParams();
     if (!params.view) {
@@ -593,7 +682,10 @@
       if (window.QDPInfoView?.active && !["#about", "#melt"].includes(location.hash)) {
         window.QDPInfoView.close({ historyEntry: false });
       }
-      if (loadingKey !== params.key) syncPopup();
+      if (loadingKey !== params.key) {
+        syncPopup();
+        if (Date.now() - renderedAt >= CLIENT_CACHE_MS) refreshCurrentRoute(params);
+      }
       return;
     }
     const serial = ++requestNumber;
@@ -613,6 +705,8 @@
     }
     archive.active = true;
     renderedKey = params.key;
+    renderedAt = 0;
+    renderedPayload = "";
     loadingKey = params.key;
     document.body.classList.add("archive-mode");
     document.documentElement.classList.add("archive-open");
@@ -642,19 +736,9 @@
     try {
       const data = await load(resource, value);
       if (serial !== requestNumber) return;
-      if (directoryViews.has(resource)) renderDirectory(resource, data[resource]);
-      else if (resource === "months") renderMonths(data.months);
-      else if (resource === "month") renderEvents(data.events);
-      else {
-        if (!data.profile || data.profile.id !== params.id) throw new Error("Profile not found");
-        header(data.profile.name);
-        renderEvents(data.events, data.profile, resource);
-        if (!window.QDPInfoView?.active) document.title = `${data.profile.name} | Queer Dance Philly`;
-      }
+      displayRouteData(params, resource, data);
       archiveStack.scrollTop = 0;
-      syncYearHeadings();
       loadingKey = "";
-      archive.updateControls();
       syncPopup();
       if (directoryPromise) {
         directoryPromise.then(directoryData => {
@@ -669,10 +753,9 @@
     } catch (error) {
       if (serial !== requestNumber) return;
       loadingKey = "";
+      renderedKey = "";
       console.error("Could not load QDP archive:", error);
-      message(directoryViews.has(params.view) && ["parties", "collectives"].includes(params.view)
-        ? `${params.view[0].toUpperCase() + params.view.slice(1)} are waiting for the sheet to be published.`
-        : "Archive feed is not connected yet. The calendar remains available.");
+      loadError(error);
     }
   }
 
@@ -840,6 +923,12 @@
     if (!url.searchParams.has("archive")) hideMenu();
   });
   window.addEventListener("popstate", route);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && archive.active) route();
+  });
+  window.addEventListener("pageshow", event => {
+    if (event.persisted && archive.active) route();
+  });
   window.addEventListener("resize", () => {
     if (menuTrack.hidden) return;
     positionMenu();
