@@ -222,7 +222,7 @@
 }
 .archive-menu-badge[data-tab-color="orange"] {
   background: #ff7945;
-  color: #241016 !important;
+  color: var(--qdp-plum-text) !important;
 }
 .archive-menu-badge[data-tab-color="purple"] {
   background: #922185;
@@ -237,7 +237,7 @@
   content: "✦";
   position: absolute;
   right: 12px;
-  color: #fff1f4;
+  color: inherit;
   font-size: .75em;
 }
 .archive-menu > .archive-menu-map {
@@ -384,7 +384,6 @@
   border-bottom-left-radius: var(--qdp-tail-radius, var(--qdp-card-radius));
 }
 a.event-card.archive-card { text-decoration: none; }
-a.event-card.archive-card:focus-visible .event-title { text-decoration: underline; }
 .archive-card .event-card-content { pointer-events: none; }
 .archive-month .date-heading { margin-bottom: var(--qdp-cards-next-time-gap); }
 .archive-month .date-section + .date-section { margin-top: var(--qdp-cards-next-time-gap); }

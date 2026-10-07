@@ -50,5 +50,5 @@
   const serialize = value => JSON.stringify(value).replace(/</g, "\\u003c")
     .replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
   globalThis.QDPEventMetadata = Object.freeze({ origin, cleanTitle, url, safeUrl, undisclosed,
-    image, schema, description, serialize, title: event => `Check out ${cleanTitle(event)} on Queer Dance Philly` });
+    image, schema, description, serialize, title: event => `${cleanTitle(event)} | Queer Dance Philly` });
 })();
