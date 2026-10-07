@@ -191,8 +191,9 @@
       // emerge directly from the frame once the artwork is layered above them.
       const menuInset = posterWidth * (1653 - 1586) / 1727;
       const overlap = posterWidth * (1 - purpleBorder);
-      const room = window.innerWidth - menuTrack.getBoundingClientRect().left - menuInset - 20;
-      const expandedWidth = Math.max(sideWidth, Math.min(sideWidth + 64, room));
+      const trackRoom = Math.max(0, window.innerWidth - menuTrack.getBoundingClientRect().left - 20);
+      const expandedWidth = Math.max(0, Math.min(sideWidth + 64, trackRoom - menuInset));
+      menuTrack.style.setProperty("--archive-menu-room", `${trackRoom}px`);
       menuTrack.style.setProperty("--archive-nav-expanded-width", `${expandedWidth}px`);
       menuTrack.style.setProperty("--archive-menu-inset", `${menuInset}px`);
       menuTrack.style.setProperty("--archive-overlap", `${overlap}px`);
@@ -202,9 +203,14 @@
       menuTrack.style.setProperty("--archive-alphabet-top", `${menu.offsetTop + menu.offsetHeight + 8}px`);
       if (!menuTrack.hidden) {
         const labels = menu.querySelectorAll(".archive-menu-badge-label");
-        const labelWidth = Math.ceil(Math.max(...[...labels].map(label => label.scrollWidth))) + 22.8;
+        const canvas = positionMenu.canvas || (positionMenu.canvas = document.createElement("canvas"));
+        const measure = canvas.getContext("2d");
+        const labelWidth = Math.ceil(Math.max(...[...labels].map(label => {
+          measure.font = getComputedStyle(label).font;
+          return measure.measureText(label.textContent).width;
+        }))) + 22.8;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
-        menuTrack.style.setProperty("--archive-tab-length", `${labelWidth + menuInset + 7.6}px`);
+        menuTrack.style.setProperty("--archive-tab-length", `${Math.max(0, Math.min(labelWidth + menuInset + 14, menuInset + expandedWidth - 12))}px`);
         menuTrack.style.setProperty("--archive-nav-compact-width", `${Math.min(expandedWidth, labelWidth + 30.4)}px`);
       }
     }
@@ -432,6 +438,8 @@
         collectives: "collective" }[kind];
       const card = stripCard(item.name, subtitle,
         archiveUrl(singular, item.id).href);
+      const classification = window.QDPProfileMetadata.classification(singular, item);
+      if (classification) card.prepend(node("span", "sr-only", `${classification} `));
       if ((kind === "artists" && (item.queerArtist || item.transArtist)) ||
           (kind === "venues" && item.queerVenue) ||
           (kind === "parties" && item.queerParty) ||
@@ -485,6 +493,8 @@
     const info = node("section", "archive-profile-info");
     info.setAttribute("aria-label", `${kind[0].toUpperCase() + kind.slice(1)} information`);
     info.appendChild(node("h2", "archive-profile-heading", person.name));
+    const classification = window.QDPProfileMetadata.classification(kind, person);
+    if (classification) info.appendChild(node("span", "sr-only", classification));
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
     if (Array.isArray(person.related) && person.related.length) {

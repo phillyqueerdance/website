@@ -36,11 +36,11 @@
 <meta name="twitter:title" content="Queer Dance Philly">
 <meta name="twitter:description" content="Your cheat sheet for queer dance parties, DJs, venues, and nightlife in Philadelphia.">
 <meta name="twitter:image" content="https://queerdancephilly.com/qdp-share-card.jpg">
- <link rel="stylesheet" href="style.css?v=20260928-01">
+ <link rel="stylesheet" href="style.css?v=20261007-accessibility-1">
  <link rel="stylesheet" href="poster-theme.css?v=20261007-bubble-links-1">
  <link rel="stylesheet" href="poster-redesign.css?v=20261007-cache-refresh-1">
- <link rel="stylesheet" href="archive.css?v=20261007-cache-refresh-1">
- <link rel="stylesheet" href="mobile.css?v=20261006-start-here-scroll-1">
+ <link rel="stylesheet" href="archive.css?v=20261007-discover-fit-1">
+ <link rel="stylesheet" href="mobile.css?v=20261007-discover-fit-1">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
@@ -55,6 +55,8 @@
   <main class="site-shell">
 
     <section class="poster-stage" aria-label="Queer Dance Philly events">
+
+      <div id="eventDialog" class="event-dialog">
 
       <div id="poster" class="poster">
 
@@ -96,7 +98,7 @@
         <div id="archiveViewport" class="archive-viewport" hidden>
           <div id="archivePage" class="archive-page">
             <a id="archiveBack" class="archive-back" href="/?archive=artists" data-archive-link hidden>← Back to Artists</a>
-            <div id="archiveHeader" class="poster-date archive-header" role="heading" aria-level="1"></div>
+            <div id="archiveHeader" class="poster-date archive-header" role="heading" aria-level="1" tabindex="-1"></div>
             <div id="archiveStack" class="event-stack archive-stack" role="region"
               aria-label="Archive listings" tabindex="0"></div>
           </div>
@@ -118,7 +120,7 @@
         loading="lazy"
         decoding="async"
       >
-      <h2 id="aboutDialogTitle">Hi gay!</h2>
+      <h2 id="aboutDialogTitle" tabindex="-1">Hi gay!</h2>
 
       <p>
         Welcome to Queer Dance Philly, your cheat sheet for finding the next move.
@@ -157,9 +159,10 @@
   <section
   id="meltDialog"
   class="poster-info-page about-dialog melt-dialog"
-  aria-label="Melt"
+  aria-labelledby="meltDialogTitle"
 >
   <div class="about-dialog-content melt-dialog-content">
+    <h2 id="meltDialogTitle" class="sr-only" tabindex="-1">Melt</h2>
     <img
       class="melt-dialog-logo"
       src="melt-logo.png"
@@ -234,6 +237,8 @@
       </div>
 
       <button id="todayButton" class="today-button" type="button">today</button>
+
+      </div>
 
     </section>
 
@@ -1261,11 +1266,11 @@
   <template id="qdpInitialEvent"></template>
   <template id="qdpInitialArchive"></template>
   <script src="event-metadata.js?v=20261007-bubble-links-1"></script>
-  <script src="profile-metadata.js?v=20261007-profile-pages-1"></script>
+  <script src="profile-metadata.js?v=20261007-accessibility-1"></script>
   <script src="event-linking.js?v=20261007-profile-pages-1"></script>
-  <script src="app.js?v=20261007-cache-refresh-1"></script>
-  <script src="archive.js?v=20261007-profile-pages-1"></script>
-  <script src="mobile.js?v=20261006-browser-shortcuts-1"></script>
+  <script src="app.js?v=20261007-accessibility-1"></script>
+  <script src="archive.js?v=20261007-discover-fit-1"></script>
+  <script src="mobile.js?v=20261007-accessibility-1"></script>
   <script src="menu-pointer-sparkles.js?v=20261002-discover-1"></script>
 
 </body>

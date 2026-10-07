@@ -172,7 +172,7 @@
       requestAnimationFrame(() => {
         sync();
         const target = window.QDPInfoView?.active
-          ? document.getElementById(`${window.QDPInfoView.active}CloseButton`)
+          ? document.getElementById(`${window.QDPInfoView.active}DialogTitle`)
           : document.getElementById(window.QDPArchive?.active ? "archiveStack" : "eventStack");
         target?.focus({ preventScroll: true });
       });

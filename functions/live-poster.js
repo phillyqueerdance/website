@@ -35,8 +35,9 @@ function formatDate(key) {
 export function renderEventCard(event, { href, hideLocation = false } = {}) {
   const id = String(event.eventId ?? event.EventID ?? "").trim();
   const flags = `${event.queerArtist ? '<span class="card-flag card-flag-queer" aria-label="Features a queer artist" role="img"></span>' : ""}${event.transArtist ? '<span class="card-flag card-flag-trans" aria-label="Features a trans artist" role="img"></span>' : ""}`;
+  const classification = event.explicitQueer ? '<span class="sr-only">Queer event. </span>' : "";
   const location = (field, value) => `<div class="${field}"${value ? "" : " hidden"}>${escapeHtml(value)}</div>`;
-  return `<a class="event-card ${event.explicitQueer ? "explicit" : "default"}${event.queerArtist || event.transArtist ? " has-flags" : ""}" data-event-id="${escapeHtml(id)}" href="${escapeHtml(href || `/?event=${encodeURIComponent(id)}`)}">${flags}<span class="event-card-shape" aria-hidden="true"></span><span class="event-card-content"><div class="event-title">${escapeHtml(displayTitle(event))}</div>${hideLocation ? "" : location("event-venue", String(event.venue || "").trim()) + location("event-address", String(event.address || "").trim())}</span></a>`;
+  return `<a class="event-card ${event.explicitQueer ? "explicit" : "default"}${event.queerArtist || event.transArtist ? " has-flags" : ""}" data-event-id="${escapeHtml(id)}" href="${escapeHtml(href || `/?event=${encodeURIComponent(id)}`)}">${classification}${flags}<span class="event-card-shape" aria-hidden="true"></span><span class="event-card-content"><div class="event-title">${escapeHtml(displayTitle(event))}</div>${hideLocation ? "" : location("event-venue", String(event.venue || "").trim()) + location("event-address", String(event.address || "").trim())}</span></a>`;
 }
 
 export function renderLivePoster(events, now = new Date()) {

@@ -10,6 +10,7 @@ const EVENTS_STORAGE_MAX_AGE_MS =
 const dateLabel = document.getElementById("dateLabel");
 const eventStack = document.getElementById("eventStack");
 const eventDetail = document.getElementById("eventDetail");
+const eventDialog = document.getElementById("eventDialog");
 const dateButton = document.getElementById("dateButton");
 const datePopover = document.getElementById("datePopover");
 const previousPoster = document.getElementById("previousPoster");
@@ -57,6 +58,25 @@ let activeEvent = null;
 let eventEntryPushed = false;
 let freshEventsLoaded = false;
 let activeDetailSlide = null;
+
+function syncViewAccessibility() {
+  const infoOpen = document.body.classList.contains("info-mode");
+  const detailOpen = !eventDetail.hidden && !infoOpen;
+  for (const element of [dateButton, datePopover, eventStack, todayButton,
+    document.getElementById("archiveViewport"), document.querySelector(".frame")]) {
+    if (element) element.inert = infoOpen || detailOpen;
+  }
+  document.querySelector(".poster-controls").inert = infoOpen;
+  document.getElementById("infoViewport").inert = !infoOpen;
+  eventDetail.inert = infoOpen;
+  if (detailOpen) {
+    eventDialog.setAttribute("role", "dialog");
+    eventDialog.setAttribute("aria-modal", "true");
+    eventDialog.setAttribute("aria-labelledby", "eventDetailTitle");
+  } else {
+    for (const name of ["role", "aria-modal", "aria-labelledby"]) eventDialog.removeAttribute(name);
+  }
+}
 
 previousPoster.disabled = true;
 nextPoster.disabled = true;
@@ -844,6 +864,13 @@ function createEventCard(event) {
     (event.explicitQueer ? "explicit" : "default") +
     (event.queerArtist || event.transArtist ? " has-flags" : "");
 
+  if (event.explicitQueer) {
+    const classification = document.createElement("span");
+    classification.className = "sr-only";
+    classification.textContent = "Queer event. ";
+    card.appendChild(classification);
+  }
+
   if (event.queerArtist) {
     const flag = document.createElement("span");
     flag.className = "card-flag card-flag-queer";
@@ -901,6 +928,7 @@ function renderPoster() {
     eventDetail.classList.remove("is-open", "explicit");
   }
   eventStack.hidden = keepDetail;
+  syncViewAccessibility();
   eventStack.innerHTML = "";
   pageCards = new Array(posterPages.length);
   eventCardsById = new Map();
@@ -1244,8 +1272,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   const dateBadge = eventDetail.querySelector(".event-detail-date-badge") ||
     document.createElement("div");
   eventDetail.replaceChildren();
-  eventDetail.setAttribute("role", "dialog");
-  eventDetail.setAttribute("aria-modal", "true");
+  eventDetail.setAttribute("role", "group");
   eventDetail.setAttribute("aria-labelledby", "eventDetailTitle");
   eventDetail.tabIndex = -1;
 
@@ -1343,6 +1370,12 @@ function openEventDetail(event, { updateHistory = true } = {}) {
 
   heading.id = "eventDetailTitle";
   heading.textContent = displayTitle(event);
+  if (event.explicitQueer) {
+    const classification = document.createElement("span");
+    classification.className = "sr-only";
+    classification.textContent = "Queer event. ";
+    eventDetail.appendChild(classification);
+  }
 
   const venue = document.createElement("span");
   const venueTime = document.createElement("p");
@@ -1454,6 +1487,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   eventDetail.append(detailCard, back);
   fitDetailContent();
   updateDetailNavigationState();
+  syncViewAccessibility();
   if (infoView.active) {
     eventDetail.inert = true;
     eventDetail.setAttribute("aria-hidden", "true");
@@ -1688,6 +1722,7 @@ function hideEventDetail({ restoreFocus = true } = {}) {
     eventDetail.hidden = true;
     eventDetail.classList.remove("is-open", "explicit");
     eventStack.hidden = false;
+    syncViewAccessibility();
     eventStack.scrollTop = savedEventScrollTop;
     if (window.QDPArchive?.active) window.QDPArchive.updateControls();
     else updateScrollState();
@@ -1721,8 +1756,7 @@ function showEventLookupError(error) {
   eventDetail.hidden = false;
   eventDetail.classList.add("is-open");
   eventDetail.replaceChildren();
-  eventDetail.setAttribute("role", "dialog");
-  eventDetail.setAttribute("aria-modal", "true");
+  eventDetail.setAttribute("role", "group");
   eventDetail.setAttribute("aria-labelledby", "eventDetailTitle");
   eventDetail.tabIndex = -1;
   const card = document.createElement("article");
@@ -1756,6 +1790,7 @@ function showEventLookupError(error) {
   eventDetail.append(card, back);
   previousPoster.disabled = true;
   nextPoster.disabled = true;
+  syncViewAccessibility();
   eventDetail.focus({ preventScroll: true });
 }
 
@@ -1794,20 +1829,17 @@ async function syncEventFromUrl({ final = freshEventsLoaded } = {}) {
 
 window.addEventListener("popstate", () => syncEventFromUrl());
 
-eventDetail.addEventListener("keydown", event => {
-  if (event.key !== "Tab") return;
-  const liveCard = eventDetail.querySelector(".event-detail-card:not([aria-hidden])");
-  const controls = [...(liveCard?.querySelectorAll("a[href], button:not([disabled])") || []),
-    ...eventDetail.querySelectorAll(".event-detail-back")];
-  {
-    for (let i = controls.length - 1; i >= 0; i--) {
-      if (controls[i].classList.contains("event-detail-back")) controls.splice(i, 1);
-    }
-    const mobileBack = document.getElementById("mobileBack");
-    if (mobileBack && !mobileBack.hidden) controls.push(mobileBack);
-  }
+eventDialog.addEventListener("keydown", event => {
+  if (event.key !== "Tab" || eventDialog.getAttribute("aria-modal") !== "true") return;
+  const controls = [...eventDialog.querySelectorAll("a[href], button:not([disabled]), [tabindex='0']")]
+    .filter(element => !element.closest("[inert], [hidden], [aria-hidden='true']") && element.getClientRects().length);
   const first = controls[0];
   const last = controls[controls.length - 1];
+  if (!first) {
+    event.preventDefault();
+    eventDetail.focus({ preventScroll: true });
+    return;
+  }
   if (document.activeElement === eventDetail) {
     event.preventDefault();
     (event.shiftKey ? last : first).focus();
@@ -1844,10 +1876,14 @@ const infoViews = { about: aboutDialog, melt: meltDialog };
 const infoView = {
   active: "",
   restoreDiscover: false,
+  returnFocus: null,
   show(kind, { historyEntry = true } = {}) {
     if (!infoViews[kind]) return;
     if (this.active === kind) return;
-    if (!this.active) this.restoreDiscover = window.QDPArchive?.isMenuOpen() || false;
+    if (!this.active) {
+      this.restoreDiscover = window.QDPArchive?.isMenuOpen() || false;
+      this.returnFocus = document.activeElement;
+    }
     closeDatePopover();
     if (historyEntry) {
       const url = new URL(location.href);
@@ -1874,6 +1910,8 @@ const infoView = {
       if (this.active === kind) infoViews[kind].classList.add("is-open");
     });
     document.title = `${kind === "about" ? "About" : "Melt"} | Queer Dance Philly`;
+    syncViewAccessibility();
+    document.getElementById(`${kind}DialogTitle`).focus({ preventScroll: true });
   },
   close({ historyEntry = true, preserveMenu = false } = {}) {
     if (!this.active) return;
@@ -1901,12 +1939,19 @@ const infoView = {
       else if (this.restoreDiscover) window.QDPArchive?.showMenu();
       else window.QDPArchive?.hideMenu();
     }
-    document.title = window.QDPArchive?.active
-      ? `${document.getElementById("archiveHeader").textContent} | Queer Dance Philly`
-      : "Queer Dance Philly";
+    syncViewAccessibility();
+    if (!eventDetail.hidden && activeEvent) window.QDPEventLinks?.apply(activeEvent);
+    else if (window.QDPArchive?.active) window.QDPArchive.restoreMetadata();
+    else document.title = "Queer Dance Philly";
+    const origin = this.returnFocus;
+    if (!eventDetail.hidden) eventDetail.focus({ preventScroll: true });
+    else if (origin?.isConnected && origin !== document.body && !origin.closest("[inert], [hidden]")) origin.focus({ preventScroll: true });
+    else (window.QDPArchive?.active ? document.getElementById("archiveHeader") : dateButton).focus({ preventScroll: true });
+    this.returnFocus = null;
   }
 };
 window.QDPInfoView = infoView;
+syncViewAccessibility();
 
 aboutLink.addEventListener("click", event => {
   event.preventDefault();

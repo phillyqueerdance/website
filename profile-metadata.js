@@ -11,6 +11,13 @@
   };
   const title = profile => `${profile.name} | Queer Dance Philly`;
   const description = profile => String(profile.bio || profile.name || "").replace(/\s+/g, " ").trim().slice(0, 180);
+  const classification = (kind, profile) => {
+    const labels = [];
+    const flag = { artist: "queerArtist", venue: "queerVenue", party: "queerParty", collective: "queerCollective" }[kind];
+    if (flag && profile[flag] === true) labels.push(`Queer ${kind}.`);
+    if (kind === "artist" && profile.transArtist === true) labels.push("Trans artist.");
+    return labels.join(" ");
+  };
   const tags = (kind, profile, base = origin) => [
     ['meta[name="description"]', description(profile)],
     ['meta[property="og:title"]', title(profile)],
@@ -22,5 +29,5 @@
     ['meta[name="twitter:image"]', new URL("/qdp-share-card.jpg", base).href],
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
-  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, title, description, tags });
+  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, title, description, classification, tags });
 })();

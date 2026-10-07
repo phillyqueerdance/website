@@ -34,7 +34,7 @@ export function renderEventDetail(event, requestUrl) {
   }).join("");
   const flags = [[event.queerArtist, "queer"], [event.transArtist, "trans"]]
     .filter(([enabled]) => enabled).map(([, type]) => `<span class="event-detail-flag event-detail-flag-${type}" role="img" aria-label="Features a ${type} artist"></span>`).join("");
-  return `${flags}<div class="event-detail-date-badge"><span class="event-detail-date-text">${escape(dateLabel(event))}</span></div>
+  return `${event.explicitQueer ? '<span class="sr-only">Queer event. </span>' : ""}${flags}<div class="event-detail-date-badge"><span class="event-detail-date-text">${escape(dateLabel(event))}</span></div>
     <article class="event-detail-card${image ? "" : " without-flyer"}">
       ${image ? `<div class="event-detail-flyer-slot"><img class="event-detail-flyer" src="${escape(image)}" alt="Flyer for ${escape(meta.cleanTitle(event))}" referrerpolicy="no-referrer"></div>` : ""}
       <div class="event-detail-title-location"><h2 id="eventDetailTitle">${escape(meta.cleanTitle(event))}</h2>
@@ -50,13 +50,25 @@ export function renderEventDetail(event, requestUrl) {
 export function renderEventPage(context, page, result, id) {
   const event = result.event;
   const origin = context.env.QDP_CANONICAL_ORIGIN || meta.origin;
+  const back = new URL(context.request.url);
+  back.searchParams.delete("event");
   let rewriter = new HTMLRewriter()
+    .on("#eventDialog", { element(element) {
+      element.setAttribute("role", "dialog");
+      element.setAttribute("aria-modal", "true");
+      element.setAttribute("aria-labelledby", "eventDetailTitle");
+    } })
+    .on("#dateButton, #datePopover, #archiveViewport, #todayButton, .frame", { element(element) { element.setAttribute("inert", ""); } })
+    .on("#mobileBack", { element(element) {
+      element.removeAttribute("hidden");
+      element.setAttribute("href", back.href);
+      element.setInnerContent("← Back");
+    } })
     .on("#eventStack", { element(element) { element.setAttribute("hidden", ""); element.setInnerContent(""); } })
     .on("#eventDetail", { element(element) {
       element.removeAttribute("hidden");
       element.setAttribute("class", `event-detail is-open${event?.explicitQueer ? " explicit" : ""}`);
-      element.setAttribute("role", "dialog");
-      element.setAttribute("aria-modal", "true");
+      element.setAttribute("role", "group");
       element.setAttribute("aria-labelledby", "eventDetailTitle");
       element.setAttribute("tabindex", "-1");
       const body = event ? renderEventDetail(event, context.request.url) :
