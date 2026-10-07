@@ -17,9 +17,10 @@ const sheets = {
     ['HIDDEN', 'Hidden Room', 'No', 'Private address']
   ],
   Parties: [
-    ['PartyID', 'PartyName', 'PartyInsta', 'PartyDesc', 'PartyColls'],
-    ['NIGHT', 'The Night', '@night', 'Public party description', ''],
-    ['OTHER', 'Other party', '', '', 'CREW']
+    ['PartyID', 'PartyName', 'PartyInsta', 'PartyDesc', 'PartyColls', 'Public_OK', 'PartyQueer'],
+    ['NIGHT', 'The Night', '@night', 'Public party description', '', 'Yes', 'Yes'],
+    ['OTHER', 'Other party', '', '', 'CREW', 'Yes', 'No'],
+    ['PRIVATEPARTY', 'Private party', '@private', 'Do not publish this party', '', 'No', 'Yes']
   ],
   Collectives: [
     ['CollectiveID', 'CollectiveName', 'Public_Name', 'CollInsta', 'CollBio', 'Public_OK', 'CollParty'],
@@ -50,9 +51,9 @@ const sheets = {
   ]
 };
 
-function appsScript() {
+function appsScript(fixture = sheets) {
   const ss = { getSheetByName(name) {
-    const rows = sheets[name];
+    const rows = fixture[name];
     if (!rows) return null;
     return {
       getLastRow: () => rows.length,
@@ -71,7 +72,9 @@ function appsScript() {
     qdpPublicDateTime_: (date, time) => date ? `${date}T${time || '00:00:00'}-04:00` : '',
     stripAllQdpMetadata_: value => value,
     extractFlyerUrl_: () => '',
-    Utilities: { newBlob: value => ({ getBytes: () => Buffer.from(value) }) },
+    Utilities: { newBlob: value => ({ getBytes: () => Buffer.from(value) }),
+      formatDate: date => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit' }).format(date) },
     Buffer
   });
   vm.runInContext(source, context);
@@ -86,6 +89,8 @@ test('publisher builds only approved data and one source scan supports all views
   assert.equal(snapshot.parties.length, 2);
   assert.equal(snapshot.collectives.length, 1);
   assert.equal(snapshot.parties.find(item => item.id === 'NIGHT').bio, 'Public party description');
+  assert.equal(snapshot.parties.find(item => item.id === 'NIGHT').queerParty, true);
+  assert.equal(JSON.stringify(snapshot).includes('PRIVATEPARTY'), false);
   assert.equal(snapshot.collectives[0].name, 'The Crew');
   assert.equal(snapshot.artists[0].queerArtist, true);
   assert.equal(snapshot.artists[0].transArtist, false);
@@ -153,6 +158,12 @@ test('publisher commits manifest last and skips writes when data has not changed
   assert.equal(calls[1].url.endsWith('/bulk'), true);
   assert.equal(calls[2].url.includes('/values/'), true);
   assert.equal(calls[2].options.payload.includes('revision-1'), true);
+  const manifest = JSON.parse(calls[2].options.payload);
+  assert.equal(manifest.partyPublicGate, true);
+  assert.equal(manifest.eventIndexVersion, 1);
+  assert.equal(manifest.eventShards, 8);
+  assert.equal(manifest.eventIds.includes('E6'), true);
+  assert.equal(manifest.eventIds.includes('E2'), false);
   assert.deepEqual(sleeps, [1000]);
   context.qdpArchivePublish();
   assert.equal(calls.length, 3);
@@ -204,7 +215,7 @@ test('Pages serves a prepared profile without calling Apps Script and denies rem
   snapshot.artistEntries.ALPHA.profile.name = '[DJ Alpha]';
   snapshot.artistEntries.ALPHA.events[0].venue = '[The Room]';
   const records = context.qdpArchiveKvRecords_(snapshot, 'revision-1');
-  assert.equal(records.length, 19);
+  assert.equal(records.length, 27);
   const values = new Map(records.map(({ key, value }) => [key, JSON.parse(value)]));
   values.set('qdp-archive:v1:manifest', {
     schema: 1, revision: 'revision-1', partyPublicGate: true,
@@ -369,4 +380,38 @@ test('a propagating party snapshot never falls back to the old Apps Script respo
     assert.equal(response.status, 503);
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('the permanent event index includes active-sheet past events and one authoritative copy per ID', () => {
+  const fixture = structuredClone(sheets);
+  fixture.Events.push(['ENDED', 'Ended active event', 'Yes', '', '2026-10-01', '20:00:00', 'ALPHA', 'NIGHT', 'CREW']);
+  fixture.Events.push(['E1', 'Updated public night', 'Yes', '', '2024-09-01', '20:00:00', 'ALPHA', 'NIGHT', 'CREW']);
+  const { ss, context } = appsScript(fixture);
+  context.Date = class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-10-07T12:00:00Z'])); } };
+  const snapshot = context.qdpArchivePublishSource_(ss);
+  assert.equal(snapshot.eventEntries.ENDED.title, 'Ended active event');
+  assert.equal(snapshot.monthEntries['2026-10'].events[0].eventId, 'ENDED');
+  assert.equal(snapshot.eventEntries.E1.title, 'Updated public night');
+  assert.equal(snapshot.monthEntries['2024-09'].events.filter(event => event.eventId === 'E1').length, 1);
+  assert.equal(snapshot.eventEntries.E6.start.startsWith('2026-11'), true);
+  assert.equal(snapshot.monthEntries['2026-11'], undefined);
+  assert.deepEqual(Array.from(snapshot.eventEntries.E1.related, item => item.kind), ['artist', 'party', 'collective']);
+});
+
+test('withdrawing an active event also suppresses its archived copy', () => {
+  const fixture = structuredClone(sheets);
+  fixture.Events.push(['E1', 'Withdrawn active event', 'No', '', '2024-09-01', '20:00:00', 'ALPHA', 'NIGHT', 'CREW']);
+  const { ss, context } = appsScript(fixture);
+  const snapshot = context.qdpArchivePublishSource_(ss);
+  assert.equal(snapshot.eventEntries.E1, undefined);
+  assert.equal(snapshot.excludedEventIds.includes('E1'), true);
+  assert.equal(snapshot.monthEntries['2024-09'].events.some(event => event.eventId === 'E1'), false);
+  assert.equal(snapshot.artistEntries.ALPHA.events.some(event => event.eventId === 'E1'), false);
+});
+
+test('publisher fails closed when the party approval column is missing', () => {
+  const fixture = structuredClone(sheets);
+  fixture.Parties[0][5] = 'Unused';
+  const { ss, context } = appsScript(fixture);
+  assert.throws(() => context.qdpArchivePublishSource_(ss), /Parties requires its ID and public fields/);
 });

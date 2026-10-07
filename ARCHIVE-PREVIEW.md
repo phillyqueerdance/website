@@ -1,7 +1,8 @@
 # Massive branch archive preview
 
 This branch adds an in-frame archive UI to the existing single-page calendar.
-It does **not** create separate HTML pages or include a spreadsheet export.
+Cloudflare renders individual event URLs into complete HTML responses; no
+spreadsheet export is bundled with the site.
 The directory and profile views have query URLs such as `/?archive=artists`,
 `/?archive=artist&id=ARTIST-ID`, `/?archive=venues`, and
 `/?archive=events&month=2025-09`. An `&event=EVENT-ID` parameter opens the
@@ -60,3 +61,22 @@ is installed, or immediately when `qdpArchivePublish` is run manually.
 Unchanged data causes no KV writes. The branch uses the live feed during
 setup or a partial update. Only the preview environment should receive the
 binding; `main` remains untouched.
+
+
+## Permanent individual event pages
+
+`/?event=EVENT-ID` and contextual archive event links resolve through
+`/api/event`, independently of the filtered current calendar. The server
+renders one selected event and its canonical URL, description, image, and
+eligible Event JSON-LD. The browser preserves that URL through refreshes,
+restores the original Back destination, and provides real event anchor links.
+`/sitemap.xml` lists unique canonical public event URLs. Unavailable events
+return 404 after the new index is installed; incomplete snapshots return 503.
+
+The publisher now writes 27 grouped records plus the manifest, including eight
+event shards with public related-profile links. A cold indexed event lookup
+uses the manifest and one shard; a warm normalized lookup uses the edge cache.
+Past month views include ended rows still on the active Events sheet. The
+compatibility path can resolve existing archived events while the Apps Script
+update is pending. Installation and production checks are in the publisher
+[README](apps-script/README.md#permanent-event-links-and-google-event-markup).

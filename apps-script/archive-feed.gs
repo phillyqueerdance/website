@@ -38,7 +38,7 @@ function qdpArchiveFirstText_(row, index, names) {
 }
 
 function qdpArchiveYes_(value) {
-  return /^yes$/i.test(trim(value));
+  return value === true || /^yes$/i.test(trim(value));
 }
 
 function qdpArchiveIds_(value) {
@@ -73,13 +73,13 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
   if (!data) throw new Error('Missing ' + name + ' sheet.');
   const idField = { artists: 'ArtistID', venues: 'VenueID', parties: 'PartyID', collectives: 'CollectiveID' }[kind];
   if (!idField || data.index[idField.toLowerCase()] == null ||
-      (kind !== 'parties' && data.index.public_ok == null)) {
+      data.index.public_ok == null) {
     throw new Error(name + ' requires its ID and public fields.');
   }
   const flags = kind === 'artists' ? (artistFlags || qdpPublicArtistFlags_()) : null;
   const profiles = new Map();
   data.rows.forEach(row => {
-    if (kind !== 'parties' && !qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['Public_OK']))) return;
+    if (!qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['Public_OK']))) return;
     const id = qdpArchiveText_(row, data.index, [idField]);
     const displayName = qdpArchiveFirstText_(row, data.index,
       { artists: ['StageName'], venues: ['Public_Name', 'VenueName'],
@@ -104,14 +104,17 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
         }
       : kind === 'venues' ? {
           ...shared,
+          queerVenue: qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['VenueQueer', 'QueerVenue', 'Queer'])),
           neighborhood: qdpArchiveText_(row, data.index, ['Neighborhood']),
           address: qdpArchiveText_(row, data.index, ['Address']),
           maps: qdpArchiveLink_(qdpArchiveValue_(row, data.index, ['GMaps_URL']))
         } : kind === 'parties' ? {
           ...shared,
+          queerParty: qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['PartyQueer', 'QueerParty'])),
           collectiveIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['PartyColls']))
         } : {
           ...shared,
+          queerCollective: qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['CollQueer', 'QueerCollective'])),
           partyIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['CollParty']))
         });
   });
@@ -128,6 +131,13 @@ function qdpArchiveRelateProfiles_(parties, collectives) {
       if (party && !party.collectiveIds.includes(collectiveId)) party.collectiveIds.push(collectiveId);
     });
     delete profile.partyIds;
+  });
+  parties.forEach(profile => {
+    profile.related = profile.collectiveIds.map(id => ({ kind: 'collective', id, name: collectives.get(id).name }));
+  });
+  collectives.forEach((profile, id) => {
+    profile.related = [...parties.values()].filter(party => party.collectiveIds.includes(id))
+      .map(party => ({ kind: 'party', id: party.id, name: party.name }));
   });
 }
 
@@ -185,6 +195,7 @@ function qdpArchiveEventSets_(ss, artists, venues, parties, collectives, include
   flags = qdpPublicArtistFlags_()) {
   const archivedById = new Map();
   const allById = new Map();
+  const excludedIds = new Set();
   (includeActive ? [...QDP_ARCHIVE_TABS_, CONFIG.SHEET_EVENTS] : QDP_ARCHIVE_TABS_).forEach(name => {
     const data = qdpArchiveSheet_(ss, name);
     if (!data) return;
@@ -194,12 +205,27 @@ function qdpArchiveEventSets_(ss, artists, venues, parties, collectives, include
     data.rows.forEach(row => {
       const event = qdpArchivePublicEvent_(row, data.index, name, artists, venues,
         parties, collectives, flags);
-      if (!event) return;
+      if (!event) {
+        // The active row is authoritative if an old archived copy has the same ID.
+        if (name === CONFIG.SHEET_EVENTS) {
+          const id = qdpArchiveText_(row, data.index, ['EventID', 'Event ID']);
+          if (id) { allById.delete(id); archivedById.delete(id); excludedIds.add(id); }
+        }
+        return;
+      }
+      excludedIds.delete(event.eventId);
       allById.set(event.eventId, event);
       if (name !== CONFIG.SHEET_EVENTS) archivedById.set(event.eventId, event);
     });
   });
-  return { archived: [...archivedById.values()], all: [...allById.values()] };
+  return { archived: [...archivedById.values()], all: [...allById.values()], excludedIds: [...excludedIds] };
+}
+
+function qdpArchivePastEvents_(events) {
+  const now = new Date();
+  const today = Utilities.formatDate(now, 'America/New_York', 'yyyy-MM-dd');
+  return events.filter(event => event.start.slice(0, 10) < today ||
+    (event.end && Date.parse(event.end) <= now.getTime()));
 }
 
 function qdpArchiveEvents_(ss, includeActive, artists, venues, parties, collectives, flags) {
@@ -225,7 +251,7 @@ function qdpArchiveResource_(resource, parameters) {
   }
   if (resource === 'archivemonths') {
     const counts = new Map();
-    qdpArchiveEvents_(ss, false, artists, venues, parties, collectives, flags).forEach(event => {
+    qdpArchivePastEvents_(qdpArchiveEvents_(ss, true, artists, venues, parties, collectives, flags)).forEach(event => {
       const month = event.start.slice(0, 7);
       counts.set(month, (counts.get(month) || 0) + 1);
     });
@@ -248,7 +274,7 @@ function qdpArchiveResource_(resource, parameters) {
   if (resource === 'archivemonth') {
     const month = trim(params.month);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Invalid archive month.');
-    return { events: qdpArchiveEvents_(ss, false, artists, venues, parties, collectives, flags)
+    return { events: qdpArchivePastEvents_(qdpArchiveEvents_(ss, true, artists, venues, parties, collectives, flags))
       .filter(event => event.start.slice(0, 7) === month) };
   }
   throw new Error('Unknown archive resource.');
@@ -277,7 +303,7 @@ function qdpArchivePreviewCheck() {
 // QDP_ARCHIVE_CF_ACCOUNT_ID, QDP_ARCHIVE_CF_NAMESPACE_ID,
 // QDP_ARCHIVE_CF_API_TOKEN (Workers KV Storage Write permission).
 const QDP_ARCHIVE_KV_PREFIX_ = 'qdp-archive:v1:';
-const QDP_ARCHIVE_SHARDS_ = { artist: 4, venue: 2, party: 2, collective: 2, month: 4 };
+const QDP_ARCHIVE_SHARDS_ = { artist: 4, venue: 2, party: 2, collective: 2, month: 4, event: 8 };
 
 function qdpArchiveShard_(id, count) {
   let hash = 0;
@@ -314,6 +340,7 @@ function qdpArchiveSnapshot_(artists, venues, parties, collectives, sets) {
   const partyEntries = Object.create(null);
   const collectiveEntries = Object.create(null);
   const monthEntries = Object.create(null);
+  const eventEntries = Object.create(null);
   artists.forEach((profile, id) => {
     artistEntries[id] = { profile: { ...profile, count: 0 }, events: [] };
   });
@@ -327,6 +354,15 @@ function qdpArchiveSnapshot_(artists, venues, parties, collectives, sets) {
     collectiveEntries[id] = { profile: { ...profile, count: 0 }, events: [] };
   });
   sets.all.forEach(event => {
+    const related = [];
+    const addRelated = (kind, id, entries) => {
+      if (id && entries[id]) related.push({ kind, id, name: entries[id].profile.name });
+    };
+    event.artistIds.forEach(id => addRelated('artist', id, artistEntries));
+    addRelated('venue', event.venueId, venueEntries);
+    addRelated('party', event.partyId, partyEntries);
+    event.collectiveIds.forEach(id => addRelated('collective', id, collectiveEntries));
+    eventEntries[event.eventId] = { ...event, related };
     event.artistIds.forEach(id => {
       if (Object.prototype.hasOwnProperty.call(artistEntries, id)) artistEntries[id].events.push(event);
     });
@@ -354,7 +390,7 @@ function qdpArchiveSnapshot_(artists, venues, parties, collectives, sets) {
   Object.keys(collectiveEntries).forEach(id => {
     collectiveEntries[id].profile.count = collectiveEntries[id].events.length;
   });
-  sets.archived.forEach(event => {
+  qdpArchivePastEvents_(sets.all).forEach(event => {
     const month = event.start.slice(0, 7);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return;
     if (!Object.prototype.hasOwnProperty.call(monthEntries, month)) monthEntries[month] = { events: [] };
@@ -367,7 +403,8 @@ function qdpArchiveSnapshot_(artists, venues, parties, collectives, sets) {
     collectives: [...collectives.values()].sort(sortByName),
     months: Object.keys(monthEntries).sort().reverse()
       .map(month => ({ month, count: monthEntries[month].events.length })),
-    artistEntries, venueEntries, partyEntries, collectiveEntries, monthEntries
+    artistEntries, venueEntries, partyEntries, collectiveEntries, monthEntries, eventEntries,
+    excludedEventIds: sets.excludedIds || []
   };
 }
 
@@ -389,7 +426,7 @@ function qdpArchiveKvRecords_(snapshot, revision) {
   for (const [kind, entries] of [
     ['artist', snapshot.artistEntries], ['venue', snapshot.venueEntries],
     ['party', snapshot.partyEntries], ['collective', snapshot.collectiveEntries],
-    ['month', snapshot.monthEntries]
+    ['month', snapshot.monthEntries], ['event', snapshot.eventEntries]
   ]) {
     const shards = Array.from({ length: QDP_ARCHIVE_SHARDS_[kind] }, () => Object.create(null));
     Object.keys(entries).forEach(id => {
@@ -491,7 +528,11 @@ function qdpArchivePublish_(force) {
       venues: Object.keys(snapshot.venueEntries),
       parties: Object.keys(snapshot.partyEntries),
       collectives: Object.keys(snapshot.collectiveEntries),
-      months: Object.keys(snapshot.monthEntries)
+      months: Object.keys(snapshot.monthEntries),
+      partyPublicGate: true,
+      eventIndexVersion: 1, eventShards: QDP_ARCHIVE_SHARDS_.event,
+      eventIds: Object.keys(snapshot.eventEntries),
+      excludedEventIds: snapshot.excludedEventIds
     };
     qdpArchiveCloudflareRequest_(base + '/values/' +
       encodeURIComponent(QDP_ARCHIVE_KV_PREFIX_ + 'manifest'), token, 'put',
@@ -500,6 +541,7 @@ function qdpArchivePublish_(force) {
     Logger.log(JSON.stringify({ artistCount: manifest.artists.length,
       venueCount: manifest.venues.length, partyCount: manifest.parties.length,
       collectiveCount: manifest.collectives.length, archiveMonthCount: manifest.months.length,
+      eventCount: manifest.eventIds.length,
       archivedEventCount: snapshot.months.reduce((sum, item) => sum + item.count, 0),
       recordCount: records.length, batchCount: batches.length, publishedAt: manifest.updatedAt }));
   } finally {

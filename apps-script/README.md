@@ -1,9 +1,65 @@
-# Install the archive feed in the existing QDP Apps Script project
+# QDP public-data publisher and event pages
 
 This folder contains the archive feed and prepared-data publisher for the
 existing v6.3 Apps Script project.
 The branch does not contain the full Apps Script, spreadsheet ID, sheet data,
 or script properties. The existing public Web app already serves the archive.
+
+
+## Permanent event links and Google event markup
+
+The October 7 update keeps each public EventID at `/?event=EVENT-ID` after it
+leaves the current calendar. Cloudflare renders the selected event, metadata,
+and eligible Event JSON-LD in the initial HTML. Archive context URLs keep their
+Back destination and canonicalize to the same standalone event URL. Shared
+links and Google Calendar drafts use the standalone URL.
+
+For the existing configured Apps Script project:
+
+1. Replace the **existing archive helper file** with the current
+   [`archive-feed.gs`](archive-feed.gs), keeping one copy of each helper. Keep
+   the existing master script, `doGet`, deployment URL, script properties,
+   publication approvals, and refresh triggers. All four profile tabs require
+   `Public_OK`; this update preserves the party gate and public identity flags.
+2. Save and run `qdpArchiveForcePublish` once. It publishes the permanent event
+   index plus the normal directories and profiles. The log should report
+   `recordCount: 27` and `eventCount`. The manifest now declares
+   `eventIndexVersion: 1` and eight event shards. Then run `qdpLivePublish` to
+   refresh the current calendar. The existing fifteen-minute archive trigger
+   and five-minute live trigger continue to work; no additional trigger is
+   needed. Install those triggers only if the project does not already have them.
+3. Update the **existing Web app deployment** to a new version of the saved
+   code so the archive live fallback uses the same gates and month logic. Keep
+   its current access settings and URL. No new project, token, or KV binding is
+   needed for the preview.
+4. On the Massive preview, verify a past and an upcoming `/?event=...` page.
+   Their response header should become `X-QDP-Event: INDEXED`; `/api/event`
+   should return the selected event, and `/sitemap.xml` should include its
+   canonical URL. Current-month ended events also enter the month archive,
+   including those still on the active Events sheet.
+5. Run Google's Rich Results Test on an **individual event URL** or its HTML.
+   A calendar containing many events is not the target for Event rich results.
+   Event markup requires a publicly disclosed venue and address. Pages with an
+   undisclosed or incomplete location stay readable and retain their permanent
+   links, but omit Event markup instead of disclosing or inventing an address.
+
+Before this publisher update is installed, the preview can resolve the
+already-published archive and current feed through a compatibility path. It
+cannot establish the existence of recently ended rows that have not yet been
+archived; those requests return a temporary 503 rather than erase the link.
+Mixed KV revisions likewise return 503 until propagation finishes. After the
+new index is published, a known absent event returns 404; an unpublished active
+row overrides an older archived copy with the same ID.
+
+The Massive preview retains `noindex`. Google indexing starts only after a
+separate production rollout: merge the reviewed changes, bind the public-data
+namespace under `QDP_PUBLIC_FEED_KV` (the event resolver reads the archive index
+as well as the live record), verify production event responses have no
+`noindex`, and submit `https://queerdancephilly.com/sitemap.xml` in Search
+Console. Valid markup makes an event eligible; Google decides whether to index
+it or display a rich result. Main and production are not changed by the preview
+commit.
+
 
 The numbered steps below document the original feed installation. **For the
 speed update, leave the existing `doGet` alone and follow “Prepared archive
@@ -45,10 +101,9 @@ The extension reads `Artists`, `Venues`, `Parties`, `Collectives`, `Archive 2024
 or Calendar entry. The publisher writes approved public fields to the
 configured Cloudflare KV namespace.
 
-- Artist, venue, and collective profiles require `Public_OK=Yes`. A nonpublic
-  venue's address or collective's bio and ID are never returned. The `Parties`
-  tab has no `Public_OK` column; its name, description, and Instagram fields
-  form the party directory.
+- Artist, venue, party, and collective profiles require `Public_OK=Yes`. A
+  nonpublic venue's address or a private profile's fields and ID are excluded.
+  A missing `Public_OK` header stops the publisher before any KV write.
 - **Every event row** requires `Publish_To_Web=Yes`, including legacy archive
   tabs. If a tab has no `Publish_To_Web` header, all its rows are excluded.
   This is the sheet preparation needed to make legacy events appear. Review
@@ -68,7 +123,7 @@ The updated `archive-feed.gs` also contains a publisher in **the same Apps
 Script project**. Replace the previous archive helpers with this updated file;
 do not paste a second copy of the functions. The existing `doGet` dispatch
 above remains the same. The publisher reads the sheets, applies the same
-public gates, and writes 19 grouped records to Cloudflare KV in request-size-limited batches. It writes no
+public gates, and writes 27 grouped records to Cloudflare KV in request-size-limited batches. It writes no
 sheet cells, Calendar entries, or public data into GitHub.
 
 1. In Cloudflare, create a Workers KV namespace named `qdp-archive-preview`.
@@ -123,8 +178,8 @@ see new data; the current page keeps loaded archive views in memory.
    if a prepared record is temporarily unavailable.
 2. In the `Collectives` sheet, mark each collective you want public with
    `Public_OK=Yes`. Rows left blank or marked No stay private. The `Parties`
-   sheet has no public gate; review its `PartyName`, `PartyDesc`, and
-   `PartyInsta` fields before publishing.
+   sheet also requires `Public_OK=Yes`; its approved `PartyName`, `PartyDesc`,
+   and `PartyInsta` fields are public.
 3. Run `qdpArchivePublish` in the Apps Script editor. The existing archive
    trigger will then keep Parties and Collectives current with the other
    directories and events. The log now includes `partyCount` and
@@ -172,7 +227,8 @@ needed.
 4. After reviewing the preview, bring the speed changes to `main`. In the
    `qdp` Pages project's **Production** environment, bind the **same** KV
    namespace under `QDP_PUBLIC_FEED_KV`, then redeploy production. The
-   production function reads only the `qdp-live:v1:feed` record. Until both
+   production event pages and sitemap also read the public archive manifest
+   and event shards. Until both
    the code and production binding are present, the live site remains on the
    old feed path.
 
@@ -182,3 +238,4 @@ change. A missed trigger or stale record switches back to the current Google
 path. The trigger consumes Apps Script execution time and writes one KV record
 per run (about 288 per day); check your Apps Script executions and Cloudflare
 plan's daily limits after enabling it.
+

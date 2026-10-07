@@ -276,7 +276,10 @@ function formatTimeRange(event) {
 function formatDetailDateBadge(event) {
   const start = new Date(event.start);
   return {
-    date: formatPosterDate(dateKey(start)),
+    date: dateKey(start) < dateKey(new Date())
+      ? new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York",
+        weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(start)
+      : formatPosterDate(dateKey(start)),
     time: compactTime(start)
   };
 }
@@ -292,6 +295,10 @@ function eventPermalink(eventId) {
   const url = new URL("/", window.location.origin);
   url.searchParams.set("event", eventId);
   return url.toString();
+}
+
+function eventShareUrl(eventId) {
+  return window.QDPEventMetadata.url(eventId, window.location.origin);
 }
 
 function homepageUrl() {
@@ -562,7 +569,7 @@ async function loadPublicEvents() {
 }
 
 function showEventFeedMessage(message) {
-  eventStack.hidden = false;
+  eventStack.hidden = Boolean(requestedEventId()) && !eventDetail.hidden;
   eventStack.innerHTML = "";
 
   const notice =
@@ -830,8 +837,8 @@ function formatPosterDate(key) {
 }
 
 function createEventCard(event) {
-  const card = document.createElement("button");
-  card.type = "button";
+  const card = document.createElement("a");
+  card.href = eventPermalink(eventIdOf(event));
   card.dataset.eventId = eventIdOf(event);
   card.className = "event-card " +
     (event.explicitQueer ? "explicit" : "default") +
@@ -871,7 +878,16 @@ function createEventCard(event) {
 
   content.append(title, venue, address);
   card.append(shape, content);
-  card.addEventListener("click", () => openEventDetail(event));
+  card.addEventListener("click", click => {
+    if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
+    click.preventDefault();
+    openEventDetail(event);
+  });
+  card.addEventListener("keydown", key => {
+    if (key.key !== " ") return;
+    key.preventDefault();
+    card.click();
+  });
   return card;
 }
 
@@ -879,9 +895,12 @@ function renderPoster() {
   if (!posterPages.length) return;
 
   finishDetailSlide();
-  eventDetail.hidden = true;
-  eventDetail.classList.remove("is-open", "explicit");
-  eventStack.hidden = false;
+  const keepDetail = Boolean(requestedEventId()) && !eventDetail.hidden;
+  if (!keepDetail) {
+    eventDetail.hidden = true;
+    eventDetail.classList.remove("is-open", "explicit");
+  }
+  eventStack.hidden = keepDetail;
   eventStack.innerHTML = "";
   pageCards = new Array(posterPages.length);
   eventCardsById = new Map();
@@ -966,6 +985,7 @@ function renderPoster() {
     measureEndSpacer();
     scrollToPage(currentPosterIndex, "auto");
     fitPosterTitles();
+    if (!eventDetail.hidden && activeEvent) updateDetailNavigationState();
   });
 }
 
@@ -1110,7 +1130,7 @@ function googleCalendarEventUrl(event) {
   url.searchParams.set("stz", "America/New_York");
   url.searchParams.set("etz", "America/New_York");
   if (location) url.searchParams.set("location", location);
-  const details = [event.description, eventIdOf(event) && eventPermalink(eventIdOf(event))]
+  const details = [event.description, eventIdOf(event) && eventShareUrl(eventIdOf(event))]
     .filter(Boolean).join("\n\n");
   if (details) url.searchParams.set("details", details);
   return url.href;
@@ -1140,7 +1160,7 @@ async function shareEvent(event, status) {
     return;
   }
 
-  const url = eventPermalink(id);
+  const url = eventShareUrl(id);
   if (navigator.share) {
     try {
       await navigator.share({
@@ -1205,6 +1225,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
       .find(card => card.dataset.eventId === id && id) || null;
   activeEventId = id;
   activeEvent = event;
+  window.QDPEventLinks?.apply(event);
   eventEntryPushed = updateHistory && Boolean(id);
 
   if (eventEntryPushed) {
@@ -1331,14 +1352,16 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   const venueText = eventVenue(event);
   const addressText = eventAddress(event);
   const mapsQuery = [venueText, addressText].filter(Boolean).join(", ");
-  const mapsUrl = mapsQuery
+  const mapsUrl = mapsQuery && !window.QDPEventMetadata.undisclosed(mapsQuery)
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
     : "";
   if (venueText) {
-    const mapLink = document.createElement("a");
-    mapLink.href = mapsUrl;
-    mapLink.target = "_blank";
-    mapLink.rel = "noopener noreferrer";
+    const mapLink = document.createElement(mapsUrl ? "a" : "span");
+    if (mapsUrl) {
+      mapLink.href = mapsUrl;
+      mapLink.target = "_blank";
+      mapLink.rel = "noopener noreferrer";
+    }
     mapLink.textContent = venueText;
     venue.appendChild(mapLink);
     venueTime.appendChild(venue);
@@ -1437,17 +1460,21 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   } else {
     eventDetail.focus({ preventScroll: true });
   }
-  loadEventRelations(id, detailCard, seeMore, seeMoreLinks);
+  loadEventRelations(id, detailCard, seeMore, seeMoreLinks, event.related);
 }
 
 const eventRelations = new Map();
 
-function loadEventRelations(id, card, section, links) {
+function loadEventRelations(id, card, section, links, preparedRelated) {
   if (!id) return;
-  if (!eventRelations.has(id)) {
+  if (Array.isArray(preparedRelated)) {
+    eventRelations.set(id, Promise.resolve({ related: preparedRelated }));
+  } else if (!eventRelations.has(id)) {
     eventRelations.set(id, fetch(`/api/event-relations?event=${encodeURIComponent(id)}`)
-      .then(response => response.ok ? response.json() : { related: [] })
-      .catch(() => ({ related: [] })));
+      .then(response => {
+        if (!response.ok) throw new Error("Related links unavailable");
+        return response.json();
+      }).catch(() => { eventRelations.delete(id); return { related: [] }; }));
   }
   eventRelations.get(id).then(data => {
     if (!card.isConnected || activeEventId !== id || !Array.isArray(data.related)) return;
@@ -1475,7 +1502,7 @@ function orderedEvents() {
 
 function updateDetailNavigationState() {
   const events = orderedEvents();
-  const index = events.indexOf(activeEvent);
+  const index = events.findIndex(event => event === activeEvent || activeEventId && eventIdOf(event) === activeEventId);
   previousPoster.disabled = index <= 0;
   nextPoster.disabled = index < 0 || index === events.length - 1;
   previousPoster.setAttribute("aria-label", "Previous event");
@@ -1501,7 +1528,9 @@ function finishDetailSlide() {
 function moveEventDetail(direction) {
   if (window.QDPArchive?.active) {
     const items = orderedEvents();
-    const next = items[items.indexOf(activeEvent) + direction];
+    const index = items.findIndex(event => event === activeEvent || activeEventId && eventIdOf(event) === activeEventId);
+    if (index < 0) return;
+    const next = items[index + direction];
     if (!next) return;
     const pushed = eventEntryPushed;
     hideEventDetail({ restoreFocus: false });
@@ -1516,7 +1545,9 @@ function moveEventDetail(direction) {
   }
   finishDetailSlide();
   const events = orderedEvents();
-  const next = events[events.indexOf(activeEvent) + direction];
+  const index = events.findIndex(event => event === activeEvent || activeEventId && eventIdOf(event) === activeEventId);
+  if (index < 0) return;
+  const next = events[index + direction];
   if (!next) return;
 
   const animateSlide = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1627,6 +1658,7 @@ function moveEventDetail(direction) {
 
 function hideEventDetail({ restoreFocus = true } = {}) {
   finishDetailSlide();
+  window.QDPEventLinks?.clear();
   if (
     eventDetail.classList.contains(
       "is-open"
@@ -1660,34 +1692,81 @@ function closeEventDetail() {
   else if (hasEventUrl) history.replaceState(null, "", homepageUrl());
 }
 
-function syncEventFromUrl({ final = freshEventsLoaded } = {}) {
+let eventLookupSerial = 0;
+
+function showEventLookupError(error) {
+  hideEventDetail({ restoreFocus: false });
+  eventStack.hidden = true;
+  eventDetail.hidden = false;
+  eventDetail.classList.add("is-open");
+  eventDetail.replaceChildren();
+  eventDetail.setAttribute("role", "dialog");
+  eventDetail.setAttribute("aria-modal", "true");
+  eventDetail.setAttribute("aria-labelledby", "eventDetailTitle");
+  eventDetail.tabIndex = -1;
+  const card = document.createElement("article");
+  card.className = "event-detail-card without-flyer";
+  const heading = document.createElement("h2");
+  heading.id = "eventDetailTitle";
+  heading.textContent = error.status === 404 || error.status === 400
+    ? "Event unavailable" : "Event data is temporarily unavailable";
+  card.appendChild(heading);
+  if (error.status !== 404 && error.status !== 400) {
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Try again";
+    retry.addEventListener("click", () => {
+      const id = requestedEventId();
+      window.QDPEventLinks.get(id, { force: true }).then(event => {
+        if (requestedEventId() === eventIdOf(event)) openEventDetail(event, { updateHistory: false });
+      }).catch(error => { if (requestedEventId() === id) showEventLookupError(error); });
+    });
+    card.appendChild(retry);
+  }
+  const back = document.createElement("a");
+  back.className = "event-detail-back";
+  back.href = homepageUrl();
+  back.textContent = "← Back";
+  back.addEventListener("click", click => {
+    if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
+    click.preventDefault();
+    closeEventDetail();
+  });
+  eventDetail.append(card, back);
+  previousPoster.disabled = true;
+  nextPoster.disabled = true;
+  eventDetail.focus({ preventScroll: true });
+}
+
+async function syncEventFromUrl({ final = freshEventsLoaded } = {}) {
   if (window.QDPArchive?.active ||
       new URLSearchParams(window.location.search).has("archive")) return;
   const id = requestedEventId();
+  const serial = ++eventLookupSerial;
   if (!id) {
     hideEventDetail();
     return;
   }
-
+  if (activeEventId === id && !eventDetail.hidden) return;
   const index = posterPages.findIndex(page =>
     page.events.some(event => eventIdOf(event) === id));
-  if (index < 0) {
-    if (final) {
-      hideEventDetail();
-      history.replaceState(null, "", homepageUrl());
+  let event = index >= 0 ? posterPages[index].events.find(item => eventIdOf(item) === id) : null;
+  if (!event) {
+    if (!final && !window.QDPEventLinks?.initial?.event) return;
+    try { event = await window.QDPEventLinks.get(id); }
+    catch (error) {
+      if (serial === eventLookupSerial && requestedEventId() === id && !window.QDPArchive?.active) showEventLookupError(error);
+      return;
     }
-    return;
   }
-
-  if (activeEventId === id && !eventDetail.hidden) return;
+  if (serial !== eventLookupSerial || requestedEventId() !== id || window.QDPArchive?.active) return;
   if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
-  scrollToPage(index, "auto");
+  if (index >= 0) scrollToPage(index, "auto");
   const targetCard = eventCardsById.get(id);
   if (targetCard) {
     eventStack.scrollTo({ top: scrollOffset(targetCard), behavior: "auto" });
     updateScrollState();
   }
-  const event = posterPages[index].events.find(item => eventIdOf(item) === id);
   openEventDetail(event, { updateHistory: false });
   eventEntryPushed = Boolean(history.state?.qdpPushed);
 }
@@ -2145,6 +2224,9 @@ function ensureLiveEvents() {
 window.QDPEnsureLiveEvents = ensureLiveEvents;
 
 const initialArchiveView = new URLSearchParams(location.search).get("archive");
+if (!initialArchiveView && window.QDPEventLinks?.initial?.event) {
+  openEventDetail(window.QDPEventLinks.initial.event, { updateHistory: false });
+}
 (initialArchiveView ? Promise.resolve() : ensureLiveEvents()).finally(() => {
   if (
     typeof window

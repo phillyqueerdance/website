@@ -676,18 +676,22 @@
     }
   }
 
-  function syncPopup() {
+  async function syncPopup() {
     const id = new URLSearchParams(location.search).get("event") || "";
     if (!id) {
       if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
       return;
     }
     if (activeEventId === id && !eventDetail.hidden) return;
-    const event = archive.events.find(item => eventIdOf(item) === id);
+    let event = archive.events.find(item => eventIdOf(item) === id);
     if (!event) {
-      history.replaceState(null, "", archive.baseUrl());
-      return;
+      try { event = await window.QDPEventLinks.get(id); }
+      catch (error) {
+        if (archive.active && requestedEventId() === id) showEventLookupError(error);
+        return;
+      }
     }
+    if (!archive.active || requestedEventId() !== id) return;
     if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
     archive.focusEvent(event);
     openEventDetail(event, { updateHistory: false });

@@ -14,7 +14,7 @@ const calendarUrl = vm.runInNewContext(
     eventVenue: event => event.venue,
     eventAddress: event => event.address,
     eventIdOf: event => event.eventId,
-    eventPermalink: id => `https://queerdancephilly.com/?event=${id}`,
+    eventShareUrl: id => `https://queerdancephilly.com/?event=${id}`,
     displayTitle: event => event.title
   }
 );

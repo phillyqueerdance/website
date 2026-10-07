@@ -68,7 +68,7 @@ function profile(input, kind, publicIds = null, details = false) {
   };
 }
 
-function publicEvent(input) {
+export function publicEvent(input) {
   if (!input || !yes(input.public)) return null;
   const status = value(input.status, 80);
   if (/cancel|delet|draft|private|reject/i.test(status)) return null;

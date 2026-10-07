@@ -1,4 +1,5 @@
 // Resolve links only when an event is opened. The initial calendar feed stays small.
+import { cleanIndexedEvent, shard, validEventId } from "../event-records.js";
 const PREFIX = "qdp-archive:v1:";
 const KINDS = [
   { name: "artist", shards: 4 },
@@ -14,20 +15,41 @@ function publicName(input) {
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const eventId = url.searchParams.get("event") || "";
-  if (!eventId || eventId.length > 128 || /[\r\n]/.test(eventId)) {
+  if (!validEventId(eventId)) {
     return Response.json({ error: "Invalid event ID." }, { status: 400 });
   }
-  const kv = context.env.QDP_ARCHIVE_KV;
+  const kv = context.env.QDP_ARCHIVE_KV || context.env.QDP_PUBLIC_FEED_KV;
   if (!kv) return Response.json({ related: [] }, { headers: { "Cache-Control": "no-store" } });
 
-  const cache = caches.default;
-  const cacheKey = new Request(url.href);
-  const cached = await cache.match(cacheKey);
+  const cache = typeof caches === "undefined" ? null : caches.default;
+  const normalized = new URL("/api/event-relations", url);
+  normalized.searchParams.set("event", eventId);
+  const cacheKey = new Request(normalized.href);
+  const cached = await cache?.match(cacheKey);
   if (cached) return cached;
 
   try {
     const manifest = await kv.get(PREFIX + "manifest", "json");
     if (manifest?.schema !== 1 || !manifest.revision) throw new Error("Missing public archive");
+    if (manifest.eventIndexVersion === 1 && Array.isArray(manifest.eventIds)) {
+      let related = [];
+      if (manifest.eventIds.includes(eventId) && !manifest.excludedEventIds?.includes(eventId)) {
+        const count = manifest.eventShards;
+        if (!Number.isInteger(count) || count < 1 || count > 64) throw new Error("Invalid event index");
+        const record = await kv.get(`${PREFIX}event:${shard(eventId, count)}`, "json");
+        if (record?.revision !== manifest.revision) throw new Error("Event update is propagating");
+        related = cleanIndexedEvent(record.entries?.[eventId], manifest)?.related || [];
+      }
+      const response = Response.json({ related }, { headers: {
+        "Cache-Control": "public, max-age=60", "X-Robots-Tag": "noindex",
+        "X-Content-Type-Options": "nosniff"
+      } });
+      if (cache) {
+        const write = cache.put(cacheKey, response.clone());
+        if (context.waitUntil) context.waitUntil(write); else await write;
+      }
+      return response;
+    }
     const kinds = KINDS.filter(kind => kind.name !== "party" || manifest.partyPublicGate === true);
     const keys = kinds.flatMap(kind => Array.from({ length: kind.shards }, (_, index) => ({
       kind: kind.name, key: `${PREFIX}${kind.name}:${index}`
@@ -61,10 +83,15 @@ export async function onRequestGet(context) {
       "X-Robots-Tag": "noindex",
       "X-Content-Type-Options": "nosniff"
     } });
-    context.waitUntil?.(cache.put(cacheKey, response.clone()));
+    if (cache) {
+      const write = cache.put(cacheKey, response.clone());
+      if (context.waitUntil) context.waitUntil(write); else await write;
+    }
     return response;
   } catch (error) {
     console.error("QDP related links unavailable:", error);
-    return Response.json({ related: [] }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ error: "Related links temporarily unavailable." }, {
+      status: 503, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
+    });
   }
 }
