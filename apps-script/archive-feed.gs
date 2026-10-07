@@ -99,6 +99,8 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
           ...shared,
           queerArtist: flags.get(id)?.queer === true,
           transArtist: flags.get(id)?.trans === true,
+          partyIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['Artist_Parties'])),
+          collectiveIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['Artist_Collectives'])),
           music: qdpArchiveLink_(qdpArchiveFirstText_(row, data.index,
             ['Music_URL', 'Music', 'SoundCloud', 'Bandcamp', 'Mixcloud']))
         }
@@ -111,34 +113,52 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
         } : kind === 'parties' ? {
           ...shared,
           queerParty: qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['PartyQueer', 'QueerParty'])),
+          artistIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['PartyArtists'])),
           collectiveIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['PartyColls']))
         } : {
           ...shared,
           queerCollective: qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['CollQueer', 'QueerCollective'])),
+          artistIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['CollArtists'])),
           partyIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['CollParty']))
         });
   });
   return profiles;
 }
 
-function qdpArchiveRelateProfiles_(parties, collectives) {
+function qdpArchiveRelateProfiles_(artists, parties, collectives) {
+  const maps = { artist: artists, party: parties, collective: collectives };
+  Object.values(maps).forEach(map => map.forEach(profile => { profile.related = []; }));
+  const add = (profile, kind, target) => {
+    if (!profile.related.some(item => item.kind === kind && item.id === target.id)) {
+      profile.related.push({ kind, id: target.id, name: target.name });
+    }
+  };
+  const link = (kind, profile, targetKind, id) => {
+    const target = maps[targetKind].get(id);
+    if (!target) return;
+    add(profile, targetKind, target);
+    add(target, kind, profile);
+    if (kind === 'collective' && targetKind === 'party' && !target.collectiveIds.includes(profile.id)) {
+      target.collectiveIds.push(profile.id);
+    }
+  };
+  // Use the declared ID columns in either direction, never event history.
+  artists.forEach(profile => {
+    profile.partyIds.forEach(id => link('artist', profile, 'party', id));
+    profile.collectiveIds.forEach(id => link('artist', profile, 'collective', id));
+  });
   parties.forEach(profile => {
     profile.collectiveIds = profile.collectiveIds.filter(id => collectives.has(id));
+    profile.artistIds.forEach(id => link('party', profile, 'artist', id));
+    profile.collectiveIds.forEach(id => link('party', profile, 'collective', id));
   });
-  collectives.forEach((profile, collectiveId) => {
-    profile.partyIds.forEach(partyId => {
-      const party = parties.get(partyId);
-      if (party && !party.collectiveIds.includes(collectiveId)) party.collectiveIds.push(collectiveId);
-    });
-    delete profile.partyIds;
+  collectives.forEach(profile => {
+    profile.artistIds.forEach(id => link('collective', profile, 'artist', id));
+    profile.partyIds.forEach(id => link('collective', profile, 'party', id));
   });
-  parties.forEach(profile => {
-    profile.related = profile.collectiveIds.map(id => ({ kind: 'collective', id, name: collectives.get(id).name }));
-  });
-  collectives.forEach((profile, id) => {
-    profile.related = [...parties.values()].filter(party => party.collectiveIds.includes(id))
-      .map(party => ({ kind: 'party', id: party.id, name: party.name }));
-  });
+  artists.forEach(profile => { delete profile.partyIds; delete profile.collectiveIds; });
+  parties.forEach(profile => { delete profile.artistIds; });
+  collectives.forEach(profile => { delete profile.artistIds; delete profile.partyIds; });
 }
 
 function qdpArchivePublicEvent_(row, index, source, artists, venues, parties, collectives, flags) {
@@ -241,7 +261,7 @@ function qdpArchiveResource_(resource, parameters) {
   const venues = qdpArchiveProfiles_(ss, 'venues');
   const parties = qdpArchiveProfiles_(ss, 'parties');
   const collectives = qdpArchiveProfiles_(ss, 'collectives');
-  qdpArchiveRelateProfiles_(parties, collectives);
+  qdpArchiveRelateProfiles_(artists, parties, collectives);
   const sortByName = (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
   const directories = { archiveartists: ['artists', artists], archivevenues: ['venues', venues],
     archiveparties: ['parties', parties], archivecollectives: ['collectives', collectives] };
@@ -326,7 +346,7 @@ function qdpArchivePublishSource_(ss) {
   const venues = qdpArchiveProfiles_(ss, 'venues');
   const parties = qdpArchiveProfiles_(ss, 'parties');
   const collectives = qdpArchiveProfiles_(ss, 'collectives');
-  qdpArchiveRelateProfiles_(parties, collectives);
+  qdpArchiveRelateProfiles_(artists, parties, collectives);
   if (!artists.size || !venues.size) throw new Error('Cannot publish an empty public directory.');
   const sets = qdpArchiveEventSets_(ss, artists, venues, parties, collectives, true, flags);
   if (!sets.archived.length) throw new Error('Cannot publish an empty archive.');

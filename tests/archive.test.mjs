@@ -415,3 +415,24 @@ test('publisher fails closed when the party approval column is missing', () => {
   const { ss, context } = appsScript(fixture);
   assert.throws(() => context.qdpArchivePublishSource_(ss), /Parties requires its ID and public fields/);
 });
+
+test('profile relationships preserve declared ID columns without inferring ownership from event history', () => {
+  const fixture = structuredClone(sheets);
+  fixture.Artists[0].push('Artist_Parties', 'Artist_Collectives');
+  fixture.Artists[1].push('NIGHT,PRIVATEPARTY', 'CREW,SECRET');
+  fixture.Parties[0].push('PartyArtists');
+  fixture.Parties[1].push('ALPHA,PRIVATE');
+  fixture.Collectives[0].push('CollArtists');
+  fixture.Collectives[1].push('ALPHA,PRIVATE');
+  const { ss, context } = appsScript(fixture);
+  const snapshot = context.qdpArchivePublishSource_(ss);
+  assert.deepEqual(Array.from(snapshot.artistEntries.ALPHA.profile.related, item => `${item.kind}:${item.id}`).sort(),
+    ['collective:CREW', 'party:NIGHT']);
+  assert.deepEqual(Array.from(snapshot.partyEntries.NIGHT.profile.related, item => `${item.kind}:${item.id}`).sort(),
+    ['artist:ALPHA', 'collective:CREW']);
+  assert.deepEqual(Array.from(snapshot.collectiveEntries.CREW.profile.related, item => `${item.kind}:${item.id}`).sort(),
+    ['artist:ALPHA', 'party:NIGHT', 'party:OTHER']);
+  assert.equal(snapshot.partyEntries.OTHER.profile.related.some(item => item.kind === 'artist'), false);
+  assert.equal(JSON.stringify(snapshot).includes('PRIVATEPARTY'), false);
+  assert.equal(JSON.stringify(snapshot).includes('SECRET'), false);
+});

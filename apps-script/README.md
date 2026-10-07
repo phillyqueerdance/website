@@ -21,6 +21,11 @@ For the existing configured Apps Script project:
    the existing master script, `doGet`, deployment URL, script properties,
    publication approvals, and refresh triggers. All four profile tabs require
    `Public_OK`; this update preserves the party gate and public identity flags.
+   It also preserves the direct profile relationship columns `Artist_Collectives`,
+   `Artist_Parties`, `PartyArtists`, `PartyColls`, `CollArtists`, and `CollParty`.
+   These links use approved IDs in either direction and do not infer ownership
+   or membership from event history. Keep any existing separate enrichment
+   helpers only once; the publisher now includes this relationship handling.
 2. Save and run `qdpArchiveForcePublish` once. It publishes the permanent event
    index plus the normal directories and profiles. The log should report
    `recordCount: 27` and `eventCount`. The manifest now declares
@@ -238,4 +243,3 @@ change. A missed trigger or stale record switches back to the current Google
 path. The trigger consumes Apps Script execution time and writes one KV record
 per run (about 288 per day); check your Apps Script executions and Cloudflare
 plan's daily limits after enabling it.
-
