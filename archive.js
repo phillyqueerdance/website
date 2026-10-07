@@ -208,7 +208,7 @@
         const labelWidth = Math.ceil(Math.max(...[...labels].map(label => {
           measure.font = getComputedStyle(label).font;
           return measure.measureText(label.textContent).width;
-        }))) + 22.8;
+        }))) + 26.8;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
         menuTrack.style.setProperty("--archive-tab-length", `${Math.max(0, Math.min(labelWidth + menuInset + 14, menuInset + expandedWidth - 12))}px`);
         menuTrack.style.setProperty("--archive-nav-compact-width", `${Math.min(expandedWidth, labelWidth + 30.4)}px`);
@@ -971,6 +971,9 @@
     positionMenu();
     if (!archive.active) return;
     archive.updateLayout();
+  });
+  document.fonts?.ready.then(() => {
+    if (!menuTrack.hidden) positionMenu();
   });
   if (routeParams().view) route();
 })();
