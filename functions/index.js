@@ -1,69 +1,49 @@
-import { onRequestGet as getEventFeed } from "./api/events.js";
-
-function eventTitle(event) {
-  const title = String(event.title || "");
-  return title
-    .replace(/^(?:(?:🏳️‍🌈|🏳️‍⚧️|✊🏾)\s*)+/u, "")
-    .trim() || title;
-}
+import { readPreparedEvents } from "./api/events.js";
+import { renderLivePoster } from "./live-poster.js";
+import { resolveEvent } from "./event-records.js";
+import { renderEventPage } from "./event-page.js";
+import { profilePage } from "./profile-page.js";
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
+  const cache = typeof caches === "undefined" ? null : caches.default;
+  const cacheKey = new Request(new URL("/_qdp/prepared-home", url));
   const page = await context.env.ASSETS.fetch(new URL("/", url));
-  const id = url.searchParams.get("event");
-  if (!page.ok || !id || id.length > 128) return page;
-
+  if (!page.ok) return page;
+  // Event content and metadata also apply to contextual archive URLs.
+  if (url.searchParams.has("event")) {
+    const id = url.searchParams.get("event") || "";
+    return renderEventPage(context, page, await resolveEvent(context, id), id);
+  }
+  const kind = url.searchParams.get("archive");
+  if (Object.hasOwn(globalThis.QDPProfileMetadata.kinds, kind || "")) {
+    return profilePage(context, page, kind, url.searchParams.get("id") || "");
+  }
+  if (url.searchParams.has("archive")) return page;
+  const cached = await cache?.match(cacheKey);
+  if (cached) return cached;
   try {
-    // Reuse the public event feed and its cache, including its publication gate.
-    const feedRequest = new Request(new URL("/api/events", url));
-    const feed = await getEventFeed({
-      request: feedRequest,
-      waitUntil: task => context.waitUntil(task)
-    });
-    if (!feed.ok) return page;
-
-    const { events } = await feed.json();
-    if (!Array.isArray(events)) return page;
-    const event = events.find(item =>
-      String(item.eventId ?? item.EventID ?? "").trim() === id
-    );
-    if (!event) return page;
-
-    const title = eventTitle(event);
-    if (!title) return page;
-    const shareTitle = `Check out ${title} on Queer Dance Philly`;
-    const eventUrl = new URL("/", url);
-    eventUrl.searchParams.set("event", id);
-
+    const prepared = await readPreparedEvents(context);
+    if (!prepared) return page;
+    const { markup, dateLabel } = renderLivePoster(prepared.events);
     const rewritten = new HTMLRewriter()
-      .on("title", {
-        element(element) { element.setInnerContent(shareTitle); }
-      })
-      .on('meta[property="og:title"]', {
-        element(element) { element.setAttribute("content", shareTitle); }
-      })
-      .on('meta[name="twitter:title"]', {
-        element(element) { element.setAttribute("content", shareTitle); }
-      })
-      .on('meta[property="og:url"]', {
-        element(element) { element.setAttribute("content", eventUrl.toString()); }
-      })
-      .on('link[rel="canonical"]', {
-        element(element) { element.setAttribute("href", eventUrl.toString()); }
-      })
+      .on("#eventStack", { element(element) { element.setInnerContent(markup, { html: true }); } })
+      .on("#dateLabel", { element(element) { element.setInnerContent(dateLabel); } })
+      .on("#qdpInitialEvents", { element(element) { element.setInnerContent(JSON.stringify(prepared)); } })
       .transform(page);
-
     const headers = new Headers(rewritten.headers);
-    headers.set("Cache-Control", "public, max-age=300");
+    headers.set("Cache-Control", "public, max-age=30");
+    headers.set("X-QDP-Initial-Events", "PREPARED");
     headers.delete("ETag");
     headers.delete("Content-Length");
-    return new Response(rewritten.body, {
-      status: rewritten.status,
-      statusText: rewritten.statusText,
-      headers
-    });
+    const result = new Response(rewritten.body, { headers });
+    if (cache) {
+      const write = cache.put(cacheKey, result.clone());
+      if (context.waitUntil) context.waitUntil(write); else await write;
+    }
+    return result;
   } catch (error) {
-    console.error("QDP event preview failed:", error);
+    console.error("QDP initial events unavailable:", error);
     return page;
   }
 }

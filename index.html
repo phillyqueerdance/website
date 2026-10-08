@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
  <title>Queer Dance Philly</title>
 
 <meta
@@ -10,7 +10,7 @@
   content="Find queer dance parties, DJs, venues, and nightlife in Philadelphia. Queer Dance Philly is your cheat sheet for finding the next move."
 >
 
-  
+
 <meta name="theme-color" content="#000000">
 
 <link
@@ -34,16 +34,19 @@
 <meta property="og:image:alt" content="Queer Dance Philly — find the next move">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Queer Dance Philly">
+<meta name="twitter:description" content="Your cheat sheet for queer dance parties, DJs, venues, and nightlife in Philadelphia.">
 <meta name="twitter:image" content="https://queerdancephilly.com/qdp-share-card.jpg">
- <link rel="stylesheet" href="style.css?v=20260928-01">
- <link rel="stylesheet" href="poster-theme.css?v=20260926-01">
- <link rel="stylesheet" href="poster-redesign.css?v=20260928-15">
+ <link rel="stylesheet" href="style.css?v=20261007-accessibility-1">
+ <link rel="stylesheet" href="poster-theme.css?v=20261007-bubble-links-1">
+ <link rel="stylesheet" href="poster-redesign.css?v=20261007-cache-refresh-1">
+ <link rel="stylesheet" href="archive.css?v=20261007-discover-containment-1">
+ <link rel="stylesheet" href="mobile.css?v=20261007-discover-fit-1">
   <link
     id="layoutOverridesStylesheet"
     rel="stylesheet"
     href="layout-overrides.css?v=20260925-01"
   >
-  <link rel="stylesheet" href="menu-pointer-sparkles.css">
+  <link rel="stylesheet" href="menu-pointer-sparkles.css?v=massive-3">
   <link rel="icon" type="image/png" href="/favicon.png">
 </head>
 
@@ -52,6 +55,8 @@
   <main class="site-shell">
 
     <section class="poster-stage" aria-label="Queer Dance Philly events">
+
+      <div id="eventDialog" class="event-dialog">
 
       <div id="poster" class="poster">
 
@@ -90,110 +95,32 @@
           tabindex="0"
         ></div>
 
-        <div id="eventDetail" class="event-detail" hidden></div>
+        <div id="archiveViewport" class="archive-viewport" hidden>
+          <div id="archivePage" class="archive-page">
+            <a id="archiveBack" class="archive-back" href="/?archive=artists" data-archive-link hidden>← Back to Artists</a>
+            <div id="archiveHeader" class="poster-date archive-header" role="heading" aria-level="1" tabindex="-1"></div>
+            <div id="archiveStack" class="event-stack archive-stack" role="region"
+              aria-label="Archive listings" tabindex="0"></div>
+          </div>
+        </div>
 
-      </div>
-
-      <div class="poster-controls" aria-label="Event navigation">
-        <button
-          id="previousPoster"
-          type="button"
-          aria-label="Previous events"
-        >
-          ←
-        </button>
-
-        <button
-          id="nextPoster"
-          type="button"
-          aria-label="Next events"
-        >
-          →
-        </button>
-      </div>
-
-      <button id="todayButton" class="today-button" type="button">today</button>
-
-    </section>
-
-    <nav
-      class="side-nav"
-      aria-label="Site links"
-      data-layout-target="nav"
-    >
-      <button
-        id="mobileMenuButton"
-        class="mobile-menu-toggle"
-        type="button"
-        aria-controls="siteMenuLinks"
-        aria-expanded="false"
-      >More</button>
-
-      <div id="siteMenuLinks" class="side-nav-links">
-        <a
-          href="https://www.instagram.com/queerdancephilly/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >Instagram</a>
-
-        <a
-          id="aboutLink"
-          href="#about"
-          aria-haspopup="dialog"
-          aria-controls="aboutDialog"
-        >About</a>
-
-        <a
-          href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
-          target="_blank"
-          rel="noopener noreferrer"
-        >Venue Map</a>
-
-        <a
-          href="https://calendar.google.com/calendar/u/0?cid=cGhpbGx5cXVlZXJkYW5jZUBnbWFpbC5jb20"
-          target="_blank"
-          rel="noopener noreferrer"
-        >Add QDP Calendar</a>
-
-        <a
-          href="https://docs.google.com/forms/d/e/1FAIpQLScZijFfh9oe1puPByS2CZ4u1Wr3WJwYa7m79za-8wMvU24tgQ/viewform"
-          target="_blank"
-          rel="noopener noreferrer"
-        >Submit Event</a>
-
-         <a
-  id="meltLink"
-  class="melt-nav-link"
-  href="#melt"
-  aria-label="About Melt"
-  aria-haspopup="dialog"
-  aria-controls="meltDialog"
->
-  <img
-    class="melt-nav-logo"
-    src="melt-logo.png"
-    alt="Melt"
-  >
-</a>
-
-        <a
-          href="https://ra.co/promoters/189746"
-          target="_blank"
-          rel="noopener noreferrer"
-        >QDP on RA</a>
-        
-      </div>
-    </nav>
-
-  </main>
-
-  <dialog
+        <div id="infoViewport" class="info-viewport" hidden>
+  <section
     id="aboutDialog"
-    class="about-dialog"
+    class="poster-info-page about-dialog"
     aria-labelledby="aboutDialogTitle"
   >
     <div class="about-dialog-content">
-      <h2 id="aboutDialogTitle">Hi gay!</h2>
+      <img
+        class="about-dialog-logo"
+        src="start-here-logo.png"
+        alt="Queer Dance Philly"
+        width="512"
+        height="512"
+        loading="lazy"
+        decoding="async"
+      >
+      <h2 id="aboutDialogTitle" tabindex="-1">Hi gay!</h2>
 
       <p>
         Welcome to Queer Dance Philly, your cheat sheet for finding the next move.
@@ -213,7 +140,7 @@
 
       <p>
         Browse the calendar by swiping, using the arrows, or tapping the date in the upper-left corner. Tap on
-        an event to see more info. 
+        an event to see more info.
         </p>
 
       <p>
@@ -227,14 +154,15 @@
       type="button"
       aria-label="Close About"
     >×</button>
-  </dialog>
+  </section>
 
-  <dialog
+  <section
   id="meltDialog"
-  class="about-dialog melt-dialog"
-  aria-label="Melt"
+  class="poster-info-page about-dialog melt-dialog"
+  aria-labelledby="meltDialogTitle"
 >
   <div class="about-dialog-content melt-dialog-content">
+    <h2 id="meltDialogTitle" class="sr-only" tabindex="-1">Melt</h2>
     <img
       class="melt-dialog-logo"
       src="melt-logo.png"
@@ -262,14 +190,14 @@
       <a href="https://www.instagram.com/melt.phl/" target="_blank" rel="noopener noreferrer">@melt.phl on Instagram</a>
     </p>
 
-    
+
     <p>
       <a href="https://www.instagram.com/melt.phl/"><img
         src="melt1017-wide.png"
         width="100%"
       ></a>
     </p>
-    
+
   </div>
 
   <button
@@ -278,8 +206,131 @@
     type="button"
     aria-label="Close Melt"
   >×</button>
-</dialog>
-  
+</section>
+
+        </div>
+
+        <div id="eventDetail" class="event-detail" hidden></div>
+
+      </div>
+
+      <div id="mobileContext" class="mobile-context" hidden>
+      </div>
+
+      <div class="poster-controls" aria-label="Event navigation">
+        <a id="mobileBack" class="mobile-back" href="/" hidden></a>
+        <button
+          id="previousPoster"
+          type="button"
+          aria-label="Previous events"
+        >
+          ←
+        </button>
+
+        <button
+          id="nextPoster"
+          type="button"
+          aria-label="Next events"
+        >
+          →
+        </button>
+      </div>
+
+      <button id="todayButton" class="today-button" type="button">today</button>
+
+      </div>
+
+    </section>
+
+    <nav
+      class="side-nav"
+      aria-label="Site links"
+      data-layout-target="nav"
+    >
+      <div class="mobile-primary">
+        <a id="mobileCalendarLink" href="/" data-archive-link>Calendar</a>
+        <button id="mobileDiscoverButton" type="button" aria-controls="archiveMenuTrack" aria-expanded="false" aria-haspopup="dialog">Discover</button>
+        <button
+          id="mobileMenuButton"
+          class="mobile-menu-toggle"
+          type="button"
+          aria-controls="siteMenuLinks"
+          aria-expanded="false"
+          aria-haspopup="dialog"
+        >More</button>
+      </div>
+
+      <div id="siteMenuLinks" class="side-nav-links">
+        <div class="mobile-more-heading">
+          <span id="mobileMoreHeading">More</span>
+          <button id="mobileMoreClose" class="mobile-menu-close" type="button" aria-label="Close menu">×</button>
+        </div>
+        <a id="aboutLink" href="#about" aria-controls="aboutDialog">Start Here</a>
+        <a href="/" data-archive-link>Calendar</a>
+        <a id="discoverLink" href="#discover" data-discover-link aria-controls="archiveMenuTrack" aria-expanded="false">Discover</a>
+
+        <a
+          id="meltLink"
+          class="melt-nav-link"
+          href="#melt"
+          aria-label="Melt"
+          aria-controls="meltDialog"
+        >
+          <img class="melt-nav-logo" src="melt-logo.png" alt="Melt">
+        </a>
+
+        <a
+          id="submitEventLink"
+          href="https://docs.google.com/forms/d/e/1FAIpQLScZijFfh9oe1puPByS2CZ4u1Wr3WJwYa7m79za-8wMvU24tgQ/viewform"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Submit Event</a>
+
+        <div class="side-nav-socials">
+          <a href="https://www.instagram.com/queerdancephilly/" target="_blank" rel="noopener noreferrer" aria-label="QDP on Instagram" title="Instagram">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false">
+              <rect x="3" y="3" width="18" height="18" rx="5"></rect>
+              <circle cx="12" cy="12" r="4.2"></circle>
+              <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"></circle>
+            </svg>
+          </a>
+          <a href="https://ra.co/promoters/189746" target="_blank" rel="noopener noreferrer" aria-label="QDP on Resident Advisor" title="Resident Advisor">
+            <svg class="side-nav-ra-icon" viewBox="18 15 54 28" fill="currentColor" aria-hidden="true" focusable="false">
+              <path d="M34.1125 32.925L41.325 40.1375C42.075 40.8875 43.0375 41.3625 44.175 41.35H64.075C64.925 41.35 65.675 41 66.25 40.425L70.2875 36.3625C70.6125 36 70.8625 35.575 70.8625 35.075C70.8625 34.575 70.65 34.075 70.325 33.75L55.6 19.075L51.1375 23.5L62.75 35.125H46.3125C45.4875 35.125 44.8875 34.8 44.35 34.2625L36.9625 26.9C36.2125 26.1875 35.175 25.725 34.0375 25.725H25V22.65H34.3375C36.1875 22.65 37.8375 23.4 39.05 24.6125L44.55 30.1125L49.0125 25.6875L43.4 20.075C41.0375 17.725 37.9 16.3625 34.325 16.3625H18.75V32H31.9375C32.7875 32 33.5375 32.35 34.1125 32.925Z"></path>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <div id="archiveMenuTrack" class="archive-menu-track" hidden>
+      <div class="archive-menu-panel">
+        <nav id="archiveMenu" class="archive-menu" aria-labelledby="discoverHeading">
+          <h2 id="discoverHeading" class="archive-menu-heading">Discover</h2>
+          <button id="mobileDiscoverClose" class="mobile-menu-close" type="button" aria-label="Close Discover">×</button>
+          <a class="archive-menu-badge archive-menu-badge--artists" href="/?archive=artists" data-archive-link><span class="archive-menu-badge-label">Artists</span></a>
+          <a class="archive-menu-badge archive-menu-badge--venues" href="/?archive=venues" data-archive-link><span class="archive-menu-badge-label">Venues</span></a>
+          <a
+            id="archiveVenueMap"
+            class="archive-menu-map"
+            href="https://www.google.com/maps/d/viewer?mid=1OUueFvhyuAiI3HpkeNlM83M10my90gY"
+            target="_blank"
+            rel="noopener noreferrer"
+            hidden
+          >Venue Map</a>
+          <a class="archive-menu-badge archive-menu-badge--parties" href="/?archive=parties" data-archive-link><span class="archive-menu-badge-label">Parties</span></a>
+          <a class="archive-menu-badge archive-menu-badge--collectives" href="/?archive=collectives" data-archive-link><span class="archive-menu-badge-label">Collectives</span></a>
+          <a class="archive-menu-badge archive-menu-past-events" href="/?archive=events" data-archive-link><span class="archive-menu-badge-label">Past Events</span></a>
+          <section id="archiveMenuProfile" class="archive-menu-profile" aria-live="polite" hidden></section>
+        </nav>
+        <nav id="archiveAlphabet" class="archive-alphabet" aria-label="Directory alphabet" hidden></nav>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="mobileSheetBackdrop" class="mobile-sheet-backdrop" aria-hidden="true" hidden></div>
+
   <script>
     (() => {
       "use strict";
@@ -371,10 +422,7 @@
           titleAlign: "left",
           venueAlign: "left",
           addressAlign: "left",
-          detailPadding: 6,
-          detailFontSize: 3.1,
-          detailTitleSize: 4.35,
-          detailFlyerMaxHeight: 68
+
         }
       };
 
@@ -1214,8 +1262,16 @@
     })();
   </script>
 
-  <script src="app.js?v=20260928-15"></script>
-  <script src="menu-pointer-sparkles.js"></script>
+  <template id="qdpInitialEvents"></template>
+  <template id="qdpInitialEvent"></template>
+  <template id="qdpInitialArchive"></template>
+  <script src="event-metadata.js?v=20261007-bubble-links-1"></script>
+  <script src="profile-metadata.js?v=20261007-accessibility-1"></script>
+  <script src="event-linking.js?v=20261007-profile-pages-1"></script>
+  <script src="app.js?v=20261007-accessibility-1"></script>
+  <script src="archive.js?v=20261007-discover-fit-2"></script>
+  <script src="mobile.js?v=20261007-accessibility-1"></script>
+  <script src="menu-pointer-sparkles.js?v=20261002-discover-1"></script>
 
 </body>
 </html>

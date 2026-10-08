@@ -1,14 +1,14 @@
 (() => {
   "use strict";
 
-  const menu = document.querySelector(".side-nav-links");
-  if (!menu) return;
-
-  const links = menu.querySelectorAll(":scope > a");
   const desktopHover = window.matchMedia("(min-width: 761px) and (hover: hover)");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const svgNamespace = "http://www.w3.org/2000/svg";
   const sparkleColors = ["#fa2b5a", "#ff7945", "#922185"];
+  document.querySelectorAll(".side-nav-links, .archive-menu").forEach(attachSparkles);
+
+  function attachSparkles(menu) {
+  const links = menu.querySelectorAll(":scope > a, :scope > .side-nav-socials > a");
   const fields = ["back", "front"].map(layer => {
     const field = document.createElement("span");
     field.className = "menu-sparkle-field menu-sparkle-field--" + layer;
@@ -158,4 +158,5 @@
   reducedMotion.addEventListener("change", () => { if (reducedMotion.matches) clear(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden) clear(); });
   window.addEventListener("blur", clear);
+  }
 })();

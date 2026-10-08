@@ -1,6 +1,6 @@
 /* Desktop menu: bold links and calendar-color sparkles that follow the pointer. */
 @media (min-width: 761px) {
-  .side-nav-links > a:not(.melt-nav-link) {
+  .side-nav-links > a:not(.melt-nav-link), .archive-menu > a {
     font-weight: 700;
   }
 }
@@ -8,12 +8,12 @@
 .menu-sparkle-field { display: none; }
 
 @media (min-width: 761px) and (hover: hover) {
-  .side-nav-links {
+  .side-nav-links, .archive-menu {
     position: relative;
     isolation: isolate;
   }
 
-  .side-nav-links > a {
+  .side-nav-links > a, .archive-menu > a {
     position: relative;
     z-index: 1;
   }
