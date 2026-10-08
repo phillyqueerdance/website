@@ -1525,7 +1525,8 @@ function loadEventRelations(id, card, section, links, preparedRelated) {
     links.replaceChildren();
     const colors = { artist: "red", venue: "orange", party: "purple", collective: "collective" };
     for (const item of data.related) {
-      if (!colors[item.kind] || !/^[\w-]{1,80}$/.test(item.id) || !item.name) continue;
+      const name = String(item?.name ?? "").trim().replace(/^\[(.*)\]$/s, "$1").trim();
+      if (!item || !colors[item.kind] || !/^[\w-]{1,80}$/.test(item.id) || !name) continue;
       const url = new URL("/", location.origin);
       url.searchParams.set("archive", item.kind);
       url.searchParams.set("id", item.id);
@@ -1533,7 +1534,7 @@ function loadEventRelations(id, card, section, links, preparedRelated) {
       link.className = `event-detail-related-bubble event-detail-related-bubble--${colors[item.kind]}`;
       link.href = url.href;
       link.setAttribute("data-archive-link", "");
-      link.textContent = item.name;
+      link.textContent = name;
       links.appendChild(link);
     }
     section.hidden = !links.childElementCount;
