@@ -1,3 +1,5 @@
+import { readKvJson, withKvScope, cacheResponse, freshResponse } from "../kv-cache.js";
+
 export const DEFAULT_APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec";
 
@@ -73,9 +75,17 @@ function createJsonResponse(
 }
 
 export async function readPreparedEvents(context) {
+  context = withKvScope(context);
   const kv = context.env?.QDP_PUBLIC_FEED_KV || context.env?.QDP_ARCHIVE_KV;
   if (!kv) return null;
-  const record = await kv.get(PREPARED_KEY, "json");
+  const record = await readKvJson(context, kv, PREPARED_KEY, {
+    seconds: PREPARED_CACHE_SECONDS,
+    valid: record => {
+      const age = Date.now() - Date.parse(record?.publishedAt);
+      return record?.schema === 1 && Array.isArray(record.payload?.events) &&
+        Number.isFinite(age) && age >= 0 && age <= PREPARED_MAX_AGE_MS;
+    }
+  });
   const published = Date.parse(record?.publishedAt);
   const age = Date.now() - published;
   if (record?.schema !== 1 || !Array.isArray(record.payload?.events) ||
@@ -92,10 +102,11 @@ export async function readPreparedEvents(context) {
 export async function onRequestGet(
   context
 ) {
+  context = withKvScope(context);
   const cache = typeof caches === "undefined" ? null : caches.default;
   const cacheUrl = new URL("/api/events", context.request.url);
   const cacheKey = new Request(cacheUrl.href);
-  const cachedResponse = await cache?.match(cacheKey);
+  const cachedResponse = freshResponse(await cache?.match(cacheKey), context);
   if (cachedResponse) {
     const publishedAt = cachedResponse.headers.get("X-QDP-Published-At");
     const age = publishedAt ? Date.now() - Date.parse(publishedAt) : 0;
@@ -111,11 +122,11 @@ export async function onRequestGet(
   try {
     const prepared = await readPreparedEvents(context);
     if (prepared) {
-      const response = createJsonResponse(prepared, {
+      const response = cacheResponse(context, createJsonResponse(prepared, {
         cacheStatus: "PREPARED",
         maxAge: PREPARED_CACHE_SECONDS,
         publishedAt: prepared.publishedAt
-      });
+      }), PREPARED_CACHE_SECONDS);
       if (cache) {
         const write = cache.put(cacheKey, response.clone());
         if (context.waitUntil) context.waitUntil(write); else await write;
@@ -177,10 +188,7 @@ export async function onRequestGet(
         )
     };
 
-    const response =
-      createJsonResponse(
-        filteredPayload
-      );
+    const response = cacheResponse(context, createJsonResponse(filteredPayload), EDGE_CACHE_SECONDS);
 
     if (cache) {
       const write = cache.put(cacheKey, response.clone());

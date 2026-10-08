@@ -1,6 +1,8 @@
 // Read the prepared public archive when the preview has a KV binding. Until
 // its first publish (or during propagation), keep the live Apps Script feed.
 import { DEFAULT_APPS_SCRIPT_URL } from "./events.js";
+import { withKvScope, readArchiveManifest, readArchiveRecord,
+  cacheResponse, freshResponse } from "../kv-cache.js";
 
 const RESOURCES = {
   artists: "archiveArtists",
@@ -15,7 +17,6 @@ const RESOURCES = {
   month: "archiveMonth"
 };
 const CACHE_SECONDS = 60;
-const KV_PREFIX = "qdp-archive:v1:";
 const SHARDS = { artist: 4, venue: 2, party: 2, collective: 2, month: 4 };
 
 const value = (input, limit = 500) => String(input ?? "").trim().slice(0, limit);
@@ -131,9 +132,9 @@ function shard(id, count) {
   return hash % count;
 }
 
-async function preparedPayload(kv, resource, id) {
+async function preparedPayload(context, kv, resource, id) {
   if (!kv) return null;
-  const manifest = await kv.get(KV_PREFIX + "manifest", "json");
+  const manifest = await readArchiveManifest(context, kv);
   if (manifest?.schema !== 1 || !manifest.revision) return null;
   if (["parties", "party"].includes(resource) && manifest.partyPublicGate !== true) {
     return { unpublished: true };
@@ -152,8 +153,8 @@ async function preparedPayload(kv, resource, id) {
     if (!list.includes(id)) return { missing: true };
   }
   const key = directory ? resource : `${resource}:${shard(id, SHARDS[resource])}`;
-  const record = await kv.get(KV_PREFIX + key, "json");
-  if (record?.revision !== manifest.revision) return null;
+  const record = await readArchiveRecord(context, kv, manifest, key);
+  if (!record) return null;
   const raw = directory ? record.payload : record.entries?.[id];
   if (!raw || (!directory && !Object.hasOwn(record.entries, id))) return null;
   const payload = cleanPayload(resource, raw, id, manifest);
@@ -161,6 +162,7 @@ async function preparedPayload(kv, resource, id) {
 }
 
 export async function onRequestGet(context) {
+  context = withKvScope(context);
   const url = new URL(context.request.url);
   const resource = url.searchParams.get("resource") || "";
   const id = resource === "month"
@@ -182,11 +184,11 @@ export async function onRequestGet(context) {
   if (id) key.searchParams.set(resource === "month" ? "month" : "id", id);
   const cacheKey = new Request(key.href);
   const cache = typeof caches === "undefined" ? null : caches.default;
-  const hit = await cache?.match(cacheKey);
+  const hit = freshResponse(await cache?.match(cacheKey), context);
   if (hit) return hit;
 
   try {
-    const prepared = await preparedPayload(context.env.QDP_ARCHIVE_KV || context.env.QDP_PUBLIC_FEED_KV, resource, id);
+    const prepared = await preparedPayload(context, context.env.QDP_ARCHIVE_KV || context.env.QDP_PUBLIC_FEED_KV, resource, id);
     if (prepared?.unpublished) {
       return Response.json({ error: "Directory is waiting for the sheet to be published." }, {
         status: 503, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
@@ -198,10 +200,10 @@ export async function onRequestGet(context) {
       });
     }
     if (prepared?.payload) {
-      const result = Response.json(prepared.payload, {
+      const result = cacheResponse(context, Response.json(prepared.payload, {
         headers: { ...headers, "Cache-Control": "public, max-age=60",
           "X-QDP-Archive-Source": "prepared" }
-      });
+      }), CACHE_SECONDS);
       if (cache) {
         const write = cache.put(cacheKey, result.clone());
         if (context.waitUntil) context.waitUntil(write); else await write;
@@ -228,7 +230,7 @@ export async function onRequestGet(context) {
     if (!response.ok) throw new Error(`Apps Script returned ${response.status}`);
     const payload = cleanPayload(resource, await response.json(), id);
     if (!payload) throw new Error("Apps Script archive resource is unavailable or has an invalid shape");
-    const result = Response.json(payload, { headers });
+    const result = cacheResponse(context, Response.json(payload, { headers }), CACHE_SECONDS);
     if (cache) {
       const write = cache.put(cacheKey, result.clone());
       if (context.waitUntil) context.waitUntil(write); else await write;

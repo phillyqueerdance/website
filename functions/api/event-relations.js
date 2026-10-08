@@ -1,6 +1,7 @@
 // Resolve links only when an event is opened. The initial calendar feed stays small.
 import { cleanIndexedEvent, shard, validEventId } from "../event-records.js";
-const PREFIX = "qdp-archive:v1:";
+import { withKvScope, readArchiveManifest, readArchiveRecord,
+  cacheResponse, freshResponse } from "../kv-cache.js";
 const KINDS = [
   { name: "artist", shards: 4 },
   { name: "venue", shards: 2 },
@@ -13,6 +14,7 @@ function publicName(input) {
 }
 
 export async function onRequestGet(context) {
+  context = withKvScope(context);
   const url = new URL(context.request.url);
   const eventId = url.searchParams.get("event") || "";
   if (!validEventId(eventId)) {
@@ -25,25 +27,25 @@ export async function onRequestGet(context) {
   const normalized = new URL("/api/event-relations", url);
   normalized.searchParams.set("event", eventId);
   const cacheKey = new Request(normalized.href);
-  const cached = await cache?.match(cacheKey);
+  const cached = freshResponse(await cache?.match(cacheKey), context);
   if (cached) return cached;
 
   try {
-    const manifest = await kv.get(PREFIX + "manifest", "json");
+    const manifest = await readArchiveManifest(context, kv);
     if (manifest?.schema !== 1 || !manifest.revision) throw new Error("Missing public archive");
     if (manifest.eventIndexVersion === 1 && Array.isArray(manifest.eventIds)) {
       let related = [];
       if (manifest.eventIds.includes(eventId) && !manifest.excludedEventIds?.includes(eventId)) {
         const count = manifest.eventShards;
         if (!Number.isInteger(count) || count < 1 || count > 64) throw new Error("Invalid event index");
-        const record = await kv.get(`${PREFIX}event:${shard(eventId, count)}`, "json");
-        if (record?.revision !== manifest.revision) throw new Error("Event update is propagating");
+        const record = await readArchiveRecord(context, kv, manifest, `event:${shard(eventId, count)}`);
+        if (!record) throw new Error("Event update is propagating");
         related = cleanIndexedEvent(record.entries?.[eventId], manifest)?.related || [];
       }
-      const response = Response.json({ related }, { headers: {
+      const response = cacheResponse(context, Response.json({ related }, { headers: {
         "Cache-Control": "public, max-age=60", "X-Robots-Tag": "noindex",
         "X-Content-Type-Options": "nosniff"
-      } });
+      } }), 60);
       if (cache) {
         const write = cache.put(cacheKey, response.clone());
         if (context.waitUntil) context.waitUntil(write); else await write;
@@ -52,12 +54,12 @@ export async function onRequestGet(context) {
     }
     const kinds = KINDS.filter(kind => kind.name !== "party" || manifest.partyPublicGate === true);
     const keys = kinds.flatMap(kind => Array.from({ length: kind.shards }, (_, index) => ({
-      kind: kind.name, key: `${PREFIX}${kind.name}:${index}`
+      kind: kind.name, key: `${kind.name}:${index}`
     })));
     const records = await Promise.all(keys.map(async item => ({
-      kind: item.kind, data: await kv.get(item.key, "json")
+      kind: item.kind, data: await readArchiveRecord(context, kv, manifest, item.key)
     })));
-    if (records.some(item => item.data?.revision !== manifest.revision)) {
+    if (records.some(item => !item.data)) {
       throw new Error("Archive update is propagating");
     }
     const seen = new Set();
@@ -78,11 +80,11 @@ export async function onRequestGet(context) {
     const kindOrder = new Map(KINDS.map((kind, index) => [kind.name, index]));
     related.sort((a, b) => kindOrder.get(a.kind) - kindOrder.get(b.kind) ||
       a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
-    const response = Response.json({ related }, { headers: {
+    const response = cacheResponse(context, Response.json({ related }, { headers: {
       "Cache-Control": "public, max-age=60",
       "X-Robots-Tag": "noindex",
       "X-Content-Type-Options": "nosniff"
-    } });
+    } }), 60);
     if (cache) {
       const write = cache.put(cacheKey, response.clone());
       if (context.waitUntil) context.waitUntil(write); else await write;
