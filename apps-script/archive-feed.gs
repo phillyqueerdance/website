@@ -428,10 +428,17 @@ function qdpArchiveSnapshot_(artists, venues, parties, collectives, sets) {
   };
 }
 
+// Content versions let unchanged records survive a new manifest revision.
+function qdpArchiveDigest_(value) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256, value)).replace(/=+$/, '');
+}
+
 function qdpArchiveKvRecords_(snapshot, revision) {
   const records = [];
   const add = (key, data) => {
-    const value = JSON.stringify({ revision, ...data });
+    const recordRevision = revision || qdpArchiveDigest_(JSON.stringify(data));
+    const value = JSON.stringify({ revision: recordRevision, ...data });
     // The KV value limit is 25 MiB. Fail before writing any partial snapshot.
     if (Utilities.newBlob(value).getBytes().length > 25 * 1024 * 1024) {
       throw new Error('Archive record exceeds the Cloudflare KV value limit: ' + key);
@@ -521,15 +528,26 @@ function qdpArchivePublish_(force) {
   lock.waitLock(30000);
   try {
     const snapshot = qdpArchivePublishSource_(ss_());
-    const digest = Utilities.base64EncodeWebSafe(Utilities.computeDigest(
-      Utilities.DigestAlgorithm.SHA_256, JSON.stringify(snapshot)));
-    const fingerprint = account + ':' + namespace + ':' + digest;
-    if (!force && properties.getProperty('QDP_ARCHIVE_LAST_PUBLISHED') === fingerprint) {
+    const target = account + ':' + namespace;
+    const fingerprint = target + ':' + qdpArchiveDigest_(JSON.stringify(snapshot));
+    const allRecords = qdpArchiveKvRecords_(snapshot);
+    const recordRevisions = Object.create(null);
+    allRecords.forEach(record => {
+      recordRevisions[record.key.slice(QDP_ARCHIVE_KV_PREFIX_.length)] = JSON.parse(record.value).revision;
+    });
+    let previous;
+    try { previous = JSON.parse(properties.getProperty('QDP_ARCHIVE_RECORD_REVISIONS') || 'null'); }
+    catch (_) { previous = null; }
+    const known = previous?.version === 1 && previous.target === target && previous.records;
+    const records = allRecords.filter(record => force || !known ||
+      known[record.key.slice(QDP_ARCHIVE_KV_PREFIX_.length)] !== JSON.parse(record.value).revision);
+    // A missing ledger requires one full migration even if the old publisher's
+    // whole-snapshot fingerprint says the spreadsheet is unchanged.
+    if (!force && !records.length && properties.getProperty('QDP_ARCHIVE_LAST_PUBLISHED') === fingerprint) {
       Logger.log('Public archive is unchanged; no Cloudflare write needed.');
-      return;
+      return { unchanged: true, recordCount: 0, kvWriteCount: 0, skippedRecordCount: allRecords.length };
     }
     const revision = Utilities.getUuid();
-    const records = qdpArchiveKvRecords_(snapshot, revision);
     const batches = qdpArchiveBulkBatches_(records);
     const base = 'https://api.cloudflare.com/client/v4/accounts/' + account +
       '/storage/kv/namespaces/' + namespace;
@@ -540,10 +558,11 @@ function qdpArchivePublish_(force) {
         throw new Error('Cloudflare did not confirm all archive records. The manifest was not updated.');
       }
     });
-    // Publish the manifest last. Readers detect a mismatched revision and use
-    // the live feed until all the new records have propagated to their region.
+    // Publish the manifest last. Each record retains its content version when
+    // unchanged; readers validate that version before using a cached record.
     const manifest = {
       schema: 1, revision, updatedAt: new Date().toISOString(),
+      recordIndexVersion: 1, recordRevisions,
       artists: Object.keys(snapshot.artistEntries),
       venues: Object.keys(snapshot.venueEntries),
       parties: Object.keys(snapshot.partyEntries),
@@ -557,23 +576,32 @@ function qdpArchivePublish_(force) {
     qdpArchiveCloudflareRequest_(base + '/values/' +
       encodeURIComponent(QDP_ARCHIVE_KV_PREFIX_ + 'manifest'), token, 'put',
       JSON.stringify(manifest), 'application/octet-stream');
+    // Commit the local ledger only after all records AND the manifest succeed.
+    // A partial failure retries the affected records on the next publish.
+    properties.setProperty('QDP_ARCHIVE_RECORD_REVISIONS', JSON.stringify({
+      version: 1, target, records: recordRevisions
+    }));
     properties.setProperty('QDP_ARCHIVE_LAST_PUBLISHED', fingerprint);
-    Logger.log(JSON.stringify({ artistCount: manifest.artists.length,
+    const summary = { artistCount: manifest.artists.length,
       venueCount: manifest.venues.length, partyCount: manifest.parties.length,
       collectiveCount: manifest.collectives.length, archiveMonthCount: manifest.months.length,
       eventCount: manifest.eventIds.length,
       archivedEventCount: snapshot.months.reduce((sum, item) => sum + item.count, 0),
-      recordCount: records.length, batchCount: batches.length, publishedAt: manifest.updatedAt }));
+      recordCount: records.length, skippedRecordCount: allRecords.length - records.length,
+      kvWriteCount: records.length + 1, batchCount: batches.length, publishedAt: manifest.updatedAt };
+    Logger.log(JSON.stringify(summary));
+    return summary;
   } finally {
     lock.releaseLock();
   }
 }
 
-function qdpArchivePublish() { qdpArchivePublish_(false); }
+
+function qdpArchivePublish() { return qdpArchivePublish_(false); }
 
 // Use this if the namespace was cleared or its binding changed without a
 // spreadsheet change. It rewrites the snapshot even when the data is the same.
-function qdpArchiveForcePublish() { qdpArchivePublish_(true); }
+function qdpArchiveForcePublish() { return qdpArchivePublish_(true); }
 
 // Run once to check for direct edits to the Sheet every 15 minutes.
 // Unchanged data costs zero KV writes. Calling this again creates no duplicate.

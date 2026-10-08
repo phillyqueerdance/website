@@ -1,5 +1,6 @@
 import { onRequestGet as archiveData } from "./api/archive.js";
 import { renderEventCard } from "./live-poster.js";
+import { withKvScope, cacheResponse, freshResponse, inheritCacheDeadline } from "./kv-cache.js";
 import "../event-metadata.js";
 import "../profile-metadata.js";
 
@@ -116,18 +117,20 @@ export function renderProfilePage(context, page, result, kind, id) {
 }
 
 export async function profilePage(context, page, kind, id) {
+  context = withKvScope(context);
   if (!meta.validId(id)) return renderProfilePage(context, page, { status: 404, error: "This page is no longer available." }, kind, id);
   const key = new URL("/_qdp/profile", context.request.url);
   key.searchParams.set("kind", kind); key.searchParams.set("id", id);
   const cache = typeof caches === "undefined" ? null : caches.default;
   const cacheKey = new Request(key.href);
-  const hit = await cache?.match(cacheKey);
+  const hit = freshResponse(await cache?.match(cacheKey), context);
   if (hit) return hit;
   let result;
   try {
     const url = new URL("/api/archive", context.request.url);
     url.searchParams.set("resource", kind); url.searchParams.set("id", id);
     const response = await archiveData({ ...context, request: new Request(url.href) });
+    inheritCacheDeadline(context, response);
     const payload = await response.json();
     if (response.ok && payload.profile?.id === id && Array.isArray(payload.events)) result = { status: 200, payload };
     else result = { status: response.status === 404 ? 404 : 503, error: response.status === 404
@@ -136,7 +139,7 @@ export async function profilePage(context, page, kind, id) {
     console.error("QDP profile unavailable:", error);
     result = { status: 503, error: "Could not load these listings right now." };
   }
-  const response = renderProfilePage(context, page, result, kind, id);
+  const response = cacheResponse(context, renderProfilePage(context, page, result, kind, id), 60);
   if (cache && response.status === 200) {
     const write = cache.put(cacheKey, response.clone());
     if (context.waitUntil) context.waitUntil(write); else await write;

@@ -3,8 +3,10 @@ import { renderLivePoster } from "./live-poster.js";
 import { resolveEvent } from "./event-records.js";
 import { renderEventPage } from "./event-page.js";
 import { profilePage } from "./profile-page.js";
+import { withKvScope, cacheResponse, freshResponse } from "./kv-cache.js";
 
 export async function onRequestGet(context) {
+  context = withKvScope(context);
   const url = new URL(context.request.url);
   const cache = typeof caches === "undefined" ? null : caches.default;
   const cacheKey = new Request(new URL("/_qdp/prepared-home", url));
@@ -13,14 +15,14 @@ export async function onRequestGet(context) {
   // Event content and metadata also apply to contextual archive URLs.
   if (url.searchParams.has("event")) {
     const id = url.searchParams.get("event") || "";
-    return renderEventPage(context, page, await resolveEvent(context, id), id);
+    return cacheResponse(context, renderEventPage(context, page, await resolveEvent(context, id), id), 60);
   }
   const kind = url.searchParams.get("archive");
   if (Object.hasOwn(globalThis.QDPProfileMetadata.kinds, kind || "")) {
     return profilePage(context, page, kind, url.searchParams.get("id") || "");
   }
   if (url.searchParams.has("archive")) return page;
-  const cached = await cache?.match(cacheKey);
+  const cached = freshResponse(await cache?.match(cacheKey), context);
   if (cached) return cached;
   try {
     const prepared = await readPreparedEvents(context);
@@ -36,7 +38,7 @@ export async function onRequestGet(context) {
     headers.set("X-QDP-Initial-Events", "PREPARED");
     headers.delete("ETag");
     headers.delete("Content-Length");
-    const result = new Response(rewritten.body, { headers });
+    const result = cacheResponse(context, new Response(rewritten.body, { headers }), 30);
     if (cache) {
       const write = cache.put(cacheKey, result.clone());
       if (context.waitUntil) context.waitUntil(write); else await write;

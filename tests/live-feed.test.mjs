@@ -84,7 +84,8 @@ test('prepared live feed skips Google and filters ended listings', async () => {
     });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('X-QDP-Cache'), 'PREPARED');
-    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=30');
+    const ttl = Number(response.headers.get('Cache-Control').match(/max-age=(\d+)/)[1]);
+    assert.ok(ttl > 0 && ttl <= 30);
     assert.deepEqual((await response.json()).events.map(event => event.eventId), ['FUTURE']);
   } finally { globalThis.fetch = originalFetch; }
 });
@@ -121,6 +122,9 @@ test('stale prepared feed uses the existing live Google path', async () => {
 test('warm prepared event requests avoid KV, and expired records use the live fallback', async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
+  const originalNow = Date.now;
+  let now = originalNow();
+  Date.now = () => now;
   const edge = new Map();
   let reads = 0;
   let upstreamCalls = 0;
@@ -151,7 +155,8 @@ test('warm prepared event requests avoid KV, and expired records use the live fa
     const headers = new Headers(expired.headers);
     headers.set('X-QDP-Published-At', new Date(Date.now() - 17 * 60 * 1000).toISOString());
     edge.set(key, new Response(expired.body, { headers }));
+    now += 31000;
     await onRequestGet(context);
     assert.equal(reads, 2, 'an expired cached response must not hide a newer KV record');
-  } finally { globalThis.caches = originalCaches; globalThis.fetch = originalFetch; }
+  } finally { globalThis.caches = originalCaches; globalThis.fetch = originalFetch; Date.now = originalNow; }
 });

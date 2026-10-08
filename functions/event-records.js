@@ -1,8 +1,9 @@
 import { readPreparedEvents, onRequestGet as getLiveFeed } from "./api/events.js";
 import { publicEvent } from "./api/archive.js";
+import { withKvScope, readArchiveManifest, readArchiveRecord,
+  cacheResponse, freshResponse, inheritCacheDeadline } from "./kv-cache.js";
 import "../profile-metadata.js";
 
-const PREFIX = "qdp-archive:v1:";
 const TTL = 60;
 export const validEventId = id => typeof id === "string" && /^[\w-]{1,100}$/.test(id);
 export function shard(id, count) {
@@ -20,7 +21,7 @@ const cacheKey = (context, resource, id = "") => {
 const put = (context, key, payload) => {
   const cache = cacheFor();
   if (!cache) return;
-  const write = cache.put(key, Response.json(payload, { headers: { "Cache-Control": `public, max-age=${TTL}` } }));
+  const write = cache.put(key, cacheResponse(context, Response.json(payload), TTL));
   if (context.waitUntil) context.waitUntil(write);
   else return write;
 };
@@ -48,15 +49,17 @@ export function cleanIndexedEvent(raw, manifest) {
 // Compatibility for the already-published preview. A shared edge cache avoids
 // rescanning old records for every event while the new publisher is installed.
 export async function legacyEvents(context, manifest) {
+  context = withKvScope(context);
   const key = cacheKey(context, "event-legacy-index");
-  const cached = await cacheFor()?.match(key);
+  const cached = freshResponse(await cacheFor()?.match(key), context);
   if (cached) {
     const payload = await cached.json();
     if (payload.revision === manifest.revision) return payload.events;
   }
   const kv = kvFor(context);
-  const records = await Promise.all(Array.from({ length: 4 }, (_, i) => kv.get(`${PREFIX}month:${i}`, "json")));
-  if (records.some(record => record?.revision !== manifest.revision)) throw new Error("Archive update is propagating");
+  const records = await Promise.all(Array.from({ length: 4 }, (_, i) =>
+    readArchiveRecord(context, kv, manifest, `month:${i}`)));
+  if (records.some(record => !record)) throw new Error("Archive update is propagating");
   const found = new Map();
   for (const record of records) for (const [month, entry] of Object.entries(record.entries || {})) {
     if (!manifest.months?.includes(month)) continue;
@@ -75,6 +78,7 @@ async function liveEvent(context, id) {
   if (!feed) {
     const response = await getLiveFeed({ ...context, request: new Request(new URL("/api/events", context.request.url)) });
     if (!response.ok) throw new Error("Live events unavailable");
+    inheritCacheDeadline(context, response);
     feed = await response.json();
   }
   const raw = feed.events?.find(item => item.eventId === id);
@@ -84,21 +88,22 @@ async function liveEvent(context, id) {
 }
 
 export async function resolveEvent(context, id) {
+  context = withKvScope(context);
   if (!validEventId(id)) return { status: 400, error: "Invalid event ID." };
   const key = cacheKey(context, "event", id);
-  const cached = await cacheFor()?.match(key);
+  const cached = freshResponse(await cacheFor()?.match(key), context);
   if (cached) return cached.json();
   try {
     const kv = kvFor(context);
-    const manifest = kv && await kv.get(`${PREFIX}manifest`, "json");
+    const manifest = kv && await readArchiveManifest(context, kv);
     if (manifest?.schema === 1 && manifest.revision) {
       if (manifest.eventIndexVersion === 1 && Array.isArray(manifest.eventIds)) {
         if (manifest.excludedEventIds?.includes(id)) return { status: 404, error: "Event unavailable." };
         if (manifest.eventIds.includes(id)) {
           const count = manifest.eventShards;
           if (!Number.isInteger(count) || count < 1 || count > 64) throw new Error("Invalid event index");
-          const record = await kv.get(`${PREFIX}event:${shard(id, count)}`, "json");
-          if (record?.revision !== manifest.revision) throw new Error("Event update is propagating");
+          const record = await readArchiveRecord(context, kv, manifest, `event:${shard(id, count)}`);
+          if (!record) throw new Error("Event update is propagating");
           const event = cleanIndexedEvent(record.entries?.[id], manifest);
           if (!event || event.eventId !== id) return { status: 404, error: "Event unavailable." };
           const payload = { status: 200, event, indexed: true };
@@ -147,8 +152,9 @@ async function eventsFromManifest(context, manifest) {
 }
 
 export async function publicSitemapEntries(context) {
+  context = withKvScope(context);
   const kv = kvFor(context);
-  const manifest = kv && await kv.get(`${PREFIX}manifest`, "json");
+  const manifest = kv && await readArchiveManifest(context, kv);
   if (manifest?.schema !== 1 || !manifest.revision) throw new Error("Public index unavailable");
   const meta = globalThis.QDPProfileMetadata;
   const profiles = Object.entries(meta.kinds).flatMap(([kind, directory]) => {

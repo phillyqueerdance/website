@@ -107,7 +107,8 @@ test('normalized profile HTML is cached and production binding uses the same pre
     context.request = new Request('https://massive.example/?noise=two&id=PUBLIC-1&archive=artist');
     assert.equal((await page(context)).headers.get('X-QDP-Profile'), 'PREPARED');
     assert.equal(reads.length, 2);
-    assert.equal(edge.size, 2); // One API entry plus one HTML entry.
+    assert.ok([...edge.keys()].some(key => key.includes('/api/archive?')));
+    assert.ok([...edge.keys()].some(key => key.includes('/_qdp/profile?')));
   } finally { globalThis.caches = previous.caches; globalThis.HTMLRewriter = previous.rewriter; }
 });
 

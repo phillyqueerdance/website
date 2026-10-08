@@ -1,5 +1,43 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Current production update: v7.2
+
+For the existing four-file v7.1 project, replace **only PublicData.gs** with
+the supplied v7.2 file. Keep Core.gs, Imports.gs, ArchiveReview.gs, the
+manifest, properties, Web app URL, and existing triggers. Save, then use
+**QDP > Public data / Website > Publish archive changes**. Do not install
+`archive-feed.gs` alongside PublicData.gs; this repository helper documents
+and tests the same publishing protocol for the older project layout.
+
+The first successful v7.2 archive publish migrates all 27 data records and
+the manifest. Later publishes write only changed data records and publish the
+manifest last. Each manifest has `recordIndexVersion: 1` and a
+`recordRevisions` map of content versions. The private Script Property
+`QDP_ARCHIVE_RECORD_REVISIONS` remembers successful versions for the configured
+account and namespace. Unchanged runs cost zero writes; a changed manifest
+with no changed data records costs one write. Logs include `recordCount`,
+`skippedRecordCount`, and `kvWriteCount` (including the manifest). The existing
+force-publish menu action rebuilds all records after a reset. Failed writes do
+not advance the local ledger or whole-snapshot fingerprint.
+
+Production uses the existing `QDP_PUBLIC_FEED_KV` binding. Preview can keep
+`QDP_ARCHIVE_KV`. No new namespace, token, binding, or trigger is required.
+Website readers accept both the original global-revision format and the new
+per-record format, so deploy the website before running the v7.2 publisher.
+
+Calendar HTML and API responses share a cached live record for at most 30
+seconds. Profile, event, related-link, and sitemap readers share the manifest
+for at most 60 seconds and share version-validated archive records for up to
+one hour. Every new response expires by its source manifest/live deadline;
+these cache layers do not add another 30 or 60 seconds to publication changes.
+Identical reads within a request or concurrent requests in one worker are
+coalesced. Missing, invalid, or mismatched records are not retained between
+requests. Existing publication gates, propagation fallback, and refresh
+trigger timing remain in effect.
+
+The sections below are historical installation notes for the earlier preview
+and standalone helper. They are not additional setup steps for v7.2.
+
 This folder contains the archive feed and prepared-data publisher for the
 existing v6.3 Apps Script project.
 The branch does not contain the full Apps Script, spreadsheet ID, sheet data,
