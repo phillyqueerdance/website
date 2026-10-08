@@ -2012,6 +2012,18 @@ nextPoster.addEventListener(
   () => movePoster(1)
 );
 
+async function showCurrentCalendar() {
+  if (window.QDPArchive?.active) return;
+  if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
+  closeDatePopover();
+  if (!posterPages.length) await ensureLiveEvents();
+  if (window.QDPArchive?.active || requestedEventId() || infoView.active) return;
+  const today = dateKey(new Date());
+  const index = posterPages.findIndex(page => page.date >= today);
+  if (index >= 0) scrollToPage(index, "auto");
+}
+window.QDPShowCurrentCalendar = showCurrentCalendar;
+
 todayButton.addEventListener("click", () => {
   if (window.QDPArchive?.active) return;
   const today = dateKey(new Date());
