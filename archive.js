@@ -49,6 +49,7 @@
   let cards = [];
   let corners = [];
   let profileNavigation = null;
+  let menuReset = false;
 
   function routeParams() {
     const params = new URLSearchParams(location.search);
@@ -262,12 +263,24 @@
     }, 500);
   }
 
-  function setProfile(kind, person = null) {
-    archive.profile = person ? { kind, person } : null;
+  function clearMenuProfile() {
     menu.classList.remove("has-profile");
     menuProfile.replaceChildren();
-    menuProfile.hidden = !person;
-    if (person) {
+    menuProfile.hidden = true;
+  }
+
+  function resetMenu() {
+    menuReset = true;
+    clearMenuProfile();
+    showMenu("", !archive.isMenuOpen());
+    menuTrack.scrollTop = 0;
+  }
+
+  function setProfile(kind, person = null) {
+    archive.profile = person ? { kind, person } : null;
+    clearMenuProfile();
+    if (person && !menuReset) {
+      menuProfile.hidden = false;
       const badge = menu.querySelector(`.archive-menu-badge--${profileViews[kind]}`);
       (kind === "venue" && !venueMap.hidden ? venueMap : badge).after(menuProfile);
       const badgeStyle = getComputedStyle(badge);
@@ -713,6 +726,7 @@
     }
     const serial = ++requestNumber;
     profileNavigation = null;
+    menuReset = false;
     const directory = profileViews[params.view];
     archiveBack.hidden = !directory && !(params.view === "events" && params.month);
     if (!archiveBack.hidden) {
@@ -908,6 +922,7 @@
     return card.getBoundingClientRect().top - archiveStack.getBoundingClientRect().top + archiveStack.scrollTop;
   }
   archive.showMenu = showMenu;
+  archive.resetMenu = resetMenu;
   archive.hideMenu = hideMenu;
   archive.isMenuOpen = () => discoverLink.getAttribute("aria-expanded") === "true";
   window.QDPArchive = archive;
@@ -926,7 +941,7 @@
       history.replaceState(returnState, "", url);
       window.QDPInfoView.close({ historyEntry: false, preserveMenu: true });
     }
-    showMenu(routeParams().view, !archive.isMenuOpen());
+    resetMenu();
     requestAnimationFrame(() => {
       positionMenu();
       if (window.matchMedia("(max-width: 760px)").matches) {
@@ -957,7 +972,10 @@
     event.preventDefault();
     if (url.href !== location.href) history.pushState({ qdpArchive: true }, "", url);
     route();
-    if (!url.searchParams.has("archive")) hideMenu();
+    if (!url.searchParams.has("archive")) {
+      hideMenu();
+      window.QDPShowCurrentCalendar?.();
+    }
   });
   window.addEventListener("popstate", route);
   document.addEventListener("visibilitychange", () => {

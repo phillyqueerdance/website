@@ -50,7 +50,7 @@
     if (historyEntry && history.state?.qdpMobilePanel === "discover") history.back();
     if (open && restoreFocus) (returnFocus?.isConnected ? returnFocus : discoverButton).focus({ preventScroll: true });
   }
-  function openDiscover({ historyEntry = true } = {}) {
+  function openDiscover({ historyEntry = true, reset = true } = {}) {
     if (!media.matches) return;
     returnFocus = document.activeElement;
     closeMore();
@@ -61,7 +61,8 @@
       history.replaceState(state, "", url);
       window.QDPInfoView.close({ historyEntry: false, preserveMenu: true });
     }
-    window.QDPArchive.showMenu(view());
+    if (reset) window.QDPArchive.resetMenu();
+    else window.QDPArchive.showMenu(view());
     toggleClass(document.body, "mobile-discover-open", true);
     if (historyEntry) pushPanel("discover");
     sync();
@@ -206,7 +207,7 @@
     if (!media.matches) return;
     closeDiscover();
     closeMore();
-    if (event.state?.qdpMobilePanel === "discover") openDiscover({ historyEntry: false });
+    if (event.state?.qdpMobilePanel === "discover") openDiscover({ historyEntry: false, reset: false });
     else if (event.state?.qdpMobilePanel === "more") {
       toggleClass(nav, "menu-open", true);
       moreButton.setAttribute("aria-expanded", "true");
