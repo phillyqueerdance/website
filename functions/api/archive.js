@@ -20,7 +20,7 @@ const CACHE_SECONDS = 60;
 const SHARDS = { artist: 4, venue: 2, party: 2, collective: 2, month: 4 };
 
 const value = (input, limit = 500) => String(input ?? "").trim().slice(0, limit);
-const publicName = input => value(input, 180).replace(/^\[(.*)\]$/s, "$1").trim();
+export const publicName = input => value(input, 180).replace(/^\[(.*)\]$/s, "$1").trim();
 const yes = input => input === true || /^yes$/i.test(String(input));
 const RELATED_KINDS = { artist: "artists", venue: "venues", party: "parties",
   collective: "collectives" };

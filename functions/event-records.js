@@ -1,5 +1,5 @@
 import { readPreparedEvents, onRequestGet as getLiveFeed } from "./api/events.js";
-import { publicEvent } from "./api/archive.js";
+import { publicEvent, publicName } from "./api/archive.js";
 import { withKvScope, readArchiveManifest, readArchiveRecord,
   cacheResponse, freshResponse, inheritCacheDeadline } from "./kv-cache.js";
 import "../profile-metadata.js";
@@ -42,7 +42,8 @@ export function cleanIndexedEvent(raw, manifest) {
     party: event.partyId ? [event.partyId] : [], collective: event.collectiveIds };
   if (Array.isArray(raw.related)) event.related = raw.related.filter(item =>
     item && Object.hasOwn(lists, item.kind) && lists[item.kind].includes(item.id) && item.name)
-    .map(item => ({ kind: item.kind, id: item.id, name: String(item.name).trim().slice(0, 180) }));
+    .map(item => ({ kind: item.kind, id: item.id, name: publicName(item.name) }))
+    .filter(item => item.name);
   return event;
 }
 
