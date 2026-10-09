@@ -229,6 +229,18 @@
     return pages;
   }
 
+  function calendarGroups(pages) {
+    const groups = [];
+    for (const days of pages) {
+      const group = groups.at(-1);
+      const previous = group?.at(-1);
+      // Pages sharing a date stay together before that group's event photos.
+      if (previous && previous.at(-1).key === days[0].key) group.push(days);
+      else groups.push([days]);
+    }
+    return groups;
+  }
+
   function canvas(width = WIDTH, height = HEIGHT) {
     const element = document.createElement("canvas");
     element.width = width;
@@ -694,17 +706,20 @@
       const prefix = `qdp-${first}-${last}`;
       await addImage(titleSlide(logo, first, last), "Title slide", `${prefix}-title.png`);
       let missingFlyers = 0;
+      let calendarIndex = 0;
       let eventIndex = 0;
-      for (let index = 0; index < pages.length; index++) {
-        const days = pages[index];
-        status.textContent = `Drawing calendar ${index + 1} of ${pages.length}…`;
-        const dates = days.length === 1 ? dayPart(days[0].key) :
-          `${dayPart(days[0].key)} - ${dayPart(days.at(-1).key)}`;
-        await addImage(calendarSlide(frame, days),
-          `Calendar ${index + 1}: ${dates}`,
-          `${prefix}-calendar-${String(index + 1).padStart(2, "0")}.png`);
-        // Each calendar page is followed by only the events shown on that page.
-        const individual = orderEventSlides(days.flatMap(day => day.events));
+      for (const group of calendarGroups(pages)) {
+        for (const days of group) {
+          calendarIndex++;
+          status.textContent = `Drawing calendar ${calendarIndex} of ${pages.length}…`;
+          const dates = days.length === 1 ? dayPart(days[0].key) :
+            `${dayPart(days[0].key)} - ${dayPart(days.at(-1).key)}`;
+          await addImage(calendarSlide(frame, days),
+            `Calendar ${calendarIndex}: ${dates}`,
+            `${prefix}-calendar-${String(calendarIndex).padStart(2, "0")}.png`);
+        }
+        const individual = orderEventSlides(group.flatMap(days =>
+          days.flatMap(day => day.events)));
         for (const item of individual) {
           eventIndex++;
           status.textContent = `Drawing event ${eventIndex} of ${selected.length}…`;
