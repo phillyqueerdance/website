@@ -693,6 +693,8 @@
       ]);
       const prefix = `qdp-${first}-${last}`;
       await addImage(titleSlide(logo, first, last), "Title slide", `${prefix}-title.png`);
+      let missingFlyers = 0;
+      let eventIndex = 0;
       for (let index = 0; index < pages.length; index++) {
         const days = pages[index];
         status.textContent = `Drawing calendar ${index + 1} of ${pages.length}…`;
@@ -701,19 +703,19 @@
         await addImage(calendarSlide(frame, days),
           `Calendar ${index + 1}: ${dates}`,
           `${prefix}-calendar-${String(index + 1).padStart(2, "0")}.png`);
-      }
-      let missingFlyers = 0;
-      const individual = orderEventSlides(selected);
-      for (let index = 0; index < individual.length; index++) {
-        const item = individual[index];
-        status.textContent = `Drawing event ${index + 1} of ${individual.length}…`;
-        let flyer = null;
-        try { flyer = await flyerImage(item); }
-        catch (error) { console.warn(error); }
-        if (!flyer) missingFlyers++;
-        await addImage(popupSlide(frame, item, flyer, queerBackground),
-          `${stripFlags(item.title)} · ${posterDate(dateKey(item.start))}`,
-          `${prefix}-event-${String(index + 1).padStart(2, "0")}.png`);
+        // Each calendar page is followed by only the events shown on that page.
+        const individual = orderEventSlides(days.flatMap(day => day.events));
+        for (const item of individual) {
+          eventIndex++;
+          status.textContent = `Drawing event ${eventIndex} of ${selected.length}…`;
+          let flyer = null;
+          try { flyer = await flyerImage(item); }
+          catch (error) { console.warn(error); }
+          if (!flyer) missingFlyers++;
+          await addImage(popupSlide(frame, item, flyer, queerBackground),
+            `${stripFlags(item.title)} · ${posterDate(dateKey(item.start))}`,
+            `${prefix}-event-${String(eventIndex).padStart(2, "0")}.png`);
+        }
       }
       status.textContent = `${1 + pages.length + selected.length} PNG images ready.` +
         (missingFlyers ? ` ${missingFlyers} flyer${missingFlyers === 1 ? "" : "s"} could not be loaded; those images show a placeholder.` : "");
