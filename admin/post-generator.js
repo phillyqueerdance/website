@@ -107,6 +107,18 @@
     }).format(new Date(event.start)).replace(":00", "").replace(" ", "");
   }
 
+  function orderEventSlides(events) {
+    const priority = event => {
+      let artists = 3;
+      if (event.queerArtist && event.transArtist) artists = 0;
+      else if (event.transArtist) artists = 1;
+      else if (event.queerArtist) artists = 2;
+      // Queer events without artist flags still precede all non-queer events.
+      return (event.explicitQueer ? 0 : 4) + artists;
+    };
+    return [...events].sort((a, b) => priority(a) - priority(b));
+  }
+
   function splitEvents(events) {
     const count = Math.ceil(events.length / MAX_EVENTS);
     const base = Math.floor(events.length / count);
@@ -691,9 +703,10 @@
           `${prefix}-calendar-${String(index + 1).padStart(2, "0")}.png`);
       }
       let missingFlyers = 0;
-      for (let index = 0; index < selected.length; index++) {
-        const item = selected[index];
-        status.textContent = `Drawing event ${index + 1} of ${selected.length}…`;
+      const individual = orderEventSlides(selected);
+      for (let index = 0; index < individual.length; index++) {
+        const item = individual[index];
+        status.textContent = `Drawing event ${index + 1} of ${individual.length}…`;
         let flyer = null;
         try { flyer = await flyerImage(item); }
         catch (error) { console.warn(error); }
