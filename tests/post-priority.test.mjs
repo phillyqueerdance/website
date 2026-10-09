@@ -46,12 +46,14 @@ const calendarIds = images => images.filter(item => item.slide.type === 'calenda
 const individualIds = images => images.filter(item => item.slide.type === 'event')
   .map(item => item.slide.event.eventId);
 
-function assertPageSequence(images, expectedGroups) {
+function assertGroupSequence(images, expectedGroups) {
   assert.equal(images[0].slide.type, 'title');
   let offset = 1;
-  for (const ids of expectedGroups) {
-    assert.equal(images[offset++].slide.type, 'calendar');
-    for (const id of ids) {
+  for (const { calendars, eventIds } of expectedGroups) {
+    for (let page = 0; page < calendars; page++) {
+      assert.equal(images[offset++].slide.type, 'calendar');
+    }
+    for (const id of eventIds) {
       const { slide } = images[offset++];
       assert.equal(slide.type, 'event');
       assert.equal(slide.event.eventId, id);
@@ -60,25 +62,25 @@ function assertPageSequence(images, expectedGroups) {
   assert.equal(offset, images.length, 'every image belongs to its expected calendar group');
 }
 
-test('each calendar page is followed by its own prioritized events, covering all flag combinations', async () => {
+test('all calendar pages for the 10th precede all of its prioritized event slides', async () => {
   const events = [
     ['non-none', false, false, false], ['queer-queer', true, true, false],
     ['non-trans', false, false, true], ['queer-both', true, true, true],
     ['queer-none', true, false, false], ['non-queer', false, true, false],
     ['queer-trans', true, false, true], ['non-both', false, true, true]
   ].map(([eventId, explicitQueer, queerArtist, transArtist], index) => ({
-    eventId, title: eventId, start: `2030-10-09T${14 + index}:00:00-04:00`,
+    eventId, title: eventId, start: `2030-10-10T${14 + index}:00:00-04:00`,
     explicitQueer, queerArtist, transArtist
   }));
   const before = structuredClone(events);
-  const images = await generate(events);
-  assertPageSequence(images, [
-    ['queer-both', 'queer-queer', 'non-trans', 'non-none'],
-    ['queer-trans', 'queer-none', 'non-both', 'non-queer']
-  ]);
+  const images = await generate(events, '2030-10-10', '2030-10-10');
+  assertGroupSequence(images, [{ calendars: 2, eventIds: [
+    'queer-both', 'queer-trans', 'queer-queer', 'queer-none',
+    'non-both', 'non-trans', 'non-queer', 'non-none'
+  ] }]);
   assert.deepEqual(calendarIds(images), events.map(event => event.eventId));
   assert.deepEqual(images.filter(item => item.slide.type === 'event').map(item => item.filename),
-    Array.from({ length: 8 }, (_, index) => `qdp-2030-10-09-2030-10-10-event-0${index + 1}.png`));
+    Array.from({ length: 8 }, (_, index) => `qdp-2030-10-10-2030-10-10-event-0${index + 1}.png`));
   assert.deepEqual(events, before, 'the source feed must not be reordered or changed');
 });
 
@@ -92,11 +94,14 @@ test('calendar dates take precedence; equal priorities retain time and alphabeti
   events.push({ eventId: 'outside', title: 'Outside dates', start: '2030-10-11T13:00:00-04:00' });
   events.push({ eventId: 'deleted', title: '(DELETED ENTRY) removed', start: '2030-10-09T14:00:00-04:00' });
   const images = await generate(events);
-  assertPageSequence(images, [['alpha', 'beta', 'unflagged'], ['later']]);
+  assertGroupSequence(images, [
+    { calendars: 1, eventIds: ['alpha', 'beta', 'unflagged'] },
+    { calendars: 1, eventIds: ['later'] }
+  ]);
   assert.deepEqual(calendarIds(images), ['unflagged', 'alpha', 'beta', 'later']);
 });
 
-test('posts exceeding 20 images retain calendar packing and prioritize events within each page', async () => {
+test('posts exceeding 20 images retain calendar packing and prioritize events within each date group', async () => {
   const events = Array.from({ length: 22 }, (_, index) => ({
     eventId: `E${index}`, title: `Event ${index}`,
     start: `2030-10-${String(9 + (index < 18 ? Math.floor(index / 6) : 3 + Math.floor((index - 18) / 2))).padStart(2, '0')}T${14 + (index < 18 ? index % 6 : index % 2)}:00:00-04:00`,
@@ -109,15 +114,15 @@ test('posts exceeding 20 images retain calendar packing and prioritize events wi
     .map(item => item.slide.days.map(day => day.key)),
   [['2030-10-09'], ['2030-10-10'], ['2030-10-11'], ['2030-10-12', '2030-10-13']]);
   assert.equal(individualIds(images).length, events.length);
-  assertPageSequence(images, [
-    ['E3', 'E1', 'E5', 'E0', 'E4', 'E2'],
-    ['E9', 'E7', 'E11', 'E8', 'E6', 'E10'],
-    ['E15', 'E13', 'E17', 'E12', 'E16', 'E14'],
-    ['E21', 'E19', 'E20', 'E18']
+  assertGroupSequence(images, [
+    { calendars: 1, eventIds: ['E3', 'E1', 'E5', 'E0', 'E4', 'E2'] },
+    { calendars: 1, eventIds: ['E9', 'E7', 'E11', 'E8', 'E6', 'E10'] },
+    { calendars: 1, eventIds: ['E15', 'E13', 'E17', 'E12', 'E16', 'E14'] },
+    { calendars: 1, eventIds: ['E21', 'E19', 'E20', 'E18'] }
   ]);
 });
 
-test('combined 13th and 14th calendar is followed by its events before the 15th calendar', async () => {
+test('combined 13th and 14th group precedes both calendars for the 15th and then all of its events', async () => {
   const events = [
     { eventId: '13-unflagged', title: '13 unflagged', start: '2030-10-13T14:00:00-04:00' },
     { eventId: '13-trans', title: '13 trans', start: '2030-10-13T15:00:00-04:00', explicitQueer: true, transArtist: true },
@@ -126,7 +131,7 @@ test('combined 13th and 14th calendar is followed by its events before the 15th 
   ];
   // A busy 15th triggers the existing >20-image packing rule and splits that
   // day across pages. All of its events outrank some events on the earlier page.
-  const laterIds = Array.from({ length: 19 }, (_, index) => `15-${index}`);
+  const laterIds = Array.from({ length: 12 }, (_, index) => `15-${index}`);
   events.push(...laterIds.map((eventId, index) => ({
     eventId, title: eventId, start: `2030-10-15T12:${String(index).padStart(2, '0')}:00-04:00`,
     explicitQueer: true, queerArtist: true, transArtist: true
@@ -134,12 +139,27 @@ test('combined 13th and 14th calendar is followed by its events before the 15th 
   const images = await generate(events, '2030-10-13', '2030-10-15');
   assert.deepEqual(images.filter(item => item.slide.type === 'calendar')
     .map(item => item.slide.days.map(day => day.key)),
-  [['2030-10-13', '2030-10-14'], ['2030-10-15'], ['2030-10-15'], ['2030-10-15'], ['2030-10-15']]);
-  assertPageSequence(images, [
-    ['14-both', '13-trans', '14-queer', '13-unflagged'],
-    laterIds.slice(0, 5), laterIds.slice(5, 10), laterIds.slice(10, 15), laterIds.slice(15)
+  [['2030-10-13', '2030-10-14'], ['2030-10-15'], ['2030-10-15']]);
+  assertGroupSequence(images, [
+    { calendars: 1, eventIds: ['14-both', '13-trans', '14-queer', '13-unflagged'] },
+    { calendars: 2, eventIds: laterIds }
   ]);
   assert.deepEqual(calendarIds(images), events.map(event => event.eventId));
   assert.deepEqual(individualIds(images).sort(), events.map(event => event.eventId).sort(),
     'each selected event is rendered exactly once');
+});
+
+test('a date spanning two pages finishes before a later date, even when the later events rank higher', async () => {
+  const earlierIds = Array.from({ length: 8 }, (_, index) => `10-${index}`);
+  const events = earlierIds.map((eventId, index) => ({
+    eventId, title: eventId, start: `2030-10-10T12:${String(index).padStart(2, '0')}:00-04:00`
+  }));
+  events.push({ eventId: '11-both', title: '11 both', start: '2030-10-11T12:00:00-04:00',
+    explicitQueer: true, queerArtist: true, transArtist: true });
+  const images = await generate(events, '2030-10-10', '2030-10-11');
+  assertGroupSequence(images, [
+    { calendars: 2, eventIds: earlierIds },
+    { calendars: 1, eventIds: ['11-both'] }
+  ]);
+  assert.deepEqual(calendarIds(images), events.map(event => event.eventId));
 });
