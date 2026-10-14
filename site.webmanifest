@@ -1,0 +1,17 @@
+{
+  "name": "Queer Dance Philly",
+  "short_name": "QDP",
+  "start_url": "/",
+  "scope": "/",
+  "display": "browser",
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "icons": [
+    {
+      "src": "/start-here-logo.png?v=20261014-01",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
