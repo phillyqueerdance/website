@@ -67,7 +67,8 @@ export function renderEventPage(context, page, result, id) {
     .on("#eventStack", { element(element) { element.setAttribute("hidden", ""); element.setInnerContent(""); } })
     .on("#eventDetail", { element(element) {
       element.removeAttribute("hidden");
-      element.setAttribute("class", `event-detail is-open${event?.explicitQueer ? " explicit" : ""}`);
+      const melt = String(event?.partyId || "").trim().toUpperCase() === "MELT-001";
+      element.setAttribute("class", `event-detail is-open${event?.explicitQueer ? " explicit" : ""}${melt ? " melt" : ""}`);
       element.setAttribute("role", "group");
       element.setAttribute("aria-labelledby", "eventDetailTitle");
       element.setAttribute("tabindex", "-1");

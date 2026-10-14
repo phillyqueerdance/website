@@ -372,7 +372,8 @@
 .event-detail-content-viewport > .event-detail-card[aria-hidden="true"] {
   pointer-events: none;
 }
-.event-detail.explicit {
+.event-detail.explicit,
+.event-detail.melt {
   background-color: var(--qdp-queer-popup);
   background-image: url("queer-popup-background.png?v=a87c9d4");
   background-position: center;
@@ -380,6 +381,9 @@
   background-size: 100% 100%;
   background-origin: padding-box;
   background-clip: padding-box;
+}
+.event-detail.melt {
+  background-image: url("melt-popup-background.jpg?v=20261014-01");
 }
 .event-detail-card {
   position: relative;

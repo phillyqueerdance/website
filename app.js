@@ -925,7 +925,7 @@ function renderPoster() {
   const keepDetail = Boolean(requestedEventId()) && !eventDetail.hidden;
   if (!keepDetail) {
     eventDetail.hidden = true;
-    eventDetail.classList.remove("is-open", "explicit");
+    eventDetail.classList.remove("is-open", "explicit", "melt");
   }
   eventStack.hidden = keepDetail;
   syncViewAccessibility();
@@ -1269,6 +1269,8 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   );
 
   eventDetail.classList.toggle("explicit", event.explicitQueer === true);
+  eventDetail.classList.toggle("melt",
+    String(event.partyId || "").trim().toUpperCase() === "MELT-001");
   const dateBadge = eventDetail.querySelector(".event-detail-date-badge") ||
     document.createElement("div");
   eventDetail.replaceChildren();
@@ -1721,7 +1723,7 @@ function hideEventDetail({ restoreFocus = true } = {}) {
     )
   ) {
     eventDetail.hidden = true;
-    eventDetail.classList.remove("is-open", "explicit");
+    eventDetail.classList.remove("is-open", "explicit", "melt");
     eventStack.hidden = false;
     syncViewAccessibility();
     eventStack.scrollTop = savedEventScrollTop;
