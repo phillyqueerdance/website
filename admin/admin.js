@@ -34,7 +34,9 @@ const state = {
   artistById: new Map(),
   venueById: new Map(),
   drafts: new Map(),
+  cards: new Map(),
   busy: false,
+  searchTimer: null,
   toastTimer: null
 };
 
@@ -344,6 +346,10 @@ function unsavedCount() {
 }
 
 function setBusy(busy) {
+  if (busy && state.searchTimer !== null) {
+    renderEvents();
+  }
+
   state.busy = busy;
 
   elements.refreshButton.classList.toggle(
@@ -370,7 +376,9 @@ function setBusy(busy) {
 
   if (!busy) {
     updateGlobalControls();
-    renderEvents();
+    state.cards.forEach(({ card, event }) => {
+      updateCardState(card, event);
+    });
   }
 }
 
@@ -655,6 +663,7 @@ async function saveEvent(
       showToast(error.message, true);
     }
   } finally {
+    card.classList.remove("is-saving");
     setBusy(false);
   }
 }
@@ -722,74 +731,87 @@ function renderEvent(event) {
   let explicitQueerTouched =
     Boolean(draft.explicitQueerTouched);
 
-  const emptyVenueOption = document.createElement("option");
-  emptyVenueOption.value = "";
-  emptyVenueOption.textContent = "No linked venue";
-  venueInput.append(emptyVenueOption);
+  let venuesLoaded = false;
+  let artistsLoaded = false;
 
-  if (
-    draft.venueId &&
-    !state.venueById.has(draft.venueId)
-  ) {
-    const unknownVenueOption = document.createElement("option");
-    unknownVenueOption.value = draft.venueId;
-    unknownVenueOption.textContent =
-      `Unknown VenueID · ${draft.venueId}`;
-    venueInput.append(unknownVenueOption);
+  function addVenueOption(id) {
+    const venue = state.venueById.get(id);
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = !id
+      ? "No linked venue"
+      : venue
+        ? `${venue.name} · ${id}`
+        : `Unknown VenueID · ${id}`;
+    venueInput.append(option);
   }
 
-  state.venues.forEach(venue => {
-    const option = document.createElement("option");
-    option.value = venue.id;
-    option.textContent = `${venue.name} · ${venue.id}`;
-    venueInput.append(option);
-  });
+  addVenueOption("");
+  if (draft.venueId) addVenueOption(draft.venueId);
 
-  const selectedArtistIds = new Set(draft.artistIds);
-  const artistChoices = [
-    ...draft.artistIds.map(id =>
-      state.artistById.get(id) || {
-        id,
-        name: "Unknown ArtistID",
-        missing: true,
-        consent: false,
-        queer: false,
-        trans: false
-      }
-    ),
-    ...state.artists.filter(
-      artist => !selectedArtistIds.has(artist.id)
-    )
-  ];
+  function loadVenueOptions() {
+    if (venuesLoaded) return;
+    const selected = venueInput.value;
+    venueInput.replaceChildren();
+    addVenueOption("");
+    if (selected && !state.venueById.has(selected)) {
+      addVenueOption(selected);
+    }
+    state.venues.forEach(venue => addVenueOption(venue.id));
+    venueInput.value = selected;
+    venuesLoaded = true;
+  }
 
-  artistChoices.forEach(artist => {
-    const optionLabel = document.createElement("label");
-    optionLabel.className = "artist-option";
-    optionLabel.dataset.search =
-      `${artist.name} ${artist.id}`.toLowerCase();
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = artist.id;
-    checkbox.checked = selectedArtistIds.has(artist.id);
-
-    const copy = document.createElement("span");
-    const name = document.createElement("strong");
-    name.textContent = artistDisplayName(artist);
-    const id = document.createElement("small");
-    id.textContent = artist.missing
-      ? `${artist.id} · not found in Artists`
-      : artist.id;
-    copy.append(name, id);
-    optionLabel.append(checkbox, copy);
-    artistOptions.append(optionLabel);
-  });
+  venueInput.addEventListener("focus", loadVenueOptions);
+  venueInput.addEventListener("pointerdown", loadVenueOptions);
 
   const artistEmpty = document.createElement("p");
   artistEmpty.className = "artist-empty";
   artistEmpty.textContent = "No artists match that search.";
   artistEmpty.hidden = true;
   artistOptions.append(artistEmpty);
+
+  function loadArtistOptions() {
+    if (artistsLoaded) return;
+    const selectedArtistIds = new Set(draftFor(event).artistIds);
+    const artistChoices = [
+      ...Array.from(selectedArtistIds, id =>
+        state.artistById.get(id) || {
+          id,
+          name: "Unknown ArtistID",
+          missing: true
+        }
+      ),
+      ...state.artists.filter(artist => !selectedArtistIds.has(artist.id))
+    ];
+    const options = document.createDocumentFragment();
+
+    artistChoices.forEach(artist => {
+      const optionLabel = document.createElement("label");
+      optionLabel.className = "artist-option";
+      optionLabel.dataset.search =
+        `${artist.name} ${artist.id}`.toLowerCase();
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = artist.id;
+      checkbox.checked = selectedArtistIds.has(artist.id);
+
+      const copy = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = artistDisplayName(artist);
+      const id = document.createElement("small");
+      id.textContent = artist.missing
+        ? `${artist.id} · not found in Artists`
+        : artist.id;
+      copy.append(name, id);
+      optionLabel.append(checkbox, copy);
+      options.append(optionLabel);
+    });
+
+    artistOptions.insertBefore(options, artistEmpty);
+    artistsLoaded = true;
+  }
 
   publicTitleInput.value = draft.publicTitle;
   descriptionInput.value = draft.description;
@@ -798,6 +820,8 @@ function renderEvent(event) {
   venueInput.value = draft.venueId;
 
   function checkedArtistIds() {
+    // Editing another field before opening this picker must preserve its IDs.
+    if (!artistsLoaded) return [...draftFor(event).artistIds];
     return Array.from(
       artistOptions.querySelectorAll(
         '.artist-option input[type="checkbox"]:checked'
@@ -866,11 +890,7 @@ function renderEvent(event) {
     }
   );
 
-  artistOptions
-    .querySelectorAll('.artist-option input[type="checkbox"]')
-    .forEach(checkbox => {
-      checkbox.addEventListener("change", storeDraft);
-    });
+  artistOptions.addEventListener("change", storeDraft);
 
   artistSearchInput.addEventListener(
     "input",
@@ -897,6 +917,7 @@ function renderEvent(event) {
     "toggle",
     () => {
       if (artistPicker.open) {
+        loadArtistOptions();
         artistSearchInput.focus();
       } else {
         artistSearchInput.value = "";
@@ -911,6 +932,7 @@ function renderEvent(event) {
       "click",
       () => {
         state.drafts.delete(event.eventId);
+        state.cards.delete(event.eventId);
         renderEvents();
         updateGlobalControls();
       }
@@ -929,11 +951,46 @@ function renderEvent(event) {
 }
 
 function renderEvents() {
+  window.clearTimeout(state.searchTimer);
+  state.searchTimer = null;
   const events = visibleEvents();
+  const currentIds = new Set(state.events.map(event => event.eventId));
+  state.cards.forEach((entry, id) => {
+    if (!currentIds.has(id)) state.cards.delete(id);
+  });
 
-  elements.eventList.replaceChildren(
-    ...events.map(renderEvent)
-  );
+  const cards = events.map(event => {
+    let entry = state.cards.get(event.eventId);
+    if (!entry || entry.event !== event) {
+      entry = { event, card: renderEvent(event) };
+      state.cards.set(event.eventId, entry);
+    }
+    if (entry.card.parentElement !== elements.eventList) {
+      // A filtered-out card may have been detached while a save was busy.
+      entry.card.querySelectorAll("button, input, textarea, select")
+        .forEach(control => { control.disabled = state.busy; });
+      entry.card.querySelectorAll("details").forEach(details => {
+        details.classList.toggle("is-disabled", state.busy);
+        if (state.busy) details.open = false;
+      });
+      updateCardState(entry.card, event);
+    }
+    return entry.card;
+  });
+  const visibleCards = new Set(cards);
+  Array.from(elements.eventList.children).forEach(card => {
+    if (!visibleCards.has(card)) card.remove();
+  });
+
+  // Leave unchanged cards attached, preserving focus and unfinished edits.
+  let next = elements.eventList.firstElementChild;
+  cards.forEach(card => {
+    if (card === next) {
+      next = next.nextElementSibling;
+    } else {
+      elements.eventList.insertBefore(card, next);
+    }
+  });
 
   elements.loadingState.hidden = true;
   elements.eventList.hidden = events.length === 0;
@@ -1082,6 +1139,7 @@ function applySavedEvent(result, expectedEventId) {
 }
 
 function applyDashboard(result) {
+  state.cards.clear();
   const references = result.references || {};
 
   state.artists = Array.isArray(references.artists)
@@ -1229,7 +1287,10 @@ elements.pushButton.addEventListener(
 
 elements.searchInput.addEventListener(
   "input",
-  renderEvents
+  () => {
+    window.clearTimeout(state.searchTimer);
+    state.searchTimer = window.setTimeout(renderEvents, 150);
+  }
 );
 
 elements.filterSelect.addEventListener(

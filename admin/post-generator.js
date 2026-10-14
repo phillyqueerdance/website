@@ -476,17 +476,69 @@
     return out;
   }
 
-  async function flyerImage(event) {
+  async function flyerImage(event, signal) {
     if (!event.flyerUrl) return null;
     const response = await fetch(
       `/admin/flyer?url=${encodeURIComponent(event.flyerUrl)}`,
-      { credentials: "same-origin", cache: "no-store" }
+      { credentials: "same-origin", cache: "no-store", signal }
     );
     if (!response.ok) throw new Error(`Flyer unavailable (${response.status}).`);
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     try { return await image(url); }
     finally { URL.revokeObjectURL(url); }
+  }
+
+  function prefetchFlyers(events) {
+    const controller = new AbortController();
+    const pending = new Map();
+    const cache = new Map();
+    const remaining = new Map();
+    events.forEach(event => {
+      const key = event.flyerUrl || "";
+      remaining.set(key, (remaining.get(key) || 0) + 1);
+    });
+    let next = 0;
+
+    function fill() {
+      // Keep only three unconsumed events ahead of drawing, rather than
+      // downloading and decoding every flyer into phone memory at once.
+      while (pending.size < 3 && next < events.length) {
+        const index = next++;
+        const event = events[index];
+        const key = event.flyerUrl || "";
+        let promise = cache.get(key);
+        if (!promise) {
+          promise = flyerImage(event, controller.signal).catch(error => {
+            if (error.name !== "AbortError") console.warn(error);
+            return null;
+          });
+          cache.set(key, promise);
+        }
+        pending.set(index, promise);
+      }
+    }
+
+    fill();
+    return {
+      async take(index) {
+        const flyer = await pending.get(index);
+        pending.delete(index);
+        const key = events[index].flyerUrl || "";
+        const left = remaining.get(key) - 1;
+        remaining.set(key, left);
+        // Unique flyers are released immediately; repeated URLs are reused
+        // until their final slide in this generation has been drawn.
+        if (!left) cache.delete(key);
+        fill();
+        return flyer;
+      },
+      close() {
+        controller.abort();
+        pending.clear();
+        cache.clear();
+      }
+    };
   }
 
   function popupSlide(frame, event, flyer, queerBackground) {
@@ -681,6 +733,7 @@
     gallery.replaceChildren();
     imageUrls.splice(0).forEach(url => URL.revokeObjectURL(url));
     imageFiles.length = 0;
+    let flyers;
     try {
       const response = await fetch("/admin/post-data", {
         credentials: "same-origin", cache: "no-store"
@@ -697,6 +750,12 @@
         stripFlags(a.title).localeCompare(stripFlags(b.title), undefined,
           { sensitivity: "base" }));
       const pages = calendarPages(selected);
+      const groups = calendarGroups(pages).map(calendars => ({
+        calendars,
+        events: orderEventSlides(calendars.flatMap(days =>
+          days.flatMap(day => day.events)))
+      }));
+      flyers = prefetchFlyers(groups.flatMap(group => group.events));
       const [logo, frame, queerBackground] = await Promise.all([
         image("../newlogoqdp.png?v=20260926-01"),
         image("../frame.png?v=20260926-01"),
@@ -708,8 +767,8 @@
       let missingFlyers = 0;
       let calendarIndex = 0;
       let eventIndex = 0;
-      for (const group of calendarGroups(pages)) {
-        for (const days of group) {
+      for (const group of groups) {
+        for (const days of group.calendars) {
           calendarIndex++;
           status.textContent = `Drawing calendar ${calendarIndex} of ${pages.length}…`;
           const dates = days.length === 1 ? dayPart(days[0].key) :
@@ -718,14 +777,10 @@
             `Calendar ${calendarIndex}: ${dates}`,
             `${prefix}-calendar-${String(calendarIndex).padStart(2, "0")}.png`);
         }
-        const individual = orderEventSlides(group.flatMap(days =>
-          days.flatMap(day => day.events)));
-        for (const item of individual) {
+        for (const item of group.events) {
           eventIndex++;
           status.textContent = `Drawing event ${eventIndex} of ${selected.length}…`;
-          let flyer = null;
-          try { flyer = await flyerImage(item); }
-          catch (error) { console.warn(error); }
+          const flyer = await flyers.take(eventIndex - 1);
           if (!flyer) missingFlyers++;
           await addImage(popupSlide(frame, item, flyer, queerBackground),
             `${stripFlags(item.title)} · ${posterDate(dateKey(item.start))}`,
@@ -737,7 +792,10 @@
       shareTools.hidden = imageFiles.length < 2 || !canShareFiles(imageFiles);
     } catch (error) {
       status.textContent = `Generation stopped: ${error.message}`;
-    } finally { button.disabled = false; }
+    } finally {
+      if (flyers) flyers.close();
+      button.disabled = false;
+    }
   });
 
   window.addEventListener("pagehide", () =>

@@ -27,7 +27,7 @@ async function generate(events, first = '2030-10-09', last = '2030-10-10') {
   })();`);
   assert.notEqual(instrumented, source);
   vm.runInNewContext(instrumented, {
-    Intl, Date, console, images, navigator: {},
+    Intl, Date, console, images, AbortController, navigator: {},
     document: { documentElement: {}, getElementById: element },
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
     window: { addEventListener() {} },
