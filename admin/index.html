@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
   <link rel="stylesheet" href="../poster-theme.css?v=20260926-01">
-  <link rel="stylesheet" href="admin.css?v=20260923-01">
+  <link rel="stylesheet" href="admin.css?v=20261015-bulk-1">
   <link rel="stylesheet" href="post-generator.css?v=20260926-02">
 </head>
 
@@ -81,6 +81,7 @@
         visibility does not require a push. A pull can create “Needs push”
         items when QDP's derived Calendar fields differ.
       </p>
+      <p id="syncProgress" class="sync-progress" role="status" aria-live="polite" hidden></p>
     </section>
 
     <section class="post-panel" aria-labelledby="postHeading">
@@ -135,6 +136,14 @@
             <option value="all">All active rows</option>
           </select>
         </label>
+      </div>
+
+      <div class="save-all-bar">
+        <div>
+          <strong id="unsavedSummary" role="status" aria-live="polite">No unsaved changes</strong>
+          <p id="saveAllHelp">Edit as many events as you need, then save them together. Includes edits hidden by your current filter.</p>
+        </div>
+        <button id="saveAllButton" class="save-all-button" type="button" disabled>Save all changes</button>
       </div>
 
       <div
@@ -311,7 +320,8 @@
     <p class="noscript">QDP Admin requires JavaScript.</p>
   </noscript>
 
-  <script src="admin.js?v=20261014-01"></script>
+  <script src="admin.js?v=20261015-bulk-1"></script>
   <script src="post-generator.js?v=20261015-melt-strip-1"></script>
 </body>
 </html>
+

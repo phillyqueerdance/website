@@ -814,3 +814,37 @@ select:focus-visible {
     transition-duration: 0.001ms !important;
   }
 }
+
+.save-all-bar {
+  position: sticky;
+  top: .5rem;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #922185;
+  border-radius: 1rem;
+  background: #1d1420;
+  box-shadow: 0 .5rem 1.5rem #0008;
+}
+.save-all-bar p { margin: .35rem 0 0; font-size: .85rem; color: #cfc3d1; }
+.save-all-button {
+  flex-shrink: 0;
+  padding: .8rem 1.1rem;
+  border: 0;
+  border-radius: .7rem;
+  background: #fa2b5a;
+  color: #fff1f4;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.save-all-button:disabled { opacity: .45; cursor: default; }
+.sync-progress { padding: .75rem; border-left: 3px solid #fa2b5a; color: #fff1f4; }
+@media (max-width: 540px) {
+  .save-all-bar { flex-direction: column; align-items: stretch; gap: .65rem; }
+  .save-all-button { width: 100%; }
+}

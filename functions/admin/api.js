@@ -5,6 +5,7 @@ const ALLOWED_ACTIONS = new Set([
   "admin.bootstrap",
   "admin.status",
   "admin.save",
+  "admin.savebatch",
   "admin.pull",
   "admin.push"
 ]);
@@ -362,7 +363,7 @@ export async function onRequestPost(
       ) || 0
     );
 
-    if (contentLength > 50000) {
+    if (contentLength > 2 * 1024 * 1024) {
       return jsonResponse(
         { error: "The request is too large." },
         413
@@ -371,7 +372,7 @@ export async function onRequestPost(
 
     const body = await context.request.json();
 
-    if (JSON.stringify(body).length > 50000) {
+    if (new TextEncoder().encode(JSON.stringify(body)).length > 2 * 1024 * 1024) {
       return jsonResponse(
         { error: "The request is too large." },
         413
@@ -462,3 +463,4 @@ export function onRequestGet() {
     405
   );
 }
+

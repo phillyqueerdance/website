@@ -4,6 +4,10 @@ const elements = {
   refreshButton: document.getElementById("refreshButton"),
   pullButton: document.getElementById("pullButton"),
   pushButton: document.getElementById("pushButton"),
+  saveAllButton: document.getElementById("saveAllButton"),
+  unsavedSummary: document.getElementById("unsavedSummary"),
+  saveAllHelp: document.getElementById("saveAllHelp"),
+  syncProgress: document.getElementById("syncProgress"),
   pendingSummary: document.getElementById("pendingSummary"),
   searchInput: document.getElementById("searchInput"),
   filterSelect: document.getElementById("filterSelect"),
@@ -36,6 +40,12 @@ const state = {
   drafts: new Map(),
   cards: new Map(),
   busy: false,
+  refreshing: false,
+  capabilities: {},
+  referencesVersion: "",
+  syncJob: null,
+  syncPollTimer: null,
+  syncPollFailures: 0,
   searchTimer: null,
   toastTimer: null
 };
@@ -272,6 +282,7 @@ async function adminRequest(
 
 function baseDraft(event) {
   return {
+    expectedRevision: event.revision,
     publicTitle: event.publicTitle,
     description: event.description,
     publishToWeb: event.publishToWeb,
@@ -394,13 +405,21 @@ function updateGlobalControls() {
       ? state.status.pendingOutsideWindowCount || 0
       : 0;
 
-  elements.pullButton.disabled =
-    state.busy || unsaved > 0;
+  const syncActive = Boolean(state.syncJob);
+  const writesBlocked = state.busy || state.refreshing || syncActive;
+  elements.pullButton.disabled = writesBlocked || unsaved > 0;
 
   elements.pushButton.disabled =
-    state.busy || unsaved > 0;
+    writesBlocked || unsaved > 0;
 
-  elements.refreshButton.disabled = state.busy;
+  elements.saveAllButton.disabled = writesBlocked || !unsaved || !state.capabilities.bulkSave;
+  elements.saveAllButton.textContent = unsaved ? `Save all changes (${unsaved})` : "Save all changes";
+  elements.unsavedSummary.textContent = unsaved ? `${unsaved} event${unsaved === 1 ? " has" : "s have"} unsaved changes` : "No unsaved changes";
+  elements.saveAllHelp.textContent = state.capabilities.bulkSave
+    ? "Saves every edited event together, including edits hidden by your current filter."
+    : "Bulk saving needs the updated Apps Script with Google Sheets API enabled. Individual Save remains available.";
+
+  elements.refreshButton.disabled = state.busy || state.refreshing;
   elements.searchInput.disabled = state.busy;
   elements.filterSelect.disabled = state.busy;
 
@@ -543,13 +562,19 @@ function updateCardState(
   const resetButton =
     card.querySelector(".reset-button");
 
-  saveButton.disabled = state.busy || !dirty;
+  saveButton.disabled = state.busy || state.refreshing || Boolean(state.syncJob) || !dirty;
   resetButton.disabled = state.busy || !dirty;
 
   const badge =
     card.querySelector(".sync-badge");
 
-  if (calendarDirty) {
+  if (event.removedFromSheet) {
+    badge.textContent = "Removed from active Sheet; keep or reset this draft";
+    badge.classList.add("needs-push");
+  } else if (dirty && draft.expectedRevision && draft.expectedRevision !== event.revision) {
+    badge.textContent = "Changed in Sheet; review before saving";
+    badge.classList.add("needs-push");
+  } else if (calendarDirty) {
     badge.textContent = "Unsaved";
     badge.classList.add("needs-push");
   } else if (event.needsPush) {
@@ -575,97 +600,9 @@ function updateCardState(
     : "Standard event styling and Calendar color";
 }
 
-async function saveEvent(
-  event,
-  card
-) {
-  const draft = draftFor(event);
-
-  if (!draftIsDirty(event, draft)) {
-    return;
-  }
-
-  if (!draft.publicTitle.trim()) {
-    showToast("Public title cannot be blank.", true);
-    card.querySelector(".public-title-input").focus();
-    return;
-  }
-
-  setBusy(true);
-  card.classList.add("is-saving");
-
-  const changedCalendarFields =
-    calendarFieldsAreDirty(event, draft);
-
-  try {
-    const result = await adminRequest(
-      "admin.save",
-      {
-        eventId: event.eventId,
-        expectedRevision: event.revision,
-        publicTitle: draft.publicTitle,
-        description: draft.description,
-        publishToWeb: draft.publishToWeb,
-        artistIds: draft.artistIds,
-        venueId: draft.venueId,
-        explicitQueer: draft.explicitQueer,
-        explicitQueerTouched: draft.explicitQueerTouched
-      }
-    );
-
-    applySavedEvent(result, event.eventId);
-
-    const updatedEvent = state.events.find(
-      candidate => candidate.eventId === event.eventId
-    );
-
-    showToast(
-      changedCalendarFields
-        ? updatedEvent && !updatedEvent.inSyncWindow
-          ? "Saved to the Sheet. This event is outside the current sync window; expand the window before pushing."
-          : "Saved to the Sheet. Push when you are ready to update Calendar."
-        : "Website visibility saved. The public feed may take up to five minutes to refresh."
-    );
-  } catch (error) {
-    const shouldReconcile =
-      /404|fetch|network|load failed|temporarily unavailable|invalid confirmation|no longer in this Admin view/i
-        .test(error.message || "");
-
-    let recovered = false;
-
-    if (shouldReconcile) {
-      try {
-        const refreshed = await adminRequest("admin.bootstrap");
-        const refreshedEvent = refreshed.events.find(
-          candidate => candidate.eventId === event.eventId
-        );
-
-        if (
-          refreshedEvent &&
-          draftMatchesEvent(draft, refreshedEvent)
-        ) {
-          state.drafts.delete(event.eventId);
-          applyDashboard(refreshed);
-          recovered = true;
-        }
-      } catch (refreshError) {
-        recovered = false;
-      }
-    }
-
-    if (recovered) {
-      showToast(
-        changedCalendarFields
-          ? "Saved to the Sheet. The response was interrupted, so Admin refreshed and confirmed the save. Push when ready."
-          : "Website visibility was saved. Admin refreshed and confirmed it."
-      );
-    } else {
-      showToast(error.message, true);
-    }
-  } finally {
-    card.classList.remove("is-saving");
-    setBusy(false);
-  }
+async function saveEvent(event) {
+  if (!draftIsDirty(event, draftFor(event))) return;
+  await saveChangedEvents([event], false);
 }
 
 function contentImpliesExplicitQueer(title, description) {
@@ -833,6 +770,7 @@ function renderEvent(event) {
     state.drafts.set(
       event.eventId,
       {
+        expectedRevision: draftFor(event).expectedRevision || event.revision,
         publicTitle: publicTitleInput.value,
         description: descriptionInput.value,
         publishToWeb: publishInput.checked,
@@ -1106,168 +1044,68 @@ function updateStatusFromEvents() {
   };
 }
 
-function applySavedEvent(result, expectedEventId) {
-  const savedEvent = result && result.event;
-
-  if (
-    !savedEvent ||
-    savedEvent.eventId !== expectedEventId
-  ) {
-    throw new Error(
-      "The Sheet saved, but Admin received an invalid confirmation. Refresh before editing again."
-    );
-  }
-
-  const index = state.events.findIndex(
-    event => event.eventId === expectedEventId
-  );
-
-  if (index === -1) {
-    throw new Error(
-      "The saved event is no longer in this Admin view. Refresh before editing again."
-    );
-  }
-
-  state.events[index] = savedEvent;
-  state.events.sort(compareEvents);
-  state.drafts.delete(expectedEventId);
-  updateStatusFromEvents();
-
-  renderEvents();
-  renderStatus();
-  updateGlobalControls();
+function applySavedEvent(result, expectedId) {
+  applySavedEvents(result, [expectedId]);
 }
 
-function applyDashboard(result) {
+function applyDashboard(result, { preserveDrafts = false } = {}) {
+  const previous = new Map(state.events.map(event => [event.eventId, event]));
+  const edited = preserveDrafts ? new Map(state.events.filter(event => draftIsDirty(event, draftFor(event)))
+    .map(event => [event.eventId, draftFor(event)])) : new Map();
+  state.drafts.clear();
   state.cards.clear();
-  const references = result.references || {};
-
-  state.artists = Array.isArray(references.artists)
-    ? references.artists
-    : [];
-
-  state.venues = Array.isArray(references.venues)
-    ? references.venues
-    : [];
-
-  state.artistById = new Map(
-    state.artists.map(artist => [artist.id, artist])
-  );
-
-  state.venueById = new Map(
-    state.venues.map(venue => [venue.id, venue])
-  );
-
-  state.events = Array.isArray(result.events)
-    ? result.events
-    : [];
-
+  if (result.references) {
+    state.artists = result.references.artists || [];
+    state.venues = result.references.venues || [];
+    state.artistById = new Map(state.artists.map(artist => [artist.id, artist]));
+    state.venueById = new Map(state.venues.map(venue => [venue.id, venue]));
+  }
+  state.referencesVersion = result.referencesVersion || state.referencesVersion;
+  state.capabilities = result.capabilities || {};
+  state.events = Array.isArray(result.events) ? result.events : [];
+  edited.forEach((draft, id) => {
+    const current = state.events.find(event => event.eventId === id);
+    const before = previous.get(id);
+    if (current && before && draftMatchesEvent(baseDraft(before), current)) draft.expectedRevision = current.revision;
+    if (!current && before) state.events.push({ ...before, removedFromSheet: true });
+    state.drafts.set(id, draft);
+  });
+  state.events.sort(compareEvents);
   state.status = result.status || null;
-
-  renderEvents();
-  renderStatus();
-  updateGlobalControls();
+  renderEvents(); renderStatus(); updateGlobalControls();
+  if (result.syncJob && ['queued', 'running'].includes(result.syncJob.state)) trackSyncJob(result.syncJob);
 }
 
-async function refreshDashboard({
-  discardDrafts = false
-} = {}) {
-  if (
-    unsavedCount() > 0 &&
-    !discardDrafts
-  ) {
-    const confirmed = window.confirm(
-      "Refresh and discard your unsaved edits?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-  }
-
-  setBusy(true);
-
+async function refreshDashboard({ discardDrafts = false, preserveDrafts = false, quiet = false } = {}) {
+  if (unsavedCount() && !discardDrafts && !preserveDrafts && !window.confirm('Refresh and discard your unsaved edits?')) return;
+  if (quiet) { state.refreshing = true; updateGlobalControls(); state.cards.forEach(({card,event}) => updateCardState(card,event)); }
+  else setBusy(true);
   try {
-    const result = await adminRequest(
-      "admin.bootstrap"
-    );
-
-    state.drafts.clear();
-    applyDashboard(result);
+    const result = await adminRequest('admin.bootstrap', { referencesVersion: state.referencesVersion });
+    applyDashboard(result, { preserveDrafts });
   } catch (error) {
-    elements.loadingState.hidden = false;
-    elements.loadingState.textContent =
-      error.message;
+    if (!quiet) { elements.loadingState.hidden = false; elements.loadingState.textContent = error.message; }
     showToast(error.message, true);
   } finally {
-    setBusy(false);
+    state.refreshing = false;
+    if (!quiet) setBusy(false);
+    else { updateGlobalControls(); state.cards.forEach(({card,event}) => updateCardState(card,event)); }
   }
 }
 
 async function runSync(kind) {
-  if (unsavedCount() > 0) {
-    showToast(
-      "Save or reset your unsaved edits before syncing.",
-      true
-    );
-    return;
+  if (unsavedCount() || state.busy || state.syncJob) {
+    showToast('Save or reset your unsaved edits before syncing.', true); return;
   }
-
-  if (
-    kind === "pull" &&
-    state.status &&
-    state.status.pendingPushTotalCount > 0
-  ) {
-    const count = state.status.pendingPushTotalCount;
-
-    const confirmed = window.confirm(
-      `${count} saved event${count === 1 ? "" : "s"} ` +
-      `${count === 1 ? "has" : "have"} changes that have not been pushed. ` +
-      "Pulling can replace those Sheet edits with Calendar data. Pull anyway?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-  }
-
+  if (kind === 'pull' && state.status?.pendingPushTotalCount > 0 &&
+      !window.confirm(`${state.status.pendingPushTotalCount} saved events have changes that have not been pushed. Pulling can replace those Sheet edits with Calendar data. Pull anyway?`)) return;
   setBusy(true);
-
   try {
-    const result = await adminRequest(
-      `admin.${kind}`
-    );
-
-    state.drafts.clear();
-    applyDashboard(result);
-
-    const summary = result.operation || {};
-
-    if (kind === "pull") {
-      showToast(
-        `Pull complete: ${summary.updated || 0} updated, ` +
-        `${summary.appended || 0} added.`
-      );
-    } else {
-      const patched = summary.patched || 0;
-      const acknowledged = summary.acknowledged || 0;
-
-      showToast(
-        patched > 0
-          ? `Push complete: ${patched} Calendar ` +
-            `event${patched === 1 ? "" : "s"} updated; ` +
-            `${acknowledged} marked synced.`
-          : acknowledged > 0
-            ? `Push complete: ${acknowledged} event` +
-              `${acknowledged === 1 ? "" : "s"} marked synced; no Calendar changes were needed.`
-            : "Push complete: no Calendar changes were needed."
-      );
-    }
-  } catch (error) {
-    showToast(error.message, true);
-  } finally {
-    setBusy(false);
-  }
+    const result = await adminRequest(`admin.${kind}`);
+    if (result.job) trackSyncJob(result.job);
+    else { applyDashboard(result); showToast(`${kind === 'pull' ? 'Pull' : 'Push'} complete.`); }
+  } catch (error) { showToast(error.message, true); }
+  finally { setBusy(false); }
 }
 
 elements.refreshButton.addEventListener(
@@ -1311,3 +1149,106 @@ window.addEventListener(
 refreshDashboard({
   discardDrafts: true
 });
+
+
+
+function eventSavePayload(event) {
+  const draft = draftFor(event);
+  return { eventId: event.eventId, expectedRevision: draft.expectedRevision || event.revision,
+    publicTitle: draft.publicTitle, description: draft.description, publishToWeb: draft.publishToWeb,
+    artistIds: [...draft.artistIds], venueId: draft.venueId,
+    explicitQueer: draft.explicitQueer, explicitQueerTouched: draft.explicitQueerTouched };
+}
+
+
+async function saveAllChanges() {
+  if (!state.capabilities.bulkSave) {
+    showToast('Install the updated Apps Script and enable Google Sheets API to save events together.', true);
+    return;
+  }
+  const events = state.events.filter(event => draftIsDirty(event, draftFor(event)));
+  if (events.length) await saveChangedEvents(events, true);
+}
+
+
+async function saveChangedEvents(events, batch) {
+  if (state.busy || state.refreshing || state.syncJob) return;
+  const changes = events.map(eventSavePayload);
+  const invalid = changes.find(change => !change.publicTitle.trim());
+  if (invalid) { showToast(`${invalid.eventId}: Public title cannot be blank. Nothing was saved.`, true); return; }
+  if (changes.length > 500) { showToast('Save all supports up to 500 edited events. Save some individually first, then save the rest together.', true); return; }
+  const payload = batch ? { changes } : changes[0];
+  if (new TextEncoder().encode(JSON.stringify(payload)).length > 2 * 1024 * 1024) {
+    showToast('These edits contain too much text for one save. Save some events individually first.', true); return;
+  }
+  setBusy(true);
+  events.forEach(event => state.cards.get(event.eventId)?.card.classList.add('is-saving'));
+  try {
+    const result = await adminRequest(batch ? 'admin.savebatch' : 'admin.save', payload);
+    applySavedEvents(result, changes.map(change => change.eventId));
+    showToast(`${changes.length === 1 ? 'Event saved' : `${changes.length} events saved together`}. Push when ready to update Calendar.`);
+  } catch (error) {
+    let recovered = false;
+    if (/404|fetch|network|load failed|temporarily unavailable|invalid confirmation/i.test(error.message || '')) {
+      try {
+        const result = await adminRequest('admin.bootstrap', { referencesVersion: state.referencesVersion });
+        const saved = new Map((result.events || []).map(event => [event.eventId, event]));
+        if (changes.every(change => saved.has(change.eventId) && draftMatchesEvent(change, saved.get(change.eventId)))) {
+          applySavedEvents({ events: changes.map(change => saved.get(change.eventId)) }, changes.map(change => change.eventId));
+          recovered = true;
+          showToast(`${changes.length} saved event${changes.length === 1 ? '' : 's'} confirmed after the response was interrupted.`);
+        }
+      } catch (_) { /* Keep every draft when confirmation is unavailable. */ }
+    }
+    if (!recovered) showToast(error.message, true);
+  } finally {
+    state.cards.forEach(({card}) => card.classList.remove('is-saving'));
+    setBusy(false);
+  }
+}
+
+
+function applySavedEvents(result, expectedIds) {
+  const returned = result && (result.event ? [result.event] : result.events);
+  const byId = new Map((Array.isArray(returned) ? returned : []).map(event => [event.eventId, event]));
+  if (expectedIds.some(id => !byId.has(id) || !byId.get(id).revision || !state.events.some(event => event.eventId === id))) {
+    throw new Error('Admin received an invalid confirmation. Your edits are being checked against the Sheet.');
+  }
+  const expected = new Set(expectedIds);
+  state.events = state.events.map(event => expected.has(event.eventId) ? byId.get(event.eventId) : event).sort(compareEvents);
+  expectedIds.forEach(id => state.drafts.delete(id));
+  updateStatusFromEvents(); renderEvents(); renderStatus(); updateGlobalControls();
+}
+
+
+function trackSyncJob(job) {
+  if (state.syncPollTimer !== null) clearTimeout(state.syncPollTimer);
+  state.syncJob = job; state.syncPollFailures = 0;
+  elements.syncProgress.hidden = false;
+  elements.syncProgress.textContent = `${job.kind === 'pull' ? 'Pull' : 'Push'} ${job.state === 'queued' ? 'queued; waiting to start' : 'running'}. You can keep browsing and editing; save after sync finishes.`;
+  updateGlobalControls(); state.cards.forEach(({card,event}) => updateCardState(card,event));
+  state.syncPollTimer = setTimeout(pollSyncJob, 2000);
+}
+
+
+async function pollSyncJob() {
+  state.syncPollTimer = null;
+  if (!state.syncJob) return;
+  try {
+    const result = await adminRequest('admin.status');
+    const job = result.job;
+    if (!job || job.id !== state.syncJob.id) throw new Error('Sync status changed. Refresh Admin to check the current operation.');
+    if (['queued', 'running'].includes(job.state)) { trackSyncJob(job); return; }
+    state.syncJob = null;
+    elements.syncProgress.textContent = job.state === 'complete'
+      ? `${job.kind === 'pull' ? 'Pull' : 'Push'} complete. Your unsaved edits have been kept.`
+      : `Sync stopped: ${job.error || 'Open Apps Script Executions for details.'} Your unsaved edits have been kept.`;
+    await refreshDashboard({ preserveDrafts: true, quiet: true });
+  } catch (error) {
+    state.syncPollFailures++;
+    elements.syncProgress.textContent = `Waiting for sync status: ${error.message} Your edits remain on this page.`;
+    state.syncPollTimer = setTimeout(pollSyncJob, Math.min(15000, 3000 * state.syncPollFailures));
+  }
+}
+
+elements.saveAllButton.addEventListener("click", saveAllChanges);
