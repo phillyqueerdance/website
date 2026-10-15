@@ -862,7 +862,8 @@ function createEventCard(event) {
   card.dataset.eventId = eventIdOf(event);
   card.className = "event-card " +
     (event.explicitQueer ? "explicit" : "default") +
-    (event.queerArtist || event.transArtist ? " has-flags" : "");
+    (event.queerArtist || event.transArtist ? " has-flags" : "") +
+    (String(event.partyId || "").trim().toUpperCase() === "MELT-001" ? " melt" : "");
 
   if (event.explicitQueer) {
     const classification = document.createElement("span");

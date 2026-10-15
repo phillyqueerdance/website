@@ -298,6 +298,26 @@
   pointer-events: none;
 }
 .event-card.has-flags .event-card-content { width: calc(100% - 5.5cqw); }
+.event-card.melt {
+  background-image: url("melt-event-strip.jpg?v=20261015-01");
+  background-position: left center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+.event-card.melt .event-card-shape {
+  background-image: inherit;
+  background-position: inherit;
+  background-repeat: inherit;
+  background-size: 100% 100%;
+}
+.event-card.melt.has-flags .event-card-shape {
+  /* Align the clipped overlay with the full-width artwork below the flags. */
+  background-size: calc(100% + 4.3cqw) 100%;
+}
+.event-card.melt .event-card-content {
+  /* The artwork includes its own lettering; retain the accessible link text. */
+  opacity: 0;
+}
 .event-title,
 .event-venue,
 .event-address {

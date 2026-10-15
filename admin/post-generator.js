@@ -377,18 +377,21 @@
   const RAINBOW = ["#e50000", "#ff8d00", "#ffef00", "#008121", "#004cff", "#760088"];
   const TRANS = ["#5bcefa", "#f5a9b8", "#ffffff", "#f5a9b8", "#5bcefa"];
 
-  function eventCard(ctx, event, top, height, index, length) {
+  function eventCard(ctx, event, top, height, index, length, meltStrip) {
     const radius = 4.3 * Q;
     const corner = [0, index === 0 ? radius : 0,
       index === length - 1 ? radius : 0,
       length > 1 && index === length - 1 ? radius : 0];
     const base = event.explicitQueer ? COLORS.queerCard : COLORS.standardCard;
     const flagged = event.queerArtist || event.transArtist;
+    const artwork = String(event.partyId || "").trim().toUpperCase() === "MELT-001"
+      ? meltStrip : null;
     ctx.save();
     roundedPath(ctx, CARD_X, top, CARD_WIDTH, height, corner);
     ctx.clip();
     ctx.fillStyle = base;
     ctx.fillRect(CARD_X, top, CARD_WIDTH, height);
+    if (artwork) ctx.drawImage(artwork, CARD_X, top, CARD_WIDTH, height);
     if (event.queerArtist) stripes(ctx, CARD_X + CARD_WIDTH - 8.6 * Q,
       top, 8.6 * Q, height / 2, RAINBOW);
     if (event.transArtist) stripes(ctx, CARD_X + CARD_WIDTH - 8.6 * Q,
@@ -402,9 +405,19 @@
       ctx.lineTo(CARD_X + CARD_WIDTH - 8.6 * Q, top + height);
       ctx.lineTo(CARD_X, top + height);
       ctx.closePath();
-      ctx.fill();
+      if (artwork) {
+        ctx.save();
+        ctx.clip();
+        ctx.drawImage(artwork, CARD_X, top, CARD_WIDTH, height);
+        ctx.restore();
+      } else {
+        ctx.fill();
+      }
     }
     ctx.restore();
+
+    // The uploaded strip contains the visible title, venue, and address.
+    if (artwork) return;
 
     const x = CARD_X + 2.2 * Q;
     const width = CARD_WIDTH - (flagged ? 7.7 : 4.4) * Q;
@@ -439,7 +452,7 @@
     }
   }
 
-  function calendarSlide(frame, days) {
+  function calendarSlide(frame, days, meltStrip) {
     const [out, ctx] = canvas();
     ctx.drawImage(frame, 0, 0, WIDTH, HEIGHT);
     const rawHeight = pageHeight(days);
@@ -467,7 +480,7 @@
         ctx.fillText(time, TIME_X + TIME_WIDTH / 2 + .25 * Q,
           start + cardHeight / 2 - .2 * Q);
         group.events.forEach((event, index) => {
-          eventCard(ctx, event, y, cardHeight, index, group.events.length);
+          eventCard(ctx, event, y, cardHeight, index, group.events.length, meltStrip);
           y += cardHeight;
           if (index < group.events.length - 1) y += SAME_TIME_GAP * scale;
         });
@@ -758,12 +771,16 @@
           days.flatMap(day => day.events)))
       }));
       flyers = prefetchFlyers(groups.flatMap(group => group.events));
-      const [logo, frame, queerBackground, meltBackground] = await Promise.all([
+      const needsMelt = selected.some(event =>
+        String(event.partyId || "").trim().toUpperCase() === "MELT-001");
+      const [logo, frame, queerBackground, meltBackground, meltStrip] = await Promise.all([
         image("../newlogoqdp.png?v=20260926-01"),
         image("../frame.png?v=20260926-01"),
         image("../queer-popup-background.png?v=a87c9d4"),
-        selected.some(event => String(event.partyId || "").trim().toUpperCase() === "MELT-001")
+        needsMelt
           ? image("../melt-popup-background.jpg?v=20261014-01") : Promise.resolve(null),
+        needsMelt
+          ? image("../melt-event-strip.jpg?v=20261015-01") : Promise.resolve(null),
         loadTitleFont()
       ]);
       const prefix = `qdp-${first}-${last}`;
@@ -777,7 +794,7 @@
           status.textContent = `Drawing calendar ${calendarIndex} of ${pages.length}…`;
           const dates = days.length === 1 ? dayPart(days[0].key) :
             `${dayPart(days[0].key)} - ${dayPart(days.at(-1).key)}`;
-          await addImage(calendarSlide(frame, days),
+          await addImage(calendarSlide(frame, days, meltStrip),
             `Calendar ${calendarIndex}: ${dates}`,
             `${prefix}-calendar-${String(calendarIndex).padStart(2, "0")}.png`);
         }
