@@ -1,5 +1,6 @@
 // The first page uses the same date, time, and card structure as app.js.
 // Keep this small renderer in sync when changing the live poster markup.
+import "../live-calendar.js";
 const dateFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit"
 });
@@ -43,7 +44,7 @@ export function renderEventCard(event, { href, hideLocation = false } = {}) {
 
 export function renderLivePoster(events, now = new Date()) {
   const dates = new Map();
-  const sorted = [...events].sort((a, b) =>
+  const sorted = events.filter(event => globalThis.QDPLiveCalendar.isVisible(event, now.getTime())).sort((a, b) =>
     new Date(a.start) - new Date(b.start) ||
     String(a.title || "").replace(/🏳️‍🌈|🏳️‍⚧️|✊🏾/gu, "").trim()
       .localeCompare(String(b.title || "").replace(/🏳️‍🌈|🏳️‍⚧️|✊🏾/gu, "").trim(),
@@ -62,9 +63,8 @@ export function renderLivePoster(events, now = new Date()) {
     return { markup: '<p class="event-feed-message">No upcoming listings right now.</p>', dateLabel: "" };
   }
 
-  const today = dateFormat.format(now);
   const keys = [...dates.keys()].sort();
-  const current = keys.find(key => key >= today) || keys[0];
+  const current = keys[0];
   const markup = keys.map((key, index) => {
     const title = formatDate(key);
     const heading = index ? `<div class="date-heading">${escapeHtml(title)}</div>` : "";

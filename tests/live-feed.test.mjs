@@ -150,7 +150,7 @@ test('warm prepared event requests avoid KV, and expired records use the live fa
     assert.equal(warm.headers.get('X-QDP-Cache'), 'HIT');
     assert.equal(reads, 1);
     assert.equal(upstreamCalls, 0);
-    const key = 'https://massive.example/api/events';
+    const key = 'https://massive.example/api/events?cutoff=6am-v1';
     const expired = edge.get(key).clone();
     const headers = new Headers(expired.headers);
     headers.set('X-QDP-Published-At', new Date(Date.now() - 17 * 60 * 1000).toISOString());

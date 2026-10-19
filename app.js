@@ -7,6 +7,8 @@ const EVENTS_STORAGE_KEY =
 const EVENTS_STORAGE_MAX_AGE_MS =
   24 * 60 * 60 * 1000;
 
+const liveCalendar = globalThis.QDPLiveCalendar;
+
 const dateLabel = document.getElementById("dateLabel");
 const eventStack = document.getElementById("eventStack");
 const eventDetail = document.getElementById("eventDetail");
@@ -433,29 +435,10 @@ function stripQdpFooter(description) {
 function normalizePublicEvents(
   events
 ) {
-  const today =
-    dateKey(new Date());
+  const now = Date.now();
 
   return events
-    .filter(event => {
-      const endDate =
-        new Date(
-          event.end ||
-          event.start
-        );
-
-      if (
-        Number.isNaN(
-          endDate.getTime()
-        )
-      ) {
-        return false;
-      }
-
-      return (
-        dateKey(endDate) >= today
-      );
-    })
+    .filter(event => liveCalendar.isVisible(event, now))
     .map(event => ({
       ...event,
 
@@ -2023,7 +2006,7 @@ async function showCurrentCalendar() {
   closeDatePopover();
   if (!posterPages.length) await ensureLiveEvents();
   if (window.QDPArchive?.active || requestedEventId() || infoView.active) return;
-  const today = dateKey(new Date());
+  const today = liveCalendar.dayKey();
   const index = posterPages.findIndex(page => page.date >= today);
   if (index >= 0) scrollToPage(index, "auto");
 }
@@ -2031,7 +2014,7 @@ window.QDPShowCurrentCalendar = showCurrentCalendar;
 
 todayButton.addEventListener("click", () => {
   if (window.QDPArchive?.active) return;
-  const today = dateKey(new Date());
+  const today = liveCalendar.dayKey();
   const index = posterPages.findIndex(page => page.date >= today);
   if (index < 0) return;
   if (!eventDetail.hidden) closeEventDetail();
@@ -2192,18 +2175,16 @@ function renderEventCollection(
     eventCardsById = new Map();
     dateSections = [];
     cornerTransitions = [];
-    previousPoster.disabled = true;
-    nextPoster.disabled = true;
-
     if (!window.QDPArchive?.active) {
+      previousPoster.disabled = true;
+      nextPoster.disabled = true;
       showEventFeedMessage("No upcoming listings right now.");
     }
 
     return;
   }
 
-  const today =
-    dateKey(new Date());
+  const today = liveCalendar.dayKey();
 
   const todayIndex =
     posterPages.findIndex(
@@ -2233,6 +2214,27 @@ function renderEventCollection(
 let displayedPublicEvents = null;
 let lastLiveRefreshAt = 0;
 let liveRefreshPromise = null;
+let liveExpiryTimer = 0;
+
+function schedulePublicEventExpiry() {
+  clearTimeout(liveExpiryTimer);
+  const next = liveCalendar.nextExpiry(displayedPublicEvents || []);
+  if (Number.isFinite(next)) {
+    liveExpiryTimer = setTimeout(prunePublicEvents,
+      Math.max(1, Math.min(next - Date.now(), 2147483647)));
+  }
+}
+
+function prunePublicEvents() {
+  if (!displayedPublicEvents) return;
+  const current = normalizePublicEvents(displayedPublicEvents);
+  if (current.length !== displayedPublicEvents.length) {
+    displayedPublicEvents = current;
+    renderEventCollection(current);
+    writeCachedPublicEvents(current);
+  }
+  schedulePublicEventExpiry();
+}
 
 function refreshPublicEvents() {
   if (liveRefreshPromise) return liveRefreshPromise;
@@ -2244,6 +2246,7 @@ function refreshPublicEvents() {
         renderEventCollection(freshEvents);
       }
       displayedPublicEvents = freshEvents;
+      schedulePublicEventExpiry();
       lastLiveRefreshAt = Date.now();
     } catch (error) {
       console.error(error);
@@ -2264,7 +2267,10 @@ async function initialize() {
   // transfers the same listings again and can repeat a KV read at a cold edge.
   const initialEvents = readInitialPublicEvents();
   displayedPublicEvents = initialEvents ?? readCachedPublicEvents();
-  if (displayedPublicEvents) renderEventCollection(displayedPublicEvents);
+  if (displayedPublicEvents) {
+    renderEventCollection(displayedPublicEvents);
+    schedulePublicEventExpiry();
+  }
   else showEventFeedMessage("Loading listings…");
 
   if (initialEvents) {
@@ -2297,6 +2303,7 @@ if (layoutEditorEnabled) {
 
 let liveInitializationPromise = null;
 function ensureLiveEvents() {
+  prunePublicEvents();
   if (!liveInitializationPromise) liveInitializationPromise = initialize();
   else if (Date.now() - lastLiveRefreshAt >= 60 * 1000) refreshPublicEvents();
   return liveInitializationPromise;

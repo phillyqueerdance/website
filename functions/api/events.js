@@ -1,4 +1,7 @@
 import { readKvJson, withKvScope, cacheResponse, freshResponse } from "../kv-cache.js";
+import "../../live-calendar.js";
+
+const liveCalendar = globalThis.QDPLiveCalendar;
 
 export const DEFAULT_APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec";
@@ -11,34 +14,6 @@ const PREPARED_CACHE_SECONDS = 30;
 // feed only needs a heartbeat write every ten minutes.
 const PREPARED_MAX_AGE_MS = 16 * 60 * 1000;
 const PREPARED_KEY = "qdp-live:v1:feed";
-
-function phillyDateKey(date) {
-  return new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "America/New_York",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }
-  ).format(date);
-}
-
-function isCurrentOrFutureEvent(event, today) {
-  const endValue =
-    event.end || event.start;
-
-  const endDate =
-    new Date(endValue);
-
-  if (
-    Number.isNaN(endDate.getTime())
-  ) {
-    return false;
-  }
-
-  return phillyDateKey(endDate) >= today;
-}
 
 function createJsonResponse(
   payload,
@@ -90,12 +65,12 @@ export async function readPreparedEvents(context) {
   const age = Date.now() - published;
   if (record?.schema !== 1 || !Array.isArray(record.payload?.events) ||
       !Number.isFinite(age) || age < 0 || age > PREPARED_MAX_AGE_MS) return null;
-  const today = phillyDateKey(new Date());
+  const now = Date.now();
   return {
     generatedAt: record.payload.generatedAt,
     publishedAt: record.publishedAt,
     events: record.payload.events.filter(event =>
-      event && event.eventId && event.title && isCurrentOrFutureEvent(event, today))
+      event && event.eventId && event.title && liveCalendar.isVisible(event, now))
   };
 }
 
@@ -105,6 +80,7 @@ export async function onRequestGet(
   context = withKvScope(context);
   const cache = typeof caches === "undefined" ? null : caches.default;
   const cacheUrl = new URL("/api/events", context.request.url);
+  cacheUrl.searchParams.set("cutoff", "6am-v1");
   const cacheKey = new Request(cacheUrl.href);
   const cachedResponse = freshResponse(await cache?.match(cacheKey), context);
   if (cachedResponse) {
@@ -122,11 +98,13 @@ export async function onRequestGet(
   try {
     const prepared = await readPreparedEvents(context);
     if (prepared) {
+      const maxAge = Math.min(PREPARED_CACHE_SECONDS,
+        Math.max(0, Math.floor((liveCalendar.nextExpiry(prepared.events) - Date.now()) / 1000)));
       const response = cacheResponse(context, createJsonResponse(prepared, {
         cacheStatus: "PREPARED",
-        maxAge: PREPARED_CACHE_SECONDS,
+        maxAge,
         publishedAt: prepared.publishedAt
-      }), PREPARED_CACHE_SECONDS);
+      }), maxAge);
       if (cache) {
         const write = cache.put(cacheKey, response.clone());
         if (context.waitUntil) context.waitUntil(write); else await write;
@@ -172,23 +150,18 @@ export async function onRequestGet(
       );
     }
 
-    const today =
-      phillyDateKey(new Date());
+    const now = Date.now();
 
     const filteredPayload = {
       ...payload,
 
       events:
-        payload.events.filter(
-          event =>
-            isCurrentOrFutureEvent(
-              event,
-              today
-            )
-        )
+        payload.events.filter(event => liveCalendar.isVisible(event, now))
     };
 
-    const response = cacheResponse(context, createJsonResponse(filteredPayload), EDGE_CACHE_SECONDS);
+    const maxAge = Math.min(EDGE_CACHE_SECONDS,
+      Math.max(0, Math.floor((liveCalendar.nextExpiry(filteredPayload.events) - Date.now()) / 1000)));
+    const response = cacheResponse(context, createJsonResponse(filteredPayload, { maxAge }), maxAge);
 
     if (cache) {
       const write = cache.put(cacheKey, response.clone());

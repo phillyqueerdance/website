@@ -9,7 +9,7 @@ export async function onRequestGet(context) {
   context = withKvScope(context);
   const url = new URL(context.request.url);
   const cache = typeof caches === "undefined" ? null : caches.default;
-  const cacheKey = new Request(new URL("/_qdp/prepared-home", url));
+  const cacheKey = new Request(new URL("/_qdp/prepared-home-6am-v1", url));
   const page = await context.env.ASSETS.fetch(new URL("/", url));
   if (!page.ok) return page;
   // Event content and metadata also apply to contextual archive URLs.
@@ -27,18 +27,20 @@ export async function onRequestGet(context) {
   try {
     const prepared = await readPreparedEvents(context);
     if (!prepared) return page;
-    const { markup, dateLabel } = renderLivePoster(prepared.events);
+    const { markup, dateLabel } = renderLivePoster(prepared.events, new Date(Date.now()));
+    const maxAge = Math.min(30, Math.max(0,
+      Math.floor((globalThis.QDPLiveCalendar.nextExpiry(prepared.events) - Date.now()) / 1000)));
     const rewritten = new HTMLRewriter()
       .on("#eventStack", { element(element) { element.setInnerContent(markup, { html: true }); } })
       .on("#dateLabel", { element(element) { element.setInnerContent(dateLabel); } })
       .on("#qdpInitialEvents", { element(element) { element.setInnerContent(JSON.stringify(prepared)); } })
       .transform(page);
     const headers = new Headers(rewritten.headers);
-    headers.set("Cache-Control", "public, max-age=30");
+    headers.set("Cache-Control", `public, max-age=${maxAge}`);
     headers.set("X-QDP-Initial-Events", "PREPARED");
     headers.delete("ETag");
     headers.delete("Content-Length");
-    const result = cacheResponse(context, new Response(rewritten.body, { headers }), 30);
+    const result = cacheResponse(context, new Response(rewritten.body, { headers }), maxAge);
     if (cache) {
       const write = cache.put(cacheKey, result.clone());
       if (context.waitUntil) context.waitUntil(write); else await write;
