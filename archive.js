@@ -376,6 +376,47 @@
     return key || fullName;
   }
 
+  async function loadMeltDates() {
+    const links = document.getElementById("meltArchiveDates");
+    if (!links) return;
+    links.setAttribute("aria-busy", "true");
+    links.replaceChildren(node("span", "", "Loading archived dates…"));
+    try {
+      const data = await load("party", "MELT-001");
+      if (data.profile?.id !== "MELT-001" || !Array.isArray(data.events)) {
+        throw new Error("Invalid Melt archive");
+      }
+      const now = Date.now();
+      const events = sortEvents(data.events.filter(event => {
+        const start = Date.parse(event.start), end = Date.parse(event.end);
+        const cutoff = Number.isFinite(end) && end >= start ? end : start;
+        return eventIdOf(event) && Number.isFinite(start) && cutoff < now;
+      })).reverse();
+      const format = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric"
+      });
+      links.replaceChildren();
+      for (const event of events) {
+        const label = format.format(new Date(event.start));
+        const link = node("a", "event-detail-related-bubble event-detail-related-bubble--red", label);
+        const url = archiveUrl("party", "MELT-001");
+        url.searchParams.set("event", eventIdOf(event));
+        link.href = url.href;
+        link.setAttribute("data-archive-link", "");
+        link.setAttribute("aria-label", `Melt on ${label}`);
+        links.appendChild(link);
+      }
+      if (!events.length) links.appendChild(node("span", "", "No archived dates yet."));
+    } catch {
+      const retry = retryButton(loadMeltDates);
+      retry.className = "event-detail-related-retry";
+      retry.textContent = "Archived dates unavailable. Try again";
+      links.replaceChildren(retry);
+    } finally {
+      links.setAttribute("aria-busy", "false");
+    }
+  }
+
   function sortProfiles(items, kind) {
     return [...items].filter(item => item.id && item.name).sort((a, b) => {
       const aKey = directorySortName(a.name, kind);
@@ -451,6 +492,9 @@
         collectives: "collective" }[kind];
       const card = stripCard(item.name, subtitle,
         archiveUrl(singular, item.id).href);
+      if (kind === "parties" && String(item.id).trim().toUpperCase() === "MELT-001") {
+        card.classList.add("melt");
+      }
       const classification = window.QDPProfileMetadata.classification(singular, item);
       if (classification) card.prepend(node("span", "sr-only", `${classification} `));
       if ((kind === "artists" && (item.queerArtist || item.transArtist)) ||
@@ -824,6 +868,7 @@
     events: [],
     profile: null,
     route,
+    loadMeltDates,
     restoreMetadata() {
       const current = this.profile;
       const params = routeParams();
@@ -926,6 +971,7 @@
   archive.hideMenu = hideMenu;
   archive.isMenuOpen = () => discoverLink.getAttribute("aria-expanded") === "true";
   window.QDPArchive = archive;
+  if (window.QDPInfoView?.active === "melt") loadMeltDates();
 
   discoverLink.addEventListener("click", event => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

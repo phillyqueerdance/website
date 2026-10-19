@@ -97,6 +97,7 @@
 .poster-info-page .about-dialog-close { position: absolute; top: 2cqw; right: 2cqw; z-index: 2; }
 .poster-info-page .melt-dialog-logo { width: min(46cqw, 280px); }
 .poster-info-page .melt-dialog-content { max-height: none; }
+.melt-see-more { margin: 4cqw 0 0; }
 .info-mode .poster-controls { visibility: hidden; }
 
 /* Keep the frame lines above the menu, without hiding the tabs behind the
@@ -367,7 +368,7 @@
 .archive-stack { overscroll-behavior: contain; }
 .archive-directory .archive-identity-card {
   --event-color: #922185;
-  background: var(--event-color);
+  background-color: var(--event-color);
   color: #ffeff2;
 }
 .archive-section + .archive-section { margin-top: var(--qdp-cards-next-time-gap); }

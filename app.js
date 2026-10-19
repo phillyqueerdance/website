@@ -1916,6 +1916,7 @@ const infoView = {
     document.title = `${kind === "about" ? "About" : "Melt"} | Queer Dance Philly`;
     syncViewAccessibility();
     document.getElementById(`${kind}DialogTitle`).focus({ preventScroll: true });
+    if (kind === "melt") window.QDPArchive?.loadMeltDates?.();
   },
   close({ historyEntry = true, preserveMenu = false } = {}) {
     if (!this.active) return;
