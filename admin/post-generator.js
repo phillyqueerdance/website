@@ -23,6 +23,7 @@
   const form = document.getElementById("postForm");
   const startInput = document.getElementById("postStart");
   const endInput = document.getElementById("postEnd");
+  const queerOnlyInput = document.getElementById("postQueerOnly");
   const button = document.getElementById("generatePost");
   const status = document.getElementById("postStatus");
   const gallery = document.getElementById("postGallery");
@@ -738,6 +739,7 @@
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const first = startInput.value, last = endInput.value;
+    const queerOnly = queerOnlyInput.checked;
     if (!first || !last || first > last) {
       status.textContent = "Choose an inclusive date range, with the first date before the last.";
       return;
@@ -759,11 +761,18 @@
       }
       const selected = data.events.filter(item => {
         if (!item.title || !item.start || /^\(DELETED ENTRY\)/i.test(item.title)) return false;
+        if (queerOnly && !(item.explicitQueer || item.queerArtist || item.transArtist)) return false;
         const key = dateKey(item.start);
         return key >= first && key <= last;
       }).sort((a, b) => new Date(a.start) - new Date(b.start) ||
         stripFlags(a.title).localeCompare(stripFlags(b.title), undefined,
           { sensitivity: "base" }));
+      if (!selected.length) {
+        status.textContent = queerOnly
+          ? "No queer events or events with a queer/trans artist match these dates."
+          : "No published events match these dates.";
+        return;
+      }
       const pages = calendarPages(selected);
       const groups = calendarGroups(pages).map(calendars => ({
         calendars,

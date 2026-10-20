@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" href="favicon.png">
   <link rel="stylesheet" href="../poster-theme.css?v=20260926-01">
   <link rel="stylesheet" href="admin.css?v=20261015-bulk-1">
-  <link rel="stylesheet" href="post-generator.css?v=20260926-02">
+  <link rel="stylesheet" href="post-generator.css?v=20261020-queer-filter-1">
 </head>
 
 <body>
@@ -94,6 +94,14 @@
       <form id="postForm" class="post-form">
         <label>First date <input id="postStart" type="date" required></label>
         <label>Last date <input id="postEnd" type="date" required></label>
+        <label class="switch-control post-filter-control">
+          <input id="postQueerOnly" class="explicit-input" type="checkbox" role="switch" aria-describedby="postQueerOnlyHelp">
+          <span class="toggle" aria-hidden="true"></span>
+          <span>
+            <strong>Queer events or queer/trans artists only</strong>
+            <small id="postQueerOnlyHelp">Applies to calendar pages and individual event slides.</small>
+          </span>
+        </label>
         <button id="generatePost" class="post-generate" type="submit">Generate Post</button>
       </form>
       <p class="post-help">Creates a title slide, calendar pages, and one framed flyer image per published event. On iPhone, tap Save to Photos, then choose Save Image in the share sheet. If Save Image is missing, download the PNG, open it in Files, and use Share → Save Image.</p>
@@ -321,7 +329,7 @@
   </noscript>
 
   <script src="admin.js?v=20261015-bulk-1"></script>
-  <script src="post-generator.js?v=20261015-melt-strip-1"></script>
+  <script src="post-generator.js?v=20261020-queer-filter-1"></script>
 </body>
 </html>
 
