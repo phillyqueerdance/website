@@ -5,7 +5,8 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../admin/post-generator.js', import.meta.url), 'utf8');
 
-async function generate(events, first = '2030-10-09', last = '2030-10-10') {
+async function generate(events, first = '2030-10-09', last = '2030-10-10',
+  { queerOnly = false, expectNoEvents = false } = {}) {
   const elements = new Map();
   const element = id => {
     if (!elements.has(id)) elements.set(id, { value: '', listeners: {},
@@ -35,8 +36,11 @@ async function generate(events, first = '2030-10-09', last = '2030-10-10') {
   });
   element('postStart').value = first;
   element('postEnd').value = last;
+  element('postQueerOnly').checked = queerOnly;
   await element('postForm').listeners.submit({ preventDefault() {} });
-  assert.match(element('postStatus').textContent, /PNG images ready\./);
+  assert.match(element('postStatus').textContent, expectNoEvents
+    ? /No queer events or events with a queer\/trans artist match these dates\./
+    : /PNG images ready\./);
   assert.equal(element('generatePost').disabled, false);
   return JSON.parse(JSON.stringify(images));
 }
@@ -162,4 +166,48 @@ test('a date spanning two pages finishes before a later date, even when the late
     { calendars: 1, eventIds: ['11-both'] }
   ]);
   assert.deepEqual(calendarIds(images), events.map(event => event.eventId));
+});
+
+test('queer-only toggle includes each qualifying flag on both calendars and event slides', async () => {
+  const events = [
+    ['none', false, false, false], ['queer-event', true, false, false],
+    ['queer-artist', false, true, false], ['trans-artist', false, false, true],
+    ['both-artists', false, true, true], ['all-flags', true, true, true]
+  ].map(([eventId, explicitQueer, queerArtist, transArtist], index) => ({
+    eventId, title: eventId, start: `2030-10-10T${14 + index}:00:00-04:00`,
+    explicitQueer, queerArtist, transArtist
+  }));
+  events.push(
+    { eventId: 'missing-flags', title: 'No indicators', start: '2030-10-10T13:00:00-04:00' },
+    { eventId: 'outside', title: 'Outside range', start: '2030-10-11T13:00:00-04:00', explicitQueer: true },
+    { eventId: 'deleted', title: '(DELETED ENTRY) gone', start: '2030-10-10T13:00:00-04:00', transArtist: true }
+  );
+  const before = structuredClone(events);
+  const images = await generate(events, '2030-10-10', '2030-10-10', { queerOnly: true });
+  assert.deepEqual(calendarIds(images), ['queer-event', 'queer-artist', 'trans-artist', 'both-artists', 'all-flags']);
+  assertGroupSequence(images, [{ calendars: 1,
+    eventIds: ['all-flags', 'queer-event', 'both-artists', 'trans-artist', 'queer-artist'] }]);
+  assert.deepEqual(events, before, 'filtering must not change the source feed');
+});
+
+test('filtered event count controls the 20-image rule and omits dates with no matches', async () => {
+  const events = Array.from({ length: 22 }, (_, index) => ({
+    eventId: `E${index}`, title: `Event ${index}`,
+    start: `2030-10-${String(9 + Math.floor(index / 2)).padStart(2, '0')}T${14 + index % 2}:00:00-04:00`,
+    queerArtist: [0, 2, 4, 6, 8].includes(index)
+  }));
+  const images = await generate(events, '2030-10-09', '2030-10-19', { queerOnly: true });
+  assert.equal(images.length, 11);
+  assert.deepEqual(images.filter(item => item.slide.type === 'calendar')
+    .map(item => item.slide.days.map(day => day.key)),
+  [['2030-10-09'], ['2030-10-10'], ['2030-10-11'], ['2030-10-12'], ['2030-10-13']]);
+  assert.deepEqual(calendarIds(images), ['E0', 'E2', 'E4', 'E6', 'E8']);
+  assert.deepEqual(individualIds(images), ['E0', 'E2', 'E4', 'E6', 'E8']);
+});
+
+test('no qualifying events produces an empty result instead of a title-only post', async () => {
+  const images = await generate([
+    { eventId: 'none', title: 'No indicators', start: '2030-10-10T14:00:00-04:00' }
+  ], '2030-10-10', '2030-10-10', { queerOnly: true, expectNoEvents: true });
+  assert.deepEqual(images, []);
 });

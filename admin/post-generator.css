@@ -20,7 +20,7 @@
   font-size: .84rem;
   font-weight: 700;
 }
-.post-form input {
+.post-form input[type="date"] {
   width: 100%;
   min-height: 44px;
   padding: 8px 10px;
@@ -29,6 +29,15 @@
   color: var(--text);
   background: var(--panel-raised);
   color-scheme: dark;
+}
+.post-form .post-filter-control {
+  display: flex;
+  flex: 1 1 280px;
+  min-width: 0;
+  gap: 11px;
+  color: var(--text);
+  line-height: 1.35;
+  cursor: pointer;
 }
 .post-generate, .post-download, .post-share-photo, .post-share-all {
   display: inline-flex;
