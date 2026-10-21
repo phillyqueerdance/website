@@ -135,7 +135,7 @@ test('warm prepared event requests avoid KV, and expired records use the live fa
   globalThis.fetch = async () => { upstreamCalls++; return Response.json({ events: [] }); };
   const kv = { get: async () => {
     reads++;
-    return { schema: 1, publishedAt: new Date().toISOString(),
+    return { schema: 1, publishedAt: new Date(now).toISOString(),
       payload: { generatedAt: 'now', events: [
         { eventId: 'FUTURE', title: 'Next', start: '2030-09-29T20:00:00-04:00' }
       ] } };

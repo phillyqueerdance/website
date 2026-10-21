@@ -5,7 +5,8 @@ import { withKvScope, readArchiveManifest, readArchiveRecord,
 import "../profile-metadata.js";
 
 const TTL = 60;
-export const validEventId = id => typeof id === "string" && /^[\w-]{1,100}$/.test(id);
+// Apps Script preserves Unicode letters and numbers when generating EventIDs.
+export const validEventId = id => typeof id === "string" && id.length <= 100 && /^[\p{L}\p{N}_-]+$/u.test(id);
 export function shard(id, count) {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
