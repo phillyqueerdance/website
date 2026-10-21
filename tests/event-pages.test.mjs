@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { resolveEvent, cleanIndexedEvent, shard } from '../functions/event-records.js';
+import { resolveEvent, cleanIndexedEvent, shard, validEventId } from '../functions/event-records.js';
 import { renderEventDetail, renderEventPage } from '../functions/event-page.js';
 import { onRequestGet as sitemap } from '../functions/sitemap.xml.js';
 import { onRequestGet as relations } from '../functions/api/event-relations.js';
+import { onRequestGet as eventApi } from '../functions/api/event.js';
 
 const meta = globalThis.QDPEventMetadata;
 const event = { eventId: 'PAST-1', public: true, title: '🏳️‍🌈 Dance & Go',
@@ -13,16 +14,16 @@ const event = { eventId: 'PAST-1', public: true, title: '🏳️‍🌈 Dance & 
   venue: 'The Room', venueId: 'ROOM', address: '123 Market St, Philadelphia, PA 19106',
   description: 'Doors at 10.', artistIds: ['ALPHA'], partyId: 'NIGHT', collectiveIds: ['CREW'],
   related: [{ kind: 'artist', id: 'ALPHA', name: 'Alpha' }, { kind: 'venue', id: 'ROOM', name: 'The Room' }] };
-function fixture(overrides = {}) {
+function fixture(overrides = {}, indexedEvent = event) {
   const manifest = { schema: 1, revision: 'one', eventIndexVersion: 1, eventShards: 8,
-    eventIds: [event.eventId], excludedEventIds: [], partyPublicGate: true,
+    eventIds: [indexedEvent.eventId], excludedEventIds: [], partyPublicGate: true,
     artists: ['ALPHA'], venues: ['ROOM'], parties: ['NIGHT'], collectives: ['CREW'], ...overrides };
   const reads = [];
   const values = new Map([
     ['qdp-archive:v1:manifest', manifest],
-    [`qdp-archive:v1:event:${shard(event.eventId, 8)}`, { revision: 'one', entries: { [event.eventId]: event } }]
+    [`qdp-archive:v1:event:${shard(indexedEvent.eventId, 8)}`, { revision: 'one', entries: { [indexedEvent.eventId]: indexedEvent } }]
   ]);
-  const context = { request: new Request(`https://massive.example/?event=${event.eventId}`),
+  const context = { request: new Request(`https://massive.example/?event=${encodeURIComponent(indexedEvent.eventId)}`),
     env: { QDP_ARCHIVE_KV: { get: async key => { reads.push(key); return values.get(key) || null; } } } };
   return { manifest, reads, values, context };
 }
@@ -180,6 +181,55 @@ test('indexed event relations use two reads instead of scanning every profile sh
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).related, event.related);
   assert.equal(reads.length, 2);
+});
+
+test('event IDs accept Unicode letters and numbers while rejecting unsafe characters and oversized IDs', () => {
+  for (const id of ['SAZÓNP-102926', 'CAFÉ-102926', '東京-102926', 'MELT-081526', 'EVENT_1', 'A'.repeat(100)]) {
+    assert.equal(validEventId(id), true, id);
+  }
+  for (const id of ['', '../private', 'E/1', 'E?x=1', 'E#1', 'E 1', 'E\n', '<script>',
+    'SAZ%C3%93NP-102926', '🎉-102926', 'A'.repeat(101), null, 123]) {
+    assert.equal(validEventId(id), false, String(id));
+  }
+});
+
+test('Sazón IDs resolve unchanged through the event API, related links, and canonical sitemap URLs', async () => {
+  const sazon = { ...event, eventId: 'SAZÓNP-102926', title: 'Sazón presents: Soy Emo',
+    partyId: 'SAZON-001', related: [{ kind: 'party', id: 'SAZON-001', name: 'Sazón' }] };
+  const { context } = fixture({ parties: ['SAZON-001'] }, sazon);
+  const url = new URL('/api/event', context.request.url);
+  url.searchParams.set('event', sazon.eventId);
+  context.request = new Request(url);
+  const eventResponse = await eventApi(context);
+  assert.equal(eventResponse.status, 200);
+  const returned = (await eventResponse.json()).event;
+  assert.equal(returned.eventId, sazon.eventId);
+  assert.equal(returned.title, sazon.title);
+  assert.equal(returned.partyId, 'SAZON-001');
+
+  url.pathname = '/api/event-relations';
+  context.request = new Request(url);
+  const relatedResponse = await relations(context);
+  assert.equal(relatedResponse.status, 200);
+  assert.deepEqual((await relatedResponse.json()).related, sazon.related);
+
+  const sitemapResponse = await sitemap(context);
+  assert.equal(sitemapResponse.status, 200);
+  assert.match(await sitemapResponse.text(), /\?event=SAZ%C3%93NP-102926/);
+  assert.equal(new URL(meta.url(returned.eventId)).searchParams.get('event'), sazon.eventId);
+  assert.match(renderEventDetail(returned, meta.url(returned.eventId)), /Sazón presents: Soy Emo/);
+});
+
+test('an accented ID in the live feed resolves before its archive record is published', async () => {
+  const sazon = { ...event, eventId: 'SAZÓNP-102926',
+    start: '2099-10-29T22:00:00-04:00', end: '' };
+  const { context, values } = fixture({ eventIds: [] }, sazon);
+  values.set('qdp-live:v1:feed', { schema: 1, publishedAt: new Date().toISOString(),
+    payload: { events: [sazon] } });
+  const result = await resolveEvent(context, sazon.eventId);
+  assert.equal(result.status, 200);
+  assert.equal(result.event.eventId, sazon.eventId);
+  assert.equal(result.indexed, false);
 });
 
 const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
