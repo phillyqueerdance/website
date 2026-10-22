@@ -77,6 +77,15 @@ for (const kind of Object.keys(meta.kinds)) {
       assert.equal(recorded.get('meta[property="og:url"]:content'), meta.url(kind, profile.id));
       assert.equal(recorded.get('meta[name="description"]:content'), profile.bio);
       const body = recorded.get('#archiveStack');
+      if (kind === 'artist') {
+        assert.match(body, /class="archive-artist-summary"/);
+        assert.ok(body.indexOf('Approved profile bio') < body.indexOf('archive-event-period'));
+        assert.ok(body.indexOf('archive-profile-links') < body.indexOf('archive-profile-related'));
+        assert.equal(recorded.get('#archiveMenuProfile'), '<h2 class="archive-profile-heading">Public &amp; Profile</h2>');
+      } else {
+        assert.match(body, /class="mobile-profile-summary"/);
+        assert.match(recorded.get('#archiveMenuProfile'), /Approved profile bio/);
+      }
       assert.match(body, /Public &amp; Profile/);
       assert.match(body, /Approved profile bio/);
       assert.match(body, /Public night/);
@@ -151,6 +160,33 @@ test('profile markup escapes text, rejects unsafe links, and groups local dates 
   assert.match(result, /datetime="2031-01-12T00:30:00Z">11th/); // Philadelphia is still January 11.
   assert.ok(result.indexOf('EVENT-1') < result.indexOf('NEXT-YEAR'));
   assert.doesNotMatch(result, /class="event-venue"|class="event-address"/);
+});
+
+test('Callaia has the preview portrait before the bio; other artists do not get a placeholder or her photo', () => {
+  const info = renderProfileInfo('artist', { ...profile, id: 'CALLAIA-001', name: 'Callaia' }, 'https://massive.example');
+  assert.match(info, /<img class="archive-artist-portrait" src="\/artist-images\/callaia.jpg" alt="Callaia" width="2048" height="2016"/);
+  assert.ok(info.indexOf('<img') < info.indexOf('Approved profile bio'));
+  assert.ok(info.indexOf('archive-profile-links') < info.indexOf('archive-profile-related'));
+  assert.doesNotMatch(renderProfileInfo('artist', { ...profile, name: 'Callaia' }, 'https://massive.example'), /<img/);
+  assert.doesNotMatch(renderProfileInfo('venue', { ...profile, id: 'CALLAIA-001' }, 'https://massive.example'), /<img/);
+});
+
+test('the red tab keeps the artist name through the profile, then follows event year markers in both scroll directions', () => {
+  const source = archiveSource.slice(archiveSource.indexOf('  function syncYearHeadings()'), archiveSource.indexOf('  function positionMenu()'));
+  const markers = [2026, 2025].map(year => ({ year: String(year), marker: { top: 0, style: {}, getBoundingClientRect() { return { top: this.top }; } } }));
+  const labels = [];
+  const context = vm.createContext({ profileName: 'Callaia', yearHeadings: markers,
+    archiveStack: { getBoundingClientRect: () => ({ top: 100 }) },
+    archiveHeader: { getBoundingClientRect: () => ({ height: 42 }), setAttribute() {} },
+    header: label => labels.push(label), fitProfileHeaders() {},
+    headerLabel: { style: {} }, incomingYear: { style: {} }
+  });
+  vm.runInContext(source, context);
+  for (const [tops, expected] of [[[700, 1200], 'Callaia'], [[101, 600], 'Callaia'], [[59, 600], '2026'], [[-400, 59], '2025'], [[700, 1200], 'Callaia']]) {
+    markers.forEach((entry, i) => { entry.marker.top = tops[i]; });
+    vm.runInContext('syncYearHeadings()', context);
+    assert.equal(labels.at(-1), expected);
+  }
 });
 
 test('sitemap reads one manifest, includes all four canonical profile types, and honors public gates', async () => {

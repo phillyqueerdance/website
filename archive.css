@@ -287,6 +287,26 @@
 .archive-menu-profile:not([hidden]) { margin: 12px 0 28px; }
 .archive-menu.has-profile .archive-menu-profile { max-height: min(65dvh, 800px); opacity: 1; overflow-y: auto; }
 .archive-profile-info { overflow-wrap: anywhere; }
+/* Artist profiles share the frame's scrolling content with their events. */
+.archive-artist-summary {
+  flex-shrink: 0;
+  padding: 3cqw 4cqw 5cqw;
+  color: #fff1f4;
+  font: 400 clamp(15px, 2.3cqw, 18px)/1.6 Verdana, Geneva, sans-serif;
+}
+.archive-artist-portrait {
+  display: block;
+  width: min(100%, 52cqw, 360px);
+  height: auto;
+  margin: 0 auto 3cqw;
+  border-radius: var(--qdp-card-radius);
+}
+.archive-artist-summary .archive-profile-links { margin-top: 1.2em; }
+.archive-artist-summary .archive-profile-related .event-detail-related-bubble {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: clamp(14px, 2.2cqw, 16px);
+}
 .archive-profile-heading {
   margin: 0 0 .55em;
   color: var(--archive-profile-accent, #fa2b5a);

@@ -289,7 +289,8 @@
       const badgeStyle = getComputedStyle(badge);
       menuProfile.style.setProperty("--archive-profile-accent",
         kind === "collective" ? badgeStyle.color : badgeStyle.backgroundColor);
-      menuProfile.appendChild(profileInfo(kind, person));
+      menuProfile.appendChild(kind === "artist"
+        ? node("h2", "archive-profile-heading", person.name) : profileInfo(kind, person));
       requestAnimationFrame(() => {
         if (menuProfile.firstChild) menu.classList.add("has-profile");
       });
@@ -552,11 +553,22 @@
   function profileInfo(kind, person) {
     const info = node("section", "archive-profile-info");
     info.setAttribute("aria-label", `${kind[0].toUpperCase() + kind.slice(1)} information`);
-    info.appendChild(node("h2", "archive-profile-heading", person.name));
+    info.appendChild(node("h2", kind === "artist" ? "sr-only" : "archive-profile-heading", person.name));
     const classification = window.QDPProfileMetadata.classification(kind, person);
     if (classification) info.appendChild(node("span", "sr-only", classification));
+    const image = kind === "artist" && window.QDPProfileMetadata.artistImage(person);
+    if (image) {
+      const portrait = node("img", "archive-artist-portrait");
+      portrait.src = image.src;
+      portrait.alt = person.name;
+      portrait.width = image.width;
+      portrait.height = image.height;
+      portrait.decoding = "async";
+      info.appendChild(portrait);
+    }
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
     if (person.bio) info.appendChild(node("p", "", person.bio));
+    let related = null;
     if (Array.isArray(person.related) && person.related.length) {
       const colors = { artist: "red", venue: "orange", party: "purple", collective: "collective" };
       const more = node("section", "archive-profile-related");
@@ -571,9 +583,10 @@
       }
       if (bubbles.childElementCount) {
         more.appendChild(bubbles);
-        info.appendChild(more);
+        related = more;
       }
     }
+    if (kind !== "artist" && related) info.appendChild(related);
     const links = node("div", "archive-profile-links");
     for (const [key, label] of [["maps", "Map"], ["website", "Website"],
       ["instagram", "Instagram"], ["music", "Music"]]) {
@@ -585,6 +598,7 @@
       links.appendChild(link);
     }
     if (links.childNodes.length) info.appendChild(links);
+    if (kind === "artist" && related) info.appendChild(related);
     return info;
   }
 
@@ -610,7 +624,7 @@
     archive.events = person ? [...upcoming, ...past] : [...events].reverse();
     setProfile(kind, person);
     if (person) {
-      const summary = node("section", "mobile-profile-summary");
+      const summary = node("section", kind === "artist" ? "archive-artist-summary" : "mobile-profile-summary");
       summary.style.setProperty("--archive-profile-accent", menuProfile.style.getPropertyValue("--archive-profile-accent"));
       summary.appendChild(profileInfo(kind, person));
       archiveStack.appendChild(summary);
