@@ -49,6 +49,7 @@ function profile(input, kind, publicIds = null, details = false) {
       ? {
           queerArtist: yes(input.queerArtist),
           transArtist: yes(input.transArtist),
+          ...(Object.hasOwn(input, "imageUrl") ? { imageUrl: safeUrl(input.imageUrl) } : {}),
           music: safeUrl(input.music)
         }
       : kind === "venues" ? {

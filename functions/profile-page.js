@@ -27,7 +27,7 @@ export function renderProfileInfo(kind, profile, base) {
   const more = related ? `<section class="archive-profile-related"><h3>See More</h3><div class="archive-profile-related-links">${related}</div></section>` : "";
   const external = links ? `<div class="archive-profile-links">${links}</div>` : "";
   return `<section class="archive-profile-info" aria-label="${kind[0].toUpperCase() + kind.slice(1)} information">
-    ${image ? `<img class="archive-artist-portrait" src="${escape(image.src)}" alt="${escape(profile.name)}" width="${image.width}" height="${image.height}" decoding="async">` : ""}
+    ${image ? `<img class="archive-artist-portrait" src="${escape(image.src)}" alt="${escape(profile.name)}"${image.width && image.height ? ` width="${image.width}" height="${image.height}"` : ""} decoding="async">` : ""}
     <h2 class="archive-profile-heading">${escape(profile.name)}</h2>
     ${meta.classification(kind, profile) ? `<span class="sr-only">${meta.classification(kind, profile)}</span>` : ""}
     ${kind === "venue" && profile.address ? `<address>${escape(profile.address)}</address>` : ""}

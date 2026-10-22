@@ -1,5 +1,27 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Artist image preview
+
+The preview reads each approved artist's `ArtistImage_URL` from the Artists
+tab and displays it above their profile name, on desktop and mobile. Drive
+URLs use the same browser image conversion as event flyers. Existing photo
+boundaries, proportions, and rounded corners apply to every artist image.
+
+Install the supplied Core.gs v7.4.6 and PublicData.gs v7.4.2 in the existing
+Apps Script project. Keep the other files and settings. Reload the Index,
+then use **QDP > Update Artist Image URLs (from Raw_ArtistImage_URL)** to
+convert Drive file share links into `ArtistImage_URL`. This changes only the
+destination cells for valid, changed links; blank or invalid raw links leave
+existing values untouched. Column order does not matter. The existing flyer
+conversion and scraper menu remain available.
+
+Use **QDP > Public data / Website > Publish archive changes** to publish the
+photos. Images must be viewable without signing in. The raw column is never
+published. To remove a photo, clear both image columns and publish again.
+The temporary Callaia image remains only for older feeds that do not yet
+include the new image field. The repository `archive-feed.gs` remains a
+reference helper, not an additional file to install beside PublicData.gs.
+
 ## Current production update: v7.2
 
 For the existing four-file v7.1 project, replace **only PublicData.gs** with

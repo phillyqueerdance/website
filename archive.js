@@ -557,8 +557,10 @@
       const portrait = node("img", "archive-artist-portrait");
       portrait.src = image.src;
       portrait.alt = person.name;
-      portrait.width = image.width;
-      portrait.height = image.height;
+      if (image.width && image.height) {
+        portrait.width = image.width;
+        portrait.height = image.height;
+      }
       portrait.decoding = "async";
       info.appendChild(portrait);
     }

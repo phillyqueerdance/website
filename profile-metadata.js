@@ -18,9 +18,15 @@
     return result.href;
   };
   const title = profile => `${profile.name} | Queer Dance Philly`;
-  // Preview portrait until artist image URLs are published from the Index.
-  const artistImage = profile => profile.id === "CALLAIA-001"
-    ? { src: "/artist-images/callaia.jpg", width: 2048, height: 2016 } : null;
+  const artistImage = profile => {
+    if (Object.hasOwn(profile, "imageUrl")) {
+      const src = globalThis.QDPEventMetadata.image({ flyerUrl: profile.imageUrl });
+      return src ? { src } : null;
+    }
+    // Keep the preview portrait only until the publisher supplies the new field.
+    return profile.id === "CALLAIA-001"
+      ? { src: "/artist-images/callaia.jpg", width: 2048, height: 2016 } : null;
+  };
   const directoryUrl = (kind, base = origin) => {
     const result = new URL("/", base);
     result.searchParams.set("archive", kind);
