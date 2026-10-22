@@ -27,12 +27,12 @@ export function renderProfileInfo(kind, profile, base) {
   const more = related ? `<section class="archive-profile-related"><h3>See More</h3><div class="archive-profile-related-links">${related}</div></section>` : "";
   const external = links ? `<div class="archive-profile-links">${links}</div>` : "";
   return `<section class="archive-profile-info" aria-label="${kind[0].toUpperCase() + kind.slice(1)} information">
-    <h2 class="${kind === "artist" ? "sr-only" : "archive-profile-heading"}">${escape(profile.name)}</h2>
-    ${meta.classification(kind, profile) ? `<span class="sr-only">${meta.classification(kind, profile)}</span>` : ""}
     ${image ? `<img class="archive-artist-portrait" src="${escape(image.src)}" alt="${escape(profile.name)}" width="${image.width}" height="${image.height}" decoding="async">` : ""}
+    <h2 class="archive-profile-heading">${escape(profile.name)}</h2>
+    ${meta.classification(kind, profile) ? `<span class="sr-only">${meta.classification(kind, profile)}</span>` : ""}
     ${kind === "venue" && profile.address ? `<address>${escape(profile.address)}</address>` : ""}
     ${profile.bio ? `<p>${escape(profile.bio)}</p>` : ""}
-    ${kind === "artist" ? external + more : more + external}</section>`;
+    ${more + external}</section>`;
 }
 
 export function renderProfileEvents(kind, profile, items, base, now = Date.now()) {
@@ -85,7 +85,7 @@ export function renderProfilePage(context, page, result, kind, id) {
   const base = new URL(context.request.url).origin;
   const info = profile ? renderProfileInfo(kind, profile, base) : "";
   const markup = profile
-    ? `<section class="${kind === "artist" ? "archive-artist-summary" : "mobile-profile-summary"}" style="--archive-profile-accent:${accents[kind]}">${info}</section>` + renderProfileEvents(kind, profile, result.payload.events, base)
+    ? `<section class="mobile-profile-summary" style="--archive-profile-accent:${accents[kind]}">${info}</section>` + renderProfileEvents(kind, profile, result.payload.events, base)
     : `<p class="event-feed-message">${escape(result.error)}</p>`;
   const directory = meta.kinds[kind];
   const label = directory[0].toUpperCase() + directory.slice(1);
@@ -104,7 +104,7 @@ export function renderProfilePage(context, page, result, kind, id) {
       .on('link[rel="canonical"]', { element(element) { element.setAttribute("href", meta.url(kind, id, origin)); } })
       .on("#archiveMenuTrack", { element(element) { element.removeAttribute("hidden"); element.setAttribute("class", "archive-menu-track is-open"); } })
       .on("#archiveMenu", { element(element) { element.setAttribute("class", "archive-menu has-profile"); } })
-      .on("#archiveMenuProfile", { element(element) { element.removeAttribute("hidden"); element.setAttribute("style", `--archive-profile-accent:${accents[kind]}`); element.setInnerContent(kind === "artist" ? `<h2 class="archive-profile-heading">${escape(profile.name)}</h2>` : info, { html: true }); } })
+      .on("#archiveMenuProfile", { element(element) { element.removeAttribute("hidden"); element.setAttribute("style", `--archive-profile-accent:${accents[kind]}`); element.setInnerContent(info, { html: true }); } })
       .on(`.archive-menu-badge--${directory}`, { element(element) { element.setAttribute("aria-current", "page"); } });
     for (const [selector, content] of meta.tags(kind, profile, origin)) rewriter = rewriter.on(selector, {
       element(element) { element.setAttribute("content", content); }

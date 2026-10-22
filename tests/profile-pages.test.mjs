@@ -77,15 +77,10 @@ for (const kind of Object.keys(meta.kinds)) {
       assert.equal(recorded.get('meta[property="og:url"]:content'), meta.url(kind, profile.id));
       assert.equal(recorded.get('meta[name="description"]:content'), profile.bio);
       const body = recorded.get('#archiveStack');
-      if (kind === 'artist') {
-        assert.match(body, /class="archive-artist-summary"/);
-        assert.ok(body.indexOf('Approved profile bio') < body.indexOf('archive-event-period'));
-        assert.ok(body.indexOf('archive-profile-links') < body.indexOf('archive-profile-related'));
-        assert.equal(recorded.get('#archiveMenuProfile'), '<h2 class="archive-profile-heading">Public &amp; Profile</h2>');
-      } else {
-        assert.match(body, /class="mobile-profile-summary"/);
-        assert.match(recorded.get('#archiveMenuProfile'), /Approved profile bio/);
-      }
+      assert.match(body, /class="mobile-profile-summary"/);
+      assert.doesNotMatch(body, /archive-artist-summary/);
+      assert.match(recorded.get('#archiveMenuProfile'), /Approved profile bio/);
+      assert.match(recorded.get('#archiveMenuProfile'), /class="archive-profile-heading"/);
       assert.match(body, /Public &amp; Profile/);
       assert.match(body, /Approved profile bio/);
       assert.match(body, /Public night/);
@@ -162,16 +157,17 @@ test('profile markup escapes text, rejects unsafe links, and groups local dates 
   assert.doesNotMatch(result, /class="event-venue"|class="event-address"/);
 });
 
-test('Callaia has the preview portrait before the bio; other artists do not get a placeholder or her photo', () => {
+test('Callaia has the preview portrait above the profile name; other artists do not get a placeholder or her photo', () => {
   const info = renderProfileInfo('artist', { ...profile, id: 'CALLAIA-001', name: 'Callaia' }, 'https://massive.example');
   assert.match(info, /<img class="archive-artist-portrait" src="\/artist-images\/callaia.jpg" alt="Callaia" width="2048" height="2016"/);
-  assert.ok(info.indexOf('<img') < info.indexOf('Approved profile bio'));
-  assert.ok(info.indexOf('archive-profile-links') < info.indexOf('archive-profile-related'));
+  assert.ok(info.indexOf('<img') < info.indexOf('class="archive-profile-heading"'));
+  assert.ok(info.indexOf('class="archive-profile-heading"') < info.indexOf('Approved profile bio'));
+  assert.ok(info.indexOf('archive-profile-related') < info.indexOf('archive-profile-links'));
   assert.doesNotMatch(renderProfileInfo('artist', { ...profile, name: 'Callaia' }, 'https://massive.example'), /<img/);
   assert.doesNotMatch(renderProfileInfo('venue', { ...profile, id: 'CALLAIA-001' }, 'https://massive.example'), /<img/);
 });
 
-test('the red tab keeps the artist name through the profile, then follows event year markers in both scroll directions', () => {
+test('the red tab follows event year markers and restores the artist name when scrolling back up', () => {
   const source = archiveSource.slice(archiveSource.indexOf('  function syncYearHeadings()'), archiveSource.indexOf('  function positionMenu()'));
   const markers = [2026, 2025].map(year => ({ year: String(year), marker: { top: 0, style: {}, getBoundingClientRect() { return { top: this.top }; } } }));
   const labels = [];
