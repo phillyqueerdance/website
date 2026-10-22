@@ -576,25 +576,107 @@ a.event-card.archive-card { text-decoration: none; }
   #previousPoster { right: calc(100% + var(--qdp-arrow-gap)); left: auto; }
   #nextPoster { left: calc(100% + var(--qdp-arrow-gap)); right: auto; }
   .archive-menu {
+    --archive-nav-width: var(--archive-nav-expanded-width, 228px);
+    --archive-tab-retreat: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "heading heading"
+      "artists parties"
+      "venues collectives"
+      "map map"
+      "profile profile"
+      "past past";
+    grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+    column-gap: 12px;
     max-height: calc(100% - var(--qdp-arrow-bottom) - var(--qdp-arrow-height) - var(--qdp-menu-arrow-gap) - var(--archive-nav-top, 0px));
+    padding-left: calc(var(--archive-menu-inset, 33px) + 12px);
     justify-content: flex-start;
+    overflow-y: hidden;
+  }
+  .archive-menu:has(> :is(.archive-menu-badge--artists, .archive-menu-badge--parties)[aria-current="page"]) {
+    grid-template-areas:
+      "heading heading"
+      "artists parties"
+      "profile profile"
+      "venues collectives"
+      "map map"
+      "past past";
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  }
+  .archive-menu-heading {
+    grid-area: heading;
+    width: 100%;
+    margin: 0 0 12px;
   }
   .archive-menu > a, .archive-menu-heading { flex-shrink: 0; }
+  .archive-menu-badge--artists { grid-area: artists; }
+  .archive-menu-badge--parties { grid-area: parties; }
+  .archive-menu-badge--venues { grid-area: venues; }
+  .archive-menu-badge--collectives { grid-area: collectives; }
   .archive-menu > .archive-menu-badge {
-    max-width: calc(100% + var(--archive-overlap, 64px) + 12px);
+    align-self: stretch;
+    justify-self: start;
+    font-size: clamp(12px, calc((var(--archive-nav-expanded-width, 228px) - 80px) / 13), calc(var(--archive-nav-font-size, 18px) * .95));
+    width: calc(100% + var(--archive-menu-inset, 33px) + 12px - var(--archive-tab-retreat));
+    max-width: none;
+    margin: 0 0 0 calc(0px - var(--archive-menu-inset, 33px) - 12px);
+    padding: 4.75px 12px 4.75px calc(var(--archive-menu-inset, 33px) + 12px);
+    justify-content: center;
   }
-  .archive-menu:not(.has-profile):has(> .archive-menu-badge[aria-current="page"]) {
-    --archive-feed-extension: 15.2px;
+  .archive-menu > .archive-menu-badge[aria-current="page"] {
+    --archive-tab-retreat: 0px;
+    width: calc(100% + var(--archive-menu-inset, 33px) + 12px);
+    padding-right: 25px;
+  }
+  .archive-menu-badge-label { white-space: nowrap; }
+  .archive-menu > :is(.archive-menu-badge--parties, .archive-menu-badge--collectives) {
+    justify-self: end;
+    width: calc(100% + 12px - var(--archive-tab-retreat));
+    margin: 0 -12px 0 0;
+    padding: 4.75px 12px;
+    border-radius: 14px 0 0 14px;
+  }
+  .archive-menu > :is(.archive-menu-badge--parties, .archive-menu-badge--collectives)[aria-current="page"] {
+    width: calc(100% + 12px);
+    padding-left: 25px;
+    padding-right: 12px;
+  }
+  .archive-menu > :is(.archive-menu-badge--parties, .archive-menu-badge--collectives)[aria-current="page"]::after {
+    right: auto;
+    left: 10px;
+  }
+  .archive-menu > .archive-menu-map {
+    grid-area: map;
+    justify-self: start;
+    max-width: 100%;
+    margin: 7px 0;
+  }
+  .archive-menu > .archive-menu-past-events,
+  .archive-menu > .archive-menu-past-events[aria-current="page"] {
+    grid-area: past;
+    justify-self: center;
+    width: auto;
+    max-width: 100%;
+    margin: 8px 0 0;
+    padding: 4.75px 18px;
+    border-radius: 999px;
+  }
+  .archive-menu > .archive-menu-past-events[aria-current="page"] {
+    padding-right: 28px;
+    padding-left: 28px;
   }
   .archive-menu-profile {
-    width: calc(100% + var(--archive-overlap, 64px) - var(--archive-menu-inset, 33px));
+    grid-area: profile;
+    align-self: stretch;
+    width: 100%;
     min-height: 0;
     /* Leave room for every tab; long profile content scrolls inside this slot. */
     flex-shrink: 1;
     scrollbar-width: none;
   }
   .archive-menu-profile:not([hidden]) {
-    margin-left: calc(var(--archive-menu-inset, 33px) - var(--archive-overlap, 64px));
+    margin: 12px 0 18px;
   }
   .poster-controls > .mobile-back:not([hidden]) {
     bottom: 6.85%;
