@@ -30,10 +30,13 @@
   try {
     const text = document.getElementById("qdpInitialArchive")?.content.textContent.trim();
     const initial = text ? JSON.parse(text) : null;
-    if (initial?.status === 200 && Object.hasOwn(profileViews, initial.kind) &&
+    const profile = initial?.status === 200 && Object.hasOwn(profileViews, initial.kind) &&
         /^[\w-]{1,80}$/.test(initial.id) && initial.payload?.profile?.id === initial.id &&
-        Array.isArray(initial.payload.events)) {
-      cache.set(endpoint(initial.kind, initial.id), {
+        Array.isArray(initial.payload.events);
+    const directory = initial?.status === 200 && ["parties", "venues", "collectives"].includes(initial.kind) &&
+        Array.isArray(initial.payload?.[initial.kind]);
+    if (profile || directory) {
+      cache.set(endpoint(initial.kind, initial.id || ""), {
         at: Date.now(), pending: false, promise: Promise.resolve(initial.payload)
       });
     }
@@ -696,6 +699,7 @@
     if (directoryViews.has(resource)) {
       if (!Array.isArray(data[resource])) throw Object.assign(new Error("Invalid directory"), { invalid: true });
       renderDirectory(resource, data[resource]);
+      if (!requestedEventId()) archive.restoreMetadata();
     } else if (resource === "months") renderMonths(data.months);
     else if (resource === "month") renderEvents(data.events);
     else {
@@ -810,7 +814,8 @@
     header(params.view === "events" ?
       (params.month ? `${monthName(params.month)} ${params.month.slice(0, 4)}` : "Past Events") :
       params.view[0].toUpperCase() + params.view.slice(1));
-    if (!window.QDPInfoView?.active) document.title = `${archiveHeader.textContent} | Queer Dance Philly`;
+    if (!window.QDPInfoView?.active) document.title = window.QDPProfileMetadata?.directories?.[params.view]?.title ||
+      `${archiveHeader.textContent} | Queer Dance Philly`;
     message("Loading archive…");
 
     const resource = params.view === "events" ? (params.month ? "month" : "months") : params.view;
@@ -873,7 +878,17 @@
       const current = this.profile;
       const params = routeParams();
       const meta = window.QDPProfileMetadata;
-      if (!this.active || !current || !meta || params.view !== current.kind || params.id !== current.person.id) return;
+      if (!this.active || !meta) return;
+      if (Object.hasOwn(meta.directories, params.view)) {
+        if (!window.QDPInfoView?.active) document.title = meta.directories[params.view].title;
+        document.querySelector('link[rel="canonical"]')?.setAttribute("href", meta.directoryUrl(params.view));
+        for (const [selector, content] of meta.directoryTags(params.view)) {
+          const element = document.querySelector(selector);
+          if (element) element.content = content;
+        }
+        return;
+      }
+      if (!current || params.view !== current.kind || params.id !== current.person.id) return;
       if (!window.QDPInfoView?.active) document.title = meta.title(current.person);
       document.querySelector('link[rel="canonical"]')?.setAttribute("href", meta.url(current.kind, current.person.id));
       for (const [selector, content] of meta.tags(current.kind, current.person)) {

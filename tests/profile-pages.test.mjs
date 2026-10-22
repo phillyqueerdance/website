@@ -161,7 +161,10 @@ test('sitemap reads one manifest, includes all four canonical profile types, and
   context.env.QDP_CANONICAL_ORIGIN = 'https://canonical.example';
   const xml = await (await sitemap(context)).text();
   assert.equal(reads.length, 1);
-  assert.equal((xml.match(/<loc>/g) || []).length, 5); // Home, event, and three approved profile kinds.
+  assert.equal((xml.match(/<loc>/g) || []).length, 7); // Home, event, three profile kinds, and two public directories.
+  assert.match(xml, /<loc>https:\/\/canonical.example\/\?archive=venues<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/canonical.example\/\?archive=collectives<\/loc>/);
+  assert.doesNotMatch(xml, /<loc>https:\/\/canonical.example\/\?archive=parties<\/loc>/);
   for (const kind of ['artist', 'venue', 'collective']) assert.match(xml,
     new RegExp(`https://canonical.example/\\?archive=${kind}&amp;id=PUBLIC-1`));
   assert.doesNotMatch(xml, /PRIVATE-PARTY|WITHDRAWN|bad|massive.example/);
@@ -224,5 +227,5 @@ test('closing an event restores the current profile metadata; leaving the profil
   window.QDPArchive.profile = null;
   window.QDPEventLinks.clear();
   assert.equal(canonical.href, meta.origin + '/');
-  assert.match(elements.get('meta[name="description"]').content, /^Find queer dance parties/);
+  assert.equal(elements.get('meta[name="description"]').content, meta.homeDescription);
 });

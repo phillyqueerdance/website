@@ -2,6 +2,14 @@
 (() => {
   const origin = "https://queerdancephilly.com";
   const kinds = Object.freeze({ artist: "artists", venue: "venues", party: "parties", collective: "collectives" });
+  const homeDescription = "Queer Philadelphia's guide to finding the next move. Discover queer dance parties, LGBTQ+ nightlife, DJs, artists, venues, and more!";
+  const directories = Object.freeze({
+    parties: Object.freeze({ kind: "party", title: "Queer Dance Philly | Parties",
+      description: "Discover queer dance parties in Philadelphia: when they're happening, who's playing them, and where they're going down." }),
+    venues: Object.freeze({ kind: "venue", title: "Queer Dance Philly | Venues",
+      description: "Discover queer dance venues in Philadelphia: what's coming up, who's playing, and who's played before." }),
+    collectives: Object.freeze({ kind: "collective", title: "Queer Dance Philly | Collectives" })
+  });
   const validId = id => typeof id === "string" && /^[\w-]{1,80}$/.test(id);
   const url = (kind, id, base = origin) => {
     const result = new URL("/", base);
@@ -10,6 +18,20 @@
     return result.href;
   };
   const title = profile => `${profile.name} | Queer Dance Philly`;
+  const directoryUrl = (kind, base = origin) => {
+    const result = new URL("/", base);
+    result.searchParams.set("archive", kind);
+    return result.href;
+  };
+  const directoryTags = (kind, base = origin) => {
+    const directory = directories[kind];
+    return directory ? [
+      ['meta[name="description"]', directory.description || homeDescription],
+      ['meta[property="og:title"]', directory.title],
+      ['meta[name="twitter:title"]', directory.title],
+      ['meta[property="og:url"]', directoryUrl(kind, base)]
+    ] : [];
+  };
   const description = profile => String(profile.bio || profile.name || "").replace(/\s+/g, " ").trim().slice(0, 180);
   const classification = (kind, profile) => {
     const labels = [];
@@ -29,5 +51,6 @@
     ['meta[name="twitter:image"]', new URL("/qdp-share-card.jpg", base).href],
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
-  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, title, description, classification, tags });
+  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, title, description, classification, tags,
+    homeDescription, directories, directoryUrl, directoryTags });
 })();
