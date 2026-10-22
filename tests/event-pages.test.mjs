@@ -169,7 +169,7 @@ test('sitemap contains unique canonical event URLs and excludes invalid or withd
   assert.equal(response.status, 200);
   assert.match(response.headers.get('Content-Type'), /application\/xml/);
   const xml = await response.text();
-  assert.equal((xml.match(/<loc>/g) || []).length, 6);
+  assert.equal((xml.match(/<loc>/g) || []).length, 9);
   assert.match(xml, /https:\/\/queerdancephilly.com\/\?event=PAST-1/);
   assert.doesNotMatch(xml, /PRIVATE|bad|massive.example/);
 });

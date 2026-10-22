@@ -3,13 +3,14 @@ import { renderLivePoster } from "./live-poster.js";
 import { resolveEvent } from "./event-records.js";
 import { renderEventPage } from "./event-page.js";
 import { profilePage } from "./profile-page.js";
+import { directoryPage } from "./directory-page.js";
 import { withKvScope, cacheResponse, freshResponse } from "./kv-cache.js";
 
 export async function onRequestGet(context) {
   context = withKvScope(context);
   const url = new URL(context.request.url);
   const cache = typeof caches === "undefined" ? null : caches.default;
-  const cacheKey = new Request(new URL("/_qdp/prepared-home-6am-v1", url));
+  const cacheKey = new Request(new URL("/_qdp/prepared-home-6am-search-v1", url));
   const page = await context.env.ASSETS.fetch(new URL("/", url));
   if (!page.ok) return page;
   // Event content and metadata also apply to contextual archive URLs.
@@ -20,6 +21,9 @@ export async function onRequestGet(context) {
   const kind = url.searchParams.get("archive");
   if (Object.hasOwn(globalThis.QDPProfileMetadata.kinds, kind || "")) {
     return profilePage(context, page, kind, url.searchParams.get("id") || "");
+  }
+  if (Object.hasOwn(globalThis.QDPProfileMetadata.directories, kind || "")) {
+    return directoryPage(context, page, kind);
   }
   if (url.searchParams.has("archive")) return page;
   const cached = freshResponse(await cache?.match(cacheKey), context);

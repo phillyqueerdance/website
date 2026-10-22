@@ -18,7 +18,7 @@
   // Direct responses contain event or profile metadata. Keep the home defaults
   // for returning to the calendar without another page request.
   if (initial?.event || document.getElementById("qdpInitialArchive")?.content.textContent.trim()) {
-    original.set(selectors[0], "Find queer dance parties, DJs, venues, and nightlife in Philadelphia. Queer Dance Philly is your cheat sheet for finding the next move.");
+    original.set(selectors[0], "Queer Philadelphia's guide to finding the next move. Discover queer dance parties, LGBTQ+ nightlife, DJs, artists, venues, and more!");
     original.set(selectors[1], "Queer Dance Philly");
     original.set(selectors[2], "Queer Dance Philly");
     original.set(selectors[3], "Your cheat sheet for queer dance parties, DJs, venues, and nightlife in Philadelphia.");

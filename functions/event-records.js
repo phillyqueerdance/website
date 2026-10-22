@@ -164,7 +164,9 @@ export async function publicSitemapEntries(context) {
     return (Array.isArray(manifest[directory]) ? manifest[directory] : [])
       .filter(meta.validId).map(id => ({ kind, id }));
   });
-  return { events: await eventsFromManifest(context, manifest), profiles };
+  const directories = Object.keys(meta.directories).filter(directory =>
+    Array.isArray(manifest[directory]) && (directory !== "parties" || manifest.partyPublicGate === true));
+  return { events: await eventsFromManifest(context, manifest), profiles, directories };
 }
 
 export async function eventSitemapEntries(context) {
