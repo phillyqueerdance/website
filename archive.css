@@ -287,12 +287,13 @@
 .archive-menu-profile:not([hidden]) { margin: 12px 0 28px; }
 .archive-menu.has-profile .archive-menu-profile { max-height: min(65dvh, 800px); opacity: 1; overflow-y: auto; }
 .archive-profile-info { overflow-wrap: anywhere; }
+/* Portraits share the sidebar text's left and right boundaries. */
 .archive-artist-portrait {
   display: block;
-  width: auto;
+  width: 100%;
   height: auto;
   max-width: 100%;
-  max-height: min(22dvh, 180px);
+  max-height: none;
   margin: 0 auto 12px;
   border-radius: var(--qdp-card-radius, 18px);
 }
