@@ -288,7 +288,7 @@
   .archive-menu > .archive-menu-map { grid-column: 1; grid-row: 4; min-height: 44px; margin: 4px 0 0; padding: 12px 0; font-size: 16px; }
   .archive-menu .archive-menu-profile { display: none; }
   .mobile-profile-summary { display: block; flex-shrink: 0; padding: 16px 12px 24px; color: #fff1f4; font-size: 15px; line-height: 1.6; }
-  .mobile-profile-summary .archive-artist-portrait { width: min(100%, 52cqw, 280px); max-height: none; margin-bottom: 20px; }
+  .mobile-profile-summary .archive-artist-portrait { width: 90%; max-height: none; margin-bottom: 20px; }
   .archive-menu-profile { flex-shrink: 0; font-size: 15px; line-height: 1.6; }
   .archive-menu.has-profile .archive-menu-profile { max-height: none; overflow: visible; }
   .archive-menu-profile:not([hidden]) { margin: 18px 0 28px; }
