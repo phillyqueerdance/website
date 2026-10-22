@@ -134,6 +134,7 @@
 .archive-menu-track.is-open .archive-menu-panel { transform: translateX(0); }
 .archive-menu {
   --archive-nav-width: var(--archive-nav-compact-width, 164px);
+  --archive-menu-border-width: 2.5px;
   position: absolute;
   top: var(--archive-nav-top, 0px);
   left: 0;
@@ -161,7 +162,7 @@
   position: absolute;
   inset: 0 0 0 var(--archive-menu-inset, 33px);
   z-index: 0;
-  border: 2.5px solid #ffea86;
+  border: var(--archive-menu-border-width) solid #ffea86;
   border-left: 0;
   border-radius: 0 24px 24px 0;
   background: #000;
@@ -287,10 +288,10 @@
 .archive-menu-profile:not([hidden]) { margin: 12px 0 28px; }
 .archive-menu.has-profile .archive-menu-profile { max-height: min(65dvh, 800px); opacity: 1; overflow-y: auto; }
 .archive-profile-info { overflow-wrap: anywhere; }
-/* Portraits share the sidebar text's left and right boundaries. */
+/* Center every artist portrait within the same 90% width boundaries. */
 .archive-artist-portrait {
   display: block;
-  width: 100%;
+  width: 90%;
   height: auto;
   max-width: 100%;
   max-height: none;
@@ -632,15 +633,16 @@ a.event-card.archive-card { text-decoration: none; }
   .archive-menu-badge-label { white-space: nowrap; }
   .archive-menu > :is(.archive-menu-badge--parties, .archive-menu-badge--collectives) {
     justify-self: end;
-    width: calc(100% + 12px - var(--archive-tab-retreat));
-    margin: 0 -12px 0 0;
+    width: calc(100% + 12px - var(--archive-menu-border-width) - var(--archive-tab-retreat));
+    margin: 0 calc(var(--archive-menu-border-width) - 12px) 0 0;
     padding: 4.75px 12px;
     border-radius: 14px 0 0 14px;
   }
   .archive-menu > :is(.archive-menu-badge--parties, .archive-menu-badge--collectives)[aria-current="page"] {
-    width: calc(100% + 12px);
+    width: calc(100% + 12px - var(--archive-menu-border-width));
     padding-left: 25px;
     padding-right: 12px;
+    border-radius: 14px 0 0 14px;
   }
   .archive-menu > :is(.archive-menu-badge--parties, .archive-menu-badge--collectives)[aria-current="page"]::after {
     right: auto;
