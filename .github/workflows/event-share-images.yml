@@ -1,0 +1,43 @@
+name: Prepare event share images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/event-share-images.yml'
+      - 'scripts/*share-image*.mjs'
+      - 'functions/share-image-*.js'
+      - 'event-metadata.js'
+      - 'package*.json'
+      - 'frame.png'
+      - 'Fraunces-Variable.ttf'
+      - '*popup-background*'
+  schedule:
+    - cron: '13,43 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qdp-event-share-images
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository == 'phillyqueerdance/website' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run prepare:share-images
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

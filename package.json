@@ -1,0 +1,12 @@
+{
+  "name": "queer-dance-philly",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "prepare:share-images": "node scripts/prepare-share-images.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2"
+  }
+}
