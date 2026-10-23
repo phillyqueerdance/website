@@ -154,6 +154,14 @@ test('the event page writes event metadata and JSON-LD before scripts load and p
     assert.equal(response.headers.get('ETag'), null);
     assert.equal(recorded.get('link[rel="canonical"]:href'), meta.url(event.eventId));
     assert.equal(recorded.get('meta[name="twitter:description"]:content'), meta.description(event));
+    assert.equal(recorded.get('meta[property="og:image"]:content'), 'https://massive.example/qdp-share-card.jpg');
+    const withFlyer = { ...event, flyerUrl: 'https://images.example/flyer.jpg' };
+    renderEventPage(context, new Response('<html></html>'), { status: 200, event: withFlyer }, event.eventId);
+    assert.equal(recorded.get('meta[property="og:image"]:content'), meta.shareImage(withFlyer, 'https://massive.example'));
+    assert.equal(recorded.get('meta[name="twitter:image"]:content'), meta.shareImage(withFlyer, 'https://massive.example'));
+    assert.equal(recorded.get('meta[property="og:image:type"]:content'), 'image/png');
+    assert.equal(recorded.get('meta[property="og:image:width"]:content'), '900');
+    assert.equal(recorded.get('meta[property="og:image:height"]:content'), '1067');
     assert.match(recorded.get('#eventDetail'), /Dance &amp; Go/);
     assert.match(recorded.get('head:append'), /"@type":"Event"/);
     assert.equal(JSON.parse(recorded.get('#qdpInitialEvent')).event.eventId, event.eventId);
