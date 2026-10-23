@@ -208,13 +208,13 @@ test('the compatibility portrait is a separate drawer; artist details have no du
   assert.doesNotMatch(renderProfileInfo('venue', { ...profile, id: 'CALLAIA-001' }, 'https://massive.example'), /<img/);
 });
 
-test('the red tab follows event year markers and restores the artist name when scrolling back up', () => {
+test('the profile tab follows the full height of year markers and restores the artist name when scrolling back up', () => {
   const source = archiveSource.slice(archiveSource.indexOf('  function syncYearHeadings()'), archiveSource.indexOf('  function positionMenu()'));
   const markers = [2026, 2025].map(year => ({ year: String(year), marker: { top: 0, style: {}, getBoundingClientRect() { return { top: this.top }; } } }));
   const labels = [];
   const context = vm.createContext({ profileName: 'Callaia', yearHeadings: markers,
     archiveStack: { getBoundingClientRect: () => ({ top: 100 }) },
-    archiveHeader: { getBoundingClientRect: () => ({ height: 42 }), setAttribute() {} },
+    archiveHeader: { getBoundingClientRect: () => ({ height: 40 }), setAttribute() {} },
     header: label => labels.push(label), fitProfileHeaders() {},
     headerLabel: { style: {} }, incomingYear: { style: {} }
   });
@@ -224,6 +224,18 @@ test('the red tab follows event year markers and restores the artist name when s
     vm.runInContext('syncYearHeadings()', context);
     assert.equal(labels.at(-1), expected);
   }
+  // The marker's last two pixels must finish sliding before it replaces the name.
+  markers[0].marker.top = 61;
+  markers[1].marker.top = 600;
+  vm.runInContext('syncYearHeadings()', context);
+  assert.equal(context.headerLabel.textContent, 'Callaia');
+  assert.equal(context.incomingYear.textContent, '2026');
+  assert.equal(context.headerLabel.style.transform, 'translateY(-39px)');
+  const incomingOffset = Number(context.incomingYear.style.transform.match(/translateY\((.*)px\)/)[1]);
+  assert.ok(Math.abs(incomingOffset - 1) < .001);
+  markers[0].marker.top = 60;
+  vm.runInContext('syncYearHeadings()', context);
+  assert.equal(labels.at(-1), '2026');
 });
 
 test('sitemap reads one manifest, includes all four canonical profile types, and honors public gates', async () => {

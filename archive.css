@@ -21,7 +21,8 @@
 }
 .archive-page.is-open { transform: translateY(0); }
 .archive-page.is-queer-profile { --archive-profile-header-color: var(--qdp-queer-card, #922185); }
-.archive-header { cursor: default; background: var(--archive-profile-header-color, #fa2b5a); }
+/* Photo headers sit above the list, so end exactly at its clipping edge. */
+.archive-header { cursor: default; height: var(--qdp-date-height); background: var(--archive-profile-header-color, #fa2b5a); }
 .archive-header:hover, .archive-header:focus-visible { background: var(--archive-profile-header-color, #fa2b5a); color: #ffeff2; }
 .archive-page:has(.archive-artist-drawer) .archive-header { z-index: 3; }
 .archive-back {

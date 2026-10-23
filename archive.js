@@ -155,7 +155,7 @@
   function syncYearHeadings() {
     if (!profileName) return;
     const top = archiveStack.getBoundingClientRect().top;
-    const height = archiveHeader.getBoundingClientRect().height - 2;
+    const height = archiveHeader.getBoundingClientRect().height;
     if (height <= 0) return;
     let active = profileName;
     let transition = null;
