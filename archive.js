@@ -693,17 +693,7 @@
             node("span", "archive-date-number", date)
           );
         }
-        let card = createEventCard(event);
-        if (window.QDPEventPhotos.expands(kind, person) && window.QDPEventPhotos.urls(event).length) {
-          const template = document.createElement("template");
-          template.innerHTML = window.QDPEventPhotos.strip(event, card.outerHTML, archive.eventUrl(eventIdOf(event)));
-          card = template.content.firstElementChild;
-          card.querySelector(".event-photo-go").addEventListener("click", click => {
-            if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
-            click.preventDefault();
-            openEventDetail(event);
-          });
-        }
+        const card = createEventCard(event);
         if (kind === "venue") {
           card.querySelectorAll(".event-venue, .event-address").forEach(part => part.remove());
         }

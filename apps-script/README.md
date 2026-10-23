@@ -15,12 +15,14 @@ app deployment to a new version, retaining its URL and access settings. Use
 current feed and archive. The repository `archive-feed.gs` is a tested reference
 helper; do not install it beside PublicData.gs.
 
-On Brent Galen Adkins's artist page (`BRENT-001`), an assigned event with photos
-expands into a gallery with **Go to event** beneath it. One event is expanded
-at a time. Other artist/profile listings retain their normal event links.
-Every individual event page with photos displays its gallery below the
-description. Photos open in a larger viewer with arrows, keyboard navigation,
-and mobile swiping. Blank PhotoURLs cells retain the existing event layout.
+Any event strip with photos expands into a gallery with **Go to event** beneath
+it, on the calendar and all artist, party, venue, collective, and archive pages.
+One event is expanded at a time. Galleries show one complete photo at a time;
+their arrows, keyboard navigation, and mobile swipes wrap in both directions.
+Archive dropdowns extend beneath the purple date column and have two rounded
+bottom corners, with no top border. Every individual event page with photos
+displays the same carousel below its description. Photos also open in a larger
+viewer. Blank PhotoURLs cells retain the existing event layout.
 The normal event publication gates and artist flags continue to apply.
 
 ## Artist image preview

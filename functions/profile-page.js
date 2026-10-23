@@ -72,9 +72,7 @@ export function renderProfileEvents(kind, profile, items, base, now = Date.now()
       href.searchParams.set("event", event.eventId);
       const day = Number(date.slice(-2));
       const card = renderEventCard(event, { href: href.href, hideLocation: kind === "venue" });
-      const strip = globalThis.QDPEventPhotos.expands(kind, profile)
-        ? globalThis.QDPEventPhotos.strip(event, card, href.href) : card;
-      rows.push(`<div class="event-row ${rows.length ? "same-time" : "has-time"}"><time class="archive-day-chip" datetime="${escape(event.start)}">${day}${suffix(day)}</time>${strip}</div>`);
+      rows.push(`<div class="event-row ${rows.length ? "same-time" : "has-time"}"><time class="archive-day-chip" datetime="${escape(event.start)}">${day}${suffix(day)}</time>${card}</div>`);
     }
     flush();
     parts.push(`<section class="archive-event-period" data-period="${period}" aria-labelledby="archive-${period}-heading"><div class="archive-period-header"><h2 id="archive-${period}-heading" class="archive-period-heading">${label}</h2>${firstYear}</div>${blocks.join("")}</section>`);

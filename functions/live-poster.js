@@ -1,6 +1,8 @@
 // The first page uses the same date, time, and card structure as app.js.
 // Keep this small renderer in sync when changing the live poster markup.
 import "../live-calendar.js";
+import "../event-metadata.js";
+import "../event-photos.js";
 const dateFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit"
 });
@@ -39,7 +41,9 @@ export function renderEventCard(event, { href, hideLocation = false } = {}) {
   const classification = event.explicitQueer ? '<span class="sr-only">Queer event. </span>' : "";
   const melt = String(event.partyId || "").trim().toUpperCase() === "MELT-001";
   const location = (field, value) => `<div class="${field}"${value ? "" : " hidden"}>${escapeHtml(value)}</div>`;
-  return `<a class="event-card ${event.explicitQueer ? "explicit" : "default"}${event.queerArtist || event.transArtist ? " has-flags" : ""}${melt ? " melt" : ""}" data-event-id="${escapeHtml(id)}" href="${escapeHtml(href || `/?event=${encodeURIComponent(id)}`)}">${classification}${flags}<span class="event-card-shape" aria-hidden="true"></span><span class="event-card-content"><div class="event-title">${escapeHtml(displayTitle(event))}</div>${hideLocation ? "" : location("event-venue", String(event.venue || "").trim()) + location("event-address", String(event.address || "").trim())}</span></a>`;
+  const target = href || `/?event=${encodeURIComponent(id)}`;
+  const card = `<a class="event-card ${event.explicitQueer ? "explicit" : "default"}${event.queerArtist || event.transArtist ? " has-flags" : ""}${melt ? " melt" : ""}" data-event-id="${escapeHtml(id)}" href="${escapeHtml(target)}">${classification}${flags}<span class="event-card-shape" aria-hidden="true"></span><span class="event-card-content"><div class="event-title">${escapeHtml(displayTitle(event))}</div>${hideLocation ? "" : location("event-venue", String(event.venue || "").trim()) + location("event-address", String(event.address || "").trim())}</span></a>`;
+  return globalThis.QDPEventPhotos.strip(event, card, target);
 }
 
 export function renderLivePoster(events, now = new Date()) {

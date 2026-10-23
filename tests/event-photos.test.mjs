@@ -7,6 +7,7 @@ import { onRequestGet as eventApi } from '../functions/api/event.js';
 import { shard } from '../functions/event-records.js';
 import { renderEventDetail } from '../functions/event-page.js';
 import { renderProfileEvents } from '../functions/profile-page.js';
+import { renderEventCard, renderLivePoster } from '../functions/live-poster.js';
 
 const photos = globalThis.QDPEventPhotos;
 const event = { eventId: 'PHOTO-1', public: true, title: 'A <night> & more',
@@ -85,20 +86,69 @@ test('every event detail shows safe photos in order, with Drive conversion and l
   assert.ok(html.indexOf('one.jpg') < html.indexOf('TWO_ID=w1600'));
   assert.match(html, /loading="lazy" decoding="async"/);
   assert.match(html, /Photo 1 from A &lt;night&gt; &amp; more/);
-  assert.doesNotMatch(renderEventDetail({ ...event, photoUrls: [] }, 'https://photos.example/'), /event-photo-grid/);
+  assert.doesNotMatch(renderEventDetail({ ...event, photoUrls: [] }, 'https://photos.example/'), /event-photo-carousel/);
+  assert.equal((html.match(/class="event-photo"/g) || []).length, 2);
+  assert.equal((html.match(/aria-label="View Photo [^"]*" hidden/g) || []).length, 1);
+  assert.match(html, /aria-label="Previous photo"/);
+  assert.match(html, /aria-label="Next photo"/);
 });
 
-test('only Brent gets expandable strips; the event destination retains artist context', () => {
-  const html = renderProfileEvents('artist', { id: 'BRENT-001' }, [event], 'https://photos.example');
-  assert.match(html, /<details class="event-photo-strip explicit"/);
-  assert.match(html, /<summary class="event-card /);
-  assert.doesNotMatch(html.match(/<summary[^>]*>/)[0], /href=/);
-  assert.match(html, /class="event-photo-go" href="https:\/\/photos.example\/\?archive=artist&amp;id=BRENT-001&amp;event=PHOTO-1">Go to event/);
-  assert.match(html, /2 photos/);
-  for (const [kind, id] of [['artist', 'DJ-001'], ['venue', 'BRENT-001'], ['party', 'BRENT-001']]) {
-    assert.doesNotMatch(renderProfileEvents(kind, { id }, [event], 'https://photos.example'), /event-photo-strip|event-photo-grid/);
+test('photo strips expand on every profile type and retain the correct Go to event destination', () => {
+  for (const [kind, id] of [['artist', 'BRENT-001'], ['artist', 'CALLAIA-001'], ['venue', 'ROOM'], ['party', 'MELT-001'], ['collective', 'CREW']]) {
+    const html = renderProfileEvents(kind, { id }, [event], 'https://photos.example');
+    assert.equal((html.match(/<details /g) || []).length, 1);
+    assert.match(html, /<summary class="event-card /);
+    assert.doesNotMatch(html.match(/<summary[^>]*>/)[0], /href=/);
+    assert.ok(html.includes(`class="event-photo-go" href="https://photos.example/?archive=${kind}&amp;id=${id}&amp;event=PHOTO-1">Go to event`));
+    assert.match(html, /2 photos/);
+    assert.match(html, /event-photo-dropdown/);
   }
   assert.doesNotMatch(renderProfileEvents('artist', { id: 'BRENT-001' }, [{ ...event, photoUrls: [] }], 'https://photos.example'), /<details/);
+});
+
+test('calendar strips use the same expanding gallery and ordinary events retain their direct links', () => {
+  assert.match(renderEventCard(event), /<details class="event-photo-strip/);
+  assert.match(renderEventCard(event), /class="event-photo-go" href="\/\?event=PHOTO-1"/);
+  assert.match(renderLivePoster([event], new Date('2026-09-19T12:00:00-04:00')).markup, /<details class="event-photo-strip/);
+  assert.match(renderEventCard({ ...event, photoUrls: [] }), /^<a class="event-card/);
+});
+
+test('the inline carousel shows exactly one photo and wraps forwards and backwards', () => {
+  const slides = [{ hidden: false }, { hidden: true }, { hidden: true }];
+  const counter = { textContent: '1 / 3' };
+  const section = { dataset: { photoIndex: '0' }, querySelectorAll: () => slides, querySelector: () => counter };
+  for (const [direction, expected] of [[1, 1], [1, 2], [1, 0], [-1, 2], [-1, 1], [-1, 0]]) {
+    photos.moveGallery(section, direction);
+    assert.equal(section.dataset.photoIndex, String(expected));
+    assert.equal(slides.filter(slide => !slide.hidden).length, 1);
+    assert.equal(slides[expected].hidden, false);
+    assert.equal(counter.textContent, `${expected + 1} / 3`);
+  }
+});
+
+test('browser Go to event opens the intended event and stops the click before the outside-click closer', () => {
+  const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+  const source = app.slice(app.indexOf('function createEventCard('), app.indexOf('\nfunction renderPoster('));
+  let handler, opened, templateMarkup;
+  const details = { querySelector: () => ({ addEventListener: (name, fn) => { handler = fn; } }) };
+  const template = { content: { firstElementChild: details }, set innerHTML(value) { templateMarkup = value; } };
+  const element = tag => tag === 'template' ? template : { className: '', dataset: {}, children: [],
+    append(...children) { this.children.push(...children); }, appendChild(child) { this.children.push(child); },
+    setAttribute() {}, addEventListener() {}, get outerHTML() { return `<a class="${this.className}" href="${this.href}"></a>`; } };
+  const context = vm.createContext({ QDPEventPhotos: photos, document: { createElement: element },
+    eventIdOf: e => e.eventId, eventPermalink: id => `/?archive=party&id=MELT-001&event=${id}`,
+    displayTitle: e => e.title, eventVenue: () => '', eventAddress: () => '', openEventDetail: e => { opened = e; } });
+  vm.runInContext(source, context);
+  assert.equal(context.createEventCard(event), details);
+  assert.match(templateMarkup, /archive=party&amp;id=MELT-001&amp;event=PHOTO-1/);
+  let prevented = false, stopped = false;
+  handler({ button: 0, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
+  assert.equal(opened, event);
+  assert.equal(prevented, true);
+  assert.equal(stopped, true);
+  opened = null;
+  handler({ button: 0, metaKey: true });
+  assert.equal(opened, null);
 });
 
 test('photo viewer moves through the gallery and Escape closes only the viewer and restores its trigger', () => {
@@ -112,7 +162,7 @@ test('photo viewer moves through the gallery and Escape closes only the viewer a
       : selector.includes('Previous') ? previous : selector.includes('Next') ? next : close; } };
   const grid = { querySelectorAll: () => links };
   const links = event.photoUrls.map((href, index) => ({ href, focused: false,
-    closest: selector => selector === '.event-photo-grid' ? grid : links[index],
+    closest: selector => selector === '.event-photo-slides' ? grid : selector === 'a[data-event-photo]' ? links[index] : null,
     querySelector: () => ({ alt: `Photo ${index + 1}` }), focus() { this.focused = true; } }));
   const context = vm.createContext({ URL, Object, String, Array, Set, HTMLDialogElement: class {},
     document: { addEventListener: (name, handler) => handlers.set(name, handler),

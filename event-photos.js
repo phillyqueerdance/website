@@ -10,7 +10,6 @@
     }).filter(Boolean))];
   };
   const urls = event => parse(event?.photoUrls ?? event?.PhotoURLs);
-  const expands = (kind, profile) => kind === "artist" && profile?.id === "BRENT-001";
   const escape = value => String(value ?? "").replace(/[&<>"']/g, char =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 
@@ -22,9 +21,10 @@
     const links = photos.map((url, index) => {
       const src = meta.image({ flyerUrl: url });
       const label = `Photo ${index + 1} from ${title}`;
-      return `<a class="event-photo" href="${escape(src)}" target="_blank" rel="noopener noreferrer" data-event-photo aria-label="View ${escape(label)}"><img src="${escape(src)}" alt="${escape(label)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"></a>`;
+      return `<a class="event-photo" href="${escape(src)}" target="_blank" rel="noopener noreferrer" data-event-photo aria-label="View ${escape(label)}"${index ? " hidden" : ""}><img src="${escape(src)}" alt="${escape(label)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"></a>`;
     }).join("");
-    return `<section class="event-photos" aria-label="Event photos"><h3>Photos</h3><div class="event-photo-grid">${links}</div></section>`;
+    const hidden = photos.length < 2 ? " hidden" : "";
+    return `<section class="event-photos" aria-label="Event photos" data-photo-index="0"><div class="event-photo-heading"><h3>Photos</h3><span class="event-photo-position" aria-live="polite">1 / ${photos.length}</span></div><div class="event-photo-carousel" aria-roledescription="carousel"><div class="event-photo-slides">${links}</div><button type="button" class="event-photo-previous" data-photo-direction="-1" aria-label="Previous photo"${hidden}>←</button><button type="button" class="event-photo-next" data-photo-direction="1" aria-label="Next photo"${hidden}>→</button></div></section>`;
   }
 
   function strip(event, card, href) {
@@ -33,10 +33,19 @@
     const indicator = `<span class="event-photo-toggle">${count} photo${count === 1 ? "" : "s"} <span aria-hidden="true">⌄</span></span>`;
     const summary = card.replace(/^<a /, '<summary ').replace(/\shref="[^"]*"/, "")
       .replace(/<\/a>$/, `${indicator}</summary>`);
-    return `<details class="event-photo-strip${event.explicitQueer ? " explicit" : " default"}" name="brent-event-photos" data-event-id="${escape(event.eventId)}">${summary}${gallery(event)}<a class="event-photo-go" href="${escape(href)}">Go to event</a></details>`;
+    return `<details class="event-photo-strip${event.explicitQueer ? " explicit" : " default"}" name="event-photos" data-event-id="${escape(event.eventId)}">${summary}<div class="event-photo-dropdown">${gallery(event)}<a class="event-photo-go" href="${escape(href)}">Go to event</a></div></details>`;
   }
 
-  globalThis.QDPEventPhotos = Object.freeze({ parse, urls, expands, gallery, strip });
+  function moveGallery(section, direction) {
+    const slides = [...section.querySelectorAll("a[data-event-photo]")];
+    if (!slides.length) return;
+    const index = ((Number(section.dataset.photoIndex) || 0) + direction + slides.length) % slides.length;
+    slides.forEach((slide, number) => { slide.hidden = number !== index; });
+    section.dataset.photoIndex = String(index);
+    section.querySelector(".event-photo-position").textContent = `${index + 1} / ${slides.length}`;
+  }
+
+  globalThis.QDPEventPhotos = Object.freeze({ parse, urls, gallery, strip, moveGallery });
   if (typeof document === "undefined") return;
 
   // Keep one event expanded, including browsers without native details grouping.
@@ -46,7 +55,8 @@
     if (details.open) document.querySelectorAll(".event-photo-strip[open]").forEach(other => {
       if (other !== details) other.open = false;
     });
-    globalThis.QDPArchive?.updateLayout();
+    if (globalThis.QDPArchive?.active) globalThis.QDPArchive.updateLayout();
+    else globalThis.QDPUpdatePhotoLayout?.();
   }, true);
   document.addEventListener("error", event => {
     const image = event.target;
@@ -84,7 +94,10 @@
     viewer.querySelector(".event-photo-close").addEventListener("click", close);
     previous.addEventListener("click", () => show(current - 1));
     next.addEventListener("click", () => show(current + 1));
-    viewer.addEventListener("click", event => { if (event.target === viewer) close(); });
+    viewer.addEventListener("click", event => {
+      event.stopPropagation();
+      if (event.target === viewer) close();
+    });
     viewer.addEventListener("cancel", event => { event.preventDefault(); close(); });
     viewer.addEventListener("wheel", event => event.stopPropagation(), { passive: true });
     viewer.addEventListener("keydown", event => {
@@ -101,14 +114,46 @@
       touch = null;
     }, { passive: true });
   }
+  document.addEventListener("keydown", event => {
+    const section = event.target.closest?.(".event-photos");
+    if (!section || !["ArrowLeft", "ArrowRight"].includes(event.key) ||
+        event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    moveGallery(section, event.key === "ArrowRight" ? 1 : -1);
+  });
+  let swipe;
+  document.addEventListener("touchstart", event => {
+    const section = event.target.closest?.(".event-photo-carousel")?.closest(".event-photos");
+    if (!section || event.touches.length !== 1) return;
+    event.stopPropagation();
+    swipe = { section, x: event.touches[0].clientX, y: event.touches[0].clientY };
+  }, { capture: true, passive: true });
+  document.addEventListener("touchend", event => {
+    if (!swipe) return;
+    event.stopPropagation();
+    const end = event.changedTouches[0];
+    if (end && Math.abs(end.clientX - swipe.x) > 60 && Math.abs(end.clientY - swipe.y) < 80) {
+      moveGallery(swipe.section, end.clientX < swipe.x ? 1 : -1);
+    }
+    swipe = null;
+  }, { capture: true, passive: true });
+  document.addEventListener("touchcancel", () => { swipe = null; }, { passive: true });
   document.addEventListener("click", event => {
+    const arrow = event.target.closest?.("button[data-photo-direction]");
+    if (arrow) {
+      event.preventDefault();
+      event.stopPropagation();
+      moveGallery(arrow.closest(".event-photos"), Number(arrow.dataset.photoDirection));
+      return;
+    }
     const link = event.target.closest?.("a[data-event-photo]");
     if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey ||
         event.ctrlKey || event.shiftKey || event.altKey || typeof HTMLDialogElement === "undefined") return;
     if (!viewer) createViewer();
     event.preventDefault();
     trigger = link;
-    photos = [...link.closest(".event-photo-grid").querySelectorAll("a[data-event-photo]")];
+    photos = [...link.closest(".event-photo-slides").querySelectorAll("a[data-event-photo]")];
     show(photos.indexOf(link));
     viewer.showModal();
   });

@@ -889,6 +889,18 @@ function createEventCard(event) {
 
   content.append(title, venue, address);
   card.append(shape, content);
+  if (globalThis.QDPEventPhotos?.urls(event).length) {
+    const template = document.createElement("template");
+    template.innerHTML = globalThis.QDPEventPhotos.strip(event, card.outerHTML, card.href);
+    const strip = template.content.firstElementChild;
+    strip.querySelector(".event-photo-go").addEventListener("click", click => {
+      if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
+      click.preventDefault();
+      click.stopPropagation();
+      openEventDetail(event);
+    });
+    return strip;
+  }
   card.addEventListener("click", click => {
     if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
     click.preventDefault();
@@ -1127,6 +1139,11 @@ function schedulePosterLayout() {
     fitPosterTitles();
   });
 }
+
+window.QDPUpdatePhotoLayout = () => {
+  measureEndSpacer();
+  fitPosterTitles();
+};
 
 function googleCalendarEventUrl(event) {
   const start = new Date(event.start);
