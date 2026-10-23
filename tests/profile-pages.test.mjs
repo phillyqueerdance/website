@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { onRequestGet as page } from '../functions/index.js';
-import { renderProfileInfo, renderProfileEvents } from '../functions/profile-page.js';
+import { renderArtistDrawer, renderProfileInfo, renderProfileEvents } from '../functions/profile-page.js';
 import { onRequestGet as sitemap } from '../functions/sitemap.xml.js';
 import { shard } from '../functions/event-records.js';
 
@@ -12,6 +12,7 @@ const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const archiveSource = fs.readFileSync(new URL('../archive.js', import.meta.url), 'utf8');
 const eventLinksSource = fs.readFileSync(new URL('../event-linking.js', import.meta.url), 'utf8');
 const profile = { id: 'PUBLIC-1', publicOk: true, name: 'Public & Profile', bio: 'Approved profile bio.',
+  imageUrl: 'https://example.com/artist.jpg',
   website: 'https://example.com/', instagram: 'https://www.instagram.com/public/', address: '123 Public St',
   related: [{ kind: 'artist', id: 'OTHER', name: 'Other Artist' }, { kind: 'artist', id: 'PRIVATE', name: 'Private Artist' }] };
 const event = { public: true, eventId: 'EVENT-1', title: 'Public night', start: '2030-10-01T23:00:00-04:00',
@@ -77,10 +78,18 @@ for (const kind of Object.keys(meta.kinds)) {
       assert.equal(recorded.get('meta[property="og:url"]:content'), meta.url(kind, profile.id));
       assert.equal(recorded.get('meta[name="description"]:content'), profile.bio);
       const body = recorded.get('#archiveStack');
-      assert.match(body, /class="mobile-profile-summary"/);
-      assert.doesNotMatch(body, /archive-artist-summary/);
-      assert.match(recorded.get('#archiveMenuProfile'), /Approved profile bio/);
-      assert.match(recorded.get('#archiveMenuProfile'), /class="archive-profile-heading"/);
+      if (kind === 'artist') {
+        assert.match(body, /class="archive-profile-summary archive-artist-summary"/);
+        assert.ok(body.indexOf('archive-artist-drawer') < body.indexOf('archive-artist-summary'));
+        assert.ok(body.indexOf('Approved profile bio') < body.indexOf('archive-event-period'));
+        assert.equal(recorded.has('#archiveMenuProfile'), false);
+        assert.match(recorded.get('.archive-menu-badge--artists'), /archive-menu-profile-name">Public &amp; Profile/);
+        assert.doesNotMatch(recorded.get('.archive-menu-badge--artists'), /Approved profile bio|<img/);
+      } else {
+        assert.match(body, /class="mobile-profile-summary"/);
+        assert.match(recorded.get('#archiveMenuProfile'), /Approved profile bio/);
+        assert.match(recorded.get('#archiveMenuProfile'), /class="archive-profile-heading"/);
+      }
       assert.match(body, /Public &amp; Profile/);
       assert.match(body, /Approved profile bio/);
       assert.match(body, /Public night/);
@@ -157,13 +166,15 @@ test('profile markup escapes text, rejects unsafe links, and groups local dates 
   assert.doesNotMatch(result, /class="event-venue"|class="event-address"/);
 });
 
-test('Callaia has the preview portrait above the profile name; other artists do not get a placeholder or her photo', () => {
-  const info = renderProfileInfo('artist', { ...profile, id: 'CALLAIA-001', name: 'Callaia' }, 'https://massive.example');
-  assert.match(info, /<img class="archive-artist-portrait" src="\/artist-images\/callaia.jpg" alt="Callaia" width="2048" height="2016"/);
-  assert.ok(info.indexOf('<img') < info.indexOf('class="archive-profile-heading"'));
-  assert.ok(info.indexOf('class="archive-profile-heading"') < info.indexOf('Approved profile bio'));
+test('the compatibility portrait is a separate drawer; artist details have no duplicate photo or name', () => {
+  const { imageUrl, ...legacy } = profile;
+  const person = { ...legacy, id: 'CALLAIA-001', name: 'Callaia' };
+  const drawer = renderArtistDrawer(person);
+  assert.match(drawer, /<div class="archive-artist-drawer"><img class="archive-artist-portrait" src="\/artist-images\/callaia.jpg" alt="Callaia" width="2048" height="2016"/);
+  const info = renderProfileInfo('artist', person, 'https://massive.example');
+  assert.doesNotMatch(info, /<img|archive-profile-heading/);
   assert.ok(info.indexOf('archive-profile-related') < info.indexOf('archive-profile-links'));
-  assert.doesNotMatch(renderProfileInfo('artist', { ...profile, name: 'Callaia' }, 'https://massive.example'), /<img/);
+  assert.equal(renderArtistDrawer({ ...legacy, name: 'Callaia' }), '');
   assert.doesNotMatch(renderProfileInfo('venue', { ...profile, id: 'CALLAIA-001' }, 'https://massive.example'), /<img/);
 });
 

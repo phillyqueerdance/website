@@ -117,7 +117,8 @@ function menuFixture({ open = true } = {}) {
     if (view === 'artists') link.setAttribute('aria-current', 'page');
     return link;
   });
-  menu.querySelectorAll = () => links; menu.querySelector = () => links[0];
+  menu.querySelectorAll = selector => selector === '.archive-menu-profile-name' ? [] : links;
+  menu.querySelector = () => links[0];
   const actions = [], frames = [];
   let handler;
   discoverLink.addEventListener = (type, fn) => { assert.equal(type, 'click'); handler = fn; };

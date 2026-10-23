@@ -3,9 +3,13 @@
 ## Artist image preview
 
 The preview reads each approved artist's `ArtistImage_URL` from the Artists
-tab and displays it above their profile name, on desktop and mobile. Drive
-URLs use the same browser image conversion as event flyers. Existing photo
-boundaries, proportions, and rounded corners apply to every artist image.
+tab. On desktop and mobile, the portrait sits directly beneath the red name
+header inside the frame, with matching width and red side borders. Its bottom
+corners match the header's curves. It scrolls into the header like a closing
+drawer; the description, links, related profiles, and events follow below.
+Drive URLs use the same browser image conversion as event flyers. Desktop
+Discover uses vertical tabs, with the artist's name in plum inside an extended
+Artists tab.
 
 Install the supplied Core.gs v7.4.6 and PublicData.gs v7.4.2 in the existing
 Apps Script project. Keep the other files and settings. Reload the Index,

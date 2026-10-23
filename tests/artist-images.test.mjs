@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { onRequestGet } from '../functions/api/archive.js';
-import { renderProfileInfo } from '../functions/profile-page.js';
+import { renderArtistDrawer, renderProfileInfo } from '../functions/profile-page.js';
 
 const meta = globalThis.QDPProfileMetadata;
 const publisherSources = [['repository publisher', fs.readFileSync(new URL('../apps-script/archive-feed.gs', import.meta.url), 'utf8')]];
@@ -57,9 +57,10 @@ test('artist pages use the published image for any artist, including Callaia', (
   for (const id of ['A', 'CALLAIA-001']) {
     const profile = { id, name: 'Artist & Name', imageUrl: 'https://drive.google.com/uc?export=view&id=FINAL' };
     assert.equal(meta.artistImage(profile).src, 'https://lh3.googleusercontent.com/d/FINAL=w1600');
-    const html = renderProfileInfo('artist', profile, 'https://images.example');
+    const html = renderArtistDrawer(profile);
     assert.match(html, /src="https:\/\/lh3\.googleusercontent\.com\/d\/FINAL=w1600" alt="Artist &amp; Name"/);
-    assert.ok(html.indexOf('<img') < html.indexOf('archive-profile-heading'));
+    assert.match(html, /^<div class="archive-artist-drawer"><img/);
+    assert.doesNotMatch(renderProfileInfo('artist', profile, 'https://images.example'), /<img|archive-profile-heading/);
     assert.doesNotMatch(html, /callaia\.jpg|width="undefined"|height="undefined"/);
     assert.doesNotMatch(renderProfileInfo('venue', profile, 'https://images.example'), /<img/);
   }
@@ -70,7 +71,7 @@ test('an explicitly blank or unsafe image URL hides the photo, even for Callaia'
   for (const imageUrl of ['', 'javascript:alert(1)', 'data:image/png;base64,abc']) {
     const profile = { id: 'CALLAIA-001', name: 'Callaia', imageUrl };
     assert.equal(meta.artistImage(profile), null);
-    assert.doesNotMatch(renderProfileInfo('artist', profile, 'https://images.example'), /<img/);
+    assert.equal(renderArtistDrawer(profile), '');
   }
 });
 

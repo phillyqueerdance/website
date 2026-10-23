@@ -268,6 +268,8 @@
 
   function clearMenuProfile() {
     menu.classList.remove("has-profile");
+    menu.querySelectorAll(".archive-menu-profile-name").forEach(name => name.remove());
+    menu.querySelector(".archive-menu-badge--artists").classList.remove("has-profile-name");
     menuProfile.replaceChildren();
     menuProfile.hidden = true;
   }
@@ -283,8 +285,14 @@
     archive.profile = person ? { kind, person } : null;
     clearMenuProfile();
     if (person && !menuReset) {
-      menuProfile.hidden = false;
       const badge = menu.querySelector(`.archive-menu-badge--${profileViews[kind]}`);
+      if (kind === "artist") {
+        badge.appendChild(node("span", "archive-menu-profile-name", person.name));
+        badge.classList.add("has-profile-name");
+        menu.classList.add("has-profile");
+        return;
+      }
+      menuProfile.hidden = false;
       (kind === "venue" && !venueMap.hidden ? venueMap : badge).after(menuProfile);
       const badgeStyle = getComputedStyle(badge);
       menuProfile.style.setProperty("--archive-profile-accent",
@@ -549,22 +557,38 @@
     archive.updateLayout();
   }
 
+  function artistDrawer(person) {
+    const image = window.QDPProfileMetadata.artistImage(person);
+    if (!image) return null;
+    const drawer = node("div", "archive-artist-drawer");
+    const portrait = node("img", "archive-artist-portrait");
+    portrait.src = image.src;
+    portrait.alt = person.name;
+    if (image.width && image.height) {
+      portrait.width = image.width;
+      portrait.height = image.height;
+    }
+    portrait.decoding = "async";
+    portrait.addEventListener("load", () => archive.updateLayout(), { once: true });
+    drawer.appendChild(portrait);
+    return drawer;
+  }
+
+  function measureArtistDrawer() {
+    const drawer = archiveStack.querySelector(".archive-artist-drawer");
+    if (!drawer) return;
+    const tab = archiveHeader.getBoundingClientRect();
+    const stack = archiveStack.getBoundingClientRect();
+    const style = getComputedStyle(archiveHeader);
+    drawer.style.setProperty("--archive-portrait-width", `${tab.width}px`);
+    drawer.style.setProperty("--archive-portrait-left", `${tab.left - stack.left}px`);
+    drawer.style.setProperty("--archive-portrait-radius", style.borderTopLeftRadius);
+  }
+
   function profileInfo(kind, person) {
     const info = node("section", "archive-profile-info");
     info.setAttribute("aria-label", `${kind[0].toUpperCase() + kind.slice(1)} information`);
-    const image = kind === "artist" && window.QDPProfileMetadata.artistImage(person);
-    if (image) {
-      const portrait = node("img", "archive-artist-portrait");
-      portrait.src = image.src;
-      portrait.alt = person.name;
-      if (image.width && image.height) {
-        portrait.width = image.width;
-        portrait.height = image.height;
-      }
-      portrait.decoding = "async";
-      info.appendChild(portrait);
-    }
-    info.appendChild(node("h2", "archive-profile-heading", person.name));
+    if (kind !== "artist") info.appendChild(node("h2", "archive-profile-heading", person.name));
     const classification = window.QDPProfileMetadata.classification(kind, person);
     if (classification) info.appendChild(node("span", "sr-only", classification));
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
@@ -622,8 +646,14 @@
     archive.events = person ? [...upcoming, ...past] : [...events].reverse();
     setProfile(kind, person);
     if (person) {
-      const summary = node("section", "mobile-profile-summary");
-      summary.style.setProperty("--archive-profile-accent", menuProfile.style.getPropertyValue("--archive-profile-accent"));
+      if (kind === "artist") {
+        const drawer = artistDrawer(person);
+        if (drawer) archiveStack.appendChild(drawer);
+      }
+      const summary = node("section", kind === "artist"
+        ? "archive-profile-summary archive-artist-summary" : "mobile-profile-summary");
+      summary.style.setProperty("--archive-profile-accent", kind === "artist"
+        ? "#fa2b5a" : menuProfile.style.getPropertyValue("--archive-profile-accent"));
       summary.appendChild(profileInfo(kind, person));
       archiveStack.appendChild(summary);
     }
@@ -976,6 +1006,7 @@
     updateLayout() {
       fitPosterTitles(archiveStack);
       fitProfileHeaders();
+      measureArtistDrawer();
       measureYearEndSpacer();
       syncYearHeadings();
       this.updateControls();
@@ -1058,13 +1089,13 @@
     if (event.persisted && archive.active) route();
   });
   window.addEventListener("resize", () => {
-    if (menuTrack.hidden) return;
-    positionMenu();
+    if (!menuTrack.hidden) positionMenu();
     if (!archive.active) return;
     archive.updateLayout();
   });
   document.fonts?.ready.then(() => {
     if (!menuTrack.hidden) positionMenu();
+    if (archive.active) archive.updateLayout();
   });
   if (routeParams().view) route();
 })();
