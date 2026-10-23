@@ -12,8 +12,7 @@
   const selectors = [
     'meta[name="description"]', 'meta[property="og:title"]', 'meta[name="twitter:title"]',
     'meta[property="og:description"]', 'meta[name="twitter:description"]', 'meta[property="og:url"]',
-    'meta[property="og:image"]', 'meta[name="twitter:image"]', 'meta[property="og:image:alt"]',
-    'meta[property="og:image:width"]', 'meta[property="og:image:height"]', 'meta[property="og:image:type"]'
+    'meta[property="og:image"]', 'meta[name="twitter:image"]', 'meta[property="og:image:alt"]'
   ];
   const original = new Map(selectors.map(selector => [selector, document.querySelector(selector)?.content || ""]));
   // Direct responses contain event or profile metadata. Keep the home defaults
@@ -28,9 +27,6 @@
     original.set(selectors[6], meta.origin + "/qdp-share-card.jpg");
     original.set(selectors[7], meta.origin + "/qdp-share-card.jpg");
     original.set(selectors[8], "Queer Dance Philly — find the next move");
-    original.set(selectors[9], "1200");
-    original.set(selectors[10], "1200");
-    original.set(selectors[11], "image/jpeg");
   }
   let returnTitle = null;
   const set = (selector, value) => {
@@ -48,12 +44,9 @@
     set(selectors[3], meta.description(event));
     set(selectors[4], meta.description(event));
     set(selectors[5], meta.url(event.eventId));
-    set(selectors[6], meta.shareImage(event, window.location?.origin || meta.origin));
-    set(selectors[7], meta.shareImage(event, window.location?.origin || meta.origin));
-    set(selectors[8], meta.image(event) ? `Framed flyer and date for ${meta.cleanTitle(event)}` : original.get(selectors[8]));
-    set(selectors[9], meta.image(event) ? "900" : "1200");
-    set(selectors[10], meta.image(event) ? "1067" : "1200");
-    set(selectors[11], meta.image(event) ? "image/png" : "image/jpeg");
+    set(selectors[6], meta.image(event) || meta.origin + "/qdp-share-card.jpg");
+    set(selectors[7], meta.image(event) || meta.origin + "/qdp-share-card.jpg");
+    set(selectors[8], meta.image(event) ? `Flyer for ${meta.cleanTitle(event)}` : original.get(selectors[8]));
     const data = meta.schema(event);
     let script = document.getElementById("qdpEventStructuredData");
     if (!data) { script?.remove(); return; }
