@@ -606,6 +606,7 @@ a.event-card.archive-card { text-decoration: none; }
   .archive-menu > .archive-menu-badge.has-profile-name {
     flex-direction: column;
     gap: 0;
+    margin-bottom: 8px;
     padding: 0;
     border: 0;
     background: transparent;
