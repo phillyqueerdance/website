@@ -1,6 +1,6 @@
 /* Phone layouts use the original artwork, typography and navigation hierarchy. */
 .mobile-primary, .mobile-context, .mobile-more-heading,
-.mobile-menu-close, .mobile-sheet-backdrop, .mobile-profile-summary { display: none; }
+.mobile-menu-close, .mobile-sheet-backdrop { display: none; }
 
 @media (max-width: 760px) {
   html, html.archive-open, html.discover-open {
@@ -287,12 +287,10 @@
   }
   .archive-menu > .archive-menu-map { grid-column: 1; grid-row: 4; min-height: 44px; margin: 4px 0 0; padding: 12px 0; font-size: 16px; }
   .archive-menu .archive-menu-profile { display: none; }
-  .mobile-profile-summary { display: block; flex-shrink: 0; padding: 16px 12px 24px; color: #fff1f4; font-size: 15px; line-height: 1.6; }
-  .archive-artist-summary { font-size: 15px; }
+  .archive-profile-summary { font-size: 15px; }
   .archive-menu-profile { flex-shrink: 0; font-size: 15px; line-height: 1.6; }
   .archive-menu.has-profile .archive-menu-profile { max-height: none; overflow: visible; }
   .archive-menu-profile:not([hidden]) { margin: 18px 0 28px; }
-  .archive-profile-heading { font-size: 21px; }
   .archive-profile-related .event-detail-related-bubble { min-height: 40px; padding: 9px 12px; font-size: 14px; }
   .archive-profile-links { gap: 4px 18px; }
   .archive-profile-links a { display: inline-flex; align-items: center; min-height: 44px; }

@@ -96,16 +96,15 @@ for (const kind of Object.keys(meta.kinds)) {
       if (kind === 'artist') {
         assert.match(body, /class="archive-profile-summary archive-artist-summary"/);
         assert.ok(body.indexOf('archive-artist-drawer') < body.indexOf('archive-artist-summary'));
-        assert.ok(body.indexOf('Approved profile bio') < body.indexOf('archive-event-period'));
-        assert.equal(recorded.has('#archiveMenuProfile'), false);
-        assert.match(recorded.get('.archive-menu-badge--artists'), /archive-menu-profile-name">Public &amp; Profile/);
-        assert.doesNotMatch(recorded.get('.archive-menu-badge--artists'), /Approved profile bio|<img/);
       } else {
-        assert.match(body, /class="mobile-profile-summary"/);
-        assert.match(recorded.get('#archiveMenuProfile'), /Approved profile bio/);
-        assert.match(recorded.get('#archiveMenuProfile'), /class="archive-profile-heading"/);
+        assert.match(body, /class="archive-profile-summary"/);
       }
-      assert.match(body, /Public &amp; Profile/);
+      assert.ok(body.indexOf('Approved profile bio') < body.indexOf('archive-event-period'));
+      assert.equal(recorded.has('#archiveMenuProfile'), false);
+      assert.match(recorded.get(`.archive-menu-badge--${meta.kinds[kind]}`), /archive-menu-profile-name">Public &amp; Profile/);
+      assert.doesNotMatch(recorded.get(`.archive-menu-badge--${meta.kinds[kind]}`), /Approved profile bio|<img/);
+      assert.equal(recorded.get('#archiveHeader'), profile.name);
+      assert.doesNotMatch(body, /mobile-profile-summary|archive-profile-heading/);
       assert.match(body, /Approved profile bio/);
       assert.match(body, /Public night/);
       assert.match(body, new RegExp(`archive=${kind}&amp;id=PUBLIC-1&amp;event=EVENT-1`));

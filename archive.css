@@ -218,19 +218,26 @@
   text-align: center;
 }
 .archive-menu-profile-name { display: none; }
-.archive-menu-badge[data-tab-color="red"] {
-  background: #fa2b5a;
+.archive-menu-badge--artists, .archive-menu-badge[data-tab-color="red"] {
+  --archive-tab-background: #fa2b5a;
+  background: var(--archive-tab-background);
 }
-.archive-menu-badge[data-tab-color="orange"] {
-  background: #ff7945;
+.archive-menu-badge--venues, .archive-menu-badge[data-tab-color="orange"] {
+  --archive-tab-background: #ff7945;
+  background: var(--archive-tab-background);
   color: var(--qdp-plum-text) !important;
 }
-.archive-menu-badge[data-tab-color="purple"] {
-  background: #922185;
+.archive-menu-badge--parties, .archive-menu-badge[data-tab-color="purple"] {
+  --archive-tab-background: #922185;
+  --archive-tab-name-color: #fff1f4;
+  background: var(--archive-tab-background);
 }
-.archive-menu-badge[data-tab-color="collective"] {
+.archive-menu-badge--collectives, .archive-menu-badge[data-tab-color="collective"] {
+  --archive-tab-background: #000;
+  --archive-tab-name-color: #fff1f4;
+  --archive-tab-outline-width: 2px;
   border: 2px solid #fff1f4;
-  background: #000;
+  background: var(--archive-tab-background);
   color: #fff1f4;
 }
 .archive-menu-badge[data-tab-color="collective"][aria-current="page"] { border-width: 2px; }
@@ -309,17 +316,13 @@
   margin: 0;
 }
 .archive-profile-summary {
+  flex-shrink: 0;
   padding: 20px 12px 28px;
   color: #fff1f4;
   font: 400 clamp(14px, 2cqw, 17px)/1.6 Verdana, Geneva, sans-serif;
 }
-.archive-artist-summary .archive-profile-related .event-detail-related-bubble {
+.archive-profile-summary .archive-profile-related .event-detail-related-bubble {
   font-size: .9em;
-}
-.archive-profile-heading {
-  margin: 0 0 .55em;
-  color: var(--archive-profile-accent, #fa2b5a);
-  font: 700 1.2em/1.1 "QDP Fraunces", Georgia, serif;
 }
 .archive-profile-info p, .archive-profile-info address {
   margin: .65em 0 0;
@@ -600,14 +603,38 @@ a.event-card.archive-card { text-decoration: none; }
   .archive-menu > a, .archive-menu-heading { flex-shrink: 0; }
   .archive-menu > .archive-menu-badge.has-profile-name {
     flex-direction: column;
-    gap: 5px;
-    padding-top: 8px;
-    padding-bottom: 11px;
+    gap: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .archive-menu-badge.has-profile-name .archive-menu-badge-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 34.2px;
+    padding: 4.75px 11.4px 4.75px calc(var(--archive-menu-inset, 33px) + 11.4px);
+    border: var(--archive-tab-outline-width, 0px) solid #fff1f4;
+    border-left: 0;
+    border-radius: 0 14px 14px 0;
+    background: var(--archive-tab-background, #fa2b5a);
   }
   .archive-menu-profile-name {
+    position: relative;
     display: block;
-    width: 100%;
-    color: var(--qdp-plum-text, #2a1220);
+    box-sizing: border-box;
+    width: fit-content;
+    max-width: calc((100% - var(--archive-menu-inset, 33px)) * .75);
+    margin-top: calc(0px - var(--archive-tab-outline-width, 0px));
+    margin-left: var(--archive-menu-inset, 33px);
+    padding: 5px 12px 7px;
+    border: var(--archive-tab-outline-width, 0px) solid #fff1f4;
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    background: var(--archive-tab-background, #fa2b5a);
+    color: var(--archive-tab-name-color, var(--qdp-plum-text, #2a1220));
     font-size: .92em;
     line-height: 1.2;
     text-align: center;

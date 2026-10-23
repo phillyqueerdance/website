@@ -8,7 +8,6 @@ const meta = globalThis.QDPProfileMetadata;
 const escape = value => String(value ?? "").replace(/[&<>"']/g, char =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 const colors = { artist: "red", venue: "orange", party: "purple", collective: "collective" };
-const accents = { artist: "#fa2b5a", venue: "#ff7945", party: "#922185", collective: "#f06eb1" };
 const dateFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit"
 });
@@ -31,7 +30,6 @@ export function renderProfileInfo(kind, profile, base) {
   const more = related ? `<section class="archive-profile-related"><h3>See More</h3><div class="archive-profile-related-links">${related}</div></section>` : "";
   const external = links ? `<div class="archive-profile-links">${links}</div>` : "";
   return `<section class="archive-profile-info" aria-label="${kind[0].toUpperCase() + kind.slice(1)} information">
-    ${kind !== "artist" ? `<h2 class="archive-profile-heading">${escape(profile.name)}</h2>` : ""}
     ${meta.classification(kind, profile) ? `<span class="sr-only">${meta.classification(kind, profile)}</span>` : ""}
     ${kind === "venue" && profile.address ? `<address>${escape(profile.address)}</address>` : ""}
     ${profile.bio ? `<p>${escape(profile.bio)}</p>` : ""}
@@ -89,7 +87,7 @@ export function renderProfilePage(context, page, result, kind, id) {
   const info = profile ? renderProfileInfo(kind, profile, base) : "";
   const markup = profile
     ? (kind === "artist" ? renderArtistDrawer(profile) : "") +
-      `<section class="${kind === "artist" ? "archive-profile-summary archive-artist-summary" : "mobile-profile-summary"}" style="--archive-profile-accent:${accents[kind]}">${info}</section>` + renderProfileEvents(kind, profile, result.payload.events, base)
+      `<section class="archive-profile-summary${kind === "artist" ? " archive-artist-summary" : ""}">${info}</section>` + renderProfileEvents(kind, profile, result.payload.events, base)
     : `<p class="event-feed-message">${escape(result.error)}</p>`;
   const directory = meta.kinds[kind];
   const label = directory[0].toUpperCase() + directory.slice(1);
@@ -110,14 +108,9 @@ export function renderProfilePage(context, page, result, kind, id) {
       .on("#archiveMenu", { element(element) { element.setAttribute("class", "archive-menu has-profile"); } })
       .on(`.archive-menu-badge--${directory}`, { element(element) {
         element.setAttribute("aria-current", "page");
-        if (kind === "artist") {
-          element.setAttribute("class", "archive-menu-badge archive-menu-badge--artists has-profile-name");
-          element.setInnerContent(`<span class="archive-menu-badge-label">Artists</span><span class="archive-menu-profile-name">${escape(profile.name)}</span>`, { html: true });
-        }
+        element.setAttribute("class", `archive-menu-badge archive-menu-badge--${directory} has-profile-name`);
+        element.setInnerContent(`<span class="archive-menu-badge-label">${label}</span><span class="archive-menu-profile-name">${escape(profile.name)}</span>`, { html: true });
       } });
-    if (kind !== "artist") rewriter = rewriter.on("#archiveMenuProfile", { element(element) {
-      element.removeAttribute("hidden"); element.setAttribute("style", `--archive-profile-accent:${accents[kind]}`); element.setInnerContent(info, { html: true });
-    } });
     for (const [selector, content] of meta.tags(kind, profile, origin)) rewriter = rewriter.on(selector, {
       element(element) { element.setAttribute("content", content); }
     });

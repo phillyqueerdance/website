@@ -269,7 +269,7 @@
   function clearMenuProfile() {
     menu.classList.remove("has-profile");
     menu.querySelectorAll(".archive-menu-profile-name").forEach(name => name.remove());
-    menu.querySelector(".archive-menu-badge--artists").classList.remove("has-profile-name");
+    menu.querySelectorAll(".has-profile-name").forEach(badge => badge.classList.remove("has-profile-name"));
     menuProfile.replaceChildren();
     menuProfile.hidden = true;
   }
@@ -287,21 +287,9 @@
     clearMenuProfile();
     if (person && !menuReset) {
       const badge = menu.querySelector(`.archive-menu-badge--${profileViews[kind]}`);
-      if (kind === "artist") {
-        badge.appendChild(node("span", "archive-menu-profile-name", person.name));
-        badge.classList.add("has-profile-name");
-        menu.classList.add("has-profile");
-        return;
-      }
-      menuProfile.hidden = false;
-      (kind === "venue" && !venueMap.hidden ? venueMap : badge).after(menuProfile);
-      const badgeStyle = getComputedStyle(badge);
-      menuProfile.style.setProperty("--archive-profile-accent",
-        kind === "collective" ? badgeStyle.color : badgeStyle.backgroundColor);
-      menuProfile.appendChild(profileInfo(kind, person));
-      requestAnimationFrame(() => {
-        if (menuProfile.firstChild) menu.classList.add("has-profile");
-      });
+      badge.appendChild(node("span", "archive-menu-profile-name", person.name));
+      badge.classList.add("has-profile-name");
+      menu.classList.add("has-profile");
     }
   }
 
@@ -602,7 +590,6 @@
   function profileInfo(kind, person) {
     const info = node("section", "archive-profile-info");
     info.setAttribute("aria-label", `${kind[0].toUpperCase() + kind.slice(1)} information`);
-    if (kind !== "artist") info.appendChild(node("h2", "archive-profile-heading", person.name));
     const classification = window.QDPProfileMetadata.classification(kind, person);
     if (classification) info.appendChild(node("span", "sr-only", classification));
     if (kind === "venue" && person.address) info.appendChild(node("address", "", person.address));
@@ -664,10 +651,7 @@
         const drawer = artistDrawer(person);
         if (drawer) archiveStack.appendChild(drawer);
       }
-      const summary = node("section", kind === "artist"
-        ? "archive-profile-summary archive-artist-summary" : "mobile-profile-summary");
-      summary.style.setProperty("--archive-profile-accent", kind === "artist"
-        ? "#fa2b5a" : menuProfile.style.getPropertyValue("--archive-profile-accent"));
+      const summary = node("section", `archive-profile-summary${kind === "artist" ? " archive-artist-summary" : ""}`);
       summary.appendChild(profileInfo(kind, person));
       archiveStack.appendChild(summary);
     }

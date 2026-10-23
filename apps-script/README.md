@@ -10,8 +10,10 @@ corners match the header's curves. It scrolls into the header like a closing
 drawer; the description, links, related profiles, and events follow below.
 Profile descriptions are displayed in full, without a character cutoff.
 Drive URLs use the same browser image conversion as event flyers. Desktop
-Discover uses vertical tabs, with the artist's name in plum inside an extended
-Artists tab.
+Discover uses vertical tabs with a smaller, attached name tab beneath the active
+artist, venue, party, or collective category. These name tabs appear only on
+desktop. Descriptions, related profiles, and external links for all four profile
+types appear inside the main frame above their events on desktop and mobile.
 
 Install the supplied Core.gs v7.4.6 and PublicData.gs v7.4.2 in the existing
 Apps Script project. Keep the other files and settings. Reload the Index,

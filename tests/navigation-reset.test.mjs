@@ -105,7 +105,8 @@ function element() {
       toggle: (n, force) => force ? classes.add(n) : classes.delete(n) },
     getAttribute: n => attributes.get(n), setAttribute: (n, v) => attributes.set(n, v),
     removeAttribute: n => attributes.delete(n), replaceChildren() { this.children = []; },
-    appendChild(child) { this.children.push(child); }, get firstChild() { return this.children[0]; },
+    appendChild(child) { child.parentElement = this; this.children.push(child); }, get firstChild() { return this.children[0]; },
+    remove() { this.parentElement.children = this.parentElement.children.filter(child => child !== this); },
     style: { setProperty() {} }, after() {}, offsetHeight: 1 };
 }
 function menuFixture({ open = true } = {}) {
@@ -118,8 +119,11 @@ function menuFixture({ open = true } = {}) {
     if (view === 'artists') link.setAttribute('aria-current', 'page');
     return link;
   });
-  menu.querySelectorAll = selector => selector === '.archive-menu-profile-name' ? [] : links;
-  menu.querySelector = () => links[0];
+  menu.querySelectorAll = selector => selector === '.archive-menu-profile-name'
+    ? links.flatMap(link => link.children).filter(child => child.classes.has('archive-menu-profile-name'))
+    : selector === '.has-profile-name' ? links.filter(link => link.classes.has('has-profile-name')) : links;
+  menu.querySelector = selector => links[['artists', 'venues', 'parties', 'collectives']
+    .findIndex(view => selector === `.archive-menu-badge--${view}`)];
   const actions = [], frames = [];
   let handler;
   discoverLink.addEventListener = (type, fn) => { assert.equal(type, 'click'); handler = fn; };
@@ -131,7 +135,7 @@ function menuFixture({ open = true } = {}) {
       isMenuOpen: () => discoverLink.getAttribute('aria-expanded') === 'true' },
     document: { documentElement: element(), body: element() },
     clearTimeout() {}, requestAnimationFrame: fn => frames.push(fn), positionMenu() {},
-    profileInfo: (kind, person) => `${kind}: ${person.name}`,
+    node(tag, className, text) { const child = element(); child.classList.add(className); child.textContent = text; return child; },
     getComputedStyle: () => ({ color: 'purple', backgroundColor: 'red' }),
     window: { matchMedia: () => ({ matches: false }), QDPMobile: { active: false }, QDPProfileMetadata: { isQueer: () => false } },
     location: { href: 'https://example.test/?archive=artist&id=CALLAIA' }
@@ -162,6 +166,21 @@ for (const open of [true, false]) {
     assert.equal(f.context.archive.profile.person, f.person);
   });
 }
+
+test('all four profile names attach only to their category and clear when navigating or resetting Discover', () => {
+  const f = menuFixture();
+  for (const [index, kind] of ['artist', 'venue', 'party', 'collective'].entries()) {
+    const person = { id: kind.toUpperCase(), name: `${kind} name` };
+    f.context.setProfile(kind, person);
+    assert.equal(f.links[index].classes.has('has-profile-name'), true);
+    assert.equal(f.links[index].children[0].textContent, person.name);
+    assert.equal(f.links.filter(link => link.classes.has('has-profile-name')).length, 1);
+    assert.equal(f.context.menuProfile.hidden, true);
+    assert.equal(f.context.menuProfile.children.length, 0);
+  }
+  f.context.resetMenu();
+  assert.ok(f.links.every(link => !link.classes.has('has-profile-name') && link.children.length === 0));
+});
 
 test('the mobile Discover button clears profile details, while history restoration keeps its menu state', () => {
   const f = menuFixture();
