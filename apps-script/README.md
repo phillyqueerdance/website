@@ -1,5 +1,30 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Event photos
+
+Add an optional `PhotoURLs` column anywhere in the Events tab. Put the image
+links for that event in the same cell, one link per line. Their order becomes
+the gallery order; blank lines, repeated links, and invalid URLs are ignored.
+Public Google Drive file links use the existing flyer image conversion.
+For older events, the same column is supported on the event's archive source tab.
+
+Replace only **PublicData.gs** with v7.4.3. Keep Core.gs, Imports.gs,
+ArchiveReview.gs, properties, and triggers. Save and update the existing Web
+app deployment to a new version, retaining its URL and access settings. Use
+**QDP > Public data / Website > Publish all website changes now** to refresh the
+current feed and archive. The repository `archive-feed.gs` is a tested reference
+helper; do not install it beside PublicData.gs.
+
+Any event strip with photos expands into a gallery with **Go to event** beneath
+it, on the calendar and all artist, party, venue, collective, and archive pages.
+One event is expanded at a time. Galleries show one complete photo at a time;
+their arrows, keyboard navigation, and mobile swipes wrap in both directions.
+Archive dropdowns extend beneath the purple date column and have two rounded
+bottom corners, with no top border. Every individual event page with photos
+displays the same carousel below its description. Photos also open in a larger
+viewer. Blank PhotoURLs cells retain the existing event layout.
+The normal event publication gates and artist flags continue to apply.
+
 ## Artist image preview
 
 The preview reads each approved artist's `ArtistImage_URL` from the Artists

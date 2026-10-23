@@ -157,7 +157,8 @@ test('server-rendered event scope includes a real contextual Back control and ex
       new Response('<html></html>'), { status: 404, error: 'Unavailable' }, 'MELT');
     assert.equal(changes.get('#eventDialog').get('role'), 'dialog');
     assert.equal(changes.get('#mobileBack').get('href'), 'https://example.test/?archive=artist&id=CALLAIA');
-    assert.equal(changes.get('#mobileBack').get('hidden'), null);
+    assert.equal(changes.get('#mobileBack').get('hidden'), '');
+    assert.match(changes.get('#eventDetail').get('content'), /<article[^>]*>[\s\S]*<a href="\/">← Back to Calendar<\/a><\/article>/);
     assert.equal(changes.get('#dateButton, #datePopover, #archiveViewport, #todayButton, .frame').get('inert'), '');
   } finally { globalThis.HTMLRewriter = previous; }
 });

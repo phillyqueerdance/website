@@ -889,16 +889,27 @@ function createEventCard(event) {
 
   content.append(title, venue, address);
   card.append(shape, content);
-  card.addEventListener("click", click => {
-    if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
-    click.preventDefault();
-    openEventDetail(event);
-  });
-  card.addEventListener("keydown", key => {
-    if (key.key !== " ") return;
-    key.preventDefault();
-    card.click();
-  });
+  const bindEventLink = link => {
+    link.addEventListener("click", click => {
+      if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
+      click.preventDefault();
+      click.stopPropagation();
+      openEventDetail(event);
+    });
+    link.addEventListener("keydown", key => {
+      if (key.key !== " ") return;
+      key.preventDefault();
+      link.click();
+    });
+  };
+  if (globalThis.QDPEventPhotos?.urls(event).length) {
+    const template = document.createElement("template");
+    template.innerHTML = globalThis.QDPEventPhotos.strip(event, card.outerHTML, card.href);
+    const strip = template.content.firstElementChild;
+    strip.querySelectorAll(".event-card, .event-photo-go").forEach(bindEventLink);
+    return strip;
+  }
+  bindEventLink(card);
   return card;
 }
 
@@ -1128,6 +1139,11 @@ function schedulePosterLayout() {
   });
 }
 
+window.QDPUpdatePhotoLayout = () => {
+  measureEndSpacer();
+  fitPosterTitles();
+};
+
 function googleCalendarEventUrl(event) {
   const start = new Date(event.start);
   const providedEnd = event.end ? new Date(event.end) : null;
@@ -1231,7 +1247,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   closeDatePopover();
 
   const id = eventIdOf(event);
-  detailReturnFocus = document.activeElement?.classList.contains("event-card")
+  detailReturnFocus = document.activeElement?.matches(".event-card, .event-photo-go")
     ? document.activeElement
     : [...eventStack.querySelectorAll(".event-card")]
       .find(card => card.dataset.eventId === id && id) || null;
@@ -1445,6 +1461,8 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   else detailCard.classList.add("without-flyer");
   detailCard.appendChild(titleLocation);
   if (more.childNodes.length) detailCard.appendChild(more);
+  const photos = window.QDPEventPhotos?.gallery(event);
+  if (photos) detailCard.insertAdjacentHTML("beforeend", photos);
 
   const seeMore = document.createElement("section");
   seeMore.className = "event-detail-see-more";
@@ -1471,7 +1489,8 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     closeEventDetail();
   });
 
-  eventDetail.append(detailCard, back);
+  detailCard.appendChild(back);
+  eventDetail.appendChild(detailCard);
   fitDetailContent();
   updateDetailNavigationState();
   syncViewAccessibility();
@@ -1775,7 +1794,8 @@ function showEventLookupError(error) {
     click.preventDefault();
     closeEventDetail();
   });
-  eventDetail.append(card, back);
+  card.appendChild(back);
+  eventDetail.appendChild(card);
   previousPoster.disabled = true;
   nextPoster.disabled = true;
   syncViewAccessibility();
@@ -2334,20 +2354,10 @@ if (!initialArchiveView && window.QDPEventLinks?.initial?.event) {
 
 (() => {
   const back = document.getElementById("mobileBack");
-  const archiveBack = document.getElementById("archiveBack");
-  const mobileNavigation = window.matchMedia("(max-width: 760px)");
-  let target = null;
   let frame = 0;
   function sync() {
     frame = 0;
-    const infoOpen = Boolean(window.QDPInfoView?.active);
-    target = !eventDetail.hidden && !infoOpen ? eventDetail.querySelector(".event-detail-back")
-      : window.QDPArchive?.active && !archiveBack.hidden && !infoOpen ? archiveBack : null;
-    back.hidden = !target;
-    if (target) {
-      back.textContent = mobileNavigation.matches ? target.textContent.replace(/^←\s*/, "") : target.textContent;
-      back.href = target.href;
-    }
+    back.hidden = true;
     for (const button of [previousPoster, nextPoster]) {
       const label = button.getAttribute("aria-label") || "";
       button.dataset.navLabel = /^(Previous|Next) (letter|group): /.test(label)
@@ -2357,21 +2367,10 @@ if (!initialArchiveView && window.QDPEventLinks?.initial?.event) {
     }
   }
   function schedule() { if (!frame) frame = requestAnimationFrame(sync); }
-  back.addEventListener("click", event => {
-    if (!target || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault(); event.stopPropagation(); target.click();
-  });
-  back.addEventListener("keydown", event => {
-    if (event.key !== "Tab" || event.shiftKey || eventDetail.hidden) return;
-    const first = eventDetail.querySelector(".event-detail-card:not([aria-hidden]) a[href], .event-detail-card:not([aria-hidden]) button:not(:disabled)");
-    if (first) { event.preventDefault(); first.focus(); }
-  });
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
   observer.observe(eventDetail, { childList: true, attributes: true, attributeFilter: ["hidden"] });
-  observer.observe(archiveBack, { childList: true, attributes: true, attributeFilter: ["hidden", "href"] });
   for (const button of [previousPoster, nextPoster]) observer.observe(button, { attributes: true, attributeFilter: ["aria-label", "disabled"] });
-  mobileNavigation.addEventListener("change", schedule);
   sync();
   // A mouse drag on the flyer/header mirrors the touch gesture on desktop.
   let drag = null;

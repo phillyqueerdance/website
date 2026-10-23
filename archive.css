@@ -26,23 +26,23 @@
 .archive-header:hover, .archive-header:focus-visible { background: var(--archive-profile-header-color, #fa2b5a); color: #ffeff2; }
 .archive-page:has(.archive-artist-drawer) .archive-header { z-index: 3; }
 .archive-back {
-  display: none !important;
-  position: absolute;
-  z-index: 4;
-  bottom: calc(var(--qdp-list-bottom) + 1cqw);
-  left: 50%;
-  display: inline-flex;
+  display: none;
+}
+.archive-stack > .archive-back,
+.archive-return {
+  position: static;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 3cqw;
-  padding: 0;
+  min-height: 44px;
+  margin: 3cqw 0 0;
+  padding: 1.5cqw 0;
   color: #fff1f4;
   font: 700 clamp(13px, 2.4cqw, 20px)/1.2 "QDP Fraunces", Georgia, serif;
   text-decoration: none !important;
-  white-space: nowrap;
-  transform: translateX(-50%);
+  text-align: center;
 }
-.archive-back[hidden] { display: none; }
+.archive-stack > .archive-back[hidden] { display: none; }
 .archive-back:hover, .archive-back:focus-visible { color: #ffea86; }
 .archive-stack { z-index: 2; }
 .archive-page:has(.archive-back:not([hidden])) .archive-stack {
@@ -573,7 +573,7 @@ a.event-card.archive-card { text-decoration: none; }
   .archive-menu, .archive-menu-heading { transition-duration: .01ms; }
 }
 
-/* Desktop return text stays inside the poster; arrows clear the outer rails. */
+/* Desktop arrows clear the outer rails. */
 @media (min-width: 761px) {
   .site-shell {
     --qdp-arrow-gap: 40px;
@@ -581,7 +581,6 @@ a.event-card.archive-card { text-decoration: none; }
     --qdp-arrow-height: 56px;
     --qdp-menu-arrow-gap: 16px;
   }
-  .poster { --qdp-return-gap: 6.4cqw; }
   .poster-controls {
     inset: 0;
     z-index: 30;
@@ -646,21 +645,5 @@ a.event-card.archive-card { text-decoration: none; }
   .archive-menu-badge.has-profile-name[aria-current="page"]::after {
     top: 10px;
   }
-  .poster-controls > .mobile-back:not([hidden]) {
-    bottom: 6.85%;
-    width: 76%;
-    height: 6.4cqw;
-    min-height: 0;
-    font-size: clamp(12px, 1.8vw, 16px);
-  }
-  .archive-page:has(.archive-back:not([hidden])) .archive-stack {
-    bottom: calc(var(--qdp-list-bottom) + var(--qdp-return-gap));
-  }
   .event-detail { bottom: var(--qdp-list-bottom); }
-  .event-detail-card {
-    height: calc(100% - var(--qdp-return-gap) + var(--qdp-detail-padding) + var(--qdp-detail-border));
-  }
-  .event-detail-content-viewport {
-    max-height: calc(100% - var(--qdp-return-gap) + var(--qdp-detail-padding) + var(--qdp-detail-border));
-  }
 }

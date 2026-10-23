@@ -126,6 +126,12 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
   return profiles;
 }
 
+// One optional Events/archived-event cell contains one photo URL per line.
+function qdpArchivePhotoUrls_(value) {
+  const items = Array.isArray(value) ? value : trim(value).split(/\r?\n/);
+  return [...new Set(items.map(item => qdpArchiveLink_(item)).filter(Boolean))];
+}
+
 function qdpArchiveRelateProfiles_(artists, parties, collectives) {
   const maps = { artist: artists, party: parties, collective: collectives };
   Object.values(maps).forEach(map => map.forEach(profile => { profile.related = []; }));
@@ -203,6 +209,7 @@ function qdpArchivePublicEvent_(row, index, source, artists, venues, parties, co
     collectiveIds: [...new Set([...rawCollectiveIds, ...(parties.get(rawPartyId)?.collectiveIds || [])]
       .filter(id => collectives.has(id)))],
     flyerUrl: qdpArchiveLink_(flyerCandidate),
+    photoUrls: qdpArchivePhotoUrls_(qdpArchiveValue_(row, index, ['PhotoURLs'])),
     explicitQueer: qdpArchiveYes_(qdpArchiveValue_(row, index,
       ['ExplicitQueer (Yes/No)', 'ExplicitQueer'])),
     queerArtist: rawArtistIds.some(id => flags.get(id)?.queer === true),
@@ -646,7 +653,8 @@ function qdpLivePublish() {
         queerArtist: event.queerArtist === true,
         transArtist: event.transArtist === true,
         description: stripAllQdpMetadata_(trim(event.description)),
-        flyerUrl: qdpArchiveLink_(event.flyerUrl)
+        flyerUrl: qdpArchiveLink_(event.flyerUrl),
+        photoUrls: qdpArchivePhotoUrls_(event.photoUrls)
       };
     });
     const fingerprint = account + ':' + namespace + ':' +

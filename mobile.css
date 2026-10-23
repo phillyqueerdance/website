@@ -60,7 +60,6 @@
     pointer-events: none;
   }
   .archive-viewport, .info-viewport { clip-path: inset(8.06cqw 8.25% 8cqw); }
-  .archive-back, .event-detail-back { display: none; }
   .archive-page:has(.archive-back:not([hidden])) .archive-stack { bottom: var(--qdp-list-bottom); }
   .event-detail-card { height: 100%; }
   .event-detail-content-viewport { max-height: 100%; }
