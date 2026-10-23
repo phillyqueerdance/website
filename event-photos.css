@@ -8,45 +8,55 @@
   font: 700 3cqw/1.2 "QDP Fraunces", Georgia, serif;
 }
 .event-photo-position { font: 700 clamp(12px, 2.2cqw, 18px)/1.2 "QDP Fraunces", Georgia, serif; }
-.event-photo-carousel { position: relative; }
-.event-photo-slides { height: clamp(200px, 43cqw, 480px); }
+.event-photo-carousel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .5cqw 0;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
+.event-photo-slides { grid-column: 1 / -1; width: fit-content; max-width: 100%; }
 .event-photo,
 .event-photo:any-link {
   display: block;
   min-width: 0;
-  width: 100%;
-  height: 100%;
+  width: fit-content;
+  max-width: 100%;
   overflow: hidden;
   border-radius: 1.2cqw;
-  background: #000;
+  background: transparent;
   color: #ffea86;
   text-decoration: none;
 }
 .event-photo[hidden] { display: none; }
-.event-photo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.event-photo img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: clamp(220px, 49cqw, 540px);
+  object-fit: contain;
+}
 .event-photo:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
 .event-photo-unavailable { display: grid; place-items: center; height: 100%; font: inherit; }
 .event-photo-carousel > button {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  grid-row: 2;
+  width: 28px;
+  height: 26px;
   padding: 0;
-  transform: translateY(-50%);
-  border: 1px solid #ffea86;
-  border-radius: 50%;
-  background: rgb(0 0 0 / .8);
+  border: 0;
+  background: transparent;
   color: #fff1f4;
-  font: 700 24px/1 Georgia, serif;
+  font: 700 18px/1 Georgia, serif;
   cursor: pointer;
 }
 .event-photo-carousel > button[hidden] { display: none; }
 .event-photo-carousel > button:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
-.event-photo-previous { left: 1cqw; }
-.event-photo-next { right: 1cqw; }
+.event-photo-previous { grid-column: 1; justify-self: start; }
+.event-photo-next { grid-column: 2; justify-self: end; }
 .event-photo-strip { min-width: 0; overflow: visible; }
 .event-photo-strip > summary { cursor: pointer; list-style: none; }
 .event-photo-strip > summary::-webkit-details-marker { display: none; }
@@ -63,7 +73,7 @@
   font: 700 clamp(9px, 1.65cqw, 14px)/1.2 "QDP Fraunces", Georgia, serif;
   pointer-events: none;
 }
-.event-photo-strip .has-flags .event-photo-toggle { right: 6cqw; }
+.event-photo-strip .has-flags .event-photo-toggle { right: 10cqw; }
 .event-photo-toggle > span { display: inline-block; }
 .event-photo-strip[open] .event-photo-toggle > span { transform: rotate(180deg); }
 .event-photo-strip[open] > summary { border-bottom-right-radius: 0 !important; border-bottom-left-radius: 0 !important; }
@@ -82,12 +92,13 @@
 .archive-event-day .event-photo-strip { --event-photo-date-width: calc(10.9cqw + var(--qdp-time-card-gap)); }
 .event-photo-go,
 .event-photo-go:any-link {
-  display: block;
-  min-height: 44px;
-  padding: 1.5cqw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(6px, 1cqw) 2cqw;
   background: #ff7945;
   color: var(--qdp-plum-text);
-  font: 700 2.5cqw/1.2 "QDP Fraunces", Georgia, serif;
+  font: 700 clamp(12px, 2.5cqw, 20px)/1.2 "QDP Fraunces", Georgia, serif;
   text-align: center;
   text-decoration: none;
 }
