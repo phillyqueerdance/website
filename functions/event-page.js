@@ -85,9 +85,9 @@ export function renderEventPage(context, page, result, id) {
       ['meta[property="og:description"]', meta.description(event)],
       ['meta[name="twitter:description"]', meta.description(event)],
       ['meta[property="og:url"]', meta.url(id, origin)],
-      ['meta[property="og:image"]', meta.image(event) || new URL("/qdp-share-card.jpg", origin).href],
-      ['meta[property="og:image:alt"]', meta.image(event) ? `Flyer for ${meta.cleanTitle(event)}` : 'Queer Dance Philly — find the next move'],
-      ['meta[name="twitter:image"]', meta.image(event) || new URL("/qdp-share-card.jpg", origin).href]
+      ['meta[property="og:image"]', meta.shareImage(event, new URL(context.request.url).origin)],
+      ['meta[property="og:image:alt"]', meta.image(event) ? `Framed flyer and date for ${meta.cleanTitle(event)}` : 'Queer Dance Philly — find the next move'],
+      ['meta[name="twitter:image"]', meta.shareImage(event, new URL(context.request.url).origin)]
     ];
     rewriter = rewriter.on("title", { element(element) { element.setInnerContent(meta.title(event)); } })
       .on('link[rel="canonical"]', { element(element) { element.setAttribute("href", meta.url(id, origin)); } })

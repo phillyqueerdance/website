@@ -25,6 +25,19 @@
     }
     return source;
   };
+  const shareContent = event => JSON.stringify(['popup-2', event.eventId, event.start,
+    image(event), event.explicitQueer === true, event.queerArtist === true,
+    event.transArtist === true, String(event.partyId || '').trim().toUpperCase() === 'MELT-001']);
+  const shareImage = (event, base = origin) => {
+    if (!image(event) || !event.eventId) return new URL('/qdp-share-card.jpg', base).href;
+    const version = shareContent(event);
+    let hash = 2166136261;
+    for (const char of version) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+    const result = new URL('/api/event-share-image', base);
+    result.searchParams.set('event', event.eventId);
+    result.searchParams.set('v', `popup-2-${hash.toString(16)}`);
+    return result.href;
+  };
   const schema = (event, base = origin) => {
     // Missing public location data must never be replaced with a private address.
     const address = String(event.address || "").trim();
@@ -50,5 +63,5 @@
   const serialize = value => JSON.stringify(value).replace(/</g, "\\u003c")
     .replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
   globalThis.QDPEventMetadata = Object.freeze({ origin, cleanTitle, url, safeUrl, undisclosed,
-    image, schema, description, serialize, title: event => `${cleanTitle(event)} | Queer Dance Philly` });
+    image, shareContent, shareImage, schema, description, serialize, title: event => `${cleanTitle(event)} | Queer Dance Philly` });
 })();
