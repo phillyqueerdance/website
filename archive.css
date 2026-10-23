@@ -628,7 +628,7 @@ a.event-card.archive-card { text-decoration: none; }
     display: block;
     box-sizing: border-box;
     align-self: flex-end;
-    width: calc(100% - var(--archive-menu-inset, 33px) - 16px);
+    width: calc(100% - var(--archive-menu-inset, 33px) - 32px);
     margin-top: calc(0px - var(--archive-tab-outline-width, 0px));
     padding: 5px 12px 7px;
     border: var(--archive-tab-outline-width, 0px) solid #fff1f4;
