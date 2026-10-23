@@ -42,7 +42,7 @@ function profile(input, kind, publicIds = null, details = false) {
   return {
     id, name,
     count: Number.isSafeInteger(input.count) && input.count >= 0 ? input.count : null,
-    bio: value(input.bio, 1200),
+    bio: String(input.bio ?? "").trim(),
     website: safeUrl(input.website),
     instagram: safeUrl(input.instagram),
     ...(kind === "artists"

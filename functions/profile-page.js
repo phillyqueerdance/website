@@ -97,7 +97,7 @@ export function renderProfilePage(context, page, result, kind, id) {
     .on("html", { element(element) { element.setAttribute("class", `${element.getAttribute("class") || ""} archive-open${profile ? " discover-open" : ""}`.trim()); } })
     .on("body", { element(element) { element.setAttribute("class", `${element.getAttribute("class") || ""} archive-mode${profile ? " discover-open" : ""}`.trim()); } })
     .on("#archiveViewport", { element(element) { element.removeAttribute("hidden"); } })
-    .on("#archivePage", { element(element) { element.setAttribute("class", "archive-page is-open"); } })
+    .on("#archivePage", { element(element) { element.setAttribute("class", `archive-page is-open${meta.isQueer(kind, profile) ? " is-queer-profile" : ""}`); } })
     .on("#archiveStack", { element(element) { element.setAttribute("class", "event-stack archive-stack profile-events"); element.setInnerContent(markup, { html: true }); } })
     .on("#archiveHeader", { element(element) { element.setAttribute("aria-label", profile?.name || label); element.setInnerContent(profile?.name || label); } })
     .on("#archiveBack", { element(element) { element.removeAttribute("hidden"); element.setAttribute("href", new URL(`/?archive=${directory}`, base).href); element.setInnerContent(`← Back to ${label}`); } })

@@ -101,7 +101,8 @@ test('modified Calendar clicks retain normal browser navigation', () => {
 function element() {
   const attributes = new Map(), classes = new Set();
   return { attributes, classes, hidden: false, scrollTop: 250, children: [], dataset: {},
-    classList: { add: n => classes.add(n), remove: n => classes.delete(n), contains: n => classes.has(n) },
+    classList: { add: n => classes.add(n), remove: n => classes.delete(n), contains: n => classes.has(n),
+      toggle: (n, force) => force ? classes.add(n) : classes.delete(n) },
     getAttribute: n => attributes.get(n), setAttribute: (n, v) => attributes.set(n, v),
     removeAttribute: n => attributes.delete(n), replaceChildren() { this.children = []; },
     appendChild(child) { this.children.push(child); }, get firstChild() { return this.children[0]; },
@@ -122,7 +123,7 @@ function menuFixture({ open = true } = {}) {
   const actions = [], frames = [];
   let handler;
   discoverLink.addEventListener = (type, fn) => { assert.equal(type, 'click'); handler = fn; };
-  const context = { URL, menu, menuProfile, menuTrack, discoverLink,
+  const context = { URL, menu, menuProfile, menuTrack, discoverLink, archivePage: element(),
     venueMap: element(), alphabet: element(), exitTimer: 0, menuMotionSerial: 0, menuReset: false,
     directoryViews: new Set(['artists', 'venues', 'parties', 'collectives']),
     profileViews: { artist: 'artists', venue: 'venues', party: 'parties', collective: 'collectives' },
@@ -132,7 +133,7 @@ function menuFixture({ open = true } = {}) {
     clearTimeout() {}, requestAnimationFrame: fn => frames.push(fn), positionMenu() {},
     profileInfo: (kind, person) => `${kind}: ${person.name}`,
     getComputedStyle: () => ({ color: 'purple', backgroundColor: 'red' }),
-    window: { matchMedia: () => ({ matches: false }), QDPMobile: { active: false } },
+    window: { matchMedia: () => ({ matches: false }), QDPMobile: { active: false }, QDPProfileMetadata: { isQueer: () => false } },
     location: { href: 'https://example.test/?archive=artist&id=CALLAIA' }
   };
   vm.createContext(context);

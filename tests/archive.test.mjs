@@ -124,6 +124,26 @@ test('publisher builds only approved data and one source scan supports all views
     Array.from(liveMonths.months, item => `${item.month}:${item.count}`));
 });
 
+test('live artist feeds retain complete long biographies in directories and profiles', async () => {
+  const longBio = ('An artist biography may contain many paragraphs.\n\n').repeat(150) + 'Last paragraph remains visible.';
+  const fixture = structuredClone(sheets);
+  fixture.Artists[1][3] = longBio;
+  const { context } = appsScript(fixture);
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async url => Response.json(context.qdpArchiveResource_(
+    new URL(url).searchParams.get('resource').toLowerCase(), { id: 'ALPHA' }));
+  try {
+    for (const resource of ['artists', 'artist']) {
+      const response = await onRequestGet({
+        request: new Request(`https://massive.example/api/archive?resource=${resource}&id=ALPHA`), env: {}
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(resource === 'artist' ? payload.profile.bio : payload.artists[0].bio, longBio);
+    }
+  } finally { globalThis.fetch = previousFetch; }
+});
+
 test('publisher commits manifest last and skips writes when data has not changed', () => {
   const { context } = appsScript();
   const properties = new Map([

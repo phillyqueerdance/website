@@ -283,6 +283,7 @@
 
   function setProfile(kind, person = null) {
     archive.profile = person ? { kind, person } : null;
+    archivePage.classList.toggle("is-queer-profile", Boolean(person && window.QDPProfileMetadata.isQueer(kind, person)));
     clearMenuProfile();
     if (person && !menuReset) {
       const badge = menu.querySelector(`.archive-menu-badge--${profileViews[kind]}`);

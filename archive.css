@@ -20,8 +20,9 @@
   pointer-events: auto;
 }
 .archive-page.is-open { transform: translateY(0); }
-.archive-header { cursor: default; }
-.archive-header:hover, .archive-header:focus-visible { background: #fa2b5a; color: #ffeff2; }
+.archive-page.is-queer-profile { --archive-profile-header-color: var(--qdp-queer-card, #922185); }
+.archive-header { cursor: default; background: var(--archive-profile-header-color, #fa2b5a); }
+.archive-header:hover, .archive-header:focus-visible { background: var(--archive-profile-header-color, #fa2b5a); color: #ffeff2; }
 .archive-page:has(.archive-artist-drawer) .archive-header { z-index: 3; }
 .archive-back {
   display: none !important;
@@ -294,7 +295,7 @@
   box-sizing: border-box;
   width: var(--archive-portrait-width, 43.42cqw);
   margin-left: var(--archive-portrait-left, 33.03cqw);
-  border: 2.5px solid #fa2b5a;
+  border: 2.5px solid var(--archive-profile-header-color, #fa2b5a);
   border-top: 0;
   border-radius: 0 0 var(--archive-portrait-radius, 5cqw) var(--archive-portrait-radius, 5cqw);
   overflow: hidden;

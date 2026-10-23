@@ -61,6 +61,21 @@ function recordRewriter() {
 }
 
 for (const kind of Object.keys(meta.kinds)) {
+  test(`${kind} profile theme uses its queer flag before JavaScript loads`, async () => {
+    const previous = { rewriter: globalThis.HTMLRewriter, fetch: globalThis.fetch };
+    globalThis.fetch = () => { throw new Error('Prepared profiles must not call Google'); };
+    const flag = { artist: 'queerArtist', venue: 'queerVenue', party: 'queerParty', collective: 'queerCollective' }[kind];
+    try {
+      for (const queer of [true, false]) {
+        const recorded = recordRewriter();
+        const { context, record } = fixture(kind);
+        record.entries['PUBLIC-1'].profile = { ...profile, [flag]: queer };
+        assert.equal((await page(context)).status, 200);
+        assert.equal(recorded.get('#archivePage:class').split(' ').includes('is-queer-profile'), queer);
+      }
+    } finally { globalThis.HTMLRewriter = previous.rewriter; globalThis.fetch = previous.fetch; }
+  });
+
   test(`${kind} HTML has public content and a distinct canonical before JavaScript loads`, async () => {
     const previous = { rewriter: globalThis.HTMLRewriter, fetch: globalThis.fetch };
     const recorded = recordRewriter();
@@ -105,6 +120,22 @@ for (const kind of Object.keys(meta.kinds)) {
     } finally { globalThis.HTMLRewriter = previous.rewriter; globalThis.fetch = previous.fetch; }
   });
 }
+
+test('long artist descriptions reach the initial HTML and hydrated profile in full', async () => {
+  const previous = { rewriter: globalThis.HTMLRewriter, fetch: globalThis.fetch };
+  const recorded = recordRewriter();
+  globalThis.fetch = () => { throw new Error('Prepared profiles must not call Google'); };
+  const bio = ('A long approved artist biography with room for the full story.\n\n').repeat(120) +
+    'Final paragraph: music, community & <creative expression>.';
+  try {
+    const { context, record } = fixture();
+    record.entries['PUBLIC-1'].profile = { ...profile, bio };
+    assert.equal((await page(context)).status, 200);
+    assert.ok(recorded.get('#archiveStack').includes(bio.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')));
+    assert.equal(JSON.parse(recorded.get('#qdpInitialArchive')).payload.profile.bio, bio);
+    assert.ok(recorded.get('#archiveStack').indexOf('Final paragraph') < recorded.get('#archiveStack').indexOf('archive-event-period'));
+  } finally { globalThis.HTMLRewriter = previous.rewriter; globalThis.fetch = previous.fetch; }
+});
 
 test('normalized profile HTML is cached and production binding uses the same prepared data', async () => {
   const previous = { caches: globalThis.caches, rewriter: globalThis.HTMLRewriter };

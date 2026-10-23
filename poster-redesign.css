@@ -489,6 +489,7 @@
   pointer-events: none;
   overflow: hidden;
 }
+.event-detail.explicit .event-detail-date-badge { background: var(--qdp-queer-card, #922185); }
 .event-detail-date-text {
   position: absolute;
   inset: 0;

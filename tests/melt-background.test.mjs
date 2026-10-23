@@ -58,6 +58,7 @@ test('direct event pages have the same Melt theme before browser JavaScript runs
       renderEventPage({ request: new Request('https://qdp.example/?event=NIGHT-1'), env: {} },
         new Response('<html></html>'), { status: 200, event }, event.eventId);
       assert.equal(classes.split(' ').includes('melt'), item.melt, item.label);
+      assert.equal(classes.split(' ').includes('explicit'), item.explicitQueer, item.label);
     }
     renderEventPage({ request: new Request('https://qdp.example/?event=MISSING'), env: {} },
       new Response('<html></html>'), { status: 404, error: 'Unavailable' }, 'MISSING');

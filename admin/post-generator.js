@@ -351,11 +351,11 @@
     ctx.fillText(text, DATE_X + DATE_WIDTH / 2, top + DATE_HEIGHT / 2 - .25 * Q);
   }
 
-  function popupDateBox(ctx, key, inner) {
+  function popupDateBox(ctx, key, inner, explicitQueer = false) {
     const x = inner.x + (inner.w - DATE_WIDTH) / 2;
     roundedPath(ctx, x, inner.y, DATE_WIDTH, DATE_HEIGHT,
       [0, 0, 5 * Q, 5 * Q]);
-    ctx.fillStyle = COLORS.red;
+    ctx.fillStyle = explicitQueer ? COLORS.queerCard : COLORS.red;
     ctx.fill();
     ctx.fillStyle = COLORS.text;
     ctx.textAlign = "center";
@@ -605,7 +605,7 @@
       ctx.restore();
     }
 
-    popupDateBox(ctx, dateKey(event.start), inner);
+    popupDateBox(ctx, dateKey(event.start), inner, event.explicitQueer === true);
 
     const padding = 2.7 * Q;
     const textX = inner.x + padding;
