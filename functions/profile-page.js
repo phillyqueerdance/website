@@ -3,6 +3,7 @@ import { renderEventCard } from "./live-poster.js";
 import { withKvScope, cacheResponse, freshResponse, inheritCacheDeadline } from "./kv-cache.js";
 import "../event-metadata.js";
 import "../profile-metadata.js";
+import "../event-photos.js";
 
 const meta = globalThis.QDPProfileMetadata;
 const escape = value => String(value ?? "").replace(/[&<>"']/g, char =>
@@ -70,7 +71,10 @@ export function renderProfileEvents(kind, profile, items, base, now = Date.now()
       const href = new URL(meta.url(kind, profile.id, base));
       href.searchParams.set("event", event.eventId);
       const day = Number(date.slice(-2));
-      rows.push(`<div class="event-row ${rows.length ? "same-time" : "has-time"}"><time class="archive-day-chip" datetime="${escape(event.start)}">${day}${suffix(day)}</time>${renderEventCard(event, { href: href.href, hideLocation: kind === "venue" })}</div>`);
+      const card = renderEventCard(event, { href: href.href, hideLocation: kind === "venue" });
+      const strip = globalThis.QDPEventPhotos.expands(kind, profile)
+        ? globalThis.QDPEventPhotos.strip(event, card, href.href) : card;
+      rows.push(`<div class="event-row ${rows.length ? "same-time" : "has-time"}"><time class="archive-day-chip" datetime="${escape(event.start)}">${day}${suffix(day)}</time>${strip}</div>`);
     }
     flush();
     parts.push(`<section class="archive-event-period" data-period="${period}" aria-labelledby="archive-${period}-heading"><div class="archive-period-header"><h2 id="archive-${period}-heading" class="archive-period-heading">${label}</h2>${firstYear}</div>${blocks.join("")}</section>`);

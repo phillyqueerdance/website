@@ -1231,7 +1231,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   closeDatePopover();
 
   const id = eventIdOf(event);
-  detailReturnFocus = document.activeElement?.classList.contains("event-card")
+  detailReturnFocus = document.activeElement?.matches(".event-card, .event-photo-go")
     ? document.activeElement
     : [...eventStack.querySelectorAll(".event-card")]
       .find(card => card.dataset.eventId === id && id) || null;
@@ -1445,6 +1445,8 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   else detailCard.classList.add("without-flyer");
   detailCard.appendChild(titleLocation);
   if (more.childNodes.length) detailCard.appendChild(more);
+  const photos = window.QDPEventPhotos?.gallery(event);
+  if (photos) detailCard.insertAdjacentHTML("beforeend", photos);
 
   const seeMore = document.createElement("section");
   seeMore.className = "event-detail-see-more";

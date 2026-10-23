@@ -1,6 +1,7 @@
 // Read the prepared public archive when the preview has a KV binding. Until
 // its first publish (or during propagation), keep the live Apps Script feed.
 import { DEFAULT_APPS_SCRIPT_URL } from "./events.js";
+import "../../event-photos.js";
 import { withKvScope, readArchiveManifest, readArchiveRecord,
   cacheResponse, freshResponse } from "../kv-cache.js";
 
@@ -95,6 +96,7 @@ export function publicEvent(input) {
       ? input.collectiveIds.map(id => value(id, 80)).filter(Boolean).slice(0, 40)
       : [],
     flyerUrl: safeUrl(input.flyerUrl),
+    photoUrls: globalThis.QDPEventPhotos.urls(input),
     explicitQueer: yes(input.explicitQueer),
     queerArtist: yes(input.queerArtist),
     transArtist: yes(input.transArtist)

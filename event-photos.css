@@ -1,0 +1,89 @@
+.event-photos {
+  margin: 4cqw 4cqw 0;
+  color: #fff1f4;
+}
+.event-photos h3 {
+  margin: 0 0 1.5cqw;
+  font: 700 3cqw/1.2 "QDP Fraunces", Georgia, serif;
+}
+.event-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5cqw;
+}
+.event-photo,
+.event-photo:any-link {
+  display: block;
+  min-width: 0;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 1.2cqw;
+  background: #24151f;
+  color: #ffea86;
+  text-decoration: none;
+}
+.event-photo:only-child { grid-column: 1 / -1; }
+.event-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.event-photo:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
+.event-photo-unavailable { display: grid; place-items: center; height: 100%; font: inherit; }
+.event-photo-strip { min-width: 0; overflow: hidden; background: #000; }
+.event-photo-strip > summary { cursor: pointer; list-style: none; }
+.event-photo-strip > summary::-webkit-details-marker { display: none; }
+.event-photo-strip .event-card-content { padding-right: 12cqw; }
+.event-photo-toggle {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: 1.2cqw;
+  padding: .6cqw .8cqw;
+  border-radius: 999px;
+  background: #000;
+  color: #fff1f4;
+  font: 700 1.8cqw/1.2 "QDP Fraunces", Georgia, serif;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.event-photo-strip .has-flags .event-photo-toggle { right: 6cqw; }
+.event-photo-toggle > span { display: inline-block; }
+.event-photo-strip[open] .event-photo-toggle > span { transform: rotate(180deg); }
+.event-photo-strip[open] > summary { border-bottom-right-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+.event-photo-strip .event-photos { margin: 0; padding: 2cqw; border: 2px solid #ff7945; border-bottom: 0; }
+.event-photo-strip.explicit .event-photos { border-color: var(--qdp-queer-card, #922185); }
+.event-photo-strip .event-photos h3 { font-size: 2.5cqw; }
+.event-photo-go,
+.event-photo-go:any-link {
+  display: block;
+  padding: 1.5cqw;
+  background: #ff7945;
+  color: var(--qdp-plum-text);
+  font: 700 2.5cqw/1.2 "QDP Fraunces", Georgia, serif;
+  text-align: center;
+  text-decoration: none;
+}
+.event-photo-strip.explicit .event-photo-go { background: var(--qdp-queer-card, #922185); color: #fff1f4; }
+.event-photo-go:focus-visible { outline: 2px solid #ffea86; outline-offset: -3px; }
+.archive-group .event-row:first-child .event-photo-strip { border-top-right-radius: var(--qdp-card-radius); }
+.archive-group .event-row:last-child .event-photo-strip { border-bottom-right-radius: var(--qdp-tail-radius, var(--qdp-card-radius)); }
+.event-photo-viewer {
+  position: fixed;
+  inset: 0;
+  width: min(96vw, 1300px);
+  max-width: 96vw;
+  height: min(94dvh, 1100px);
+  max-height: 94dvh;
+  margin: auto;
+  padding: 52px 12px 58px;
+  overflow: hidden;
+  border: 1px solid #ffea86;
+  border-radius: 12px;
+  background: #090609;
+  color: #fff1f4;
+  box-sizing: border-box;
+}
+.event-photo-viewer::backdrop { background: rgb(0 0 0 / .9); }
+.event-photo-full { display: block; width: 100%; height: 100%; object-fit: contain; touch-action: pan-y; }
+.event-photo-viewer button { min-width: 44px; min-height: 44px; border: 0; border-radius: 50%; background: #922185; color: #fff1f4; font: 700 24px/1 Georgia, serif; cursor: pointer; }
+.event-photo-viewer button:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
+.event-photo-close { position: absolute; top: 6px; right: 8px; }
+.event-photo-controls { position: absolute; bottom: 6px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 20px; font: 16px/1 Verdana, sans-serif; }
+.event-photo-controls [hidden] { display: none; }
