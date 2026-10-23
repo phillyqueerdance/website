@@ -10,8 +10,9 @@ corners match the header's curves. It scrolls into the header like a closing
 drawer; the description, links, related profiles, and events follow below.
 Profile descriptions are displayed in full, without a character cutoff.
 Drive URLs use the same browser image conversion as event flyers. Desktop
-Discover uses vertical tabs with a smaller, attached name tab beneath the active
-artist, venue, party, or collective category. These name tabs appear only on
+Discover uses compact vertical tabs with an attached name tab beneath the active
+artist, venue, party, or collective category. The name tab shares the header's
+right edge and leaves a small gap on the left. These name tabs appear only on
 desktop. Descriptions, related profiles, and external links for all four profile
 types appear inside the main frame above their events on desktop and mobile.
 
