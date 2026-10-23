@@ -114,7 +114,7 @@ test('calendar strips use the same expanding gallery and ordinary events retain 
 });
 
 test('the inline carousel shows exactly one photo and wraps forwards and backwards', () => {
-  const slides = [{ hidden: false }, { hidden: true }, { hidden: true }];
+  const slides = [{ hidden: false }, { hidden: true }, { hidden: true }].map(slide => ({ ...slide, querySelector: () => null }));
   const counter = { textContent: '1 / 3' };
   const section = { dataset: { photoIndex: '0' }, querySelectorAll: () => slides, querySelector: () => counter };
   for (const [direction, expected] of [[1, 1], [1, 2], [1, 0], [-1, 2], [-1, 1], [-1, 0]]) {
@@ -124,6 +124,20 @@ test('the inline carousel shows exactly one photo and wraps forwards and backwar
     assert.equal(slides[expected].hidden, false);
     assert.equal(counter.textContent, `${expected + 1} / 3`);
   }
+});
+
+test('switching photos starts loading immediately and keeps the previous frame until the new image has dimensions', () => {
+  const frame = { aspect: 2 / 3, style: { setProperty(name, value) { frame.aspect = value; } } };
+  const slides = [false, true].map(hidden => ({ hidden, querySelector() { return this.image; } }));
+  slides.forEach(slide => { slide.image = { naturalWidth: 0, naturalHeight: 0, loading: 'lazy',
+    closest: selector => selector === '.event-photo' ? slide : frame }; });
+  const section = { dataset: { photoIndex: '0' }, querySelectorAll: () => slides, querySelector: () => ({}) };
+  photos.moveGallery(section, 1);
+  assert.equal(slides[1].image.loading, 'eager');
+  assert.equal(frame.aspect, 2 / 3);
+  Object.assign(slides[0].image, { naturalWidth: 1600, naturalHeight: 900 });
+  photos.moveGallery(section, -1);
+  assert.equal(frame.aspect, 1600 / 900);
 });
 
 test('browser Go to event opens the intended event and stops the click before the outside-click closer', () => {

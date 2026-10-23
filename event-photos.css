@@ -9,20 +9,22 @@
 }
 .event-photo-position { font: 700 clamp(12px, 2.2cqw, 18px)/1.2 "QDP Fraunces", Georgia, serif; }
 .event-photo-carousel {
+  --event-photo-height: clamp(220px, 49cqw, 540px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: .5cqw 0;
-  width: fit-content;
-  max-width: 100%;
+  width: min(100%, calc(var(--event-photo-height) * var(--event-photo-aspect, 1)));
   margin-inline: auto;
 }
-.event-photo-slides { grid-column: 1 / -1; width: fit-content; max-width: 100%; }
+.event-photo-slides { position: relative; grid-column: 1 / -1; width: 100%; aspect-ratio: var(--event-photo-aspect, 1); }
 .event-photo,
 .event-photo:any-link {
+  position: absolute;
+  inset: 0;
   display: block;
   min-width: 0;
-  width: fit-content;
-  max-width: 100%;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   border-radius: 1.2cqw;
   background: transparent;
@@ -32,10 +34,8 @@
 .event-photo[hidden] { display: none; }
 .event-photo img {
   display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: clamp(220px, 49cqw, 540px);
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 .event-photo:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }

@@ -36,11 +36,24 @@
     return `<details class="event-photo-strip${event.explicitQueer ? " explicit" : " default"}" name="event-photos" data-event-id="${escape(event.eventId)}">${summary}<div class="event-photo-dropdown">${gallery(event)}<a class="event-photo-go" href="${escape(href)}">Go to event</a></div></details>`;
   }
 
+  function sizePhoto(image) {
+    if (!image?.naturalWidth || !image.naturalHeight || image.closest(".event-photo").hidden) return;
+    image.closest(".event-photo-carousel").style.setProperty("--event-photo-aspect", image.naturalWidth / image.naturalHeight);
+  }
+
+  function activatePhoto(slide) {
+    const image = slide.querySelector("img");
+    if (!image) return;
+    image.loading = "eager";
+    sizePhoto(image);
+  }
+
   function moveGallery(section, direction) {
     const slides = [...section.querySelectorAll("a[data-event-photo]")];
     if (!slides.length) return;
     const index = ((Number(section.dataset.photoIndex) || 0) + direction + slides.length) % slides.length;
     slides.forEach((slide, number) => { slide.hidden = number !== index; });
+    activatePhoto(slides[index]);
     section.dataset.photoIndex = String(index);
     section.querySelector(".event-photo-position").textContent = `${index + 1} / ${slides.length}`;
   }
@@ -52,11 +65,18 @@
   document.addEventListener("toggle", event => {
     const details = event.target;
     if (!details.matches?.(".event-photo-strip")) return;
-    if (details.open) document.querySelectorAll(".event-photo-strip[open]").forEach(other => {
-      if (other !== details) other.open = false;
-    });
+    if (details.open) {
+      activatePhoto(details.querySelector(".event-photo:not([hidden])"));
+      document.querySelectorAll(".event-photo-strip[open]").forEach(other => {
+        if (other !== details) other.open = false;
+      });
+    }
     if (globalThis.QDPArchive?.active) globalThis.QDPArchive.updateLayout();
     else globalThis.QDPUpdatePhotoLayout?.();
+  }, true);
+  // Reserve a frame while a new lazy image loads, then fit the frame to the photo.
+  document.addEventListener("load", event => {
+    if (event.target.matches?.(".event-photo img")) sizePhoto(event.target);
   }, true);
   document.addEventListener("error", event => {
     const image = event.target;
