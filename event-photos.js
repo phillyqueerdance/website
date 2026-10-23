@@ -36,9 +36,15 @@
     return `<details class="event-photo-strip${event.explicitQueer ? " explicit" : " default"}" name="event-photos" data-event-id="${escape(event.eventId)}">${summary}<div class="event-photo-dropdown">${gallery(event)}<a class="event-photo-go" href="${escape(href)}">Go to event</a></div></details>`;
   }
 
+  function updatePhotoLayout() {
+    if (globalThis.QDPArchive?.active) globalThis.QDPArchive.updateLayout();
+    else globalThis.QDPUpdatePhotoLayout?.();
+  }
+
   function sizePhoto(image) {
     if (!image?.naturalWidth || !image.naturalHeight || image.closest(".event-photo").hidden) return;
     image.closest(".event-photo-carousel").style.setProperty("--event-photo-aspect", image.naturalWidth / image.naturalHeight);
+    updatePhotoLayout();
   }
 
   function activatePhoto(slide) {
@@ -71,13 +77,13 @@
         if (other !== details) other.open = false;
       });
     }
-    if (globalThis.QDPArchive?.active) globalThis.QDPArchive.updateLayout();
-    else globalThis.QDPUpdatePhotoLayout?.();
+    updatePhotoLayout();
   }, true);
   // Reserve a frame while a new lazy image loads, then fit the frame to the photo.
   document.addEventListener("load", event => {
     if (event.target.matches?.(".event-photo img")) sizePhoto(event.target);
   }, true);
+  document.querySelectorAll(".event-photo:not([hidden]) img").forEach(sizePhoto);
   document.addEventListener("error", event => {
     const image = event.target;
     if (!image.matches?.(".event-photo img")) return;

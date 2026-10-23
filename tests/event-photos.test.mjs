@@ -179,7 +179,7 @@ test('photo viewer moves through the gallery and Escape closes only the viewer a
     closest: selector => selector === '.event-photo-slides' ? grid : selector === 'a[data-event-photo]' ? links[index] : null,
     querySelector: () => ({ alt: `Photo ${index + 1}` }), focus() { this.focused = true; } }));
   const context = vm.createContext({ URL, Object, String, Array, Set, HTMLDialogElement: class {},
-    document: { addEventListener: (name, handler) => handlers.set(name, handler),
+    document: { addEventListener: (name, handler) => handlers.set(name, handler), querySelectorAll: () => [],
       createElement: () => dialog, body: { appendChild() {} } } });
   vm.runInContext(fs.readFileSync(new URL('../event-photos.js', import.meta.url), 'utf8'), context);
   let prevented = 0, stopped = 0;
