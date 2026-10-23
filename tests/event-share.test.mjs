@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
 import { shareImageSvg, dataImage } from '../functions/share-image-layout.js';
 import { fetchFlyer, imageBytes, publicImageUrl } from '../functions/share-image-source.js';
 import { shareImageHandler } from '../functions/share-image-handler.js';
@@ -55,6 +57,31 @@ test('event link thumbnails use a versioned image endpoint that changes when its
   assert.equal(meta.shareImage({ ...event, title: 'New title' }, url.origin), first);
   assert.equal(meta.shareImage({ ...event, flyerUrl: '' }, url.origin), 'https://preview.example/qdp-share-card.jpg');
   assert.equal(new URL(meta.shareImage({ ...event, eventId: 'SAZÓN-1' })).searchParams.get('event'), 'SAZÓN-1');
+});
+
+test('opening a popup in the browser keeps the generated thumbnail and restores home metadata on close', () => {
+  const elements = new Map([
+    ['meta[property="og:image"]', { content: 'https://preview.example/qdp-share-card.jpg' }],
+    ['meta[name="twitter:image"]', { content: 'https://preview.example/qdp-share-card.jpg' }],
+    ['meta[property="og:image:width"]', { content: '1200' }],
+    ['meta[property="og:image:height"]', { content: '1200' }],
+    ['meta[property="og:image:type"]', { content: 'image/jpeg' }]
+  ]);
+  const window = { QDPEventMetadata: meta, location: { origin: 'https://preview.example' } };
+  const document = { title: 'Queer Dance Philly', querySelector: selector => elements.get(selector),
+    getElementById: () => null };
+  const context = vm.createContext({ window, document, Map, Date, Promise, console });
+  vm.runInContext(fs.readFileSync(new URL('../event-linking.js', import.meta.url), 'utf8'), context);
+  window.QDPEventLinks.apply(event);
+  for (const selector of ['meta[property="og:image"]', 'meta[name="twitter:image"]']) {
+    assert.equal(elements.get(selector).content, meta.shareImage(event, window.location.origin));
+  }
+  assert.equal(elements.get('meta[property="og:image:width"]').content, '900');
+  assert.equal(elements.get('meta[property="og:image:height"]').content, '1067');
+  assert.equal(elements.get('meta[property="og:image:type"]').content, 'image/png');
+  window.QDPEventLinks.clear();
+  assert.equal(elements.get('meta[property="og:image"]') .content, 'https://preview.example/qdp-share-card.jpg');
+  assert.equal(elements.get('meta[property="og:image:width"]').content, '1200');
 });
 
 test('flyer loading follows safe public redirects and rejects invalid sources, nonimages and oversized bodies', async () => {
