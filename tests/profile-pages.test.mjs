@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { onRequestGet as page } from '../functions/index.js';
-import { renderProfileInfo, renderProfileEvents } from '../functions/profile-page.js';
+import { renderArtistDrawer, renderProfileInfo, renderProfileEvents } from '../functions/profile-page.js';
 import { onRequestGet as sitemap } from '../functions/sitemap.xml.js';
 import { shard } from '../functions/event-records.js';
 
@@ -12,6 +12,7 @@ const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const archiveSource = fs.readFileSync(new URL('../archive.js', import.meta.url), 'utf8');
 const eventLinksSource = fs.readFileSync(new URL('../event-linking.js', import.meta.url), 'utf8');
 const profile = { id: 'PUBLIC-1', publicOk: true, name: 'Public & Profile', bio: 'Approved profile bio.',
+  imageUrl: 'https://example.com/artist.jpg',
   website: 'https://example.com/', instagram: 'https://www.instagram.com/public/', address: '123 Public St',
   related: [{ kind: 'artist', id: 'OTHER', name: 'Other Artist' }, { kind: 'artist', id: 'PRIVATE', name: 'Private Artist' }] };
 const event = { public: true, eventId: 'EVENT-1', title: 'Public night', start: '2030-10-01T23:00:00-04:00',
@@ -60,6 +61,21 @@ function recordRewriter() {
 }
 
 for (const kind of Object.keys(meta.kinds)) {
+  test(`${kind} profile theme uses its queer flag before JavaScript loads`, async () => {
+    const previous = { rewriter: globalThis.HTMLRewriter, fetch: globalThis.fetch };
+    globalThis.fetch = () => { throw new Error('Prepared profiles must not call Google'); };
+    const flag = { artist: 'queerArtist', venue: 'queerVenue', party: 'queerParty', collective: 'queerCollective' }[kind];
+    try {
+      for (const queer of [true, false]) {
+        const recorded = recordRewriter();
+        const { context, record } = fixture(kind);
+        record.entries['PUBLIC-1'].profile = { ...profile, [flag]: queer };
+        assert.equal((await page(context)).status, 200);
+        assert.equal(recorded.get('#archivePage:class').split(' ').includes('is-queer-profile'), queer);
+      }
+    } finally { globalThis.HTMLRewriter = previous.rewriter; globalThis.fetch = previous.fetch; }
+  });
+
   test(`${kind} HTML has public content and a distinct canonical before JavaScript loads`, async () => {
     const previous = { rewriter: globalThis.HTMLRewriter, fetch: globalThis.fetch };
     const recorded = recordRewriter();
@@ -77,7 +93,18 @@ for (const kind of Object.keys(meta.kinds)) {
       assert.equal(recorded.get('meta[property="og:url"]:content'), meta.url(kind, profile.id));
       assert.equal(recorded.get('meta[name="description"]:content'), profile.bio);
       const body = recorded.get('#archiveStack');
-      assert.match(body, /Public &amp; Profile/);
+      if (kind === 'artist') {
+        assert.match(body, /class="archive-profile-summary archive-artist-summary"/);
+        assert.ok(body.indexOf('archive-artist-drawer') < body.indexOf('archive-artist-summary'));
+      } else {
+        assert.match(body, /class="archive-profile-summary"/);
+      }
+      assert.ok(body.indexOf('Approved profile bio') < body.indexOf('archive-event-period'));
+      assert.equal(recorded.has('#archiveMenuProfile'), false);
+      assert.match(recorded.get(`.archive-menu-badge--${meta.kinds[kind]}`), /archive-menu-profile-name">Public &amp; Profile/);
+      assert.doesNotMatch(recorded.get(`.archive-menu-badge--${meta.kinds[kind]}`), /Approved profile bio|<img/);
+      assert.equal(recorded.get('#archiveHeader'), profile.name);
+      assert.doesNotMatch(body, /mobile-profile-summary|archive-profile-heading/);
       assert.match(body, /Approved profile bio/);
       assert.match(body, /Public night/);
       assert.match(body, new RegExp(`archive=${kind}&amp;id=PUBLIC-1&amp;event=EVENT-1`));
@@ -92,6 +119,22 @@ for (const kind of Object.keys(meta.kinds)) {
     } finally { globalThis.HTMLRewriter = previous.rewriter; globalThis.fetch = previous.fetch; }
   });
 }
+
+test('long artist descriptions reach the initial HTML and hydrated profile in full', async () => {
+  const previous = { rewriter: globalThis.HTMLRewriter, fetch: globalThis.fetch };
+  const recorded = recordRewriter();
+  globalThis.fetch = () => { throw new Error('Prepared profiles must not call Google'); };
+  const bio = ('A long approved artist biography with room for the full story.\n\n').repeat(120) +
+    'Final paragraph: music, community & <creative expression>.';
+  try {
+    const { context, record } = fixture();
+    record.entries['PUBLIC-1'].profile = { ...profile, bio };
+    assert.equal((await page(context)).status, 200);
+    assert.ok(recorded.get('#archiveStack').includes(bio.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')));
+    assert.equal(JSON.parse(recorded.get('#qdpInitialArchive')).payload.profile.bio, bio);
+    assert.ok(recorded.get('#archiveStack').indexOf('Final paragraph') < recorded.get('#archiveStack').indexOf('archive-event-period'));
+  } finally { globalThis.HTMLRewriter = previous.rewriter; globalThis.fetch = previous.fetch; }
+});
 
 test('normalized profile HTML is cached and production binding uses the same prepared data', async () => {
   const previous = { caches: globalThis.caches, rewriter: globalThis.HTMLRewriter };
@@ -151,6 +194,36 @@ test('profile markup escapes text, rejects unsafe links, and groups local dates 
   assert.match(result, /datetime="2031-01-12T00:30:00Z">11th/); // Philadelphia is still January 11.
   assert.ok(result.indexOf('EVENT-1') < result.indexOf('NEXT-YEAR'));
   assert.doesNotMatch(result, /class="event-venue"|class="event-address"/);
+});
+
+test('the compatibility portrait is a separate drawer; artist details have no duplicate photo or name', () => {
+  const { imageUrl, ...legacy } = profile;
+  const person = { ...legacy, id: 'CALLAIA-001', name: 'Callaia' };
+  const drawer = renderArtistDrawer(person);
+  assert.match(drawer, /<div class="archive-artist-drawer"><img class="archive-artist-portrait" src="\/artist-images\/callaia.jpg" alt="Callaia" width="2048" height="2016"/);
+  const info = renderProfileInfo('artist', person, 'https://massive.example');
+  assert.doesNotMatch(info, /<img|archive-profile-heading/);
+  assert.ok(info.indexOf('archive-profile-related') < info.indexOf('archive-profile-links'));
+  assert.equal(renderArtistDrawer({ ...legacy, name: 'Callaia' }), '');
+  assert.doesNotMatch(renderProfileInfo('venue', { ...profile, id: 'CALLAIA-001' }, 'https://massive.example'), /<img/);
+});
+
+test('the red tab follows event year markers and restores the artist name when scrolling back up', () => {
+  const source = archiveSource.slice(archiveSource.indexOf('  function syncYearHeadings()'), archiveSource.indexOf('  function positionMenu()'));
+  const markers = [2026, 2025].map(year => ({ year: String(year), marker: { top: 0, style: {}, getBoundingClientRect() { return { top: this.top }; } } }));
+  const labels = [];
+  const context = vm.createContext({ profileName: 'Callaia', yearHeadings: markers,
+    archiveStack: { getBoundingClientRect: () => ({ top: 100 }) },
+    archiveHeader: { getBoundingClientRect: () => ({ height: 42 }), setAttribute() {} },
+    header: label => labels.push(label), fitProfileHeaders() {},
+    headerLabel: { style: {} }, incomingYear: { style: {} }
+  });
+  vm.runInContext(source, context);
+  for (const [tops, expected] of [[[700, 1200], 'Callaia'], [[101, 600], 'Callaia'], [[59, 600], '2026'], [[-400, 59], '2025'], [[700, 1200], 'Callaia']]) {
+    markers.forEach((entry, i) => { entry.marker.top = tops[i]; });
+    vm.runInContext('syncYearHeadings()', context);
+    assert.equal(labels.at(-1), expected);
+  }
 });
 
 test('sitemap reads one manifest, includes all four canonical profile types, and honors public gates', async () => {

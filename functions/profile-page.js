@@ -8,12 +8,16 @@ const meta = globalThis.QDPProfileMetadata;
 const escape = value => String(value ?? "").replace(/[&<>"']/g, char =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 const colors = { artist: "red", venue: "orange", party: "purple", collective: "collective" };
-const accents = { artist: "#fa2b5a", venue: "#ff7945", party: "#922185", collective: "#f06eb1" };
 const dateFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit"
 });
 const monthFormat = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "long" });
 const suffix = day => day % 100 >= 11 && day % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[day % 10] || "th");
+
+export function renderArtistDrawer(profile) {
+  const image = meta.artistImage(profile);
+  return image ? `<div class="archive-artist-drawer"><img class="archive-artist-portrait" src="${escape(image.src)}" alt="${escape(profile.name)}"${image.width && image.height ? ` width="${image.width}" height="${image.height}"` : ""} decoding="async"></div>` : "";
+}
 
 export function renderProfileInfo(kind, profile, base) {
   const related = (profile.related || []).filter(item => colors[item.kind] && meta.validId(item.id) && item.name)
@@ -23,13 +27,13 @@ export function renderProfileInfo(kind, profile, base) {
       const href = globalThis.QDPEventMetadata.safeUrl(profile[key]);
       return href ? `<a href="${escape(href)}" target="_blank" rel="noopener noreferrer">${label}</a>` : "";
     }).join("");
+  const more = related ? `<section class="archive-profile-related"><h3>See More</h3><div class="archive-profile-related-links">${related}</div></section>` : "";
+  const external = links ? `<div class="archive-profile-links">${links}</div>` : "";
   return `<section class="archive-profile-info" aria-label="${kind[0].toUpperCase() + kind.slice(1)} information">
-    <h2 class="archive-profile-heading">${escape(profile.name)}</h2>
     ${meta.classification(kind, profile) ? `<span class="sr-only">${meta.classification(kind, profile)}</span>` : ""}
     ${kind === "venue" && profile.address ? `<address>${escape(profile.address)}</address>` : ""}
     ${profile.bio ? `<p>${escape(profile.bio)}</p>` : ""}
-    ${related ? `<section class="archive-profile-related"><h3>See More</h3><div class="archive-profile-related-links">${related}</div></section>` : ""}
-    ${links ? `<div class="archive-profile-links">${links}</div>` : ""}</section>`;
+    ${more + external}</section>`;
 }
 
 export function renderProfileEvents(kind, profile, items, base, now = Date.now()) {
@@ -82,7 +86,8 @@ export function renderProfilePage(context, page, result, kind, id) {
   const base = new URL(context.request.url).origin;
   const info = profile ? renderProfileInfo(kind, profile, base) : "";
   const markup = profile
-    ? `<section class="mobile-profile-summary" style="--archive-profile-accent:${accents[kind]}">${info}</section>` + renderProfileEvents(kind, profile, result.payload.events, base)
+    ? (kind === "artist" ? renderArtistDrawer(profile) : "") +
+      `<section class="archive-profile-summary${kind === "artist" ? " archive-artist-summary" : ""}">${info}</section>` + renderProfileEvents(kind, profile, result.payload.events, base)
     : `<p class="event-feed-message">${escape(result.error)}</p>`;
   const directory = meta.kinds[kind];
   const label = directory[0].toUpperCase() + directory.slice(1);
@@ -90,7 +95,7 @@ export function renderProfilePage(context, page, result, kind, id) {
     .on("html", { element(element) { element.setAttribute("class", `${element.getAttribute("class") || ""} archive-open${profile ? " discover-open" : ""}`.trim()); } })
     .on("body", { element(element) { element.setAttribute("class", `${element.getAttribute("class") || ""} archive-mode${profile ? " discover-open" : ""}`.trim()); } })
     .on("#archiveViewport", { element(element) { element.removeAttribute("hidden"); } })
-    .on("#archivePage", { element(element) { element.setAttribute("class", "archive-page is-open"); } })
+    .on("#archivePage", { element(element) { element.setAttribute("class", `archive-page is-open${meta.isQueer(kind, profile) ? " is-queer-profile" : ""}`); } })
     .on("#archiveStack", { element(element) { element.setAttribute("class", "event-stack archive-stack profile-events"); element.setInnerContent(markup, { html: true }); } })
     .on("#archiveHeader", { element(element) { element.setAttribute("aria-label", profile?.name || label); element.setInnerContent(profile?.name || label); } })
     .on("#archiveBack", { element(element) { element.removeAttribute("hidden"); element.setAttribute("href", new URL(`/?archive=${directory}`, base).href); element.setInnerContent(`← Back to ${label}`); } })
@@ -101,8 +106,11 @@ export function renderProfilePage(context, page, result, kind, id) {
       .on('link[rel="canonical"]', { element(element) { element.setAttribute("href", meta.url(kind, id, origin)); } })
       .on("#archiveMenuTrack", { element(element) { element.removeAttribute("hidden"); element.setAttribute("class", "archive-menu-track is-open"); } })
       .on("#archiveMenu", { element(element) { element.setAttribute("class", "archive-menu has-profile"); } })
-      .on("#archiveMenuProfile", { element(element) { element.removeAttribute("hidden"); element.setAttribute("style", `--archive-profile-accent:${accents[kind]}`); element.setInnerContent(info, { html: true }); } })
-      .on(`.archive-menu-badge--${directory}`, { element(element) { element.setAttribute("aria-current", "page"); } });
+      .on(`.archive-menu-badge--${directory}`, { element(element) {
+        element.setAttribute("aria-current", "page");
+        element.setAttribute("class", `archive-menu-badge archive-menu-badge--${directory} has-profile-name`);
+        element.setInnerContent(`<span class="archive-menu-badge-label">${label}</span><span class="archive-menu-profile-name">${escape(profile.name)}</span>`, { html: true });
+      } });
     for (const [selector, content] of meta.tags(kind, profile, origin)) rewriter = rewriter.on(selector, {
       element(element) { element.setAttribute("content", content); }
     });

@@ -18,6 +18,15 @@
     return result.href;
   };
   const title = profile => `${profile.name} | Queer Dance Philly`;
+  const artistImage = profile => {
+    if (Object.hasOwn(profile, "imageUrl")) {
+      const src = globalThis.QDPEventMetadata.image({ flyerUrl: profile.imageUrl });
+      return src ? { src } : null;
+    }
+    // Keep the preview portrait only until the publisher supplies the new field.
+    return profile.id === "CALLAIA-001"
+      ? { src: "/artist-images/callaia.jpg", width: 2048, height: 2016 } : null;
+  };
   const directoryUrl = (kind, base = origin) => {
     const result = new URL("/", base);
     result.searchParams.set("archive", kind);
@@ -33,10 +42,11 @@
     ] : [];
   };
   const description = profile => String(profile.bio || profile.name || "").replace(/\s+/g, " ").trim().slice(0, 180);
+  const queerFlags = { artist: "queerArtist", venue: "queerVenue", party: "queerParty", collective: "queerCollective" };
+  const isQueer = (kind, profile) => Boolean(queerFlags[kind] && profile?.[queerFlags[kind]] === true);
   const classification = (kind, profile) => {
     const labels = [];
-    const flag = { artist: "queerArtist", venue: "queerVenue", party: "queerParty", collective: "queerCollective" }[kind];
-    if (flag && profile[flag] === true) labels.push(`Queer ${kind}.`);
+    if (isQueer(kind, profile)) labels.push(`Queer ${kind}.`);
     if (kind === "artist" && profile.transArtist === true) labels.push("Trans artist.");
     return labels.join(" ");
   };
@@ -51,6 +61,6 @@
     ['meta[name="twitter:image"]', new URL("/qdp-share-card.jpg", base).href],
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
-  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, title, description, classification, tags,
+  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, title, artistImage, description, isQueer, classification, tags,
     homeDescription, directories, directoryUrl, directoryTags });
 })();

@@ -99,6 +99,7 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
           ...shared,
           queerArtist: flags.get(id)?.queer === true,
           transArtist: flags.get(id)?.trans === true,
+          imageUrl: qdpArchiveLink_(qdpArchiveText_(row, data.index, ['ArtistImage_URL'])),
           partyIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['Artist_Parties'])),
           collectiveIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['Artist_Collectives'])),
           music: qdpArchiveLink_(qdpArchiveFirstText_(row, data.index,

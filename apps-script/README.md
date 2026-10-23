@@ -1,5 +1,36 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Artist image preview
+
+The preview reads each approved artist's `ArtistImage_URL` from the Artists
+tab. On desktop and mobile, the portrait sits directly beneath the name
+header inside the frame, with matching width and side borders. Queer profiles
+use purple headers and photo frames; other profiles use red. The portrait's bottom
+corners match the header's curves. It scrolls into the header like a closing
+drawer; the description, links, related profiles, and events follow below.
+Profile descriptions are displayed in full, without a character cutoff.
+Drive URLs use the same browser image conversion as event flyers. Desktop
+Discover uses compact vertical tabs with an attached name tab beneath the active
+artist, venue, party, or collective category. The name tab shares the header's
+right edge and leaves a small gap on the left. These name tabs appear only on
+desktop. Descriptions, related profiles, and external links for all four profile
+types appear inside the main frame above their events on desktop and mobile.
+
+Install the supplied Core.gs v7.4.6 and PublicData.gs v7.4.2 in the existing
+Apps Script project. Keep the other files and settings. Reload the Index,
+then use **QDP > Update Artist Image URLs (from Raw_ArtistImage_URL)** to
+convert Drive file share links into `ArtistImage_URL`. This changes only the
+destination cells for valid, changed links; blank or invalid raw links leave
+existing values untouched. Column order does not matter. The existing flyer
+conversion and scraper menu remain available.
+
+Use **QDP > Public data / Website > Publish archive changes** to publish the
+photos. Images must be viewable without signing in. The raw column is never
+published. To remove a photo, clear both image columns and publish again.
+The temporary Callaia image remains only for older feeds that do not yet
+include the new image field. The repository `archive-feed.gs` remains a
+reference helper, not an additional file to install beside PublicData.gs.
+
 ## Current production update: v7.2
 
 For the existing four-file v7.1 project, replace **only PublicData.gs** with

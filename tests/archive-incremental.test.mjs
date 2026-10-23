@@ -21,7 +21,8 @@ function publisher(source) {
   const calls = [], values = new Map();
   let failure = '', serial = 0, locks = 0;
   const context = vm.createContext({ Date, Map, Set, Object, Array, JSON, String, RegExp,
-    trim: value => String(value ?? '').trim(), ss_: () => ({}),
+    trim: value => String(value ?? '').trim(), ss_: () => ({ getId: () => 'test-spreadsheet' }),
+    ScriptApp: { getScriptId: () => 'test-script' },
     PropertiesService: { getScriptProperties: () => ({ getProperty: key => properties.get(key),
       setProperty: (key, value) => properties.set(key, value) }) },
     LockService: { getScriptLock: () => ({ waitLock() { locks++; }, releaseLock() { locks--; } }) },

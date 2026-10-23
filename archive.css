@@ -20,8 +20,10 @@
   pointer-events: auto;
 }
 .archive-page.is-open { transform: translateY(0); }
-.archive-header { cursor: default; }
-.archive-header:hover, .archive-header:focus-visible { background: #fa2b5a; color: #ffeff2; }
+.archive-page.is-queer-profile { --archive-profile-header-color: var(--qdp-queer-card, #922185); }
+.archive-header { cursor: default; background: var(--archive-profile-header-color, #fa2b5a); }
+.archive-header:hover, .archive-header:focus-visible { background: var(--archive-profile-header-color, #fa2b5a); color: #ffeff2; }
+.archive-page:has(.archive-artist-drawer) .archive-header { z-index: 3; }
 .archive-back {
   display: none !important;
   position: absolute;
@@ -134,6 +136,7 @@
 .archive-menu-track.is-open .archive-menu-panel { transform: translateX(0); }
 .archive-menu {
   --archive-nav-width: var(--archive-nav-compact-width, 164px);
+  --archive-menu-border-width: 2.5px;
   position: absolute;
   top: var(--archive-nav-top, 0px);
   left: 0;
@@ -155,13 +158,12 @@
   scrollbar-width: thin;
   transition: width var(--qdp-page-duration, 460ms) var(--qdp-page-ease, ease-out);
 }
-.archive-menu.has-profile { --archive-nav-width: var(--archive-nav-expanded-width, 228px); }
 .archive-menu::before {
   content: "";
   position: absolute;
   inset: 0 0 0 var(--archive-menu-inset, 33px);
   z-index: 0;
-  border: 2.5px solid #ffea86;
+  border: var(--archive-menu-border-width) solid #ffea86;
   border-left: 0;
   border-radius: 0 24px 24px 0;
   background: #000;
@@ -214,19 +216,27 @@
   overflow-wrap: anywhere;
   text-align: center;
 }
-.archive-menu-badge[data-tab-color="red"] {
-  background: #fa2b5a;
+.archive-menu-profile-name { display: none; }
+.archive-menu-badge--artists, .archive-menu-badge[data-tab-color="red"] {
+  --archive-tab-background: #fa2b5a;
+  background: var(--archive-tab-background);
 }
-.archive-menu-badge[data-tab-color="orange"] {
-  background: #ff7945;
+.archive-menu-badge--venues, .archive-menu-badge[data-tab-color="orange"] {
+  --archive-tab-background: #ff7945;
+  background: var(--archive-tab-background);
   color: var(--qdp-plum-text) !important;
 }
-.archive-menu-badge[data-tab-color="purple"] {
-  background: #922185;
+.archive-menu-badge--parties, .archive-menu-badge[data-tab-color="purple"] {
+  --archive-tab-background: #922185;
+  --archive-tab-name-color: #fff1f4;
+  background: var(--archive-tab-background);
 }
-.archive-menu-badge[data-tab-color="collective"] {
+.archive-menu-badge--collectives, .archive-menu-badge[data-tab-color="collective"] {
+  --archive-tab-background: #000;
+  --archive-tab-name-color: #fff1f4;
+  --archive-tab-outline-width: 2px;
   border: 2px solid #fff1f4;
-  background: #000;
+  background: var(--archive-tab-background);
   color: #fff1f4;
 }
 .archive-menu-badge[data-tab-color="collective"][aria-current="page"] { border-width: 2px; }
@@ -287,10 +297,31 @@
 .archive-menu-profile:not([hidden]) { margin: 12px 0 28px; }
 .archive-menu.has-profile .archive-menu-profile { max-height: min(65dvh, 800px); opacity: 1; overflow-y: auto; }
 .archive-profile-info { overflow-wrap: anywhere; }
-.archive-profile-heading {
-  margin: 0 0 .55em;
-  color: var(--archive-profile-accent, #fa2b5a);
-  font: 700 1.2em/1.1 "QDP Fraunces", Georgia, serif;
+.archive-artist-drawer {
+  box-sizing: border-box;
+  width: var(--archive-portrait-width, 43.42cqw);
+  margin-left: var(--archive-portrait-left, 33.03cqw);
+  border: 2.5px solid var(--archive-profile-header-color, #fa2b5a);
+  border-top: 0;
+  border-radius: 0 0 var(--archive-portrait-radius, 5cqw) var(--archive-portrait-radius, 5cqw);
+  overflow: hidden;
+}
+.archive-artist-drawer .archive-artist-portrait {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: none;
+  margin: 0;
+}
+.archive-profile-summary {
+  flex-shrink: 0;
+  padding: 20px 12px 28px;
+  color: #fff1f4;
+  font: 400 clamp(14px, 2cqw, 17px)/1.6 Verdana, Geneva, sans-serif;
+}
+.archive-profile-summary .archive-profile-related .event-detail-related-bubble {
+  font-size: .9em;
 }
 .archive-profile-info p, .archive-profile-info address {
   margin: .65em 0 0;
@@ -567,24 +598,51 @@ a.event-card.archive-card { text-decoration: none; }
   #nextPoster { left: calc(100% + var(--qdp-arrow-gap)); right: auto; }
   .archive-menu {
     max-height: calc(100% - var(--qdp-arrow-bottom) - var(--qdp-arrow-height) - var(--qdp-menu-arrow-gap) - var(--archive-nav-top, 0px));
-    justify-content: flex-start;
+  }
+  .archive-menu.has-profile {
+    --archive-nav-width: min(var(--archive-nav-expanded-width, 228px), calc(var(--archive-nav-compact-width, 164px) + 24px));
   }
   .archive-menu > a, .archive-menu-heading { flex-shrink: 0; }
-  .archive-menu > .archive-menu-badge {
-    max-width: calc(100% + var(--archive-overlap, 64px) + 12px);
+  .archive-menu > .archive-menu-badge.has-profile-name {
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: visible;
   }
-  .archive-menu:not(.has-profile):has(> .archive-menu-badge[aria-current="page"]) {
-    --archive-feed-extension: 15.2px;
+  .archive-menu-badge.has-profile-name .archive-menu-badge-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 34.2px;
+    padding: 4.75px 11.4px 4.75px calc(var(--archive-menu-inset, 33px) + 11.4px);
+    border: var(--archive-tab-outline-width, 0px) solid #fff1f4;
+    border-left: 0;
+    border-radius: 0 14px 0 0;
+    background: var(--archive-tab-background, #fa2b5a);
   }
-  .archive-menu-profile {
-    width: calc(100% + var(--archive-overlap, 64px) - var(--archive-menu-inset, 33px));
-    min-height: 0;
-    /* Leave room for every tab; long profile content scrolls inside this slot. */
-    flex-shrink: 1;
-    scrollbar-width: none;
+  .archive-menu-profile-name {
+    position: relative;
+    display: block;
+    box-sizing: border-box;
+    align-self: flex-end;
+    width: calc(100% - var(--archive-menu-inset, 33px) - 32px);
+    margin-top: calc(0px - var(--archive-tab-outline-width, 0px));
+    padding: 5px 12px 7px;
+    border: var(--archive-tab-outline-width, 0px) solid #fff1f4;
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    background: var(--archive-tab-background, #fa2b5a);
+    color: var(--archive-tab-name-color, var(--qdp-plum-text, #2a1220));
+    font-size: .92em;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
   }
-  .archive-menu-profile:not([hidden]) {
-    margin-left: calc(var(--archive-menu-inset, 33px) - var(--archive-overlap, 64px));
+  .archive-menu-badge.has-profile-name[aria-current="page"]::after {
+    top: 10px;
   }
   .poster-controls > .mobile-back:not([hidden]) {
     bottom: 6.85%;

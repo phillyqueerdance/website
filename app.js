@@ -1462,7 +1462,8 @@ function openEventDetail(event, { updateHistory = true } = {}) {
   back.className = "event-detail-back";
   back.href = homepageUrl();
   back.textContent = `← Back to ${window.QDPArchive?.active
-    ? document.getElementById("archiveHeader")?.textContent || "Past Events"
+    ? window.QDPArchive.profile?.person?.name ||
+      document.getElementById("archiveHeader")?.textContent || "Past Events"
     : "Calendar"}`;
   back.addEventListener("click", click => {
     if (click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
