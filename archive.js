@@ -585,6 +585,19 @@
     drawer.style.setProperty("--archive-portrait-radius", style.borderTopLeftRadius);
   }
 
+  function updateArtistDrawerCorners() {
+    const drawer = archiveStack.querySelector(".archive-artist-drawer");
+    if (!drawer) return;
+    const box = drawer.getBoundingClientRect();
+    if (box.height <= 0) return;
+    const boundary = archiveHeader.getBoundingClientRect().bottom;
+    const radius = parseFloat(getComputedStyle(archiveHeader).borderTopLeftRadius) || 0;
+    // Match the calendar: stay rounded through the first half, then flatten.
+    const progress = Math.max(0, Math.min(1,
+      (boundary - (box.top + box.height / 2)) / (box.height / 2)));
+    drawer.style.setProperty("--archive-portrait-radius", `${radius * (1 - progress)}px`);
+  }
+
   function profileInfo(kind, person) {
     const info = node("section", "archive-profile-info");
     info.setAttribute("aria-label", `${kind[0].toUpperCase() + kind.slice(1)} information`);
@@ -969,6 +982,7 @@
     },
     updateControls() {
       if (!this.active || archiveStack.hidden) return;
+      updateArtistDrawerCorners();
       if (corners.length) {
         const radius = parseFloat(getComputedStyle(corners[0].card).borderBottomRightRadius) || 0;
         for (const { time, card } of corners) {
