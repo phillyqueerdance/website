@@ -9,11 +9,10 @@
 }
 .event-photo-position { font: 700 clamp(12px, 2.2cqw, 18px)/1.2 "QDP Fraunces", Georgia, serif; }
 .event-photo-carousel {
-  --event-photo-height: clamp(220px, 49cqw, 540px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: .5cqw 0;
-  width: min(100%, calc(var(--event-photo-height) * var(--event-photo-aspect, 1)));
+  width: 100%;
   margin-inline: auto;
 }
 .event-photo-slides { position: relative; grid-column: 1 / -1; width: 100%; aspect-ratio: var(--event-photo-aspect, 1); }
@@ -58,25 +57,26 @@
 .event-photo-previous { grid-column: 1; justify-self: start; }
 .event-photo-next { grid-column: 2; justify-self: end; }
 .event-photo-strip { min-width: 0; overflow: visible; }
-.event-photo-strip > summary { cursor: pointer; list-style: none; }
-.event-photo-strip > summary::-webkit-details-marker { display: none; }
+.event-photo-card { position: relative; }
 .event-photo-strip .event-card-content { padding-right: 12cqw; }
 .event-photo-toggle {
   position: absolute;
   z-index: 3;
   bottom: .45cqw;
   right: 1.2cqw;
+  border: 0;
   padding: .3cqw .75cqw;
   border-radius: 999px;
   background: #000;
   color: #fff1f4;
   font: 700 clamp(9px, 1.65cqw, 14px)/1.2 "QDP Fraunces", Georgia, serif;
-  pointer-events: none;
+  cursor: pointer;
 }
-.event-photo-strip .has-flags .event-photo-toggle { right: 10cqw; }
+.event-photo-card:has(.has-flags) .event-photo-toggle { right: 10cqw; }
+.event-photo-toggle:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
 .event-photo-toggle > span { display: inline-block; }
-.event-photo-strip[open] .event-photo-toggle > span { transform: rotate(180deg); }
-.event-photo-strip[open] > summary { border-bottom-right-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+.event-photo-strip.is-open .event-photo-toggle > span { transform: rotate(180deg); }
+.event-photo-strip.is-open .event-card { border-bottom-right-radius: 0 !important; border-bottom-left-radius: 0 !important; }
 .event-photo-dropdown {
   margin-left: calc(-1 * var(--event-photo-date-width, 0px));
   overflow: hidden;
@@ -88,8 +88,11 @@
 .event-photo-strip.explicit .event-photo-dropdown { border-color: var(--qdp-queer-card, #922185); border-top: 0; }
 .event-photo-strip .event-photos { margin: 0; padding: 2cqw; }
 .event-photo-strip .event-photos h3 { font-size: 2.5cqw; }
-.archive-profile-month .event-photo-strip { --event-photo-date-width: 8.1cqw; }
-.archive-event-day .event-photo-strip { --event-photo-date-width: calc(10.9cqw + var(--qdp-time-card-gap)); }
+.event-photo-dropdown[hidden] { display: none; }
+@media (min-width: 761px) {
+  .archive-profile-month .event-photo-strip { --event-photo-date-width: 8.1cqw; }
+  .archive-event-day .event-photo-strip { --event-photo-date-width: calc(10.9cqw + var(--qdp-time-card-gap)); }
+}
 .event-photo-go,
 .event-photo-go:any-link {
   display: flex;

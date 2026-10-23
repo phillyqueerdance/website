@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const start = app.indexOf('  const back = document.createElement("a");', app.indexOf('function openEventDetail('));
-const end = app.indexOf('  eventDetail.append(detailCard, back);', start);
+const end = app.indexOf('  detailCard.appendChild(back);', start);
 assert.ok(start > 0 && end > start);
 const source = app.slice(start, end) + '\nthis.back = back;';
 

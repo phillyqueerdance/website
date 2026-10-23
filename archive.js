@@ -1003,6 +1003,7 @@
       nextPoster.disabled = !groups.length || index === groups.length - 1;
     },
     updateLayout() {
+      if (!archiveBack.hidden && archiveStack.lastElementChild !== archiveBack) archiveStack.appendChild(archiveBack);
       fitPosterTitles(archiveStack);
       fitProfileHeaders();
       measureArtistDrawer();

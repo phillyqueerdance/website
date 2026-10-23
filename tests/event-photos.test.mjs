@@ -93,23 +93,23 @@ test('every event detail shows safe photos in order, with Drive conversion and l
   assert.match(html, /aria-label="Next photo"/);
 });
 
-test('photo strips expand on every profile type and retain the correct Go to event destination', () => {
+test('photo strips keep separate event links and photo buttons on every profile type', () => {
   for (const [kind, id] of [['artist', 'BRENT-001'], ['artist', 'CALLAIA-001'], ['venue', 'ROOM'], ['party', 'MELT-001'], ['collective', 'CREW']]) {
     const html = renderProfileEvents(kind, { id }, [event], 'https://photos.example');
-    assert.equal((html.match(/<details /g) || []).length, 1);
-    assert.match(html, /<summary class="event-card /);
-    assert.doesNotMatch(html.match(/<summary[^>]*>/)[0], /href=/);
+    assert.equal((html.match(/class="event-photo-toggle"/g) || []).length, 1);
+    assert.match(html, /<a class="event-card [^>]*href="https:\/\/photos.example\/\?archive=/);
+    assert.match(html, /<\/a><button type="button" class="event-photo-toggle" aria-expanded="false">/);
     assert.ok(html.includes(`class="event-photo-go" href="https://photos.example/?archive=${kind}&amp;id=${id}&amp;event=PHOTO-1">Go to event`));
     assert.match(html, /2 photos/);
-    assert.match(html, /event-photo-dropdown/);
+    assert.match(html, /class="event-photo-dropdown" hidden/);
   }
-  assert.doesNotMatch(renderProfileEvents('artist', { id: 'BRENT-001' }, [{ ...event, photoUrls: [] }], 'https://photos.example'), /<details/);
+  assert.doesNotMatch(renderProfileEvents('artist', { id: 'BRENT-001' }, [{ ...event, photoUrls: [] }], 'https://photos.example'), /event-photo-toggle/);
 });
 
 test('calendar strips use the same expanding gallery and ordinary events retain their direct links', () => {
-  assert.match(renderEventCard(event), /<details class="event-photo-strip/);
+  assert.match(renderEventCard(event), /<div class="event-photo-strip/);
   assert.match(renderEventCard(event), /class="event-photo-go" href="\/\?event=PHOTO-1"/);
-  assert.match(renderLivePoster([event], new Date('2026-09-19T12:00:00-04:00')).markup, /<details class="event-photo-strip/);
+  assert.match(renderLivePoster([event], new Date('2026-09-19T12:00:00-04:00')).markup, /<div class="event-photo-strip/);
   assert.match(renderEventCard({ ...event, photoUrls: [] }), /^<a class="event-card/);
 });
 
@@ -140,12 +140,14 @@ test('switching photos starts loading immediately and keeps the previous frame u
   assert.equal(frame.aspect, 1600 / 900);
 });
 
-test('browser Go to event opens the intended event and stops the click before the outside-click closer', () => {
+test('both the event strip and Go to event open the intended event without toggling the gallery', () => {
   const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
   const source = app.slice(app.indexOf('function createEventCard('), app.indexOf('\nfunction renderPoster('));
-  let handler, opened, templateMarkup;
-  const details = { querySelector: () => ({ addEventListener: (name, fn) => { handler = fn; } }) };
-  const template = { content: { firstElementChild: details }, set innerHTML(value) { templateMarkup = value; } };
+  let opened, templateMarkup;
+  const links = [{ handlers: {} }, { handlers: {} }];
+  links.forEach(link => { link.addEventListener = (name, fn) => { link.handlers[name] = fn; }; });
+  const strip = { querySelectorAll: () => links };
+  const template = { content: { firstElementChild: strip }, set innerHTML(value) { templateMarkup = value; } };
   const element = tag => tag === 'template' ? template : { className: '', dataset: {}, children: [],
     append(...children) { this.children.push(...children); }, appendChild(child) { this.children.push(child); },
     setAttribute() {}, addEventListener() {}, get outerHTML() { return `<a class="${this.className}" href="${this.href}"></a>`; } };
@@ -153,16 +155,54 @@ test('browser Go to event opens the intended event and stops the click before th
     eventIdOf: e => e.eventId, eventPermalink: id => `/?archive=party&id=MELT-001&event=${id}`,
     displayTitle: e => e.title, eventVenue: () => '', eventAddress: () => '', openEventDetail: e => { opened = e; } });
   vm.runInContext(source, context);
-  assert.equal(context.createEventCard(event), details);
+  assert.equal(context.createEventCard(event), strip);
   assert.match(templateMarkup, /archive=party&amp;id=MELT-001&amp;event=PHOTO-1/);
-  let prevented = false, stopped = false;
-  handler({ button: 0, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
-  assert.equal(opened, event);
-  assert.equal(prevented, true);
-  assert.equal(stopped, true);
-  opened = null;
-  handler({ button: 0, metaKey: true });
-  assert.equal(opened, null);
+  for (const link of links) {
+    let prevented = false, stopped = false;
+    link.handlers.click({ button: 0, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
+    assert.equal(opened, event);
+    assert.equal(prevented, true);
+    assert.equal(stopped, true);
+    opened = null;
+    link.handlers.click({ button: 0, metaKey: true });
+    assert.equal(opened, null);
+  }
+});
+
+test('only the photo button expands its gallery, closes another gallery, and collapses again', () => {
+  const handlers = new Map();
+  const makeStrip = open => {
+    const panel = { hidden: !open };
+    const button = { expanded: String(open), getAttribute() { return this.expanded; },
+      setAttribute(name, value) { this.expanded = value; }, closest: () => strip };
+    const strip = { open, classList: { remove() { strip.open = false; }, toggle(name, value) { strip.open = value; } },
+      querySelector: selector => selector === '.event-photo-toggle' ? button
+        : selector === '.event-photo-dropdown' ? panel : { querySelector: () => null } };
+    return { strip, button, panel };
+  };
+  const first = makeStrip(true), second = makeStrip(false);
+  const context = vm.createContext({ URL, Object, String, Array, Set,
+    document: { addEventListener: (name, handler) => handlers.set(name, handler),
+      querySelectorAll: selector => selector === '.event-photo-strip.is-open'
+        ? [first.strip, second.strip].filter(strip => strip.open) : [] } });
+  vm.runInContext(fs.readFileSync(new URL('../event-photos.js', import.meta.url), 'utf8'), context);
+  const click = handlers.get('click');
+  click({ target: { closest: () => null } });
+  assert.equal(first.strip.open, true);
+  assert.equal(second.strip.open, false);
+  const event = { target: { closest: selector => selector === 'button.event-photo-toggle' ? second.button : null },
+    preventDefault() {}, stopPropagation() {} };
+  click(event);
+  assert.equal(first.strip.open, false);
+  assert.equal(first.panel.hidden, true);
+  assert.equal(first.button.expanded, 'false');
+  assert.equal(second.strip.open, true);
+  assert.equal(second.panel.hidden, false);
+  assert.equal(second.button.expanded, 'true');
+  click(event);
+  assert.equal(second.strip.open, false);
+  assert.equal(second.panel.hidden, true);
+  assert.equal(second.button.expanded, 'false');
 });
 
 test('photo viewer moves through the gallery and Escape closes only the viewer and restores its trigger', () => {

@@ -30,10 +30,8 @@
   function strip(event, card, href) {
     const count = urls(event).length;
     if (!count) return card;
-    const indicator = `<span class="event-photo-toggle">${count} photo${count === 1 ? "" : "s"} <span aria-hidden="true">⌄</span></span>`;
-    const summary = card.replace(/^<a /, '<summary ').replace(/\shref="[^"]*"/, "")
-      .replace(/<\/a>$/, `${indicator}</summary>`);
-    return `<details class="event-photo-strip${event.explicitQueer ? " explicit" : " default"}" name="event-photos" data-event-id="${escape(event.eventId)}">${summary}<div class="event-photo-dropdown">${gallery(event)}<a class="event-photo-go" href="${escape(href)}">Go to event</a></div></details>`;
+    const indicator = `<button type="button" class="event-photo-toggle" aria-expanded="false">${count} photo${count === 1 ? "" : "s"} <span aria-hidden="true">⌄</span></button>`;
+    return `<div class="event-photo-strip${event.explicitQueer ? " explicit" : " default"}" data-event-id="${escape(event.eventId)}"><div class="event-photo-card">${card}${indicator}</div><div class="event-photo-dropdown" hidden>${gallery(event)}<a class="event-photo-go" href="${escape(href)}">Go to event</a></div></div>`;
   }
 
   function updatePhotoLayout() {
@@ -67,18 +65,6 @@
   globalThis.QDPEventPhotos = Object.freeze({ parse, urls, gallery, strip, moveGallery });
   if (typeof document === "undefined") return;
 
-  // Keep one event expanded, including browsers without native details grouping.
-  document.addEventListener("toggle", event => {
-    const details = event.target;
-    if (!details.matches?.(".event-photo-strip")) return;
-    if (details.open) {
-      activatePhoto(details.querySelector(".event-photo:not([hidden])"));
-      document.querySelectorAll(".event-photo-strip[open]").forEach(other => {
-        if (other !== details) other.open = false;
-      });
-    }
-    updatePhotoLayout();
-  }, true);
   // Reserve a frame while a new lazy image loads, then fit the frame to the photo.
   document.addEventListener("load", event => {
     if (event.target.matches?.(".event-photo img")) sizePhoto(event.target);
@@ -166,6 +152,25 @@
   }, { capture: true, passive: true });
   document.addEventListener("touchcancel", () => { swipe = null; }, { passive: true });
   document.addEventListener("click", event => {
+    const toggle = event.target.closest?.("button.event-photo-toggle");
+    if (toggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      const strip = toggle.closest(".event-photo-strip");
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      document.querySelectorAll(".event-photo-strip.is-open").forEach(other => {
+        if (other === strip) return;
+        other.classList.remove("is-open");
+        other.querySelector(".event-photo-toggle").setAttribute("aria-expanded", "false");
+        other.querySelector(".event-photo-dropdown").hidden = true;
+      });
+      strip.classList.toggle("is-open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+      strip.querySelector(".event-photo-dropdown").hidden = !open;
+      if (open) activatePhoto(strip.querySelector(".event-photo:not([hidden])"));
+      updatePhotoLayout();
+      return;
+    }
     const arrow = event.target.closest?.("button[data-photo-direction]");
     if (arrow) {
       event.preventDefault();

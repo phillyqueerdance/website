@@ -46,7 +46,8 @@ export function renderEventDetail(event, requestUrl) {
         <div class="event-detail-actions"><a href="${escape(calendarUrl(event, url.origin))}" target="_blank" rel="noopener noreferrer" aria-label="Add to Google Calendar"><img class="event-detail-action-icon" src="/icons8-ios-calendar-48.png" alt=""></a></div></div>
       ${globalThis.QDPEventPhotos.gallery(event)}
       ${related ? `<section class="event-detail-see-more" aria-label="See More"><h3>See More</h3><div class="event-detail-see-more-links">${related}</div></section>` : ""}
-    </article><a class="event-detail-back" href="${escape(back.href)}">← Back</a>`;
+      <a class="event-detail-back" href="${escape(back.href)}">← Back</a>
+    </article>`;
 }
 
 export function renderEventPage(context, page, result, id) {
@@ -62,7 +63,7 @@ export function renderEventPage(context, page, result, id) {
     } })
     .on("#dateButton, #datePopover, #archiveViewport, #todayButton, .frame", { element(element) { element.setAttribute("inert", ""); } })
     .on("#mobileBack", { element(element) {
-      element.removeAttribute("hidden");
+      element.setAttribute("hidden", "");
       element.setAttribute("href", back.href);
       element.setInnerContent("← Back");
     } })

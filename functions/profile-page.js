@@ -93,12 +93,13 @@ export function renderProfilePage(context, page, result, kind, id) {
     : `<p class="event-feed-message">${escape(result.error)}</p>`;
   const directory = meta.kinds[kind];
   const label = directory[0].toUpperCase() + directory.slice(1);
+  const footer = `<a class="archive-return" href="${escape(new URL(`/?archive=${directory}`, base).href)}" data-archive-link>← Back to ${escape(label)}</a>`;
   let rewriter = new HTMLRewriter()
     .on("html", { element(element) { element.setAttribute("class", `${element.getAttribute("class") || ""} archive-open${profile ? " discover-open" : ""}`.trim()); } })
     .on("body", { element(element) { element.setAttribute("class", `${element.getAttribute("class") || ""} archive-mode${profile ? " discover-open" : ""}`.trim()); } })
     .on("#archiveViewport", { element(element) { element.removeAttribute("hidden"); } })
     .on("#archivePage", { element(element) { element.setAttribute("class", `archive-page is-open${meta.isQueer(kind, profile) ? " is-queer-profile" : ""}`); } })
-    .on("#archiveStack", { element(element) { element.setAttribute("class", "event-stack archive-stack profile-events"); element.setInnerContent(markup, { html: true }); } })
+    .on("#archiveStack", { element(element) { element.setAttribute("class", "event-stack archive-stack profile-events"); element.setInnerContent(markup + footer, { html: true }); } })
     .on("#archiveHeader", { element(element) { element.setAttribute("aria-label", profile?.name || label); element.setInnerContent(profile?.name || label); } })
     .on("#archiveBack", { element(element) { element.removeAttribute("hidden"); element.setAttribute("href", new URL(`/?archive=${directory}`, base).href); element.setInnerContent(`← Back to ${label}`); } })
     .on("#qdpInitialArchive", { element(element) { element.setInnerContent(globalThis.QDPEventMetadata.serialize({ kind, id, ...result })); } });
