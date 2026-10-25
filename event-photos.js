@@ -30,7 +30,8 @@
   function strip(event, card, href) {
     const count = urls(event).length;
     if (!count) return card;
-    const indicator = `<button type="button" class="event-photo-toggle" aria-expanded="false">${count} photo${count === 1 ? "" : "s"} <span aria-hidden="true">⌄</span></button>`;
+    const label = `Photos from ${globalThis.QDPEventMetadata.cleanTitle(event)}`;
+    const indicator = `<button type="button" class="event-photo-toggle" aria-expanded="false" aria-label="${escape(label)}" title="Photos"><svg class="event-photo-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6 9.5 3.5h5L16 6h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13.5" r="4"/></svg><svg class="event-photo-chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m3 4.5 3 3 3-3"/></svg></button>`;
     return `<div class="event-photo-strip${event.explicitQueer ? " explicit" : " default"}" data-event-id="${escape(event.eventId)}"><div class="event-photo-card">${card}${indicator}</div><div class="event-photo-dropdown" hidden>${gallery(event)}<a class="event-photo-go" href="${escape(href)}">Go to event</a></div></div>`;
   }
 
@@ -189,3 +190,4 @@
     viewer.showModal();
   });
 })();
+

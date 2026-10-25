@@ -98,9 +98,9 @@ test('photo strips keep separate event links and photo buttons on every profile 
     const html = renderProfileEvents(kind, { id }, [event], 'https://photos.example');
     assert.equal((html.match(/class="event-photo-toggle"/g) || []).length, 1);
     assert.match(html, /<a class="event-card [^>]*href="https:\/\/photos.example\/\?archive=/);
-    assert.match(html, /<\/a><button type="button" class="event-photo-toggle" aria-expanded="false">/);
+    assert.match(html, /<\/a><button type="button" class="event-photo-toggle" aria-expanded="false" aria-label="Photos from /);
     assert.ok(html.includes(`class="event-photo-go" href="https://photos.example/?archive=${kind}&amp;id=${id}&amp;event=PHOTO-1">Go to event`));
-    assert.match(html, /2 photos/);
+    assert.match(html, /class="event-photo-position" aria-live="polite">1 \/ 2/);
     assert.match(html, /class="event-photo-dropdown" hidden/);
   }
   assert.doesNotMatch(renderProfileEvents('artist', { id: 'BRENT-001' }, [{ ...event, photoUrls: [] }], 'https://photos.example'), /event-photo-toggle/);
@@ -236,3 +236,4 @@ test('photo viewer moves through the gallery and Escape closes only the viewer a
   assert.equal(stopped, 1);
   assert.equal(prevented, 2);
 });
+

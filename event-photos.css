@@ -60,12 +60,17 @@
 .event-photo-card { position: relative; }
 .event-photo-strip .event-card-content { padding-right: 12cqw; }
 .event-photo-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   position: absolute;
   z-index: 3;
   bottom: .45cqw;
   right: 1.2cqw;
   border: 0;
-  padding: .3cqw .75cqw;
+  min-height: 24px;
+  padding: 2px 6px;
   border-radius: 999px;
   background: #000;
   color: #fff1f4;
@@ -74,8 +79,9 @@
 }
 .event-photo-card:has(.has-flags) .event-photo-toggle { right: 10cqw; }
 .event-photo-toggle:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
-.event-photo-toggle > span { display: inline-block; }
-.event-photo-strip.is-open .event-photo-toggle > span { transform: rotate(180deg); }
+.event-photo-camera { display: block; width: clamp(16px, 2.4cqw, 20px); height: auto; }
+.event-photo-chevron { display: block; width: 8px; height: 8px; }
+.event-photo-strip.is-open .event-photo-chevron { transform: rotate(180deg); }
 .event-photo-strip.is-open .event-card { border-bottom-right-radius: 0 !important; border-bottom-left-radius: 0 !important; }
 .event-photo-dropdown {
   margin-left: calc(-1 * var(--event-photo-date-width, 0px));
@@ -132,3 +138,4 @@
 .event-photo-close { position: absolute; top: 6px; right: 8px; }
 .event-photo-controls { position: absolute; bottom: 6px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 20px; font: 16px/1 Verdana, sans-serif; }
 .event-photo-controls [hidden] { display: none; }
+
