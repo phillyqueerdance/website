@@ -60,6 +60,8 @@
 .event-photo-card { position: relative; }
 .event-photo-strip .event-card-content { padding-right: 12cqw; }
 .event-photo-toggle {
+  transform: scale(.85);
+  transform-origin: bottom right;
   display: inline-flex;
   align-items: center;
   justify-content: center;
