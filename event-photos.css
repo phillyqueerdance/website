@@ -58,6 +58,11 @@
 .event-photo-next { grid-column: 2; justify-self: end; }
 
 @media (min-width: 761px) {
+  .event-detail:has(.event-photos) { padding-inline: 0; }
+  .event-detail:has(.event-photos) .event-detail-card {
+    padding-left: var(--qdp-detail-padding, 5.4cqw);
+    padding-right: calc(var(--qdp-detail-padding, 5.4cqw) + 1cqw);
+  }
   .event-detail .event-photo-carousel { position: relative; row-gap: 0; }
   .event-detail .event-photo-carousel > button {
     position: absolute;
@@ -66,8 +71,8 @@
     grid-column: auto;
     width: min(28px, calc(4cqw - 4px));
   }
-  .event-detail .event-photo-previous { left: -2cqw; transform: translate(-50%, -50%); }
-  .event-detail .event-photo-next { right: -2cqw; transform: translate(50%, -50%); }
+  .event-detail .event-photo-previous { left: calc(-2cqw - var(--event-photo-left-inset, 0px)); transform: translate(-50%, -50%); }
+  .event-detail .event-photo-next { right: calc(-2cqw - var(--event-photo-right-inset, 0px)); transform: translate(50%, -50%); }
 }
 .event-photo-strip { min-width: 0; overflow: visible; }
 .event-photo-card { position: relative; }

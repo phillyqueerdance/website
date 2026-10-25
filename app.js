@@ -1218,8 +1218,11 @@ function fitDetailContent() {
   if (!card) return;
 
   const cardStyle = getComputedStyle(card);
+  const leftPadding = parseFloat(cardStyle.paddingLeft) || 0;
   const rightPadding = parseFloat(cardStyle.paddingRight) || 0;
   const scrollbarWidth = card.offsetWidth - card.clientWidth;
+  card.style.setProperty("--event-photo-left-inset", `${leftPadding / 2}px`);
+  card.style.setProperty("--event-photo-right-inset", `${(rightPadding + scrollbarWidth) / 2}px`);
   const frame = poster.getBoundingClientRect();
   const detail = eventDetail.getBoundingClientRect();
   const frameOffset = (frame.left + frame.width / 2) -
@@ -1227,7 +1230,7 @@ function fitDetailContent() {
   // Center the actions against the frame, outside the reserved scrollbar gutter.
   card.style.setProperty(
     "--qdp-detail-action-offset",
-    `${(scrollbarWidth + rightPadding) / 2 + frameOffset}px`
+    `${(scrollbarWidth + rightPadding - leftPadding) / 2 + frameOffset}px`
   );
 
   const slot = card.querySelector(".event-detail-flyer-slot");
@@ -1237,7 +1240,7 @@ function fitDetailContent() {
   const slotStyle = getComputedStyle(slot);
   const topMargin = parseFloat(slotStyle.marginTop) || 0;
   const leftMargin = parseFloat(slotStyle.marginLeft) || 0;
-  slot.style.marginRight = `${Math.max(0, leftMargin - rightPadding - scrollbarWidth)}px`;
+  slot.style.marginRight = `${Math.max(0, leftMargin - rightPadding + leftPadding - scrollbarWidth)}px`;
   const availableHeight = card.clientHeight - topMargin - 2;
   const flyerHeight = availableHeight;
   flyer.style.maxHeight = `${Math.max(0, Math.floor(flyerHeight))}px`;
