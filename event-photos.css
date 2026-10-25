@@ -56,6 +56,19 @@
 .event-photo-carousel > button:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
 .event-photo-previous { grid-column: 1; justify-self: start; }
 .event-photo-next { grid-column: 2; justify-self: end; }
+
+@media (min-width: 761px) {
+  .event-detail .event-photo-carousel { position: relative; row-gap: 0; }
+  .event-detail .event-photo-carousel > button {
+    position: absolute;
+    top: 50%;
+    grid-row: auto;
+    grid-column: auto;
+    width: min(28px, calc(4cqw - 4px));
+  }
+  .event-detail .event-photo-previous { left: -2cqw; transform: translate(-50%, -50%); }
+  .event-detail .event-photo-next { right: -2cqw; transform: translate(50%, -50%); }
+}
 .event-photo-strip { min-width: 0; overflow: visible; }
 .event-photo-card { position: relative; }
 .event-photo-strip .event-card-content { padding-right: 12cqw; }
