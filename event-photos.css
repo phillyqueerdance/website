@@ -98,6 +98,9 @@
   cursor: pointer;
 }
 .event-photo-card:has(.has-flags) .event-photo-toggle { right: 10cqw; }
+@media (max-width: 760px) {
+  .event-photo-toggle { transform: scale(.64); }
+}
 .event-photo-toggle:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
 .event-photo-camera { display: block; width: clamp(16px, 2.4cqw, 20px); height: auto; }
 .event-photo-chevron { display: block; width: 8px; height: 8px; }
