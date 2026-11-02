@@ -95,8 +95,7 @@
   margin: 0 auto 4cqw;
 }
 .poster-info-page h2 { font-family: "QDP Fraunces", Georgia, serif; font-size: 5cqw; }
-.poster-info-page p { font-size: clamp(13px, 2.25cqw, 18px); }
-#aboutDialog p { font-size: clamp(16px, 2.8cqw, 22px); }
+.poster-info-page p { font-size: clamp(16px, 2.8cqw, 22px); }
 #aboutDialog h3 {
   margin: 1.4em 0 .6em;
   font: 700 clamp(18px, 3cqw, 24px)/1.25 "QDP Fraunces", Georgia, serif;

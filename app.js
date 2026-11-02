@@ -1969,9 +1969,12 @@ aboutLink.addEventListener("click", event => {
   event.preventDefault();
   infoView.show("about");
 });
-meltLink.addEventListener("click", event => {
-  event.preventDefault();
-  infoView.show("melt");
+[meltLink, document.getElementById("aboutMeltLink")].forEach(link => {
+  link.addEventListener("click", event => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    infoView.show("melt");
+  });
 });
 aboutCloseButton.addEventListener("click", () => infoView.close());
 meltCloseButton.addEventListener("click", () => infoView.close());
