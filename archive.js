@@ -33,7 +33,7 @@
     const profile = initial?.status === 200 && Object.hasOwn(profileViews, initial.kind) &&
         /^[\w-]{1,80}$/.test(initial.id) && initial.payload?.profile?.id === initial.id &&
         Array.isArray(initial.payload.events);
-    const directory = initial?.status === 200 && ["parties", "venues", "collectives"].includes(initial.kind) &&
+    const directory = initial?.status === 200 && ["artists", "parties", "venues", "collectives"].includes(initial.kind) &&
         Array.isArray(initial.payload?.[initial.kind]);
     if (profile || directory) {
       cache.set(endpoint(initial.kind, initial.id || ""), {

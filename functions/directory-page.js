@@ -9,10 +9,11 @@ const escape = value => String(value ?? "").replace(/[&<>"']/g, char =>
 const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
 
 // Match the existing directory's alphabet, ordering, and card treatments.
-function sortName(name) {
+function sortName(name, directory) {
   let key = String(name || "").trim().replace(/^\[(.*)\]$/s, "$1").trim();
   const full = key;
-  while (/^The\b[\s.:-]+/i.test(key)) key = key.replace(/^The\b[\s.:-]+/i, "").trim();
+  const prefix = directory === "artists" ? /^(?:DJ|The)\b[\s.:-]+/i : /^The\b[\s.:-]+/i;
+  while (prefix.test(key)) key = key.replace(prefix, "").trim();
   return key || full;
 }
 
@@ -25,7 +26,7 @@ function initial(name) {
 export function renderDirectory(directory, items, base) {
   const kind = meta.directories[directory].kind;
   const profiles = items.filter(item => meta.validId(item.id) && item.name).sort((a, b) => {
-    const aKey = sortName(a.name), bKey = sortName(b.name);
+    const aKey = sortName(a.name, directory), bKey = sortName(b.name, directory);
     return collator.compare(initial(aKey), initial(bKey)) || collator.compare(aKey, bKey);
   });
   if (!profiles.length) return `<p class="event-feed-message">No ${directory} in the archive yet.</p>`;
@@ -36,7 +37,7 @@ export function renderDirectory(directory, items, base) {
     rows = [];
   };
   for (const item of profiles) {
-    const next = initial(sortName(item.name));
+    const next = initial(sortName(item.name, directory));
     if (letter !== next) { flush(); letter = next; }
     const classification = meta.classification(kind, item);
     const classes = ["event-card", "default", "archive-card"];

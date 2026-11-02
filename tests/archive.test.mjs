@@ -52,6 +52,12 @@ const sheets = {
 };
 
 function appsScript(fixture = sheets) {
+  // Keep the upcoming fixture in the future regardless of when this test runs.
+  const fixtureNow = Date.parse('2026-10-01T12:00:00Z');
+  class FixtureDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [fixtureNow])); }
+    static now() { return fixtureNow; }
+  }
   const ss = { getSheetByName(name) {
     const rows = fixture[name];
     if (!rows) return null;
@@ -63,7 +69,7 @@ function appsScript(fixture = sheets) {
     };
   } };
   const context = vm.createContext({
-    Map, Set, Date, JSON, Object, Array, RegExp, String,
+    Map, Set, Date: FixtureDate, JSON, Object, Array, RegExp, String,
     CONFIG: { SHEET_ARTISTS: 'Artists', SHEET_VENUES: 'Venues',
       SHEET_PARTIES: 'Parties', SHEET_COLLECTIVES: 'Collectives', SHEET_EVENTS: 'Events' },
     ss_: () => ss,

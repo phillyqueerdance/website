@@ -6,7 +6,7 @@ export async function onRequestGet(context) {
   context = withKvScope(context);
   const meta = globalThis.QDPEventMetadata;
   const origin = context.env.QDP_CANONICAL_ORIGIN || meta.origin;
-  const key = new Request(new URL("/_qdp/sitemap-directories-v1", context.request.url));
+  const key = new Request(new URL("/_qdp/sitemap-directories-v2", context.request.url));
   const cache = typeof caches === "undefined" ? null : caches.default;
   const cached = freshResponse(await cache?.match(key), context);
   if (cached) return cached;

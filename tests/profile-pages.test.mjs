@@ -246,7 +246,8 @@ test('sitemap reads one manifest, includes all four canonical profile types, and
   context.env.QDP_CANONICAL_ORIGIN = 'https://canonical.example';
   const xml = await (await sitemap(context)).text();
   assert.equal(reads.length, 1);
-  assert.equal((xml.match(/<loc>/g) || []).length, 7); // Home, event, three profile kinds, and two public directories.
+  assert.equal((xml.match(/<loc>/g) || []).length, 8); // Home, event, three profile kinds, and three public directories.
+  assert.match(xml, /<loc>https:\/\/canonical.example\/\?archive=artists<\/loc>/);
   assert.match(xml, /<loc>https:\/\/canonical.example\/\?archive=venues<\/loc>/);
   assert.match(xml, /<loc>https:\/\/canonical.example\/\?archive=collectives<\/loc>/);
   assert.doesNotMatch(xml, /<loc>https:\/\/canonical.example\/\?archive=parties<\/loc>/);

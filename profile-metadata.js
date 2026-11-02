@@ -4,6 +4,8 @@
   const kinds = Object.freeze({ artist: "artists", venue: "venues", party: "parties", collective: "collectives" });
   const homeDescription = "Queer Philadelphia's guide to finding the next move. Discover queer dance parties, LGBTQ+ nightlife, DJs, artists, venues, and more!";
   const directories = Object.freeze({
+    artists: Object.freeze({ kind: "artist", title: "Queer Dance Philly | Artists",
+      description: "Discover DJs and artists across Philadelphia's dance music scene: upcoming sets, past appearances, and the parties and venues connecting them." }),
     parties: Object.freeze({ kind: "party", title: "Queer Dance Philly | Parties",
       description: "Discover queer dance parties in Philadelphia: when they're happening, who's playing them, and where they're going down." }),
     venues: Object.freeze({ kind: "venue", title: "Queer Dance Philly | Venues",

@@ -11,21 +11,22 @@ const archiveSource = fs.readFileSync(new URL('../archive.js', import.meta.url),
 const linksSource = fs.readFileSync(new URL('../event-linking.js', import.meta.url), 'utf8');
 const descriptions = {
   home: "Queer Philadelphia's guide to finding the next move. Discover queer dance parties, LGBTQ+ nightlife, DJs, artists, venues, and more!",
+  artists: "Discover DJs and artists across Philadelphia's dance music scene: upcoming sets, past appearances, and the parties and venues connecting them.",
   parties: "Discover queer dance parties in Philadelphia: when they're happening, who's playing them, and where they're going down.",
   venues: "Discover queer dance venues in Philadelphia: what's coming up, who's playing, and who's played before."
 };
-const titles = { parties: 'Queer Dance Philly | Parties', venues: 'Queer Dance Philly | Venues',
+const titles = { artists: 'Queer Dance Philly | Artists', parties: 'Queer Dance Philly | Parties', venues: 'Queer Dance Philly | Venues',
   collectives: 'Queer Dance Philly | Collectives' };
 const items = [
   { id: 'BETA-1', name: 'The Beta', publicOk: true, address: '123 Public St' },
-  { id: 'ALPHA-1', name: 'Alpha & Friends', publicOk: 'Yes', queerParty: true, queerVenue: true, queerCollective: true },
+  { id: 'ALPHA-1', name: 'Alpha & Friends', publicOk: 'Yes', queerArtist: true, queerParty: true, queerVenue: true, queerCollective: true },
   { id: 'PRIVATE', name: 'Private entry', publicOk: false },
   { id: '../BAD', name: 'Invalid entry', publicOk: true }
 ];
 
 function fixture(directory, { list = items, gate = true, preview = false } = {}) {
   const manifest = { schema: 1, revision: 'one', partyPublicGate: gate,
-    artists: [], parties: ['BETA-1', 'ALPHA-1'], venues: ['BETA-1', 'ALPHA-1'], collectives: ['BETA-1', 'ALPHA-1'] };
+    artists: ['BETA-1', 'ALPHA-1'], parties: ['BETA-1', 'ALPHA-1'], venues: ['BETA-1', 'ALPHA-1'], collectives: ['BETA-1', 'ALPHA-1'] };
   const reads = [];
   const context = {
     request: new Request(`https://preview.example/?archive=${directory}&noise=one`),
@@ -155,6 +156,17 @@ test('directory rendering matches alphabet rules, escapes fields, and preserves 
   assert.match(body, /archive-card melt archive-identity-card/);
   assert.match(body, /&lt;Bad &amp; Name&gt;/);
   assert.doesNotMatch(body, /<Bad/);
+
+  const artists = renderDirectory('artists', [
+    { id: 'ZEBRA', name: '[DJ The Zebra]', transArtist: true },
+    { id: 'ALPHA', name: 'DJ The Alpha', queerArtist: true },
+    { id: 'BETA', name: 'The Beta' }
+  ], 'https://preview.example');
+  assert.ok(artists.indexOf('DJ The Alpha') < artists.indexOf('The Beta'));
+  assert.ok(artists.indexOf('The Beta') < artists.indexOf('[DJ The Zebra]'));
+  for (const letter of ['A', 'B', 'Z']) assert.ok(artists.includes(`data-letter="${letter}"`));
+  assert.match(artists, /Trans artist\./);
+  assert.match(artists, /Queer artist\./);
 });
 
 test('embedded directory data hydrates without a second request; malformed data still uses the API', async () => {
