@@ -336,6 +336,7 @@
   overscroll-behavior: contain;
   touch-action: pan-y;
   scrollbar-width: thin;
+  scrollbar-color: #a1929a transparent;
   padding-inline-end: 4px;
   --qdp-card-height: 56px;
   --qdp-card-width: 100%;

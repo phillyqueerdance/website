@@ -252,8 +252,9 @@ function toggleRelationship(map, line, keyboard = false) {
   close.type = "button";
   close.setAttribute("aria-label", "Close relationship details");
   close.onclick = () => {
+    const control = map.activeLine?.control;
     closeRelationship(map);
-    line.control.focus();
+    control?.focus({ preventScroll: true });
   };
   heading.append(node("strong", "", line.source.item.name + " · " + line.target.item.name), close);
   const link = line.link;
@@ -553,7 +554,8 @@ function addVisibleConnections(map, scene) {
 }
 
 function renderMap(map, reflow = false) {
-  closeRelationship(map);
+  const previousLine = map.activeLine;
+  const restoreLineFocus = previousLine?.control === document.activeElement;
   const scene = map.scene;
   const network = scene ? buildNetwork(map, scene) : new Map();
   const bubbles = new Map();
@@ -569,6 +571,14 @@ function renderMap(map, reflow = false) {
   map.lines = [];
   map.edgeLayer.replaceChildren();
   if (scene) addVisibleConnections(map, scene);
+  if (previousLine) {
+    const currentLine = map.lines.find(line => line.key === previousLine.key && line.link === previousLine.link);
+    if (currentLine) {
+      map.activeLine = currentLine;
+      currentLine.control.setAttribute("aria-expanded", "true");
+      if (restoreLineFocus) currentLine.control.focus({ preventScroll: true });
+    } else closeRelationship(map);
+  }
   updateBubbles(map);
   layoutGraph(map, reflow);
   if (map.pendingScene && map.pendingScene !== scene) setMessage(map, "Loading " + map.pendingScene.origin.name + "…");
