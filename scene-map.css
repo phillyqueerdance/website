@@ -185,6 +185,7 @@
 .scene-map-node:hover circle, .scene-map-node:focus-visible circle { stroke: var(--scene-accent); stroke-width: 3; }
 .scene-map-caption { pointer-events: none; }
 .scene-map-caption-body {
+  container-type: size;
   display: grid;
   place-items: center;
   width: 100%;
@@ -200,6 +201,9 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+@container (min-height: 37px) {
+  .scene-map-caption-name { -webkit-line-clamp: 3; }
 }
 
 .scene-map-detail {
