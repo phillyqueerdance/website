@@ -25,16 +25,6 @@ export function connects(kindA, kindB) {
   return kindA !== kindB;
 }
 
-export function prominence(item) {
-  // Not popularity or a subjective "importance" score. Size reflects
-  // repeated appearances together, with a smaller contribution from
-  // each entity's documented overall activity in the public directory.
-  const shared = Math.max(0, Number(item.count) || 0);
-  const history = Math.max(0, Number(item.profileCount) || 0);
-  return Math.min(1, (Math.log2(shared + 1) * 0.75 +
-    Math.log2(history + 1) * 0.25) / 5.5);
-}
-
 export function connectionsFor(focus, events, known, now = Date.now()) {
   const found = new Map();
   const seenEvents = new Set();
@@ -49,7 +39,7 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
       if (!connects(focus.kind, target.kind)) continue;
       let link = found.get(member);
       if (!link) {
-        link = { ...target, key: member, profileCount: target.count, count: 0, upcoming: 0,
+        link = { ...target, key: member, count: 0, upcoming: 0,
           recent: 0, examples: [] };
         found.set(member, link);
       }

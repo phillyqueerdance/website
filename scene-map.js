@@ -1,14 +1,44 @@
-import {DIRECTORY_FOR,KINDS,keyOf,connectionsFor,pickConnections,upcomingFor,relationshipText,prominence} from "./scene-map-graph.js?v=20261110-scene-map-3";
-const NS="http://www.w3.org/2000/svg";
-const colors={artist:"#fa2b5a",party:"#922185",venue:"#ff7945",collective:"#000"};
-const labels={artist:"Artist",party:"Party",venue:"Venue",collective:"Collective"};
-const known=new Map(), cache=new Map();
-const node=(tag,cls="",value="")=>{const e=document.createElement(tag);e.className=cls;e.textContent=value;return e;};
-const el=(tag,attrs={},value="")=>{const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);e.textContent=value;return e;};
-const key=item=>keyOf(item.kind,item.id);
-const short=(str,max=19)=>str.length>max?str.slice(0,max-1)+"…":str;
-const qdpUrl=(item,event=false)=>{const u=new URL("/",location.origin);if(event)u.searchParams.set("event",item.eventId||item.id);else{u.searchParams.set("archive",item.kind);u.searchParams.set("id",item.id);}return u.href;};
-async function resource(kind,id){const u=new URL("/api/archive",location.origin);u.searchParams.set("resource",kind);if(id)u.searchParams.set("id",id);const r=await fetch(u,{cache:"no-cache"});if(!r.ok)throw Error("Public archive unavailable ("+r.status+")");return r.json();}
+import { DIRECTORY_FOR, KINDS, keyOf, connectionsFor, pickConnections, upcomingFor,
+  relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-4";
+
+const NS = "http://www.w3.org/2000/svg";
+const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };
+const known = new Map(), cache = new Map();
+
+function node(tag, className = "", value = "") {
+  const element = document.createElement(tag);
+  element.className = className;
+  element.textContent = value;
+  return element;
+}
+
+function svgNode(tag, attributes = {}, value = "") {
+  const element = document.createElementNS(NS, tag);
+  for (const [key, attributeValue] of Object.entries(attributes)) element.setAttribute(key, attributeValue);
+  element.textContent = value;
+  return element;
+}
+
+function qdpUrl(item, event = false) {
+  const url = new URL("/", location.origin);
+  if (event) {
+    url.searchParams.set("event", item.eventId || item.id);
+  } else {
+    url.searchParams.set("archive", item.kind);
+    url.searchParams.set("id", item.id);
+  }
+  return url.href;
+}
+
+async function resource(kind, id) {
+  const url = new URL("/api/archive", location.origin);
+  url.searchParams.set("resource", kind);
+  if (id) url.searchParams.set("id", id);
+  const response = await fetch(url, { cache: "no-cache" });
+  if (!response.ok) throw new Error("Public archive unavailable (" + response.status + ")");
+  return response.json();
+}
+
 async function loadDirectories() {
   if (known.size) return;
   const results = await Promise.allSettled(KINDS.map(async kind => {
@@ -25,80 +55,330 @@ async function loadDirectories() {
     console.warn("A QDP directory was unavailable");
   }
 }
-async function profile(item){const k=key(item);if(!cache.has(k))cache.set(k,resource(item.kind,item.id).then(d=>{if(!d.profile||!Array.isArray(d.events))throw Error("Invalid profile");return d;}).catch(e=>{cache.delete(k);throw e;}));return cache.get(k);}
-function anchor(text,url){const a=node("a","scene-map-link",text);a.href=url;a.dataset.archiveLink="";return a;}
-function details(c,item,edge=null){
- c.info.replaceChildren();
- const h=node("div","scene-map-detail-heading");
- h.append(node("strong","",item.name),node("small","",labels[item.kind]));c.info.append(h);
- if(edge){c.info.append(node("p","scene-map-note",relationshipText(c.focus,edge)));
-  for(const e of edge.examples.slice(0,2))c.info.append(anchor(e.title,qdpUrl({id:e.id},true)));
-  const explore=node("button","scene-map-explore","Explore "+item.name);
-  explore.onclick=()=>visit(c,item);c.info.append(explore);
- }else{
-  const upcoming=upcomingFor(item,c.events,Date.now(),2);
-  for(const e of upcoming)c.info.append(anchor("Upcoming: "+e.title,qdpUrl(e,true)));
-  if(!upcoming.length)c.info.append(node("p","scene-map-note","No upcoming events listed here."));
- }
- c.info.append(anchor("View QDP profile",qdpUrl(item)));
+
+function profile(item) {
+  if (!cache.has(item.key)) {
+    cache.set(item.key, resource(item.kind, item.id).then(data => {
+      if (!data.profile || !Array.isArray(data.events)) throw new Error("Invalid profile");
+      return data;
+    }).catch(error => {
+      cache.delete(item.key);
+      throw error;
+    }));
+  }
+  return cache.get(item.key);
 }
-function draw(c){
- c.svg.replaceChildren();c.empty.hidden=!!c.focus;if(!c.focus)return;
- const filtered=c.links.filter(x=>c.allowed.has(x.kind));
- const links=pickConnections(filtered,9,c.path.at(-2)?key(c.path.at(-2)):"");
- const group=el("g",{transform:"translate("+c.dx+" "+c.dy+") scale("+c.scale+")"});c.svg.append(group);
- const cx=250,cy=205,dist=145;
- const coords=links.map((x,i)=>({...x,x:cx+Math.cos(2*Math.PI*i/links.length-Math.PI/2)*dist,y:cy+Math.sin(2*Math.PI*i/links.length-Math.PI/2)*dist}));
- for(const x of coords)group.append(el("line",{x1:cx,y1:cy,x2:x.x,y2:x.y,class:"scene-map-edge","stroke-width":1+Math.min(4,Math.log2(x.count+1))}));
- function circle(item,center){
-   const g=el("g",{class:"scene-map-node"+(center?" focus":""),transform:"translate("+item.x+" "+item.y+")",role:"button",tabindex:"0","aria-label":"Explore "+item.name});
-   const r=center?38:16+prominence(item)*18;
-   g.append(el("circle",{r,fill:colors[item.kind],stroke:item.kind==="collective"?"#fff1f4":"none","stroke-width":2.5}));
-   g.append(el("text",{y:r+12,class:"scene-map-label"},short(item.name)));
-   g.append(el("text",{y:r+24,class:"scene-map-kind"},labels[item.kind]+(center?"":" · "+item.count)));
-   g.addEventListener("click",()=>center?details(c,item):visit(c,item));
-   g.addEventListener("pointerenter",()=>{if(!center)details(c,item,item);});
-   g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();if(!center)visit(c,item);}});
-   group.append(g);
- }
- coords.forEach(x=>circle(x,false));circle({...c.focus,x:cx,y:cy},true);
- c.status.textContent=links.length+" connections shown · weighted by shared documented events";
+
+function isQueer(item) {
+  return window.QDPProfileMetadata.isQueer(item.kind, item) ||
+    (item.kind === "artist" && item.transArtist === true);
 }
-function historyPath(c){
- c.crumbs.replaceChildren();c.path.forEach((p,i)=>{if(i)c.crumbs.append(node("span","","›"));const b=node("button","",short(p.name,12));b.onclick=()=>{c.path=c.path.slice(0,i);visit(c,p);};c.crumbs.append(b);});
+
+function matchesQueerFilter(map, item) {
+  return !map.queerOnly || isQueer(item);
 }
-async function visit(c,item){
- if(c.busy)return;c.busy=true;c.status.textContent="Loading "+item.name+"…";
- try{const d=await profile(item);if(!c.root.isConnected)return;c.focus=item;c.events=d.events;
-  c.links=connectionsFor(item,d.events,known);
-  if(c.path.at(-1)?.id!==item.id||c.path.at(-1)?.kind!==item.kind)c.path.push(item);
-  historyPath(c);draw(c);details(c,item);
- }catch(e){if(c.root.isConnected)c.status.textContent=e.message;}finally{c.busy=false;}
+
+function visibleConnection(map, item) {
+  return map.allowed.has(item.kind) && matchesQueerFilter(map, item);
 }
-function search(c){
- const q=c.search.value.toLocaleLowerCase().trim();c.results.replaceChildren();if(!q)return;
- const found=[...known.values()].filter(x=>x.name.toLocaleLowerCase().includes(q)).sort((a,b)=>{const rank=x=>x.name.toLocaleLowerCase().startsWith(q)?0:1;return rank(a)-rank(b)||a.name.localeCompare(b.name);}).slice(0,7);
- if(!found.length)c.results.append(node("p","scene-map-note","No matching profiles."));
- found.forEach(item=>{const b=node("button","scene-map-result",item.name+" · "+labels[item.kind]);b.onclick=()=>{c.search.value="";c.results.replaceChildren();visit(c,item);};c.results.append(b);});
+
+function typePill(kind) {
+  const pill = node("span", "scene-map-pill", labels[kind]);
+  pill.dataset.kind = kind;
+  return pill;
 }
-export async function mountSceneMap(host){
- const root=node("section","scene-map-view");
- const top=node("div","scene-map-top");const input=node("input","scene-map-search");input.type="search";input.placeholder="Search the scene…";input.setAttribute("aria-label","Search artists, parties, venues and collectives");
- const results=node("div","scene-map-results");const filters=node("div","scene-map-filters");top.append(input,results,filters);
- for(const k of KINDS){const label=node("label","scene-map-filter");label.dataset.kind=k;const cb=node("input");cb.type="checkbox";cb.value=k;cb.checked=true;label.append(cb,node("span","",labels[k]+"s"));filters.append(label);}
- const crumbs=node("nav","scene-map-path");crumbs.setAttribute("aria-label","Exploration path");
- const wrap=node("div","scene-map-canvas-wrap"),canvas=el("svg",{class:"scene-map-canvas",viewBox:"0 0 500 420",role:"group","aria-label":"Scene connections"});
- const empty=node("p","scene-map-empty","Search for something you know to begin.");wrap.append(canvas,empty);
- const info=node("div","scene-map-detail"),status=node("p","scene-map-status","Loading public QDP directory…");status.setAttribute("role","status");
- root.append(top,crumbs,wrap,info,status);host.replaceChildren(root);
- const c={root,svg:canvas,info,status,empty,crumbs,search:input,results,focus:null,events:[],links:[],path:[],allowed:new Set(KINDS),dx:0,dy:0,scale:1,busy:false};
- input.addEventListener("input",()=>search(c));
- filters.addEventListener("change",()=>{c.allowed=new Set([...filters.querySelectorAll("input:checked")].map(x=>x.value));draw(c);});
- let pan=null;
- wrap.addEventListener("pointerdown",e=>{if(e.target.closest(".scene-map-node"))return;pan={x:e.clientX,y:e.clientY,dx:c.dx,dy:c.dy};wrap.setPointerCapture(e.pointerId);});
- wrap.addEventListener("pointermove",e=>{if(!pan)return;const r=canvas.getBoundingClientRect();c.dx=pan.dx+(e.clientX-pan.x)*500/r.width;c.dy=pan.dy+(e.clientY-pan.y)*420/r.height;draw(c);});
- wrap.addEventListener("pointerup",()=>pan=null);wrap.addEventListener("pointercancel",()=>pan=null);
- try{await loadDirectories();if(!root.isConnected)return;status.textContent="Choose a starting point · "+known.size+" public profiles";
-  const focus=new URL(location.href).searchParams.get("focus");if(focus&&known.has(focus))await visit(c,known.get(focus));
- }catch(e){if(root.isConnected)status.textContent=e.message;}
+
+function anchor(text, url) {
+  const link = node("a", "scene-map-link", text);
+  link.href = url;
+  link.dataset.archiveLink = "";
+  return link;
+}
+
+function setMessage(map, text) {
+  map.message.textContent = text;
+  map.message.hidden = !text;
+}
+
+function closeDetails(map) {
+  map.info.hidden = true;
+  map.svg.querySelector(".scene-map-node.focus")?.setAttribute("aria-expanded", "false");
+}
+
+function toggleDetails(map, item, bubble) {
+  if (!map.info.hidden) {
+    closeDetails(map);
+    return;
+  }
+  const heading = node("div", "scene-map-detail-heading");
+  const close = node("button", "scene-map-close", "×");
+  close.type = "button";
+  close.setAttribute("aria-label", "Close profile details");
+  close.onclick = () => {
+    closeDetails(map);
+    map.svg.querySelector(".scene-map-node.focus")?.focus();
+  };
+  heading.append(node("strong", "", item.name), typePill(item.kind), close);
+  map.info.replaceChildren(heading);
+
+  const edge = map.links.find(link => link.key === map.path.at(-2)?.key);
+  if (edge) {
+    map.info.append(node("p", "scene-map-note", edge.name + " · " + relationshipText(item, edge)));
+    for (const event of edge.examples.slice(0, 2)) {
+      map.info.append(anchor(event.title, qdpUrl({ id: event.id }, true)));
+    }
+  }
+  const upcoming = upcomingFor(item, map.events, Date.now(), 2);
+  for (const event of upcoming) map.info.append(anchor("Upcoming: " + event.title, qdpUrl(event, true)));
+  if (!upcoming.length) map.info.append(node("p", "scene-map-note", "No upcoming events listed here."));
+  map.info.append(anchor("View QDP profile", qdpUrl(item)));
+  map.info.hidden = false;
+  bubble.setAttribute("aria-expanded", "true");
+}
+
+function drawBubble(map, item, x, y, radius, selected = false) {
+  const countText = selected ? "" : item.count + (item.count === 1 ? " shared event" : " shared events");
+  const bubble = svgNode("g", {
+    class: "scene-map-node" + (selected ? " focus" : ""),
+    "data-kind": item.kind,
+    transform: "translate(" + x + " " + y + ")",
+    role: "button",
+    tabindex: "0",
+    "aria-label": (selected ? "Details for " : "Explore ") + item.name
+  });
+  if (selected) bubble.setAttribute("aria-expanded", String(!map.info.hidden));
+  else bubble.setAttribute("aria-description", countText);
+  bubble.append(svgNode("title", {}, [item.name, labels[item.kind], countText].filter(Boolean).join(" · ")));
+  bubble.append(svgNode("circle", { r: radius }));
+
+  const caption = svgNode("foreignObject", {
+    class: "scene-map-caption", "aria-hidden": "true",
+    x: -radius * .88, y: -radius * .68, width: radius * 1.76, height: radius * 1.36
+  });
+  const captionBody = node("div", "scene-map-caption-body");
+  captionBody.style.fontSize = Math.max(11, Math.min(25, radius * .39)) + "px";
+  captionBody.append(node("span", "scene-map-caption-name", item.name));
+  caption.append(captionBody);
+  bubble.append(caption);
+
+  const activate = () => selected ? toggleDetails(map, item, bubble) : visit(map, item);
+  bubble.addEventListener("click", activate);
+  bubble.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      activate();
+    }
+  });
+  map.graph.append(bubble);
+}
+
+function draw(map) {
+  map.svg.replaceChildren();
+  map.graph = null;
+  const width = map.wrap.clientWidth, height = map.wrap.clientHeight;
+  if (!map.focus || !width || !height) return;
+
+  map.svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  map.graph = svgNode("g", { transform: "translate(" + map.dx + " " + map.dy + ")" });
+  map.svg.append(map.graph);
+
+  const eligible = map.links.filter(item => visibleConnection(map, item));
+  const links = pickConnections(eligible, 9, map.path.at(-2)?.key);
+  const shortSide = Math.min(width, height);
+  const centerX = width / 2, centerY = height / 2;
+  const minRadius = shortSide * .075;
+  const maxRadius = shortSide * (links.length > 6 ? .112 : .136);
+  const maxCount = Math.max(4, ...links.map(item => item.count));
+  const padding = Math.min(8, shortSide * .02);
+  const arcX = centerX - maxRadius - padding, arcY = centerY - maxRadius - padding;
+  const startAngle = links.length < 3 && width >= height ? 0 : -Math.PI / 2;
+  const points = links.map((item, index) => {
+    const angle = startAngle + (2 * Math.PI * index) / links.length;
+    // Keep the size differences between the first few counts easy to see
+    // while allowing a heavily repeated relationship to fit in the frame.
+    const strength = Math.log(item.count) / Math.log(maxCount);
+    return {
+      item, strength,
+      x: centerX + Math.cos(angle) * arcX,
+      y: centerY + Math.sin(angle) * arcY,
+      radius: minRadius + (maxRadius - minRadius) * strength
+    };
+  });
+  for (const point of points) {
+    map.graph.append(svgNode("line", {
+      x1: centerX, y1: centerY, x2: point.x, y2: point.y,
+      class: "scene-map-edge", "stroke-width": 2 + point.strength * 4
+    }));
+  }
+  for (const point of points) drawBubble(map, point.item, point.x, point.y, point.radius);
+  drawBubble(map, map.focus, centerX, centerY, shortSide * .16, true);
+}
+
+function renderMap(map) {
+  draw(map);
+  if (!map.focus) {
+    setMessage(map, "Search for something you know to begin.");
+    return;
+  }
+  setMessage(map, map.links.some(item => visibleConnection(map, item)) ? "" : "No connections match these filters.");
+}
+
+function historyPath(map) {
+  map.crumbs.replaceChildren();
+  map.path.forEach((item, index) => {
+    if (index) map.crumbs.append(node("span", "", "›"));
+    const button = node("button", "", item.name);
+    button.type = "button";
+    button.onclick = () => visit(map, item, index);
+    map.crumbs.append(button);
+  });
+  map.crumbs.hidden = !map.path.length;
+}
+
+async function visit(map, item, pathIndex) {
+  if (map.busy || !matchesQueerFilter(map, item)) return;
+  map.busy = true;
+  closeDetails(map);
+  setMessage(map, "Loading " + item.name + "…");
+  try {
+    const data = await profile(item);
+    if (!map.root.isConnected || !matchesQueerFilter(map, item)) return;
+    map.focus = item;
+    map.events = data.events;
+    map.links = connectionsFor(item, data.events, known);
+    map.dx = map.dy = 0;
+    const previousIndex = pathIndex === undefined ? -1 : map.path.lastIndexOf(item, pathIndex);
+    if (previousIndex >= 0) map.path = map.path.slice(0, previousIndex + 1);
+    if (map.path.at(-1)?.key !== item.key) map.path.push(item);
+    historyPath(map);
+    renderMap(map);
+  } catch (error) {
+    if (map.root.isConnected && matchesQueerFilter(map, item)) setMessage(map, error.message);
+  } finally {
+    map.busy = false;
+  }
+}
+
+function search(map) {
+  const query = map.search.value.toLocaleLowerCase().trim();
+  map.results.replaceChildren();
+  if (!query || map.search.disabled) return;
+  const rank = item => item.name.toLocaleLowerCase().startsWith(query) ? 0 : 1;
+  const found = [...known.values()].filter(item =>
+    matchesQueerFilter(map, item) && item.name.toLocaleLowerCase().includes(query))
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name)).slice(0, 7);
+
+  if (!found.length) map.results.append(node("p", "scene-map-note", "No matching profiles."));
+  for (const item of found) {
+    const button = node("button", "scene-map-result");
+    button.type = "button";
+    button.append(node("span", "scene-map-result-name", item.name), typePill(item.kind));
+    button.onclick = () => {
+      map.search.value = "";
+      map.results.replaceChildren();
+      visit(map, item);
+    };
+    map.results.append(button);
+  }
+}
+
+function checkbox(text, value, checked) {
+  const label = node("label", "scene-map-filter");
+  const input = node("input");
+  input.type = "checkbox";
+  input.value = value;
+  input.checked = checked;
+  label.append(input, node("span", "", text));
+  return label;
+}
+
+function bindPan(map) {
+  let pan = null;
+  map.svg.addEventListener("pointerdown", event => {
+    if (!map.graph || event.button !== 0 || pan || event.target.closest(".scene-map-node")) return;
+    pan = { pointerId: event.pointerId, x: event.clientX - map.dx, y: event.clientY - map.dy };
+    map.svg.setPointerCapture(event.pointerId);
+  });
+  map.svg.addEventListener("pointermove", event => {
+    if (!pan || pan.pointerId !== event.pointerId || !map.graph) return;
+    const limitX = map.wrap.clientWidth * .4, limitY = map.wrap.clientHeight * .4;
+    map.dx = Math.max(-limitX, Math.min(limitX, event.clientX - pan.x));
+    map.dy = Math.max(-limitY, Math.min(limitY, event.clientY - pan.y));
+    map.graph.setAttribute("transform", "translate(" + map.dx + " " + map.dy + ")");
+  });
+  map.svg.addEventListener("lostpointercapture", () => { pan = null; });
+}
+
+export async function mountSceneMap(host) {
+  const root = node("section", "scene-map-view");
+  const top = node("div", "scene-map-top");
+  const input = node("input", "scene-map-search");
+  input.type = "search";
+  input.placeholder = "Search the scene…";
+  input.disabled = true;
+  input.setAttribute("aria-label", "Search artists, parties, venues and collectives");
+  const results = node("div", "scene-map-results");
+  const filters = node("div", "scene-map-filters");
+  top.append(input, filters, results);
+  for (const kind of KINDS) {
+    const directory = DIRECTORY_FOR[kind];
+    const label = checkbox(directory[0].toUpperCase() + directory.slice(1), kind, true);
+    label.dataset.kind = kind;
+    filters.append(label);
+  }
+  const queerLabel = checkbox("Queer only", "queer", false);
+  queerLabel.classList.add("scene-map-filter-queer");
+  filters.append(queerLabel);
+  const queerToggle = queerLabel.querySelector("input");
+  const crumbs = node("nav", "scene-map-path");
+  crumbs.setAttribute("aria-label", "Exploration path");
+  crumbs.hidden = true;
+  const wrap = node("div", "scene-map-canvas-wrap");
+  const svg = svgNode("svg", { class: "scene-map-canvas", role: "group", "aria-label": "Scene connections" });
+  const message = node("p", "scene-map-message", "Loading public QDP directory…");
+  message.setAttribute("role", "status");
+  const info = node("section", "scene-map-detail");
+  info.hidden = true;
+  info.setAttribute("aria-label", "Profile details");
+  wrap.append(svg, message, info);
+  root.append(top, crumbs, wrap);
+  host.replaceChildren(root);
+
+  const map = { root, wrap, svg, graph: null, info, message, crumbs, search: input, results,
+    focus: null, events: [], links: [], path: [], allowed: new Set(KINDS), queerOnly: false, dx: 0, dy: 0, busy: false };
+  input.addEventListener("input", () => search(map));
+  filters.addEventListener("change", () => {
+    map.allowed = new Set([...filters.querySelectorAll("label[data-kind] input:checked")].map(box => box.value));
+    map.queerOnly = queerToggle.checked;
+    if (map.queerOnly) {
+      map.path = map.path.filter(isQueer);
+      if (map.focus && !isQueer(map.focus)) {
+        map.focus = null;
+        map.events = [];
+        map.links = [];
+        map.path = [];
+      }
+    }
+    closeDetails(map);
+    historyPath(map);
+    search(map);
+    if (!input.disabled) renderMap(map);
+  });
+  bindPan(map);
+  const resize = new ResizeObserver(() => {
+    if (root.isConnected) draw(map);
+    else resize.disconnect();
+  });
+  resize.observe(wrap);
+
+  try {
+    await loadDirectories();
+    if (!root.isConnected) return;
+    input.disabled = false;
+    const focus = known.get(new URL(location.href).searchParams.get("focus"));
+    if (focus && matchesQueerFilter(map, focus)) await visit(map, focus);
+    else renderMap(map);
+  } catch (error) {
+    if (root.isConnected) setMessage(map, error.message);
+  }
 }
