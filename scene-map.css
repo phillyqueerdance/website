@@ -6,6 +6,46 @@
   scrollbar-width: none;
 }
 
+@media (min-width: 761px) {
+  .site-shell:has(.scene-map-stack) {
+    --scene-frame-base: min(calc(100vw - clamp(400px, 33vw, 475px)), calc((100dvh - 8px) * .843289));
+  }
+  .poster:has(.scene-map-stack) {
+    width: min(calc(var(--scene-frame-base) + 210px), calc(100vw - 350px));
+    height: calc(var(--scene-frame-base) * 2846 / 2400);
+    aspect-ratio: auto;
+    --qdp-date-height: calc(var(--scene-frame-base) * .05);
+    --qdp-date-left: calc(100% - var(--scene-frame-base) * .5717);
+    --qdp-date-width: calc(var(--scene-frame-base) * .4342);
+    --qdp-date-font-size: calc(var(--scene-frame-base) * .0255);
+    --qdp-list-left: calc(var(--scene-frame-base) * .098);
+    --qdp-list-right: calc(var(--scene-frame-base) * .095);
+  }
+  .poster:has(.scene-map-stack) > .frame { opacity: 0; }
+  .poster:has(.scene-map-stack)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Stretch only columns 700–719, the empty strip between the logo and key. */
+    border-style: solid;
+    border-color: transparent;
+    border-width: 0 calc(var(--scene-frame-base) * 1007 / 1727) 0 calc(var(--scene-frame-base) * 700 / 1727);
+    border-image: url("frame.png?v=20260926-01") 0 1007 0 700 fill stretch;
+  }
+  .poster:has(.scene-map-stack) .archive-viewport {
+    clip-path: inset(6.8% calc(var(--scene-frame-base) * .0825) 6.75%);
+  }
+  .poster-stage:has(.scene-map-stack)::after {
+    background-position: right center;
+    background-size: var(--scene-frame-base) 100%;
+    clip-path: inset(0 calc(var(--scene-frame-base) * .0425) 0 calc(100% - var(--scene-frame-base) * .0825));
+  }
+  .site-shell:has(.scene-map-stack) .archive-menu-track {
+    left: calc(100% - var(--scene-frame-base) * .08164);
+  }
+}
+
 .scene-map-view {
   --scene-ink: #fff1f4;
   --scene-accent: #ffea86;
@@ -178,7 +218,9 @@
   transform: none;
 }
 .scene-map-edge { stroke: var(--scene-ink); stroke-opacity: .54; }
+.scene-map-edge:not([data-depth="1"]) { stroke-opacity: .42; }
 .scene-map-view .scene-map-node { cursor: pointer; outline: none; }
+.scene-map-view .scene-map-canvas.is-dragging, .scene-map-view .is-dragging .scene-map-node { cursor: grabbing; }
 .scene-map-node circle { fill: var(--scene-kind-color); stroke-width: 2; }
 .scene-map-node[data-kind="collective"] circle { stroke: var(--scene-ink); }
 .scene-map-node.focus circle { stroke: var(--scene-accent); stroke-width: 4; }

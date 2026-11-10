@@ -189,7 +189,9 @@
       menuTrack.style.setProperty("--archive-nav-gap", getComputedStyle(leftLinks).rowGap);
       const sideWidth = parseFloat(getComputedStyle(document.querySelector(".side-nav")).width);
       const posterBox = document.querySelector(".poster").getBoundingClientRect();
-      const posterWidth = posterBox.width;
+      // The desktop map widens the space between the two original frame rails.
+      const posterWidth = window.innerWidth > 760
+        ? Math.min(posterBox.width, posterBox.height * 2400 / 2846) : posterBox.width;
       const purpleBorder = 1586 / 1727;
       // Begin behind the last pixels of the outer red line, so both rails
       // emerge directly from the frame once the artwork is layered above them.
@@ -861,7 +863,7 @@
     message(params.view === "scene-map" ? "Loading the Scene Map…" : "Loading archive…");
     if (params.view === "scene-map") {
       try {
-        const module = await import("./scene-map.js?v=20261110-scene-map-4");
+        const module = await import("./scene-map.js?v=20261110-scene-map-5");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;

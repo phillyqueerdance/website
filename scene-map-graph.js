@@ -78,6 +78,22 @@ export function pickConnections(connections, limit = 12, previousKey = "") {
   return result;
 }
 
+export function networkFor(origin, branches, eligible, maxBubbles) {
+  const nodes = new Map([[origin.key, { item: origin, parent: null, link: null, depth: 0 }]]);
+  // Map iteration includes added entries, so direct links are placed before
+  // their branches. Each published profile gets one bubble.
+  for (const vertex of nodes.values()) {
+    const branch = branches.get(vertex.item.key);
+    if (!branch?.links || nodes.size >= maxBubbles) continue;
+    const candidates = branch.links.filter(link => !nodes.has(link.key) && eligible(link));
+    const limit = Math.min(branch.limit, maxBubbles - nodes.size);
+    for (const link of pickConnections(candidates, limit)) {
+      nodes.set(link.key, { item: link, parent: vertex.item.key, link, depth: vertex.depth + 1 });
+    }
+  }
+  return nodes;
+}
+
 export function upcomingFor(focus, events, now = Date.now(), max = 5) {
   return [...new Map((events || []).filter(event => event?.eventId &&
     participants(event).includes(focus.key) &&
