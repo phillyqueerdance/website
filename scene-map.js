@@ -214,6 +214,7 @@ function positionNewBubbles(map) {
   for (const [parentKey, group] of siblings) {
     const parent = map.bubbles.get(parentKey);
     const grandparent = parent && map.bubbles.get(parent.parent);
+    const alternatingSlots = Math.ceil(group.length / 2);
     const branchAngle = grandparent
       ? Math.atan2(parent.targetY - grandparent.targetY, parent.targetX - grandparent.targetX)
       : -Math.PI / 2;
@@ -224,9 +225,11 @@ function positionNewBubbles(map) {
         bubble.y = bubble.targetY = map.height / 2;
         continue;
       }
+      // The first links get second-level branches. Space them around the ring.
+      const slot = index < alternatingSlots ? index * 2 : (index - alternatingSlots) * 2 + 1;
       const angle = grandparent
         ? branchAngle + (index - (group.length - 1) / 2) * .82
-        : branchAngle + 2 * Math.PI * index / group.length;
+        : branchAngle + 2 * Math.PI * slot / group.length;
       const distance = bubble.radius + parent.radius + linkGap(map.width, map.height);
       const horizontal = Math.max(1, Math.min(1.25, map.width / map.height));
       bubble.targetX = parent.targetX + Math.cos(angle) * distance * horizontal;
