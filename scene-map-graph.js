@@ -18,11 +18,16 @@ export function participants(event) {
   return [...new Set(nodes)];
 }
 
-export function connects(kindA, kindB) {
-  // Co-appearing artist IDs never establish a social or collaborative
-  // relationship. Only different entity types are connected by a shared
-  // published event: artist–party, artist–venue, party–venue, etc.
-  return kindA !== kindB;
+export function connects(kindA, kindB, event = {}) {
+  if (kindA !== kindB) return true;
+  if (kindA !== "artist") return false;
+  const { start, end } = event;
+  if (!start || !end) return true;
+  // A full-day schedule groups separate slots. Artist pairs use individual listings.
+  const fullDay = Date.parse(end) - Date.parse(start) >= 24 * 60 * 60 * 1000;
+  const midnightToMidnight = start.slice(11, 16) === "00:00" && end.slice(11, 16) === "00:00" &&
+    start.slice(0, 10) !== end.slice(0, 10);
+  return !fullDay && !midnightToMidnight;
 }
 
 export function connectionsFor(focus, events, known, now = Date.now()) {
@@ -36,7 +41,7 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
     for (const member of members) {
       if (member === focus.key || !known.has(member)) continue;
       const target = known.get(member);
-      if (!connects(focus.kind, target.kind)) continue;
+      if (!connects(focus.kind, target.kind, event)) continue;
       let link = found.get(member);
       if (!link) {
         link = { ...target, key: member, count: 0, upcoming: 0,
@@ -87,20 +92,57 @@ export function pickConnections(connections, limit = 12, preferred = []) {
 
 export function networkFor(origin, branches, eligible, maxBubbles) {
   const nodes = new Map([[origin.key, { item: origin, parent: null, link: null, depth: 0 }]]);
-  const directKeys = new Set(branches.get(origin.key)?.links?.map(link => link.key));
+  const root = branches.get(origin.key);
+  const direct = new Map((root?.links || []).map(link => [link.key, link]));
+  const sharesBill = link => origin.kind === "artist" && link.kind === "artist";
   // Map iteration includes added entries, so direct links are placed before
   // their branches. Each published profile gets one bubble.
   for (const vertex of nodes.values()) {
     const branch = branches.get(vertex.item.key);
-    if (vertex.depth >= 2 || !branch?.links || nodes.size >= maxBubbles) continue;
+    if (vertex.depth >= 2 || !branch?.links || !branch.limit || nodes.size >= maxBubbles) continue;
     const candidates = branch.links.filter(link => !nodes.has(link.key) && eligible(link) &&
-      (vertex.depth === 0 || !directKeys.has(link.key)));
+      (vertex.depth === 0 || !direct.has(link.key) || sharesBill(link)));
+    const contextual = candidates.filter(link => link.kind !== vertex.item.kind || branch.preferred?.includes(link.key));
     const limit = Math.min(branch.limit, maxBubbles - nodes.size);
-    for (const link of pickConnections(candidates, limit, branch.preferred)) {
+    for (const link of pickConnections(contextual.length ? contextual : candidates, limit, branch.preferred)) {
       nodes.set(link.key, { item: link, parent: vertex.item.key, link, depth: vertex.depth + 1 });
     }
   }
+  // Keep party and venue context in the neighborhood, then promote any
+  // visible co-bill to the direct level with its own evidence and weight.
+  let firstHop = 0;
+  for (const [key, vertex] of nodes) {
+    const link = direct.get(key);
+    if (!link) continue;
+    Object.assign(vertex, { item: link, parent: origin.key, link, depth: 1 });
+    firstHop++;
+  }
+  const available = Math.min((root?.limit || 0) - firstHop, maxBubbles - nodes.size);
+  if (available > 0) {
+    const more = [...direct.values()].filter(link => sharesBill(link) && eligible(link) && !nodes.has(link.key));
+    for (const link of more.slice(0, available)) {
+      nodes.set(link.key, { item: link, parent: origin.key, link, depth: 1 });
+    }
+  }
   return nodes;
+}
+
+export function visibleRelationships(nodes, branches) {
+  const edges = new Map();
+  const add = (source, target, link, cross) => {
+    const key = source < target ? source + "|" + target : target + "|" + source;
+    if (!edges.has(key)) edges.set(key, { source, target, link, cross });
+  };
+  // Preserve layout parents first, then add every proven pair among these bubbles.
+  for (const [key, vertex] of nodes) {
+    if (vertex.parent) add(vertex.parent, key, vertex.link, false);
+  }
+  for (const key of nodes.keys()) {
+    for (const link of branches.get(key)?.links || []) {
+      if (nodes.has(link.key)) add(key, link.key, link, true);
+    }
+  }
+  return edges;
 }
 
 export function upcomingFor(focus, events, now = Date.now(), max = 5) {
@@ -116,6 +158,7 @@ export function relationshipText(source, target) {
   const n = target.count;
   const appearances = `${n} documented ${n === 1 ? "event" : "events"}`;
   const labels = {
+    "artist+artist": "Listed together at",
     "artist+venue": "Performed at",
     "artist+party": "Appeared at",
     "artist+collective": "Appeared on an event with",

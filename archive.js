@@ -863,7 +863,7 @@
     message(params.view === "scene-map" ? "Loading the Scene Map…" : "Loading archive…");
     if (params.view === "scene-map") {
       try {
-        const module = await import("./scene-map.js?v=20261110-scene-map-7a");
+        const module = await import("./scene-map.js?v=20261110-scene-map-8");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;

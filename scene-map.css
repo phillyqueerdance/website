@@ -219,6 +219,7 @@
 }
 .scene-map-edge { stroke: var(--scene-ink); stroke-opacity: .54; pointer-events: none; }
 .scene-map-edge:not([data-depth="1"]) { stroke-opacity: .42; }
+.scene-map-edge.scene-map-edge-cross { stroke-opacity: .38; }
 .scene-map-edge-control { cursor: pointer; }
 .scene-map-edge-hit { stroke: transparent; stroke-width: 20px; stroke-linecap: round; pointer-events: stroke; }
 .scene-map-edge-control[aria-expanded="true"] .scene-map-edge,

@@ -1,5 +1,5 @@
 import { DIRECTORY_FOR, KINDS, keyOf, connectionsFor, upcomingFor,
-  networkFor, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-7";
+  networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-8";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, MIN_BUBBLE_HIT_RADIUS,
   SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT, SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-7";
 
@@ -228,8 +228,8 @@ function showRelationship(map, line, pin = false) {
     closeRelationship(map);
     line.control.focus();
   };
-  heading.append(node("strong", "", line.parent.item.name + " · " + line.child.item.name), close);
-  const link = line.child.link;
+  heading.append(node("strong", "", line.source.item.name + " · " + line.target.item.name), close);
+  const link = line.link;
   const count = sharedEvents(link.count) + (link.upcoming ? " · " + link.upcoming + " upcoming" : "");
   const events = node("div", "scene-map-relationship-events");
   for (const event of link.examples) {
@@ -255,19 +255,20 @@ function toggleRelationship(map, line, keyboard = false) {
   if (keyboard) map.lineInfo.querySelector("button")?.focus();
 }
 
-function createLine(map, parent, child) {
+function createLine(map, source, target, link, cross) {
   const control = svgNode("g", {
     class: "scene-map-edge-control", role: "button", tabindex: "0",
-    "aria-label": parent.item.name + " and " + child.item.name + ", " + sharedEvents(child.link.count),
+    "aria-label": source.item.name + " and " + target.item.name + ", " + sharedEvents(link.count),
     "aria-controls": map.lineInfo.id, "aria-expanded": "false"
   });
   const element = svgNode("line", {
-    class: "scene-map-edge", "data-depth": child.depth,
-    "stroke-width": 1.6 + relationshipStrength(child.link.count) * 4
+    class: cross ? "scene-map-edge scene-map-edge-cross" : "scene-map-edge",
+    "data-depth": Math.max(source.depth, target.depth),
+    "stroke-width": 1.6 + relationshipStrength(link.count) * 4
   });
   const hit = svgNode("line", { class: "scene-map-edge-hit", "aria-hidden": "true" });
   control.append(element, hit);
-  const line = { control, element, hit, parent, child, midX: 0, midY: 0 };
+  const line = { control, element, hit, source, target, link, midX: 0, midY: 0 };
   control.addEventListener("pointerenter", event => {
     if (event.pointerType !== "touch" && !map.svg.classList.contains("is-dragging")) showRelationship(map, line);
   });
@@ -420,7 +421,7 @@ function paintGraph(map, time) {
       if (bubble.drawRadius !== bubble.radius) paintRadius(bubble, bubble.radius);
     } else if (time !== undefined && bubble !== map.dragged) {
       const steady = bubble.depth === 0 || bubble === map.hovered || bubble.element === document.activeElement ||
-        bubble === map.activeLine?.parent || bubble === map.activeLine?.child;
+        bubble === map.activeLine?.source || bubble === map.activeLine?.target;
       const float = steady ? 0 : 4;
       const x = bubble.targetX + float * Math.sin(time / 1600 + bubble.phase);
       const y = bubble.targetY + float * Math.cos(time / 1900 + bubble.phase);
@@ -434,13 +435,13 @@ function paintGraph(map, time) {
     bubble.element.setAttribute("transform", "translate(" + bubble.x.toFixed(2) + " " + bubble.y.toFixed(2) + ")");
   }
   for (const line of map.lines) {
-    const { element, hit, parent, child } = line;
-    const dx = child.x - parent.x, dy = child.y - parent.y;
+    const { element, hit, source, target } = line;
+    const dx = target.x - source.x, dy = target.y - source.y;
     const distance = Math.hypot(dx, dy) || 1;
-    const trim = Math.max(0, Math.min(3, (distance - parent.drawRadius - child.drawRadius) / 2));
-    const start = (parent.drawRadius + trim) / distance, end = (child.drawRadius + trim) / distance;
-    const x1 = parent.x + dx * start, y1 = parent.y + dy * start;
-    const x2 = child.x - dx * end, y2 = child.y - dy * end;
+    const trim = Math.max(0, Math.min(3, (distance - source.drawRadius - target.drawRadius) / 2));
+    const start = (source.drawRadius + trim) / distance, end = (target.drawRadius + trim) / distance;
+    const x1 = source.x + dx * start, y1 = source.y + dy * start;
+    const x2 = target.x - dx * end, y2 = target.y - dy * end;
     line.midX = (x1 + x2) / 2;
     line.midY = (y1 + y2) / 2;
     for (const stroke of [element, hit]) {
@@ -474,7 +475,14 @@ function layoutGraph(map, recenter = false) {
   const scaleX = width / (map.width || width), scaleY = height / (map.height || height);
   const maxCounts = [1, 1, 1];
   for (const bubble of map.bubbles.values()) {
-    if (bubble.link) maxCounts[bubble.depth] = Math.max(maxCounts[bubble.depth], bubble.link.count);
+    if (!bubble.link) continue;
+    maxCounts[bubble.depth] = Math.max(maxCounts[bubble.depth], bubble.link.count);
+    if (bubble.depth === 2) {
+      // Use the branch's scale so a second-degree bubble can grow on recentering.
+      const branch = map.scene.branches.get(bubble.parent);
+      const strongest = branch?.links?.find(item => visibleConnection(map, item));
+      if (strongest) maxCounts[2] = Math.max(maxCounts[2], strongest.count);
+    }
   }
   for (const bubble of map.bubbles.values()) {
     resizeBubble(bubble, Math.min(width, height), maxCounts[1], maxCounts[2]);
@@ -498,6 +506,18 @@ function buildNetwork(map, scene) {
   return networkFor(scene.origin, scene.branches, item => visibleConnection(map, item), MAX_BUBBLES);
 }
 
+function addVisibleConnections(map, scene) {
+  const seen = new Set(map.lines.map(line => line.key));
+  for (const [key, { source, target, link, cross }] of visibleRelationships(map.bubbles, scene.branches)) {
+    if (seen.has(key)) continue;
+    const line = createLine(map, map.bubbles.get(source), map.bubbles.get(target), link, cross);
+    line.key = key;
+    map.lines.push(line);
+    if (cross) map.edgeLayer.prepend(line.control);
+    else map.edgeLayer.append(line.control);
+  }
+}
+
 function renderMap(map, recenter = false) {
   closeRelationship(map);
   const scene = map.scene;
@@ -513,12 +533,8 @@ function renderMap(map, recenter = false) {
   }
   map.bubbles = bubbles;
   map.lines = [];
-  for (const child of bubbles.values()) {
-    const parent = bubbles.get(child.parent);
-    if (!parent) continue;
-    map.lines.push(createLine(map, parent, child));
-  }
-  map.edgeLayer.replaceChildren(...map.lines.map(line => line.control));
+  map.edgeLayer.replaceChildren();
+  if (scene) addVisibleConnections(map, scene);
   updateBubbles(map);
   layoutGraph(map, recenter);
   if (map.pendingScene && map.pendingScene !== scene) setMessage(map, "Loading " + map.pendingScene.origin.name + "…");
@@ -549,11 +565,25 @@ async function loadBranch(scene, item, limit) {
     scene.branches.set(item.key, { limit, preferred: scene.preferred.get(item.key) });
   }
   const branch = scene.branches.get(item.key);
+  branch.limit = Math.max(branch.limit, limit);
   if (branch.links) return;
   const data = await profile(item);
   if (!branch.links) {
     branch.events = data.events;
     branch.links = connectionsFor(item, data.events, known);
+  }
+}
+
+async function loadVisibleConnections(map, scene) {
+  const missing = [...map.bubbles.values()].filter(bubble => !scene.branches.get(bubble.item.key)?.links);
+  const isCurrent = () => map.root.isConnected && map.scene === scene && !map.pendingScene;
+  // Fill in connections between visible bubbles without adding another level.
+  for (let index = 0; index < missing.length && isCurrent(); index += AUTO_BRANCHES) {
+    const batch = missing.slice(index, index + AUTO_BRANCHES);
+    await Promise.allSettled(batch.map(bubble => loadBranch(scene, bubble.item, 0)));
+    if (!isCurrent()) return;
+    addVisibleConnections(map, scene);
+    paintGraph(map);
   }
 }
 
@@ -576,9 +606,13 @@ async function startScene(map, item, exploring = false) {
   const preferred = new Map();
   if (previousKey) {
     const visible = [...map.bubbles.values()];
-    const children = visible.filter(bubble => bubble.parent === item.key);
+    const neighbors = [];
+    for (const line of map.lines) {
+      if (line.source.item.key === item.key) neighbors.push(line.target.item.key);
+      else if (line.target.item.key === item.key) neighbors.push(line.source.item.key);
+    }
     const formerPeers = visible.filter(bubble => bubble.parent === previousKey && bubble.item.key !== item.key);
-    preferred.set(item.key, [previousKey, arrival, ...children.map(bubble => bubble.item.key)]);
+    preferred.set(item.key, [previousKey, arrival, ...neighbors]);
     preferred.set(previousKey, formerPeers.map(bubble => bubble.item.key));
     if (arrival !== previousKey) preferred.set(arrival, [previousKey]);
   }
@@ -603,6 +637,7 @@ async function startScene(map, item, exploring = false) {
     map.pendingScene = null;
     if (map.scene === scene) {
       renderMap(map);
+      void loadVisibleConnections(map, scene);
       return;
     }
     // Preserve current screen positions while the new center animates in.
@@ -617,6 +652,7 @@ async function startScene(map, item, exploring = false) {
     map.scene = scene;
     closeDetails(map);
     renderMap(map, true);
+    void loadVisibleConnections(map, scene);
   } catch (error) {
     if (map.root.isConnected && map.pendingScene === scene) {
       map.pendingScene = null;
@@ -782,7 +818,10 @@ export async function mountSceneMap(host) {
       const scene = map.scene;
       if (scene?.branches.get(scene.origin.key)?.links) {
         void addSecondHop(map, scene).then(() => {
-          if (map.root.isConnected && map.scene === scene) renderMap(map);
+          if (map.root.isConnected && map.scene === scene) {
+            renderMap(map);
+            void loadVisibleConnections(map, scene);
+          }
         });
       }
     }
