@@ -138,27 +138,31 @@
 
 .scene-map-filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
   margin-top: 7px;
 }
 .scene-map-filter {
   display: flex;
-  flex: 1 0 auto;
+  flex: 0 1 112px;
+  min-width: 0;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-height: 27px;
-  padding: 2px 5px;
+  height: 22px;
+  min-height: 22px;
+  padding: 1px 2px;
   border: 0;
   border-radius: 999px;
   background: var(--scene-kind-color, #000);
   color: var(--scene-kind-ink, var(--scene-ink));
-  font-size: clamp(10px, 1.6cqw, 13px);
+  font-size: clamp(9px, 1.35cqw, 11px);
   cursor: pointer;
   white-space: nowrap;
 }
-.scene-map-filter input { width: 12px; height: 12px; margin: 0; accent-color: var(--scene-accent); }
+.scene-map-filter[data-kind="collective"] { border: 1px solid var(--scene-ink); }
+.scene-map-filter-queer { margin-left: auto; }
+.scene-map-filter input { flex: none; width: 10px; height: 10px; margin: 0; accent-color: var(--scene-accent); }
 
 .scene-map-canvas-wrap {
   flex: 1;
@@ -344,6 +348,6 @@
   .scene-map-search { border-radius: 12px; padding: 7px 9px; }
   .scene-map-results { left: 4px; right: 4px; }
   .scene-map-filters { gap: 3px; margin-top: 6px; }
-  .scene-map-filter { min-height: 26px; gap: 2px; padding: 2px 3px; }
+  .scene-map-filter { gap: 2px; }
   .scene-map-filter input { width: 10px; height: 10px; }
 }

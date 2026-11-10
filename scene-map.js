@@ -705,11 +705,11 @@ function activateBubble(map, bubble) {
 function search(map) {
   const query = map.search.value.toLocaleLowerCase().trim();
   map.results.replaceChildren();
-  if (!query || map.search.disabled) return;
+  if (!map.searchOpen || map.search.disabled) return;
   const rank = item => item.name.toLocaleLowerCase().startsWith(query) ? 0 : 1;
   const found = [...known.values()].filter(item =>
     matchesQueerFilter(map, item) && item.name.toLocaleLowerCase().includes(query))
-    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name)).slice(0, 7);
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 
   if (!found.length) map.results.append(node("p", "scene-map-note", "No matching profiles."));
   for (const item of found) {
@@ -718,11 +718,16 @@ function search(map) {
     button.append(node("span", "scene-map-result-name", item.name), typePill(item.kind));
     button.onclick = () => {
       map.search.value = "";
-      map.results.replaceChildren();
+      closeSearch(map);
       startScene(map, item);
     };
     map.results.append(button);
   }
+}
+
+function closeSearch(map) {
+  map.searchOpen = false;
+  map.results.replaceChildren();
 }
 
 function checkbox(text, value, checked) {
@@ -835,9 +840,36 @@ export async function mountSceneMap(host) {
   const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, lineInfo, message, search: input, results,
     scene: null, pendingScene: null, bubbles: new Map(), lines: [], phase: 0, allowed: new Set(KINDS), queerOnly: false,
     dx: 0, dy: 0, width: 0, height: 0, frameRequest: 0, dragged: null, hovered: null, skipClick: false,
-    activeLine: null,
+    activeLine: null, searchOpen: false,
     reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)") };
-  input.addEventListener("input", () => search(map));
+  const openSearch = () => {
+    if (map.searchOpen) return;
+    map.searchOpen = true;
+    search(map);
+  };
+  input.addEventListener("focus", openSearch);
+  input.addEventListener("click", openSearch);
+  input.addEventListener("input", () => {
+    map.searchOpen = true;
+    search(map);
+  });
+  input.addEventListener("keydown", event => {
+    if (event.key === "Escape" && map.searchOpen) {
+      closeSearch(map);
+      event.stopPropagation();
+    }
+    if (event.key === "ArrowDown") {
+      openSearch();
+      map.results.querySelector("button")?.focus();
+      event.preventDefault();
+    }
+  });
+  top.addEventListener("focusout", event => {
+    if (!top.contains(event.relatedTarget)) closeSearch(map);
+  });
+  root.addEventListener("pointerdown", event => {
+    if (!top.contains(event.target)) closeSearch(map);
+  });
   filters.addEventListener("change", () => {
     map.allowed = new Set([...filters.querySelectorAll("label[data-kind] input:checked")].map(box => box.value));
     map.queerOnly = queerToggle.checked;
