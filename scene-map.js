@@ -1,4 +1,4 @@
-import {DIRECTORY_FOR,KINDS,keyOf,connectionsFor,pickConnections,upcomingFor,relationshipText,prominence} from "./scene-map-graph.js";
+import {DIRECTORY_FOR,KINDS,keyOf,connectionsFor,pickConnections,upcomingFor,relationshipText,prominence} from "./scene-map-graph.js?v=20261110-scene-map-2";
 const NS="http://www.w3.org/2000/svg";
 const colors={artist:"#fa2b5a",party:"#922185",venue:"#ff7945",collective:"#000"};
 const labels={artist:"Artist",party:"Party",venue:"Venue",collective:"Collective"};

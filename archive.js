@@ -116,9 +116,9 @@
     return button;
   }
 
-  function loadError(error) {
+  function loadError(error, retry = () => route()) {
     message(errorLabel(error));
-    archiveStack.appendChild(retryButton(() => route()));
+    archiveStack.appendChild(retryButton(retry));
     archive.updateLayout();
   }
 
@@ -861,7 +861,7 @@
     message(params.view === "scene-map" ? "Loading the Scene Map…" : "Loading archive…");
     if (params.view === "scene-map") {
       try {
-        const module = await import("./scene-map.js");
+        const module = await import("./scene-map.js?v=20261110-scene-map-2");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
@@ -873,7 +873,7 @@
         if (serial !== requestNumber) return;
         console.error("Could not start Scene Map:", error);
         loadingKey = "";
-        loadError(error);
+        loadError(error, () => location.reload());
       }
       return;
     }
