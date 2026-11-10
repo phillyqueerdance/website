@@ -1,14 +1,13 @@
 import { DIRECTORY_FOR, KINDS, keyOf, connectionsFor, upcomingFor,
-  networkFor, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-5";
+  networkFor, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-6";
 import { relationshipStrength, linkGap, keepInView, settleBubbles } from "./scene-map-layout.js?v=20261110-scene-map-5";
 
 const NS = "http://www.w3.org/2000/svg";
 const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };
 const known = new Map(), cache = new Map();
-const MAX_BUBBLES = 24;
 const ROOT_LINKS = 9;
 const AUTO_BRANCHES = 4;
-const OPEN_BRANCH_LINKS = 4;
+const MAX_BUBBLES = 1 + ROOT_LINKS + AUTO_BRANCHES;
 
 function node(tag, className = "", value = "") {
   const element = document.createElement(tag);
@@ -127,14 +126,15 @@ function toggleDetails(map, bubble) {
   heading.append(node("strong", "", item.name), typePill(item.kind), close);
   map.info.replaceChildren(heading);
 
-  const parent = map.bubbles.get(bubble.parent);
-  if (parent) {
-    map.info.append(node("p", "scene-map-note", parent.item.name + " · " + relationshipText(parent.item, bubble.link)));
-    for (const event of bubble.link.examples.slice(0, 2)) {
+  const branch = map.scene.branches.get(item.key);
+  const arrival = branch?.links?.find(link => link.key === map.scene.arrival && visibleConnection(map, link));
+  if (arrival) {
+    map.info.append(node("p", "scene-map-note", arrival.name + " · " + relationshipText(item, arrival)));
+    for (const event of arrival.examples.slice(0, 2)) {
       map.info.append(anchor(event.title, qdpUrl({ id: event.id }, true)));
     }
   }
-  const events = map.scene.branches.get(item.key)?.events;
+  const events = branch?.events;
   if (events) {
     const upcoming = upcomingFor(item, events, Date.now(), 2);
     for (const event of upcoming) map.info.append(anchor("Upcoming: " + event.title, qdpUrl(event, true)));
@@ -174,11 +174,10 @@ function createBubble(map, item) {
   return bubble;
 }
 
-function updateSelection(map) {
-  const selected = map.scene?.selected;
+function updateBubbles(map) {
   for (const bubble of map.bubbles.values()) {
     const { item, element, link } = bubble;
-    const isSelected = selected === item.key;
+    const isSelected = bubble.depth === 0;
     const parent = map.bubbles.get(bubble.parent);
     const count = link ? link.count + (link.count === 1 ? " shared event" : " shared events") : "";
     const description = parent ? count + " with " + parent.item.name : count;
@@ -194,9 +193,14 @@ function updateSelection(map) {
 }
 
 function resizeBubble(bubble, shortSide) {
-  const strength = bubble.link ? relationshipStrength(bubble.link.count) : 1;
-  const radius = shortSide * (bubble.parent ? .065 + .066 * strength : .148);
-  bubble.radius = radius;
+  const strength = bubble.link ? relationshipStrength(bubble.link.count) : 0;
+  const relativeSize = bubble.depth === 0 ? .148 : .065 + .066 * strength;
+  bubble.radius = shortSide * relativeSize * (bubble.depth === 2 ? .82 : 1);
+  if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius);
+}
+
+function paintRadius(bubble, radius) {
+  bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.caption.setAttribute("x", -radius * .88);
   bubble.caption.setAttribute("y", -radius * .68);
@@ -221,8 +225,10 @@ function positionNewBubbles(map) {
     for (const [index, bubble] of group.entries()) {
       if (Number.isFinite(bubble.targetX)) continue;
       if (!parent) {
-        bubble.x = bubble.targetX = map.width / 2;
-        bubble.y = bubble.targetY = map.height / 2;
+        bubble.targetX = map.width / 2;
+        bubble.targetY = map.height / 2;
+        bubble.x ??= bubble.targetX;
+        bubble.y ??= bubble.targetY;
         continue;
       }
       // The first links get second-level branches. Space them around the ring.
@@ -235,8 +241,8 @@ function positionNewBubbles(map) {
       bubble.targetX = parent.targetX + Math.cos(angle) * distance * horizontal;
       bubble.targetY = parent.targetY + Math.sin(angle) * distance;
       keepInView(bubble, map.width, map.height);
-      bubble.x = parent.x + (bubble.targetX - parent.x) * .66;
-      bubble.y = parent.y + (bubble.targetY - parent.y) * .66;
+      bubble.x ??= parent.x + (bubble.targetX - parent.x) * .66;
+      bubble.y ??= parent.y + (bubble.targetY - parent.y) * .66;
     }
   }
 }
@@ -247,20 +253,25 @@ function paintGraph(map, time) {
     if (map.reduceMotion.matches) {
       bubble.x = bubble.targetX;
       bubble.y = bubble.targetY;
+      if (bubble.drawRadius !== bubble.radius) paintRadius(bubble, bubble.radius);
     } else if (time !== undefined && bubble !== map.dragged) {
-      const float = bubble === map.hovered || bubble.element === document.activeElement ? 0 : 4;
+      const float = bubble.depth === 0 || bubble === map.hovered || bubble.element === document.activeElement ? 0 : 4;
       const x = bubble.targetX + float * Math.sin(time / 1600 + bubble.phase);
       const y = bubble.targetY + float * Math.cos(time / 1900 + bubble.phase);
       bubble.x += (x - bubble.x) * .16;
       bubble.y += (y - bubble.y) * .16;
+      if (bubble.drawRadius !== bubble.radius) {
+        const change = bubble.radius - bubble.drawRadius;
+        paintRadius(bubble, Math.abs(change) < .2 ? bubble.radius : bubble.drawRadius + change * .16);
+      }
     }
     bubble.element.setAttribute("transform", "translate(" + bubble.x.toFixed(2) + " " + bubble.y.toFixed(2) + ")");
   }
   for (const { element, parent, child } of map.lines) {
     const dx = child.x - parent.x, dy = child.y - parent.y;
     const distance = Math.hypot(dx, dy) || 1;
-    const trim = Math.max(0, Math.min(3, (distance - parent.radius - child.radius) / 2));
-    const start = (parent.radius + trim) / distance, end = (child.radius + trim) / distance;
+    const trim = Math.max(0, Math.min(3, (distance - parent.drawRadius - child.drawRadius) / 2));
+    const start = (parent.drawRadius + trim) / distance, end = (child.drawRadius + trim) / distance;
     element.setAttribute("x1", parent.x + dx * start);
     element.setAttribute("y1", parent.y + dy * start);
     element.setAttribute("x2", child.x - dx * end);
@@ -279,7 +290,7 @@ function animateGraph(map) {
   map.frameRequest = requestAnimationFrame(tick);
 }
 
-function layoutGraph(map) {
+function layoutGraph(map, recenter = false) {
   const width = map.wrap.clientWidth, height = map.wrap.clientHeight;
   if (!width || !height) {
     cancelAnimationFrame(map.frameRequest);
@@ -290,11 +301,12 @@ function layoutGraph(map) {
   const scaleX = width / (map.width || width), scaleY = height / (map.height || height);
   for (const bubble of map.bubbles.values()) {
     resizeBubble(bubble, Math.min(width, height));
-    if (!Number.isFinite(bubble.targetX)) continue;
-    bubble.x *= scaleX;
-    bubble.y *= scaleY;
-    bubble.targetX *= scaleX;
-    bubble.targetY *= scaleY;
+    if (Number.isFinite(bubble.x)) {
+      bubble.x *= scaleX;
+      bubble.y *= scaleY;
+      bubble.targetX = recenter ? undefined : bubble.targetX * scaleX;
+      bubble.targetY = recenter ? undefined : bubble.targetY * scaleY;
+    }
   }
   map.width = width;
   map.height = height;
@@ -304,11 +316,13 @@ function layoutGraph(map) {
   animateGraph(map);
 }
 
-function renderMap(map) {
+function buildNetwork(map, scene) {
+  return networkFor(scene.origin, scene.branches, item => visibleConnection(map, item), MAX_BUBBLES);
+}
+
+function renderMap(map, recenter = false) {
   const scene = map.scene;
-  const network = scene
-    ? networkFor(scene.origin, scene.branches, item => visibleConnection(map, item), MAX_BUBBLES)
-    : new Map();
+  const network = scene ? buildNetwork(map, scene) : new Map();
   const bubbles = new Map();
   for (const [key, vertex] of network) {
     const bubble = map.bubbles.get(key) || createBubble(map, vertex.item);
@@ -330,37 +344,36 @@ function renderMap(map) {
     map.lines.push({ parent, child, element });
   }
   map.edgeLayer.replaceChildren(...map.lines.map(line => line.element));
-  if (scene && !bubbles.has(scene.selected)) {
-    closeDetails(map);
-    scene.selected = scene.origin.key;
-  }
-  updateSelection(map);
-  layoutGraph(map);
-  if (!scene) setMessage(map, "Search for something you know to begin.");
+  updateBubbles(map);
+  layoutGraph(map, recenter);
+  if (map.pendingScene && map.pendingScene !== scene) setMessage(map, "Loading " + map.pendingScene.origin.name + "…");
+  else if (!scene) setMessage(map, "Search for something you know to begin.");
   else if (!scene.branches.get(scene.origin.key)?.events) setMessage(map, "Loading " + scene.origin.name + "…");
   else setMessage(map, bubbles.size > 1 ? "" : "No connections match these filters.");
 }
 
 function historyPath(map) {
-  const path = [];
-  for (let bubble = map.bubbles.get(map.scene?.selected); bubble; bubble = map.bubbles.get(bubble.parent)) {
-    path.unshift(bubble);
-  }
+  const path = map.scene?.trail.filter(item => matchesQueerFilter(map, item)) || [];
   map.crumbs.replaceChildren();
-  for (const [index, bubble] of path.entries()) {
+  for (const [index, item] of path.entries()) {
     if (index) map.crumbs.append(node("span", "", "›"));
-    const button = node("button", "", bubble.item.name);
+    const button = node("button", "", item.name);
     button.type = "button";
-    button.onclick = () => activateBubble(map, bubble);
+    button.onclick = () => {
+      const bubble = map.bubbles.get(item.key);
+      if (bubble) activateBubble(map, bubble);
+      else void startScene(map, item, true);
+    };
     map.crumbs.append(button);
   }
   map.crumbs.hidden = !path.length;
 }
 
 async function loadBranch(scene, item, limit) {
-  if (!scene.branches.has(item.key)) scene.branches.set(item.key, { limit: 0 });
+  if (!scene.branches.has(item.key)) {
+    scene.branches.set(item.key, { limit, preferred: scene.preferred.get(item.key) });
+  }
   const branch = scene.branches.get(item.key);
-  branch.limit = Math.max(branch.limit, limit);
   if (branch.links) return;
   const data = await profile(item);
   if (!branch.links) {
@@ -369,62 +382,77 @@ async function loadBranch(scene, item, limit) {
   }
 }
 
-function currentScene(map, scene) {
-  return map.scene === scene && map.root.isConnected;
-}
-
 async function addSecondHop(map, scene) {
-  const direct = [...map.bubbles.values()].filter(bubble => bubble.depth === 1);
+  const direct = [...buildNetwork(map, scene).values()].filter(vertex => vertex.depth === 1);
   const first = direct.slice(0, AUTO_BRANCHES);
-  await Promise.allSettled(first.map(bubble => loadBranch(scene, bubble.item, 1)));
-  if (!currentScene(map, scene)) return;
-  renderMap(map);
-  if (map.bubbles.size > direct.length + 1 || direct.length <= first.length) return;
-  await Promise.allSettled(direct.slice(first.length).map(bubble => loadBranch(scene, bubble.item, 1)));
-  if (currentScene(map, scene)) renderMap(map);
+  await Promise.allSettled(first.map(vertex => loadBranch(scene, vertex.item, 1)));
+  if (!map.root.isConnected || (map.scene !== scene && map.pendingScene !== scene)) return;
+  const current = [...buildNetwork(map, scene).values()];
+  if (current.some(vertex => vertex.depth === 2)) return;
+  const rest = current.filter(vertex => vertex.depth === 1 && !first.some(seen => seen.item.key === vertex.item.key));
+  await Promise.allSettled(rest.map(vertex => loadBranch(scene, vertex.item, 1)));
 }
 
-async function startScene(map, item) {
-  if (!matchesQueerFilter(map, item)) return;
-  const scene = { origin: item, selected: item.key, branches: new Map() };
-  map.scene = scene;
-  map.dx = map.dy = 0;
-  map.graph.removeAttribute("transform");
+async function startScene(map, item, exploring = false) {
+  if (!matchesQueerFilter(map, item) || map.pendingScene?.origin.key === item.key) return;
+  const previous = exploring ? map.scene : null;
+  const previousKey = previous?.origin.key;
+  const arrival = previous && (map.bubbles.get(item.key)?.parent || previousKey);
+  const preferred = new Map();
+  if (previousKey) {
+    const visible = [...map.bubbles.values()];
+    const children = visible.filter(bubble => bubble.parent === item.key);
+    const formerPeers = visible.filter(bubble => bubble.parent === previousKey && bubble.item.key !== item.key);
+    preferred.set(item.key, [previousKey, arrival, ...children.map(bubble => bubble.item.key)]);
+    preferred.set(previousKey, formerPeers.map(bubble => bubble.item.key));
+    if (arrival !== previousKey) preferred.set(arrival, [previousKey]);
+  }
+  const trail = previous?.trail || [];
+  const back = trail.findIndex(profile => profile.key === item.key);
+  const scene = { origin: item, arrival, preferred, branches: new Map(),
+    trail: back < 0 ? [...trail, item].slice(-6) : trail.slice(0, back + 1) };
+  map.pendingScene = scene;
   closeDetails(map);
-  for (const bubble of map.bubbles.values()) bubble.element.remove();
-  map.bubbles.clear();
-  renderMap(map);
+  setMessage(map, "Loading " + item.name + "…");
+  if (!map.scene) {
+    map.scene = scene;
+    renderMap(map);
+  }
   try {
     await loadBranch(scene, item, ROOT_LINKS);
-    if (!currentScene(map, scene)) return;
-    renderMap(map);
-    void addSecondHop(map, scene);
+    if (!map.root.isConnected || map.pendingScene !== scene) return;
+    if (map.scene === scene) renderMap(map);
+    await addSecondHop(map, scene);
+    if (!map.root.isConnected || map.pendingScene !== scene) return;
+    map.pendingScene = null;
+    if (map.scene === scene) {
+      renderMap(map);
+      return;
+    }
+    // Preserve current screen positions while the new center animates in.
+    for (const bubble of map.bubbles.values()) {
+      if (!Number.isFinite(bubble.x)) continue;
+      bubble.x += map.dx;
+      bubble.y += map.dy;
+    }
+    map.dx = map.dy = 0;
+    map.dragged = null;
+    map.graph.removeAttribute("transform");
+    map.scene = scene;
+    closeDetails(map);
+    renderMap(map, true);
   } catch (error) {
-    if (currentScene(map, scene)) setMessage(map, error.message);
+    if (map.root.isConnected && map.pendingScene === scene) {
+      map.pendingScene = null;
+      setMessage(map, error.message);
+    }
   }
 }
 
-async function activateBubble(map, bubble) {
-  const scene = map.scene;
-  if (!scene || map.bubbles.get(bubble.item.key) !== bubble) return;
-  const item = bubble.item;
-  if (scene.selected === item.key) {
-    toggleDetails(map, bubble);
-    return;
-  }
-  closeDetails(map);
-  scene.selected = item.key;
-  updateSelection(map);
-  const branch = scene.branches.get(item.key);
-  const limit = Math.min(OPEN_BRANCH_LINKS, (branch?.limit || 0) + MAX_BUBBLES - map.bubbles.size);
-  if (branch?.events && branch.limit >= limit) return;
-  if (!branch?.events) setMessage(map, "Loading " + item.name + "…");
-  try {
-    await loadBranch(scene, item, limit);
-    if (currentScene(map, scene)) renderMap(map);
-  } catch (error) {
-    if (currentScene(map, scene) && scene.selected === item.key) setMessage(map, error.message);
-  }
+function activateBubble(map, bubble) {
+  if (!map.scene || map.bubbles.get(bubble.item.key) !== bubble) return;
+  if (bubble.depth === 0) toggleDetails(map, bubble);
+  else void startScene(map, bubble.item, true);
 }
 
 function search(map) {
@@ -468,12 +496,12 @@ function bindDrag(map) {
     const bubble = map.bubbles.get(key);
     map.skipClick = false;
     gesture = {
-      pointerId: event.pointerId, bubble, startX: event.clientX, startY: event.clientY,
+      pointerId: event.pointerId, scene: map.scene, bubble, startX: event.clientX, startY: event.clientY,
       x: bubble?.x ?? map.dx, y: bubble?.y ?? map.dy, moved: false
     };
   });
   map.svg.addEventListener("pointermove", event => {
-    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    if (!gesture || gesture.pointerId !== event.pointerId || gesture.scene !== map.scene) return;
     const dx = event.clientX - gesture.startX, dy = event.clientY - gesture.startY;
     if (!gesture.moved) {
       if (Math.hypot(dx, dy) < 5) return;
@@ -556,7 +584,7 @@ export async function mountSceneMap(host) {
   host.replaceChildren(root);
 
   const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, message, crumbs, search: input, results,
-    scene: null, bubbles: new Map(), lines: [], phase: 0, allowed: new Set(KINDS), queerOnly: false,
+    scene: null, pendingScene: null, bubbles: new Map(), lines: [], phase: 0, allowed: new Set(KINDS), queerOnly: false,
     dx: 0, dy: 0, width: 0, height: 0, frameRequest: 0, dragged: null, hovered: null, skipClick: false,
     reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)") };
   input.addEventListener("input", () => search(map));
@@ -564,11 +592,17 @@ export async function mountSceneMap(host) {
     map.allowed = new Set([...filters.querySelectorAll("label[data-kind] input:checked")].map(box => box.value));
     map.queerOnly = queerToggle.checked;
     if (map.scene && !matchesQueerFilter(map, map.scene.origin)) map.scene = null;
+    if (map.pendingScene && !matchesQueerFilter(map, map.pendingScene.origin)) map.pendingScene = null;
     closeDetails(map);
     search(map);
     if (!input.disabled) {
       renderMap(map);
-      if (map.scene?.branches.get(map.scene.origin.key)?.links) void addSecondHop(map, map.scene);
+      const scene = map.scene;
+      if (scene?.branches.get(scene.origin.key)?.links) {
+        void addSecondHop(map, scene).then(() => {
+          if (map.root.isConnected && map.scene === scene) renderMap(map);
+        });
+      }
     }
   });
   bindDrag(map);

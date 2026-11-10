@@ -220,6 +220,10 @@
 .scene-map-edge { stroke: var(--scene-ink); stroke-opacity: .54; }
 .scene-map-edge:not([data-depth="1"]) { stroke-opacity: .42; }
 .scene-map-view .scene-map-node { cursor: pointer; outline: none; }
+.scene-map-node[data-depth="2"] { opacity: .76; }
+@media (prefers-reduced-motion: no-preference) {
+  .scene-map-node { transition: opacity 180ms ease; }
+}
 .scene-map-view .scene-map-canvas.is-dragging, .scene-map-view .is-dragging .scene-map-node { cursor: grabbing; }
 .scene-map-node circle { fill: var(--scene-kind-color); stroke-width: 2; }
 .scene-map-node[data-kind="collective"] circle { stroke: var(--scene-ink); }

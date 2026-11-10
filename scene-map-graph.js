@@ -60,7 +60,7 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
     b.recent - a.recent || a.name.localeCompare(b.name));
 }
 
-export function pickConnections(connections, limit = 12, previousKey = "") {
+export function pickConnections(connections, limit = 12, preferred = []) {
   const result = [];
   const used = new Set();
   const add = item => {
@@ -68,7 +68,7 @@ export function pickConnections(connections, limit = 12, previousKey = "") {
       result.push(item); used.add(item.key);
     }
   };
-  if (previousKey) add(connections.find(item => item.key === previousKey));
+  for (const key of preferred) add(connections.find(item => item.key === key));
   // Put different corners of the scene in view instead of letting a huge
   // venue or a frequently billed artist crowd out everything else.
   for (const kind of ["artist", "party", "venue", "collective"]) {
@@ -80,14 +80,16 @@ export function pickConnections(connections, limit = 12, previousKey = "") {
 
 export function networkFor(origin, branches, eligible, maxBubbles) {
   const nodes = new Map([[origin.key, { item: origin, parent: null, link: null, depth: 0 }]]);
+  const directKeys = new Set(branches.get(origin.key)?.links?.map(link => link.key));
   // Map iteration includes added entries, so direct links are placed before
   // their branches. Each published profile gets one bubble.
   for (const vertex of nodes.values()) {
     const branch = branches.get(vertex.item.key);
-    if (!branch?.links || nodes.size >= maxBubbles) continue;
-    const candidates = branch.links.filter(link => !nodes.has(link.key) && eligible(link));
+    if (vertex.depth >= 2 || !branch?.links || nodes.size >= maxBubbles) continue;
+    const candidates = branch.links.filter(link => !nodes.has(link.key) && eligible(link) &&
+      (vertex.depth === 0 || !directKeys.has(link.key)));
     const limit = Math.min(branch.limit, maxBubbles - nodes.size);
-    for (const link of pickConnections(candidates, limit)) {
+    for (const link of pickConnections(candidates, limit, branch.preferred)) {
       nodes.set(link.key, { item: link, parent: vertex.item.key, link, depth: vertex.depth + 1 });
     }
   }
