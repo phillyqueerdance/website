@@ -913,6 +913,9 @@
     const id = new URLSearchParams(location.search).get("event") || "";
     if (!id) {
       if (!eventDetail.hidden) hideEventDetail({ restoreFocus: false });
+      if (routeParams().view === "scene-map" && !window.QDPInfoView?.active) {
+        document.title = `${archiveHeader.textContent} | Queer Dance Philly`;
+      }
       return;
     }
     if (activeEventId === id && !eventDetail.hidden) return;
