@@ -150,7 +150,7 @@
   gap: 3px;
   min-height: 27px;
   padding: 2px 5px;
-  border: 1px solid var(--scene-ink);
+  border: 0;
   border-radius: 999px;
   background: var(--scene-kind-color, #000);
   color: var(--scene-kind-ink, var(--scene-ink));
@@ -158,34 +158,7 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.scene-map-filter-queer { border-color: var(--scene-accent); }
 .scene-map-filter input { width: 12px; height: 12px; margin: 0; accent-color: var(--scene-accent); }
-
-.scene-map-path {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 5px;
-  overflow-x: auto;
-  min-height: 25px;
-  padding: 0 1cqw;
-  white-space: nowrap;
-  scrollbar-width: none;
-}
-.scene-map-path[hidden] { display: none; }
-.scene-map-path button {
-  flex: none;
-  max-width: min(180px, 48%);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  border: 0;
-  background: transparent;
-  color: var(--scene-accent);
-  padding: 3px;
-  font-size: clamp(11px, 1.7cqw, 14px);
-  cursor: pointer;
-}
 
 .scene-map-canvas-wrap {
   flex: 1;
@@ -200,6 +173,8 @@
   width: 100%;
   height: 100%;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .scene-map-canvas:has(.scene-map-node) { cursor: grab; }
 .scene-map-canvas:active { cursor: grabbing; }
@@ -222,7 +197,12 @@
 .scene-map-edge.scene-map-edge-cross { stroke-opacity: .34; }
 .scene-map-edge-control { cursor: pointer; }
 .scene-map-edge-hit { stroke: transparent; stroke-width: 14px; stroke-linecap: round; pointer-events: stroke; }
-.scene-map-view .scene-map-edge-control:focus-visible { outline: none; }
+.scene-map-view :is(.scene-map-canvas, .scene-map-node, .scene-map-edge-control):focus,
+.scene-map-view :is(.scene-map-canvas, .scene-map-node, .scene-map-edge-control):focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.scene-map-canvas, .scene-map-node, .scene-map-edge-control { -webkit-tap-highlight-color: transparent; }
 .scene-map-edge-control:focus-visible:not([aria-expanded="true"]) .scene-map-edge {
   stroke: var(--scene-ink);
   stroke-opacity: .85;
@@ -270,22 +250,12 @@
   line-height: 1.07;
 }
 .scene-map-caption-name {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-.scene-map-node.focus .scene-map-caption-name {
   display: block;
   width: 100%;
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
+  white-space: nowrap;
   overflow-wrap: normal;
-  -webkit-line-clamp: unset;
-}
-@container (min-height: 37px) {
-  .scene-map-caption-name { -webkit-line-clamp: 3; }
 }
 .scene-map-caption[data-outside="true"] .scene-map-caption-body { align-items: start; }
 .scene-map-caption[data-outside="true"] .scene-map-caption-name {
@@ -376,5 +346,4 @@
   .scene-map-filters { gap: 3px; margin-top: 6px; }
   .scene-map-filter { min-height: 26px; gap: 2px; padding: 2px 3px; }
   .scene-map-filter input { width: 10px; height: 10px; }
-  .scene-map-path { padding: 0 6px; }
 }

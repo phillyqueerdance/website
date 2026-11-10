@@ -2,7 +2,7 @@ import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, upcomingFor,
   networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-11";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbors, placeOuterBubble,
   MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT,
-  SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-9";
+  SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-12";
 
 const NS = "http://www.w3.org/2000/svg";
 const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };
@@ -282,7 +282,7 @@ function createLine(map, source, target, link, cross) {
   control.append(element, hit);
   const line = { control, element, hit, source, target, link, midX: 0, midY: 0 };
   control.addEventListener("click", event => {
-    if (!map.skipClick || event.detail === 0) toggleRelationship(map, line, event.detail === 0);
+    if (!map.skipClick || event.detail === 0) toggleRelationship(map, line);
   });
   control.addEventListener("keydown", event => {
     if (event.key === "Enter" || event.key === " ") {
@@ -355,17 +355,16 @@ function updateBubbles(map) {
     else element.removeAttribute("aria-expanded");
     bubble.title.textContent = [item.name, labels[item.kind], description].filter(Boolean).join(" · ");
   }
-  historyPath(map);
 }
 
-function resizeBubble(bubble, shortSide, maxDirect, maxIndirect) {
+function resizeBubble(bubble, shortSide, maxDirect, maxIndirect, labelWidth) {
   // Circle area encodes the count, with a smaller scale for second-degree links.
   const indirect = bubble.depth === 2;
   const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
   bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(bubble.link.count) * scale : shortSide * .148;
-  bubble.labelOutside = bubble.depth !== 0 && bubble.radius < OUTSIDE_LABEL_RADIUS;
+  bubble.labelOutside = bubble.radius < OUTSIDE_LABEL_RADIUS;
   if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius);
-  if (bubble.depth === 0) fitCenterCaption(bubble);
+  fitCaption(bubble, labelWidth);
 }
 
 function paintRadius(bubble, radius) {
@@ -376,40 +375,42 @@ function paintRadius(bubble, radius) {
 }
 
 function paintCaption(bubble, radius) {
-  const center = bubble.depth === 0;
-  const outside = !center && radius < OUTSIDE_LABEL_RADIUS;
-  const width = outside ? SMALL_BUBBLE_LABEL_WIDTH : radius * (center ? 1.65 : 1.76);
-  const height = outside ? SMALL_BUBBLE_LABEL_HEIGHT : radius * (center ? 1 : 1.36);
+  const outside = bubble.labelOutside;
+  const width = outside ? bubble.labelWidth || SMALL_BUBBLE_LABEL_WIDTH : radius * 1.65;
+  const height = outside ? SMALL_BUBBLE_LABEL_HEIGHT : radius;
   bubble.caption.setAttribute("data-outside", outside);
   bubble.caption.setAttribute("x", -width / 2);
   bubble.caption.setAttribute("y", outside ? radius + SMALL_BUBBLE_LABEL_GAP : -height / 2);
   bubble.caption.setAttribute("width", width);
   bubble.caption.setAttribute("height", height);
-  const size = Math.max(11, Math.min(25, radius * .39));
-  bubble.captionBody.style.fontSize = (center && bubble.centerFontSize
-    ? Math.min(size, bubble.centerFontSize * radius / bubble.radius) : size) + "px";
+  let size = Math.max(11, Math.min(25, radius * .39));
+  if (bubble.labelFontSize) {
+    size = outside ? bubble.labelFontSize : bubble.labelFontSize * radius / bubble.radius;
+  }
+  bubble.captionBody.style.fontSize = size + "px";
 }
 
-function fitCenterCaption(bubble) {
+function fitCaption(bubble, maxLabelWidth) {
   const { captionBody, captionName, radius, drawRadius } = bubble;
-  bubble.centerFontSize = null;
+  bubble.labelOutside = false;
+  bubble.labelFontSize = null;
   paintCaption(bubble, radius);
-  const max = parseFloat(captionBody.style.fontSize);
-  const width = captionBody.clientWidth, height = captionBody.clientHeight;
-  const fits = () => captionName.scrollWidth <= width && captionName.scrollHeight <= height;
-  let size = max;
-  if (width && height && !fits()) {
-    let min = 1, upper = max;
-    // Fit the actual wrapped label once at its target size, then scale during the transition.
-    while (upper - min > .25) {
-      const next = (min + upper) / 2;
-      captionBody.style.fontSize = next + "px";
-      if (fits()) min = next;
-      else upper = next;
-    }
-    size = min;
+  const base = parseFloat(captionBody.style.fontSize);
+  const width = captionBody.clientWidth;
+  const fullWidth = captionName.scrollWidth || width;
+  const insideSize = fullWidth > width && width ? base * width / fullWidth - .25 : base;
+  bubble.labelOutside = radius < OUTSIDE_LABEL_RADIUS || insideSize < 11;
+  bubble.labelFontSize = Math.max(1, insideSize);
+  if (bubble.labelOutside) {
+    const naturalWidth = fullWidth * 12 / base;
+    bubble.labelWidth = Math.min(maxLabelWidth, Math.max(SMALL_BUBBLE_LABEL_WIDTH, Math.ceil(naturalWidth) + 2));
+    bubble.labelFontSize = naturalWidth > bubble.labelWidth
+      ? Math.max(1, 12 * (bubble.labelWidth - 2) / naturalWidth) : 12;
   }
-  bubble.centerFontSize = size;
+  paintCaption(bubble, radius);
+  if (captionBody.clientWidth && captionName.scrollWidth > captionBody.clientWidth) {
+    bubble.labelFontSize = Math.max(1, bubble.labelFontSize * captionBody.clientWidth / captionName.scrollWidth - .25);
+  }
   paintCaption(bubble, drawRadius);
 }
 
@@ -520,7 +521,7 @@ function layoutGraph(map, reflow = false) {
     }
   }
   for (const bubble of map.bubbles.values()) {
-    resizeBubble(bubble, Math.min(width, height), maxCounts[1], maxCounts[2]);
+    resizeBubble(bubble, Math.min(width, height), maxCounts[1], maxCounts[2], Math.min(240, width - 24));
     if (Number.isFinite(bubble.x)) {
       bubble.x *= scaleX;
       bubble.y *= scaleY;
@@ -587,22 +588,6 @@ function renderMap(map, reflow = false) {
   else setMessage(map, bubbles.size > 1 ? "" : "No connections match these filters.");
 }
 
-function historyPath(map) {
-  const path = map.scene?.trail.filter(item => matchesQueerFilter(map, item)) || [];
-  map.crumbs.replaceChildren();
-  for (const [index, item] of path.entries()) {
-    if (index) map.crumbs.append(node("span", "", "›"));
-    const button = node("button", "", item.name);
-    button.type = "button";
-    button.onclick = () => {
-      const bubble = map.bubbles.get(item.key);
-      if (bubble) activateBubble(map, bubble);
-      else void startScene(map, item, true);
-    };
-    map.crumbs.append(button);
-  }
-  map.crumbs.hidden = !path.length;
-}
 
 async function loadBranch(scene, item, limit) {
   if (!scene.branches.has(item.key)) {
@@ -669,10 +654,7 @@ async function startScene(map, item, exploring = false) {
     preferred.set(previousKey, [...retainedPeers, ...peerKeys]);
     if (arrival !== previousKey) preferred.set(arrival, [previousKey]);
   }
-  const trail = previous?.trail || [];
-  const back = trail.findIndex(profile => profile.key === item.key);
-  const scene = { origin: item, arrival, preferred, branches: new Map(),
-    trail: back < 0 ? [...trail, item].slice(-6) : trail.slice(0, back + 1) };
+  const scene = { origin: item, arrival, preferred, branches: new Map() };
   map.pendingScene = scene;
   closeRelationship(map);
   closeDetails(map);
@@ -832,9 +814,6 @@ export async function mountSceneMap(host) {
   queerLabel.classList.add("scene-map-filter-queer");
   filters.append(queerLabel);
   const queerToggle = queerLabel.querySelector("input");
-  const crumbs = node("nav", "scene-map-path");
-  crumbs.setAttribute("aria-label", "Exploration path");
-  crumbs.hidden = true;
   const wrap = node("div", "scene-map-canvas-wrap");
   const svg = svgNode("svg", { class: "scene-map-canvas", role: "group", "aria-label": "Scene connections" });
   const graph = svgNode("g"), edgeLayer = svgNode("g"), nodeLayer = svgNode("g");
@@ -850,10 +829,10 @@ export async function mountSceneMap(host) {
   lineInfo.hidden = true;
   lineInfo.setAttribute("aria-label", "Relationship details");
   wrap.append(svg, message, info, lineInfo);
-  root.append(top, crumbs, wrap);
+  root.append(top, wrap);
   host.replaceChildren(root);
 
-  const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, lineInfo, message, crumbs, search: input, results,
+  const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, lineInfo, message, search: input, results,
     scene: null, pendingScene: null, bubbles: new Map(), lines: [], phase: 0, allowed: new Set(KINDS), queerOnly: false,
     dx: 0, dy: 0, width: 0, height: 0, frameRequest: 0, dragged: null, hovered: null, skipClick: false,
     activeLine: null,
@@ -887,8 +866,7 @@ export async function mountSceneMap(host) {
   });
   resize.observe(wrap);
   document.fonts?.ready.then(() => {
-    const center = map.bubbles.get(map.scene?.origin.key);
-    if (root.isConnected && center?.radius) fitCenterCaption(center);
+    if (root.isConnected) layoutGraph(map);
   });
 
   try {

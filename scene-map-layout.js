@@ -16,7 +16,7 @@ export function linkGap(width, height) {
 export function keepInView(bubble, width, height) {
   const margin = Math.min(8, Math.min(width, height) * .03);
   const hitRadius = Math.max(bubble.radius, MIN_BUBBLE_HIT_RADIUS);
-  const side = margin + (bubble.labelOutside ? Math.max(hitRadius, SMALL_BUBBLE_LABEL_WIDTH / 2) : hitRadius);
+  const side = margin + (bubble.labelOutside ? Math.max(hitRadius, (bubble.labelWidth || SMALL_BUBBLE_LABEL_WIDTH) / 2) : hitRadius);
   const bottom = margin + (bubble.labelOutside
     ? Math.max(hitRadius, bubble.radius + SMALL_BUBBLE_LABEL_GAP + SMALL_BUBBLE_LABEL_HEIGHT) : hitRadius);
   bubble.targetX = Math.max(side, Math.min(width - side, bubble.targetX));
@@ -54,8 +54,8 @@ export function orderNeighbors(neighbors, lines) {
 }
 
 function separation(a, b) {
-  return Math.max(a.radius, a.labelOutside ? 23 : MIN_BUBBLE_HIT_RADIUS) +
-    Math.max(b.radius, b.labelOutside ? 23 : MIN_BUBBLE_HIT_RADIUS) + 12;
+  return Math.max(a.radius, a.labelOutside ? (a.labelWidth || SMALL_BUBBLE_LABEL_WIDTH) / 2 : MIN_BUBBLE_HIT_RADIUS) +
+    Math.max(b.radius, b.labelOutside ? (b.labelWidth || SMALL_BUBBLE_LABEL_WIDTH) / 2 : MIN_BUBBLE_HIT_RADIUS) + 12;
 }
 
 export function placeOuterBubble(bubble, parent, center, bubbles, width, height) {
