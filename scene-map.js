@@ -216,16 +216,12 @@ function node(group,item,center) {
     g.append(element("text",{y:11},words.slice(at).join(" ")));
   } else g.append(element("text",{y:4},label));
   g.append(element("text",{y:r+15,class:"node-kind"},types[item.kind].toUpperCase()));
+  g.addEventListener("pointerenter",()=> {
+    if(!center && state.current) inspect(item,item,item);
+  });
   g.addEventListener("click",()=> {
-    if(center)inspect(item, profiles.get(item.key)?.profile || item,null);
-    else {
-      const raw=profiles.get(item.key);
-      inspect(item,raw?.profile||item,item);
-      // A second tap on the same node expands it.
-      if(g.dataset.selected==="yes")visit(item);
-      else {svg.querySelectorAll(".node").forEach(n=>n.dataset.selected="no");
-        g.dataset.selected="yes";}
-    }
+    if(!center) visit(item);
+    else inspect(item,item,null);
   });
   g.addEventListener("keydown",event=>{
     if(event.key==="Enter"||event.key===" "){event.preventDefault();visit(item);}
