@@ -19,9 +19,20 @@ export function participants(event) {
 }
 
 export function connects(kindA, kindB) {
-  // Venue-to-venue and party-to-party are not direct relationships.
-  if (kindA === kindB && (kindA === "venue" || kindA === "party")) return false;
-  return true;
+  // Co-appearing artist IDs never establish a social or collaborative
+  // relationship. Only different entity types are connected by a shared
+  // published event: artist–party, artist–venue, party–venue, etc.
+  return kindA !== kindB;
+}
+
+export function prominence(item) {
+  // Not popularity or a subjective "importance" score. Size reflects
+  // repeated appearances together, with a smaller contribution from
+  // each entity's documented overall activity in the public directory.
+  const shared = Math.max(0, Number(item.count) || 0);
+  const history = Math.max(0, Number(item.profileCount) || 0);
+  return Math.min(1, (Math.log2(shared + 1) * 0.75 +
+    Math.log2(history + 1) * 0.25) / 5.5);
 }
 
 export function connectionsFor(focus, events, known, now = Date.now()) {
@@ -38,7 +49,7 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
       if (!connects(focus.kind, target.kind)) continue;
       let link = found.get(member);
       if (!link) {
-        link = { ...target, key: member, count: 0, upcoming: 0,
+        link = { ...target, key: member, profileCount: target.count, count: 0, upcoming: 0,
           recent: 0, examples: [] };
         found.set(member, link);
       }
@@ -90,14 +101,12 @@ export function relationshipText(source, target) {
   const n = target.count;
   const appearances = `${n} documented ${n === 1 ? "event" : "events"}`;
   const labels = {
-    "artist+artist": "Shared a lineup at",
     "artist+venue": "Performed at",
     "artist+party": "Appeared at",
     "artist+collective": "Appeared on an event with",
     "party+venue": "Hosted at",
     "collective+party": "Appeared together at",
-    "collective+venue": "Appeared together at",
-    "collective+collective": "Co-listed at"
+    "collective+venue": "Appeared together at"
   };
   return `${labels[pair] || "Connected through"} ${appearances}`;
 }
