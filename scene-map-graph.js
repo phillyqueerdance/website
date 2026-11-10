@@ -38,6 +38,7 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
     seenEvents.add(event.eventId);
     const members = participants(event);
     if (!members.includes(focus.key)) continue;
+    const start = Date.parse(event.start);
     for (const member of members) {
       if (member === focus.key || !known.has(member)) continue;
       const target = known.get(member);
@@ -45,27 +46,22 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
       let link = found.get(member);
       if (!link) {
         link = { ...target, key: member, count: 0, upcoming: 0,
-          recent: 0, examples: [] };
+          recent: 0, events: [] };
         found.set(member, link);
       }
       link.count++;
-      const start = Date.parse(event.start);
       if (Number.isFinite(start)) {
         link.recent = Math.max(link.recent, start);
         if (start >= now) link.upcoming++;
       }
-      link.examples.push({ id: event.eventId, title: event.title || "Event", start: event.start || "" });
-      link.examples.sort((a, b) => {
-        const first = Date.parse(a.start) || 0, second = Date.parse(b.start) || 0;
-        if (first >= now || second >= now) {
-          if (first < now) return 1;
-          if (second < now) return -1;
-          return first - second;
-        }
-        return second - first;
-      });
-      if (link.examples.length > 3) link.examples.pop();
+      link.events.push(event);
     }
+  }
+  for (const link of found.values()) {
+    link.events.sort((a, b) => {
+      const first = Date.parse(a.start) || 0, second = Date.parse(b.start) || 0;
+      return first >= now && second >= now ? first - second : second - first;
+    });
   }
   return [...found.values()].sort((a, b) =>
     b.count - a.count || b.upcoming - a.upcoming ||

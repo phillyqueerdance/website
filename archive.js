@@ -863,7 +863,7 @@
     message(params.view === "scene-map" ? "Loading the Scene Map…" : "Loading archive…");
     if (params.view === "scene-map") {
       try {
-        const module = await import("./scene-map.js?v=20261110-scene-map-10");
+        const module = await import("./scene-map.js?v=20261110-scene-map-11");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
@@ -871,6 +871,7 @@
         loadingKey = "";
         previousPoster.disabled = true;
         nextPoster.disabled = true;
+        syncPopup();
       } catch (error) {
         if (serial !== requestNumber) return;
         console.error("Could not start Scene Map:", error);

@@ -1,5 +1,5 @@
 import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, upcomingFor,
-  networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-10";
+  networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-11";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbors, placeOuterBubble,
   MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT,
   SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-9";
@@ -11,9 +11,6 @@ const ROOT_LINKS = 9;
 const AUTO_BRANCHES = 4;
 const MAX_BUBBLES = 1 + ROOT_LINKS + AUTO_BRANCHES;
 const OUTSIDE_LABEL_RADIUS = 26;
-const EVENT_DATE = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric"
-});
 
 function node(tag, className = "", value = "") {
   const element = document.createElement(tag);
@@ -141,8 +138,8 @@ function toggleDetails(map, bubble) {
   const arrival = branch?.links?.find(link => link.key === map.scene.arrival && visibleConnection(map, link));
   if (arrival) {
     map.info.append(node("p", "scene-map-note", arrival.name + " · " + relationshipText(item, arrival)));
-    for (const event of arrival.examples.slice(0, 2)) {
-      map.info.append(anchor(event.title, qdpUrl({ id: event.id }, true)));
+    for (const event of arrival.events.slice(0, 2)) {
+      map.info.append(anchor(event.title, qdpUrl(event, true)));
     }
   }
   const events = branch?.events;
@@ -157,7 +154,10 @@ function toggleDetails(map, bubble) {
 }
 
 function closeRelationship(map) {
-  if (map.activeLine) map.activeLine.control.setAttribute("aria-expanded", "false");
+  if (map.activeLine) {
+    map.activeLine.control.setAttribute("aria-expanded", "false");
+    if (window.QDPArchive) window.QDPArchive.events = [];
+  }
   map.activeLine = null;
   map.lineInfo.hidden = true;
 }
@@ -200,6 +200,43 @@ function positionRelationship(map) {
   popup.style.top = best.top + "px";
 }
 
+function renderRelationshipEvents(events) {
+  const list = node("div", "scene-map-relationship-events");
+  list.tabIndex = 0;
+  list.setAttribute("role", "region");
+  list.setAttribute("aria-label", "Shared events");
+  const days = new Map();
+  for (const event of events) {
+    const date = dateKey(new Date(event.start));
+    if (!days.has(date)) days.set(date, []);
+    days.get(date).push(event);
+  }
+
+  const ordered = [];
+  for (const [date, dayEvents] of days) {
+    const section = node("section", "scene-map-event-day");
+    section.append(node("h3", "date-heading", formatPosterDate(date) + ", " + date.slice(0, 4)));
+    const sorted = sortEvents(dayEvents);
+    ordered.push(...sorted);
+    for (const atTime of groupEventsByStartTime(sorted)) {
+      const group = node("div", "event-time-group");
+      const time = node("div", "event-time");
+      appendStartTime(time, atTime[0]);
+      const cards = node("div", "event-group-cards");
+      for (const [index, event] of atTime.entries()) {
+        const row = node("div", index === 0 ? "event-row has-time" : "event-row same-time");
+        row.append(createEventCard(event));
+        cards.append(row);
+      }
+      group.append(time, cards);
+      section.append(group);
+    }
+    list.append(section);
+  }
+  if (window.QDPArchive) window.QDPArchive.events = ordered;
+  return list;
+}
+
 function toggleRelationship(map, line, keyboard = false) {
   if (map.activeLine === line) {
     closeRelationship(map);
@@ -221,18 +258,10 @@ function toggleRelationship(map, line, keyboard = false) {
   heading.append(node("strong", "", line.source.item.name + " · " + line.target.item.name), close);
   const link = line.link;
   const count = sharedEvents(link.count) + (link.upcoming ? " · " + link.upcoming + " upcoming" : "");
-  const events = node("div", "scene-map-relationship-events");
-  for (const event of link.examples) {
-    const example = anchor(event.title, qdpUrl({ id: event.id }, true));
-    const start = Date.parse(event.start);
-    if (Number.isFinite(start)) {
-      const date = (start >= Date.now() ? "Upcoming · " : "") + EVENT_DATE.format(start);
-      example.append(node("span", "scene-map-relationship-date", date));
-    }
-    events.append(example);
-  }
+  const events = renderRelationshipEvents(link.events);
   map.lineInfo.replaceChildren(heading, node("p", "scene-map-note", count), events);
   map.lineInfo.hidden = false;
+  fitPosterTitles(events);
   positionRelationship(map);
   if (keyboard) close.focus();
 }
@@ -288,10 +317,11 @@ function createBubble(map, item) {
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
   const caption = svgNode("foreignObject", { class: "scene-map-caption", "aria-hidden": "true" });
   const captionBody = node("div", "scene-map-caption-body");
-  captionBody.append(node("span", "scene-map-caption-name", item.name));
+  const captionName = node("span", "scene-map-caption-name", item.name);
+  captionBody.append(captionName);
   caption.append(captionBody);
   element.append(title, circle, hit, caption);
-  const bubble = { item, element, title, circle, hit, caption, captionBody, phase: map.phase++ * 1.7 };
+  const bubble = { item, element, title, circle, hit, caption, captionBody, captionName, phase: map.phase++ * 1.7 };
   element.addEventListener("click", event => {
     if (!map.skipClick || event.detail === 0) activateBubble(map, bubble);
   });
@@ -332,22 +362,54 @@ function resizeBubble(bubble, shortSide, maxDirect, maxIndirect) {
   const indirect = bubble.depth === 2;
   const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
   bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(bubble.link.count) * scale : shortSide * .148;
-  bubble.labelOutside = bubble.radius < OUTSIDE_LABEL_RADIUS;
+  bubble.labelOutside = bubble.depth !== 0 && bubble.radius < OUTSIDE_LABEL_RADIUS;
   if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius);
+  if (bubble.depth === 0) fitCenterCaption(bubble);
 }
 
 function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
-  const outside = radius < OUTSIDE_LABEL_RADIUS;
-  const width = outside ? SMALL_BUBBLE_LABEL_WIDTH : radius * 1.76;
+  paintCaption(bubble, radius);
+}
+
+function paintCaption(bubble, radius) {
+  const center = bubble.depth === 0;
+  const outside = !center && radius < OUTSIDE_LABEL_RADIUS;
+  const width = outside ? SMALL_BUBBLE_LABEL_WIDTH : radius * (center ? 1.65 : 1.76);
+  const height = outside ? SMALL_BUBBLE_LABEL_HEIGHT : radius * (center ? 1 : 1.36);
   bubble.caption.setAttribute("data-outside", outside);
   bubble.caption.setAttribute("x", -width / 2);
-  bubble.caption.setAttribute("y", outside ? radius + SMALL_BUBBLE_LABEL_GAP : -radius * .68);
+  bubble.caption.setAttribute("y", outside ? radius + SMALL_BUBBLE_LABEL_GAP : -height / 2);
   bubble.caption.setAttribute("width", width);
-  bubble.caption.setAttribute("height", outside ? SMALL_BUBBLE_LABEL_HEIGHT : radius * 1.36);
-  bubble.captionBody.style.fontSize = Math.max(11, Math.min(25, radius * .39)) + "px";
+  bubble.caption.setAttribute("height", height);
+  const size = Math.max(11, Math.min(25, radius * .39));
+  bubble.captionBody.style.fontSize = (center && bubble.centerFontSize
+    ? Math.min(size, bubble.centerFontSize * radius / bubble.radius) : size) + "px";
+}
+
+function fitCenterCaption(bubble) {
+  const { captionBody, captionName, radius, drawRadius } = bubble;
+  bubble.centerFontSize = null;
+  paintCaption(bubble, radius);
+  const max = parseFloat(captionBody.style.fontSize);
+  const width = captionBody.clientWidth, height = captionBody.clientHeight;
+  const fits = () => captionName.scrollWidth <= width && captionName.scrollHeight <= height;
+  let size = max;
+  if (width && height && !fits()) {
+    let min = 1, upper = max;
+    // Fit the actual wrapped label once at its target size, then scale during the transition.
+    while (upper - min > .25) {
+      const next = (min + upper) / 2;
+      captionBody.style.fontSize = next + "px";
+      if (fits()) min = next;
+      else upper = next;
+    }
+    size = min;
+  }
+  bubble.centerFontSize = size;
+  paintCaption(bubble, drawRadius);
 }
 
 function positionNewBubbles(map) {
@@ -814,6 +876,10 @@ export async function mountSceneMap(host) {
     else resize.disconnect();
   });
   resize.observe(wrap);
+  document.fonts?.ready.then(() => {
+    const center = map.bubbles.get(map.scene?.origin.key);
+    if (root.isConnected && center?.radius) fitCenterCaption(center);
+  });
 
   try {
     await loadDirectories();

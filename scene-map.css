@@ -276,6 +276,14 @@
   overflow: hidden;
   overflow-wrap: anywhere;
 }
+.scene-map-node.focus .scene-map-caption-name {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+  overflow-wrap: normal;
+  -webkit-line-clamp: unset;
+}
 @container (min-height: 37px) {
   .scene-map-caption-name { -webkit-line-clamp: 3; }
 }
@@ -310,14 +318,53 @@
   font-size: 23px;
   cursor: pointer;
 }
-.scene-map-detail a { display: inline-block; color: var(--scene-accent); margin: 3px 9px 3px 0; text-decoration: underline; }
+.scene-map-detail .scene-map-link { display: inline-block; color: var(--scene-accent); margin: 3px 9px 3px 0; text-decoration: underline; }
 .scene-map-note { margin: 3px 0; color: #d6ccd2; }
-.scene-map-relationship { z-index: 3; inset: auto; width: min(252px, calc(100% - 16px)); }
+.scene-map-relationship {
+  z-index: 3;
+  inset: auto;
+  width: min(390px, calc(100% - 16px));
+  overflow: hidden;
+}
+.scene-map-relationship:not([hidden]) { display: flex; flex-direction: column; }
 .scene-map-relationship .scene-map-detail-heading strong { font-size: clamp(13px, 2cqw, 16px); }
 .scene-map-relationship .scene-map-note { margin-bottom: 7px; }
-.scene-map-relationship-events { display: grid; gap: 6px; }
-.scene-map-relationship-events a { display: block; margin: 0; }
-.scene-map-relationship-date { display: block; color: #d6ccd2; font-size: .86em; }
+.scene-map-relationship-events {
+  container-type: inline-size;
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  padding-inline-end: 4px;
+  --qdp-card-height: 56px;
+  --qdp-card-width: 100%;
+  --qdp-card-padding-x: 8px;
+  --qdp-card-padding-y: 3px;
+  --qdp-card-radius: 15px;
+  --qdp-card-line-gap: 2px;
+  --qdp-time-card-gap: 4px;
+  --qdp-cards-next-time-gap: 5px;
+  --qdp-same-time-card-gap: 3px;
+  --qdp-time-font-size: clamp(12px, 4cqw, 15px);
+  --qdp-title-font-size: clamp(13px, 4.6cqw, 17px);
+  --qdp-venue-font-size: clamp(10px, 3.2cqw, 12px);
+  --qdp-address-font-size: clamp(9px, 2.8cqw, 11px);
+}
+.scene-map-event-day + .scene-map-event-day { margin-top: 11px; }
+.scene-map-event-day .date-heading {
+  justify-content: flex-start;
+  width: auto;
+  height: auto;
+  margin: 0 0 5px;
+  padding: 0;
+  font-size: 13px;
+  text-align: left;
+  white-space: normal;
+}
+.scene-map-relationship-events .event-time-group { grid-template-columns: clamp(38px, 14cqw, 50px) minmax(0, 1fr); }
+.scene-map-relationship-events .event-time { border-radius: var(--qdp-card-radius) 0 0 var(--qdp-card-radius); }
+.scene-map-relationship-events .event-card:focus-visible { outline-offset: -2px; }
 .scene-map-view :focus-visible { outline: 2px solid var(--scene-accent); outline-offset: 2px; }
 .scene-map-results :focus-visible { outline-offset: -2px; }
 
