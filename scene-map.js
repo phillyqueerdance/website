@@ -1,5 +1,5 @@
-import { DIRECTORY_FOR, KINDS, keyOf, connectionsFor, upcomingFor,
-  networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-8";
+import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, upcomingFor,
+  networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-10";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbors, placeOuterBubble,
   MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT,
   SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-9";
@@ -561,7 +561,8 @@ async function loadVisibleConnections(map, scene) {
 
 async function addSecondHop(map, scene) {
   const direct = [...buildNetwork(map, scene).values()].filter(vertex => vertex.depth === 1);
-  const first = direct.slice(0, AUTO_BRANCHES);
+  const arrival = direct.find(vertex => vertex.item.key === scene.arrival);
+  const first = [...new Set([...(arrival ? [arrival] : []), ...direct])].slice(0, AUTO_BRANCHES);
   await Promise.allSettled(first.map(vertex => loadBranch(scene, vertex.item, 1)));
   if (!map.root.isConnected || (map.scene !== scene && map.pendingScene !== scene)) return;
   const current = [...buildNetwork(map, scene).values()];
@@ -578,14 +579,22 @@ async function startScene(map, item, exploring = false) {
   const preferred = new Map();
   if (previousKey) {
     const visible = [...map.bubbles.values()];
-    const neighbors = [];
+    const neighbors = new Set();
     for (const line of map.lines) {
-      if (line.source.item.key === item.key) neighbors.push(line.target.item.key);
-      else if (line.target.item.key === item.key) neighbors.push(line.source.item.key);
+      if (line.source.item.key === item.key) neighbors.add(line.target.item.key);
+      else if (line.target.item.key === item.key) neighbors.add(line.source.item.key);
     }
     const formerPeers = visible.filter(bubble => bubble.parent === previousKey && bubble.item.key !== item.key);
-    preferred.set(item.key, [previousKey, arrival, ...neighbors]);
-    preferred.set(previousKey, formerPeers.map(bubble => bubble.item.key));
+    const commonMembers = new Set();
+    for (const event of previous.branches.get(previousKey)?.events || []) {
+      const members = participants(event);
+      if (members.includes(item.key)) members.forEach(key => commonMembers.add(key));
+    }
+    const sharedContext = formerPeers.filter(bubble => bubble.item.kind !== "artist" && commonMembers.has(bubble.item.key));
+    preferred.set(item.key, [previousKey, arrival, ...sharedContext.map(bubble => bubble.item.key), ...neighbors]);
+    const peerKeys = formerPeers.map(bubble => bubble.item.key);
+    const retainedPeers = (previous.preferred.get(previousKey) || []).filter(key => peerKeys.includes(key));
+    preferred.set(previousKey, [...retainedPeers, ...peerKeys]);
     if (arrival !== previousKey) preferred.set(arrival, [previousKey]);
   }
   const trail = previous?.trail || [];

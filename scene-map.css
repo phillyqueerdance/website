@@ -236,6 +236,13 @@
 .scene-map-canvas:has(.scene-map-edge-control[aria-expanded="true"]) .scene-map-edge-control[aria-expanded="false"] .scene-map-edge {
   opacity: .6;
 }
+@media (hover: hover) {
+  .scene-map-canvas:not(.is-dragging) .scene-map-edge-control:hover .scene-map-edge[data-depth="1"]:not(.scene-map-edge-cross) {
+    stroke: var(--scene-accent);
+    stroke-opacity: 1;
+    opacity: 1;
+  }
+}
 @media (pointer: coarse) {
   .scene-map-edge-hit { stroke-width: 24px; }
 }

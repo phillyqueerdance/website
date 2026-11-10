@@ -93,35 +93,25 @@ export function pickConnections(connections, limit = 12, preferred = []) {
 export function networkFor(origin, branches, eligible, maxBubbles) {
   const nodes = new Map([[origin.key, { item: origin, parent: null, link: null, depth: 0 }]]);
   const root = branches.get(origin.key);
-  const direct = new Map((root?.links || []).map(link => [link.key, link]));
-  const sharesBill = link => origin.kind === "artist" && link.kind === "artist";
-  // Map iteration includes added entries, so direct links are placed before
-  // their branches. Each published profile gets one bubble.
-  for (const vertex of nodes.values()) {
-    const branch = branches.get(vertex.item.key);
-    if (vertex.depth >= 2 || !branch?.links || !branch.limit || nodes.size >= maxBubbles) continue;
-    const candidates = branch.links.filter(link => !nodes.has(link.key) && eligible(link) &&
-      (vertex.depth === 0 || !direct.has(link.key) || sharesBill(link)));
-    const contextual = candidates.filter(link => link.kind !== vertex.item.kind || branch.preferred?.includes(link.key));
+  if (!root?.links || !root.limit || maxBubbles <= 1) return nodes;
+  const direct = new Map(root.links.map(link => [link.key, link]));
+  const ranked = root.links.filter(eligible);
+  const directLimit = Math.min(root.limit, maxBubbles - 1);
+  // Shared-event counts lead. Reserve up to three slots for context from the previous view.
+  const strongest = ranked.slice(0, Math.max(1, directLimit - 3));
+  const context = (root.preferred || []).map(key => direct.get(key)).filter(link => link && eligible(link));
+  const neighbors = [...new Set([...strongest, ...context, ...ranked])].slice(0, directLimit);
+  for (const link of neighbors) {
+    nodes.set(link.key, { item: link, parent: origin.key, link, depth: 1 });
+  }
+  for (const neighbor of neighbors) {
+    const branch = branches.get(neighbor.key);
+    if (!branch?.links || !branch.limit || nodes.size >= maxBubbles) continue;
+    const candidates = branch.links.filter(link => !nodes.has(link.key) && !direct.has(link.key) && eligible(link));
+    const contextual = candidates.filter(link => link.kind !== neighbor.kind || branch.preferred?.includes(link.key));
     const limit = Math.min(branch.limit, maxBubbles - nodes.size);
     for (const link of pickConnections(contextual.length ? contextual : candidates, limit, branch.preferred)) {
-      nodes.set(link.key, { item: link, parent: vertex.item.key, link, depth: vertex.depth + 1 });
-    }
-  }
-  // Keep party and venue context in the neighborhood, then promote any
-  // visible co-bill to the direct level with its own evidence and weight.
-  let firstHop = 0;
-  for (const [key, vertex] of nodes) {
-    const link = direct.get(key);
-    if (!link) continue;
-    Object.assign(vertex, { item: link, parent: origin.key, link, depth: 1 });
-    firstHop++;
-  }
-  const available = Math.min((root?.limit || 0) - firstHop, maxBubbles - nodes.size);
-  if (available > 0) {
-    const more = [...direct.values()].filter(link => sharesBill(link) && eligible(link) && !nodes.has(link.key));
-    for (const link of more.slice(0, available)) {
-      nodes.set(link.key, { item: link, parent: origin.key, link, depth: 1 });
+      nodes.set(link.key, { item: link, parent: neighbor.key, link, depth: 2 });
     }
   }
   return nodes;
