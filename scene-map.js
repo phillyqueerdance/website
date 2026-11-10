@@ -177,11 +177,35 @@ function positionRelationship(map) {
   const x = line.midX + map.dx, y = line.midY + map.dy;
   const margin = 8, gap = 14;
   const width = popup.offsetWidth, height = popup.offsetHeight;
-  const left = Math.max(margin, Math.min(map.width - width - margin, x - width / 2));
-  const preferredTop = y + gap + height <= map.height - margin ? y + gap : y - gap - height;
-  const top = Math.max(margin, Math.min(map.height - height - margin, preferredTop));
-  popup.style.left = left + "px";
-  popup.style.top = top + "px";
+  const leftOfLine = x - width - gap, rightOfLine = x + gap;
+  const aboveLine = y - height - gap, belowLine = y + gap;
+  const options = [
+    [rightOfLine, y - height / 2], [leftOfLine, y - height / 2],
+    [x - width / 2, aboveLine], [x - width / 2, belowLine],
+    [rightOfLine, aboveLine], [leftOfLine, aboveLine], [rightOfLine, belowLine], [leftOfLine, belowLine]
+  ];
+  let best = { score: Infinity };
+  for (const [candidateX, candidateY] of options) {
+    const left = Math.max(margin, Math.min(map.width - width - margin, candidateX));
+    const top = Math.max(margin, Math.min(map.height - height - margin, candidateY));
+    const right = left + width, bottom = top + height;
+    let score = 0;
+    for (const bubble of map.bubbles.values()) {
+      const bx = bubble.x + map.dx, by = bubble.y + map.dy, r = bubble.drawRadius;
+      const overlapX = Math.max(0, Math.min(right, bx + r) - Math.max(left, bx - r));
+      const overlapY = Math.max(0, Math.min(bottom, by + r) - Math.max(top, by - r));
+      score += overlapX * overlapY * (bubble.depth === 0 ? 3 : 1);
+    }
+    for (const connector of map.lines) {
+      const cx = connector.midX + map.dx, cy = connector.midY + map.dy;
+      if (cx > left && cx < right && cy > top && cy < bottom) {
+        score += connector === line ? width * height : 700;
+      }
+    }
+    if (score < best.score) best = { left, top, score };
+  }
+  popup.style.left = best.left + "px";
+  popup.style.top = best.top + "px";
 }
 
 function showRelationship(map, line, pin = false) {
