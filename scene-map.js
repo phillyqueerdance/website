@@ -2,7 +2,7 @@ import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, upcomingFor,
   networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-11";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbors, placeOuterBubble,
   MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT,
-  SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-12";
+  SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-12a";
 
 const NS = "http://www.w3.org/2000/svg";
 const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };

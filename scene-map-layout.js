@@ -54,8 +54,13 @@ export function orderNeighbors(neighbors, lines) {
 }
 
 function separation(a, b) {
-  return Math.max(a.radius, a.labelOutside ? (a.labelWidth || SMALL_BUBBLE_LABEL_WIDTH) / 2 : MIN_BUBBLE_HIT_RADIUS) +
-    Math.max(b.radius, b.labelOutside ? (b.labelWidth || SMALL_BUBBLE_LABEL_WIDTH) / 2 : MIN_BUBBLE_HIT_RADIUS) + 12;
+  const distance = Math.hypot(b.targetX - a.targetX, b.targetY - a.targetY) || 1;
+  const down = (b.targetY - a.targetY) / distance;
+  const labelSpace = SMALL_BUBBLE_LABEL_GAP + SMALL_BUBBLE_LABEL_HEIGHT;
+  const aBottom = a.labelOutside ? Math.max(0, down) * labelSpace : 0;
+  const bBottom = b.labelOutside ? Math.max(0, -down) * labelSpace : 0;
+  return Math.max(a.radius + aBottom, a.labelOutside ? (a.labelWidth || SMALL_BUBBLE_LABEL_WIDTH) / 2 : MIN_BUBBLE_HIT_RADIUS) +
+    Math.max(b.radius + bBottom, b.labelOutside ? (b.labelWidth || SMALL_BUBBLE_LABEL_WIDTH) / 2 : MIN_BUBBLE_HIT_RADIUS) + 12;
 }
 
 export function placeOuterBubble(bubble, parent, center, bubbles, width, height) {
