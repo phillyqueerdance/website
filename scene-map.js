@@ -1,4 +1,4 @@
-import {DIRECTORY_FOR,KINDS,keyOf,connectionsFor,pickConnections,upcomingFor,relationshipText,prominence} from "./scene-map-graph.js?v=20261110-scene-map-2";
+import {DIRECTORY_FOR,KINDS,keyOf,connectionsFor,pickConnections,upcomingFor,relationshipText,prominence} from "./scene-map-graph.js?v=20261110-scene-map-3";
 const NS="http://www.w3.org/2000/svg";
 const colors={artist:"#fa2b5a",party:"#922185",venue:"#ff7945",collective:"#000"};
 const labels={artist:"Artist",party:"Party",venue:"Venue",collective:"Collective"};
@@ -9,7 +9,22 @@ const key=item=>keyOf(item.kind,item.id);
 const short=(str,max=19)=>str.length>max?str.slice(0,max-1)+"…":str;
 const qdpUrl=(item,event=false)=>{const u=new URL("/",location.origin);if(event)u.searchParams.set("event",item.eventId||item.id);else{u.searchParams.set("archive",item.kind);u.searchParams.set("id",item.id);}return u.href;};
 async function resource(kind,id){const u=new URL("/api/archive",location.origin);u.searchParams.set("resource",kind);if(id)u.searchParams.set("id",id);const r=await fetch(u,{cache:"no-cache"});if(!r.ok)throw Error("Public archive unavailable ("+r.status+")");return r.json();}
-async function loadDirectories(){if(known.size)return;const out=await Promise.allSettled(KINDS.map(async k=>{const d=await resource(DIRECTORY_FOR[k]);for(const p of d[DIRECTORY_FOR[k]]||[])if(p?.id&&p?.name)known.set(keyOf(k,p.id),{...p,kind:k});}));if(!known.size)throw Error("Public directories unavailable");if(out.some(x=>x.status==="rejected"))console.warn("A QDP directory was unavailable");}
+async function loadDirectories() {
+  if (known.size) return;
+  const results = await Promise.allSettled(KINDS.map(async kind => {
+    const directory = DIRECTORY_FOR[kind];
+    const data = await resource(directory);
+    for (const profile of data[directory] || []) {
+      if (!profile?.id || !profile?.name) continue;
+      const profileKey = keyOf(kind, profile.id);
+      known.set(profileKey, { ...profile, kind, key: profileKey });
+    }
+  }));
+  if (!known.size) throw new Error("Public directories unavailable");
+  if (results.some(result => result.status === "rejected")) {
+    console.warn("A QDP directory was unavailable");
+  }
+}
 async function profile(item){const k=key(item);if(!cache.has(k))cache.set(k,resource(item.kind,item.id).then(d=>{if(!d.profile||!Array.isArray(d.events))throw Error("Invalid profile");return d;}).catch(e=>{cache.delete(k);throw e;}));return cache.get(k);}
 function anchor(text,url){const a=node("a","scene-map-link",text);a.href=url;a.dataset.archiveLink="";return a;}
 function details(c,item,edge=null){
