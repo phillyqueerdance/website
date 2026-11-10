@@ -42,7 +42,7 @@
     }
   } catch (error) { console.warn("Initial profile unavailable:", error); }
   const directoryViews = new Set(["artists", "venues", "parties", "collectives"]);
-  const validViews = new Set([...directoryViews, ...Object.keys(profileViews), "events"]);
+  const validViews = new Set([...directoryViews, ...Object.keys(profileViews), "events", "scene-map"]);
   let renderedKey = "";
   let loadingKey = "";
   let renderedAt = 0;
@@ -309,6 +309,7 @@
     profileNavigation = null;
     archiveBack.hidden = true;
     archivePage.classList.remove("is-open");
+    archiveStack.classList.remove("scene-map-stack");
     clearTimeout(pageExitTimer);
     pageExitTimer = setTimeout(() => {
       if (!archive.active) archiveViewport.hidden = true;
@@ -808,7 +809,7 @@
       }
       if (loadingKey !== params.key) {
         syncPopup();
-        if (Date.now() - renderedAt >= CLIENT_CACHE_MS) refreshCurrentRoute(params);
+        if (params.view !== "scene-map" && Date.now() - renderedAt >= CLIENT_CACHE_MS) refreshCurrentRoute(params);
       }
       return;
     }
@@ -836,6 +837,7 @@
     document.body.classList.add("archive-mode");
     document.documentElement.classList.add("archive-open");
     archiveStack.classList.toggle("profile-events", Boolean(profileViews[params.view]));
+    archiveStack.classList.toggle("scene-map-stack", params.view === "scene-map");
     setProfile("");
     window.QDPEventLinks?.clear();
     archiveViewport.hidden = false;
@@ -851,12 +853,30 @@
     });
     closeDatePopover();
     archiveStack.hidden = false;
-    header(params.view === "events" ?
+    header(params.view === "scene-map" ? "Explore the Scene" : params.view === "events" ?
       (params.month ? `${monthName(params.month)} ${params.month.slice(0, 4)}` : "Past Events") :
       params.view[0].toUpperCase() + params.view.slice(1));
     if (!window.QDPInfoView?.active) document.title = window.QDPProfileMetadata?.directories?.[params.view]?.title ||
       `${archiveHeader.textContent} | Queer Dance Philly`;
-    message("Loading archive…");
+    message(params.view === "scene-map" ? "Loading the Scene Map…" : "Loading archive…");
+    if (params.view === "scene-map") {
+      try {
+        const module = await import("./scene-map.js");
+        if (serial !== requestNumber) return;
+        await module.mountSceneMap(archiveStack);
+        if (serial !== requestNumber) return;
+        renderedAt = Date.now();
+        loadingKey = "";
+        previousPoster.disabled = true;
+        nextPoster.disabled = true;
+      } catch (error) {
+        if (serial !== requestNumber) return;
+        console.error("Could not start Scene Map:", error);
+        loadingKey = "";
+        loadError(error);
+      }
+      return;
+    }
 
     const resource = params.view === "events" ? (params.month ? "month" : "months") : params.view;
     const value = params.id || params.month;
@@ -981,6 +1001,11 @@
       }
       // Popup arrows belong to the open event, even while its feed scrolls.
       if (!eventDetail.hidden) return;
+      if (routeParams().view === "scene-map") {
+        previousPoster.disabled = true;
+        nextPoster.disabled = true;
+        return;
+      }
       if (profileViews[routeParams().view]) {
         const label = routeParams().view;
         const previous = profileNavigation?.profiles[profileNavigation.index - 1];
