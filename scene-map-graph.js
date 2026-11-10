@@ -49,10 +49,17 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
         link.recent = Math.max(link.recent, start);
         if (start >= now) link.upcoming++;
       }
-      if (link.examples.length < 3) {
-        link.examples.push({ id: event.eventId, title: event.title || "Event",
-          start: event.start || "" });
-      }
+      link.examples.push({ id: event.eventId, title: event.title || "Event", start: event.start || "" });
+      link.examples.sort((a, b) => {
+        const first = Date.parse(a.start) || 0, second = Date.parse(b.start) || 0;
+        if (first >= now || second >= now) {
+          if (first < now) return 1;
+          if (second < now) return -1;
+          return first - second;
+        }
+        return second - first;
+      });
+      if (link.examples.length > 3) link.examples.pop();
     }
   }
   return [...found.values()].sort((a, b) =>

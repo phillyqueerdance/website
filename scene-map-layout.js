@@ -1,4 +1,9 @@
 // Keep connected bubbles close and leave space between their outlines.
+export const MIN_BUBBLE_HIT_RADIUS = 13;
+export const SMALL_BUBBLE_LABEL_WIDTH = 80;
+export const SMALL_BUBBLE_LABEL_HEIGHT = 27;
+export const SMALL_BUBBLE_LABEL_GAP = 3;
+
 export function relationshipStrength(count) {
   const weight = Math.log(count);
   return weight / (weight + 1);
@@ -9,9 +14,13 @@ export function linkGap(width, height) {
 }
 
 export function keepInView(bubble, width, height) {
-  const padding = bubble.radius + Math.min(8, Math.min(width, height) * .03);
-  bubble.targetX = Math.max(padding, Math.min(width - padding, bubble.targetX));
-  bubble.targetY = Math.max(padding, Math.min(height - padding, bubble.targetY));
+  const margin = Math.min(8, Math.min(width, height) * .03);
+  const hitRadius = Math.max(bubble.radius, MIN_BUBBLE_HIT_RADIUS);
+  const side = margin + (bubble.labelOutside ? Math.max(hitRadius, SMALL_BUBBLE_LABEL_WIDTH / 2) : hitRadius);
+  const bottom = margin + (bubble.labelOutside
+    ? Math.max(hitRadius, bubble.radius + SMALL_BUBBLE_LABEL_GAP + SMALL_BUBBLE_LABEL_HEIGHT) : hitRadius);
+  bubble.targetX = Math.max(side, Math.min(width - side, bubble.targetX));
+  bubble.targetY = Math.max(hitRadius + margin, Math.min(height - bottom, bubble.targetY));
 }
 
 function movePair(a, b, distance, dx, dy, gap, strength, held) {
@@ -42,7 +51,8 @@ export function settleBubbles(bubbles, width, height, held) {
         const b = nodes[next];
         const dx = b.targetX - a.targetX || .01, dy = b.targetY - a.targetY;
         const distance = Math.hypot(dx, dy);
-        const clearance = a.radius + b.radius + 12;
+        const clearance = Math.max(a.radius, a.labelOutside ? 23 : MIN_BUBBLE_HIT_RADIUS) +
+          Math.max(b.radius, b.labelOutside ? 23 : MIN_BUBBLE_HIT_RADIUS) + 12;
         if (distance < clearance) movePair(a, b, distance, dx, dy, clearance, .54, held);
       }
     }

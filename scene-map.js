@@ -1,6 +1,7 @@
 import { DIRECTORY_FOR, KINDS, keyOf, connectionsFor, upcomingFor,
-  networkFor, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-6";
-import { relationshipStrength, linkGap, keepInView, settleBubbles } from "./scene-map-layout.js?v=20261110-scene-map-5";
+  networkFor, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-7";
+import { relationshipStrength, linkGap, keepInView, settleBubbles, MIN_BUBBLE_HIT_RADIUS,
+  SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT, SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-7";
 
 const NS = "http://www.w3.org/2000/svg";
 const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };
@@ -8,6 +9,9 @@ const known = new Map(), cache = new Map();
 const ROOT_LINKS = 9;
 const AUTO_BRANCHES = 4;
 const MAX_BUBBLES = 1 + ROOT_LINKS + AUTO_BRANCHES;
+const EVENT_DATE = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric"
+});
 
 function node(tag, className = "", value = "") {
   const element = document.createElement(tag);
@@ -104,12 +108,17 @@ function setMessage(map, text) {
   map.message.hidden = !text;
 }
 
+function sharedEvents(count) {
+  return count + (count === 1 ? " shared event" : " shared events");
+}
+
 function closeDetails(map) {
   map.info.hidden = true;
   map.svg.querySelector(".scene-map-node.focus")?.setAttribute("aria-expanded", "false");
 }
 
 function toggleDetails(map, bubble) {
+  closeRelationship(map);
   if (!map.info.hidden) {
     closeDetails(map);
     return;
@@ -145,18 +154,143 @@ function toggleDetails(map, bubble) {
   bubble.element.setAttribute("aria-expanded", "true");
 }
 
+function closeRelationship(map) {
+  clearTimeout(map.lineTimer);
+  if (map.activeLine) map.activeLine.control.setAttribute("aria-expanded", "false");
+  map.activeLine = null;
+  map.linePinned = false;
+  map.lineInfo.hidden = true;
+}
+
+function scheduleRelationshipClose(map, line) {
+  if (!line || map.activeLine !== line || map.linePinned) return;
+  clearTimeout(map.lineTimer);
+  map.lineTimer = setTimeout(() => {
+    if (map.activeLine === line && !map.linePinned) closeRelationship(map);
+  }, 240);
+}
+
+function positionRelationship(map) {
+  const line = map.activeLine;
+  if (!line) return;
+  const popup = map.lineInfo;
+  const x = line.midX + map.dx, y = line.midY + map.dy;
+  const margin = 8, gap = 14;
+  const width = popup.offsetWidth, height = popup.offsetHeight;
+  const left = Math.max(margin, Math.min(map.width - width - margin, x - width / 2));
+  const preferredTop = y + gap + height <= map.height - margin ? y + gap : y - gap - height;
+  const top = Math.max(margin, Math.min(map.height - height - margin, preferredTop));
+  popup.style.left = left + "px";
+  popup.style.top = top + "px";
+}
+
+function showRelationship(map, line, pin = false) {
+  clearTimeout(map.lineTimer);
+  if (map.activeLine === line) {
+    map.linePinned ||= pin;
+    return;
+  }
+  closeRelationship(map);
+  closeDetails(map);
+  map.activeLine = line;
+  map.linePinned = pin;
+  line.control.setAttribute("aria-expanded", "true");
+
+  const heading = node("div", "scene-map-detail-heading");
+  const close = node("button", "scene-map-close", "×");
+  close.type = "button";
+  close.setAttribute("aria-label", "Close relationship details");
+  close.onclick = () => {
+    closeRelationship(map);
+    line.control.focus();
+  };
+  heading.append(node("strong", "", line.parent.item.name + " · " + line.child.item.name), close);
+  const link = line.child.link;
+  const count = sharedEvents(link.count) + (link.upcoming ? " · " + link.upcoming + " upcoming" : "");
+  const events = node("div", "scene-map-relationship-events");
+  for (const event of link.examples) {
+    const example = anchor(event.title, qdpUrl({ id: event.id }, true));
+    const start = Date.parse(event.start);
+    if (Number.isFinite(start)) {
+      const date = (start >= Date.now() ? "Upcoming · " : "") + EVENT_DATE.format(start);
+      example.append(node("span", "scene-map-relationship-date", date));
+    }
+    events.append(example);
+  }
+  map.lineInfo.replaceChildren(heading, node("p", "scene-map-note", count), events);
+  map.lineInfo.hidden = false;
+  positionRelationship(map);
+}
+
+function toggleRelationship(map, line, keyboard = false) {
+  if (map.activeLine === line && map.linePinned) {
+    closeRelationship(map);
+    return;
+  }
+  showRelationship(map, line, true);
+  if (keyboard) map.lineInfo.querySelector("button")?.focus();
+}
+
+function createLine(map, parent, child) {
+  const control = svgNode("g", {
+    class: "scene-map-edge-control", role: "button", tabindex: "0",
+    "aria-label": parent.item.name + " and " + child.item.name + ", " + sharedEvents(child.link.count),
+    "aria-controls": map.lineInfo.id, "aria-expanded": "false"
+  });
+  const element = svgNode("line", {
+    class: "scene-map-edge", "data-depth": child.depth,
+    "stroke-width": 1.6 + relationshipStrength(child.link.count) * 4
+  });
+  const hit = svgNode("line", { class: "scene-map-edge-hit", "aria-hidden": "true" });
+  control.append(element, hit);
+  const line = { control, element, hit, parent, child, midX: 0, midY: 0 };
+  control.addEventListener("pointerenter", event => {
+    if (event.pointerType !== "touch" && !map.svg.classList.contains("is-dragging")) showRelationship(map, line);
+  });
+  control.addEventListener("pointerleave", () => scheduleRelationshipClose(map, line));
+  control.addEventListener("click", event => {
+    if (!map.skipClick || event.detail === 0) toggleRelationship(map, line, event.detail === 0);
+  });
+  control.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleRelationship(map, line, true);
+    }
+  });
+  return line;
+}
+
+function bindRelationshipDetails(map) {
+  map.lineInfo.addEventListener("pointerenter", () => clearTimeout(map.lineTimer));
+  map.lineInfo.addEventListener("pointerleave", () => scheduleRelationshipClose(map, map.activeLine));
+  map.root.addEventListener("pointerdown", event => {
+    if (map.activeLine && !map.lineInfo.contains(event.target) && !event.target.closest(".scene-map-edge-control")) {
+      closeRelationship(map);
+    }
+  });
+  map.root.addEventListener("keydown", event => {
+    if (event.key !== "Escape" || !map.activeLine) return;
+    const restore = map.lineInfo.contains(document.activeElement) ? map.activeLine.control : null;
+    closeRelationship(map);
+    restore?.focus();
+    event.stopPropagation();
+    event.preventDefault();
+  });
+}
+
 function createBubble(map, item) {
   const element = svgNode("g", {
     class: "scene-map-node", "data-kind": item.kind, "data-key": item.key, role: "button", tabindex: "0"
   });
   const title = svgNode("title");
-  const circle = svgNode("circle");
+  const circle = svgNode("circle", { class: "scene-map-node-disc" });
+  const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
   const caption = svgNode("foreignObject", { class: "scene-map-caption", "aria-hidden": "true" });
   const captionBody = node("div", "scene-map-caption-body");
   captionBody.append(node("span", "scene-map-caption-name", item.name));
   caption.append(captionBody);
-  element.append(title, circle, caption);
-  const bubble = { item, element, title, circle, caption, captionBody, phase: map.phase++ * 1.7 };
+  element.append(title, circle, hit, caption);
+  const bubble = { item, element, title, circle, hit, caption, captionBody, phase: map.phase++ * 1.7 };
   element.addEventListener("click", event => {
     if (!map.skipClick || event.detail === 0) activateBubble(map, bubble);
   });
@@ -179,7 +313,7 @@ function updateBubbles(map) {
     const { item, element, link } = bubble;
     const isSelected = bubble.depth === 0;
     const parent = map.bubbles.get(bubble.parent);
-    const count = link ? link.count + (link.count === 1 ? " shared event" : " shared events") : "";
+    const count = link ? sharedEvents(link.count) : "";
     const description = parent ? count + " with " + parent.item.name : count;
     element.classList.toggle("focus", isSelected);
     element.setAttribute("data-depth", bubble.depth);
@@ -192,20 +326,26 @@ function updateBubbles(map) {
   historyPath(map);
 }
 
-function resizeBubble(bubble, shortSide) {
-  const strength = bubble.link ? relationshipStrength(bubble.link.count) : 0;
-  const relativeSize = bubble.depth === 0 ? .148 : .065 + .066 * strength;
-  bubble.radius = shortSide * relativeSize * (bubble.depth === 2 ? .82 : 1);
+function resizeBubble(bubble, shortSide, maxDirect, maxIndirect) {
+  // Circle area encodes the count, with a smaller scale for second-degree links.
+  const indirect = bubble.depth === 2;
+  const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
+  bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(bubble.link.count) * scale : shortSide * .148;
+  bubble.labelOutside = bubble.radius < 22;
   if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius);
 }
 
 function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
-  bubble.caption.setAttribute("x", -radius * .88);
-  bubble.caption.setAttribute("y", -radius * .68);
-  bubble.caption.setAttribute("width", radius * 1.76);
-  bubble.caption.setAttribute("height", radius * 1.36);
+  bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
+  const outside = radius < 22;
+  const width = outside ? SMALL_BUBBLE_LABEL_WIDTH : radius * 1.76;
+  bubble.caption.setAttribute("data-outside", outside);
+  bubble.caption.setAttribute("x", -width / 2);
+  bubble.caption.setAttribute("y", outside ? radius + SMALL_BUBBLE_LABEL_GAP : -radius * .68);
+  bubble.caption.setAttribute("width", width);
+  bubble.caption.setAttribute("height", outside ? SMALL_BUBBLE_LABEL_HEIGHT : radius * 1.36);
   bubble.captionBody.style.fontSize = Math.max(11, Math.min(25, radius * .39)) + "px";
 }
 
@@ -255,7 +395,9 @@ function paintGraph(map, time) {
       bubble.y = bubble.targetY;
       if (bubble.drawRadius !== bubble.radius) paintRadius(bubble, bubble.radius);
     } else if (time !== undefined && bubble !== map.dragged) {
-      const float = bubble.depth === 0 || bubble === map.hovered || bubble.element === document.activeElement ? 0 : 4;
+      const steady = bubble.depth === 0 || bubble === map.hovered || bubble.element === document.activeElement ||
+        bubble === map.activeLine?.parent || bubble === map.activeLine?.child;
+      const float = steady ? 0 : 4;
       const x = bubble.targetX + float * Math.sin(time / 1600 + bubble.phase);
       const y = bubble.targetY + float * Math.cos(time / 1900 + bubble.phase);
       bubble.x += (x - bubble.x) * .16;
@@ -267,15 +409,22 @@ function paintGraph(map, time) {
     }
     bubble.element.setAttribute("transform", "translate(" + bubble.x.toFixed(2) + " " + bubble.y.toFixed(2) + ")");
   }
-  for (const { element, parent, child } of map.lines) {
+  for (const line of map.lines) {
+    const { element, hit, parent, child } = line;
     const dx = child.x - parent.x, dy = child.y - parent.y;
     const distance = Math.hypot(dx, dy) || 1;
     const trim = Math.max(0, Math.min(3, (distance - parent.drawRadius - child.drawRadius) / 2));
     const start = (parent.drawRadius + trim) / distance, end = (child.drawRadius + trim) / distance;
-    element.setAttribute("x1", parent.x + dx * start);
-    element.setAttribute("y1", parent.y + dy * start);
-    element.setAttribute("x2", child.x - dx * end);
-    element.setAttribute("y2", child.y - dy * end);
+    const x1 = parent.x + dx * start, y1 = parent.y + dy * start;
+    const x2 = child.x - dx * end, y2 = child.y - dy * end;
+    line.midX = (x1 + x2) / 2;
+    line.midY = (y1 + y2) / 2;
+    for (const stroke of [element, hit]) {
+      stroke.setAttribute("x1", x1);
+      stroke.setAttribute("y1", y1);
+      stroke.setAttribute("x2", x2);
+      stroke.setAttribute("y2", y2);
+    }
   }
 }
 
@@ -299,8 +448,12 @@ function layoutGraph(map, recenter = false) {
   }
   map.svg.setAttribute("viewBox", "0 0 " + width + " " + height);
   const scaleX = width / (map.width || width), scaleY = height / (map.height || height);
+  const maxCounts = [1, 1, 1];
   for (const bubble of map.bubbles.values()) {
-    resizeBubble(bubble, Math.min(width, height));
+    if (bubble.link) maxCounts[bubble.depth] = Math.max(maxCounts[bubble.depth], bubble.link.count);
+  }
+  for (const bubble of map.bubbles.values()) {
+    resizeBubble(bubble, Math.min(width, height), maxCounts[1], maxCounts[2]);
     if (Number.isFinite(bubble.x)) {
       bubble.x *= scaleX;
       bubble.y *= scaleY;
@@ -313,6 +466,7 @@ function layoutGraph(map, recenter = false) {
   positionNewBubbles(map);
   settleBubbles(map.bubbles, width, height, map.dragged);
   paintGraph(map);
+  positionRelationship(map);
   animateGraph(map);
 }
 
@@ -321,6 +475,7 @@ function buildNetwork(map, scene) {
 }
 
 function renderMap(map, recenter = false) {
+  closeRelationship(map);
   const scene = map.scene;
   const network = scene ? buildNetwork(map, scene) : new Map();
   const bubbles = new Map();
@@ -337,13 +492,9 @@ function renderMap(map, recenter = false) {
   for (const child of bubbles.values()) {
     const parent = bubbles.get(child.parent);
     if (!parent) continue;
-    const element = svgNode("line", {
-      class: "scene-map-edge", "data-depth": child.depth,
-      "stroke-width": 1.6 + relationshipStrength(child.link.count) * 4
-    });
-    map.lines.push({ parent, child, element });
+    map.lines.push(createLine(map, parent, child));
   }
-  map.edgeLayer.replaceChildren(...map.lines.map(line => line.element));
+  map.edgeLayer.replaceChildren(...map.lines.map(line => line.control));
   updateBubbles(map);
   layoutGraph(map, recenter);
   if (map.pendingScene && map.pendingScene !== scene) setMessage(map, "Loading " + map.pendingScene.origin.name + "…");
@@ -412,6 +563,7 @@ async function startScene(map, item, exploring = false) {
   const scene = { origin: item, arrival, preferred, branches: new Map(),
     trail: back < 0 ? [...trail, item].slice(-6) : trail.slice(0, back + 1) };
   map.pendingScene = scene;
+  closeRelationship(map);
   closeDetails(map);
   setMessage(map, "Loading " + item.name + "…");
   if (!map.scene) {
@@ -507,6 +659,7 @@ function bindDrag(map) {
       if (Math.hypot(dx, dy) < 5) return;
       gesture.moved = true;
       map.skipClick = true;
+      closeRelationship(map);
       map.dragged = gesture.bubble;
       map.svg.setPointerCapture(event.pointerId);
       map.svg.classList.add("is-dragging");
@@ -579,13 +732,18 @@ export async function mountSceneMap(host) {
   const info = node("section", "scene-map-detail");
   info.hidden = true;
   info.setAttribute("aria-label", "Profile details");
-  wrap.append(svg, message, info);
+  const lineInfo = node("section", "scene-map-detail scene-map-relationship");
+  lineInfo.id = "scene-map-relationship-details";
+  lineInfo.hidden = true;
+  lineInfo.setAttribute("aria-label", "Relationship details");
+  wrap.append(svg, message, info, lineInfo);
   root.append(top, crumbs, wrap);
   host.replaceChildren(root);
 
-  const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, message, crumbs, search: input, results,
+  const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, lineInfo, message, crumbs, search: input, results,
     scene: null, pendingScene: null, bubbles: new Map(), lines: [], phase: 0, allowed: new Set(KINDS), queerOnly: false,
     dx: 0, dy: 0, width: 0, height: 0, frameRequest: 0, dragged: null, hovered: null, skipClick: false,
+    activeLine: null, linePinned: false, lineTimer: 0,
     reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)") };
   input.addEventListener("input", () => search(map));
   filters.addEventListener("change", () => {
@@ -606,6 +764,7 @@ export async function mountSceneMap(host) {
     }
   });
   bindDrag(map);
+  bindRelationshipDetails(map);
   const resize = new ResizeObserver(() => {
     if (root.isConnected) layoutGraph(map);
     else resize.disconnect();
