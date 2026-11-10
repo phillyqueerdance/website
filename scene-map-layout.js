@@ -1,6 +1,6 @@
 // Keep connected bubbles close and leave space between their outlines.
 export const MIN_BUBBLE_HIT_RADIUS = 13;
-export const SMALL_BUBBLE_LABEL_WIDTH = 80;
+export const SMALL_BUBBLE_LABEL_WIDTH = 90;
 export const SMALL_BUBBLE_LABEL_HEIGHT = 27;
 export const SMALL_BUBBLE_LABEL_GAP = 3;
 
@@ -23,6 +23,61 @@ export function keepInView(bubble, width, height) {
   bubble.targetY = Math.max(hitRadius + margin, Math.min(height - bottom, bubble.targetY));
 }
 
+export function orderNeighbors(neighbors, lines) {
+  const slots = new Map(neighbors.map((bubble, index) => [bubble, index]));
+  const pairs = lines.filter(line => slots.has(line.source) && slots.has(line.target));
+  if (!pairs.length) return neighbors;
+  const span = () => pairs.reduce((sum, line) => {
+    const distance = Math.abs(slots.get(line.source) - slots.get(line.target));
+    return sum + Math.min(distance, neighbors.length - distance) * Math.min(3, line.link.count);
+  }, 0);
+  let best = span();
+  // Keep related neighbors on nearby parts of the ring so their chords cross fewer spokes.
+  for (let pass = 0; pass < 3; pass++) {
+    const before = best;
+    for (const [index, a] of neighbors.entries()) {
+      for (const b of neighbors.slice(index + 1)) {
+        const first = slots.get(a), second = slots.get(b);
+        slots.set(a, second);
+        slots.set(b, first);
+        const cost = span();
+        if (cost < best) best = cost;
+        else {
+          slots.set(a, first);
+          slots.set(b, second);
+        }
+      }
+    }
+    if (best === before) break;
+  }
+  return neighbors.sort((a, b) => slots.get(a) - slots.get(b));
+}
+
+function separation(a, b) {
+  return Math.max(a.radius, a.labelOutside ? 23 : MIN_BUBBLE_HIT_RADIUS) +
+    Math.max(b.radius, b.labelOutside ? 23 : MIN_BUBBLE_HIT_RADIUS) + 12;
+}
+
+export function placeOuterBubble(bubble, parent, center, bubbles, width, height) {
+  const angle = Math.atan2(parent.targetY - center.targetY, parent.targetX - center.targetX);
+  const distance = parent.radius + bubble.radius + linkGap(width, height);
+  let best = { score: Infinity };
+  for (const turn of [0, -.65, .65, -1.3, 1.3, -1.95, 1.95]) {
+    bubble.targetX = parent.targetX + Math.cos(angle + turn) * distance;
+    bubble.targetY = parent.targetY + Math.sin(angle + turn) * distance;
+    keepInView(bubble, width, height);
+    let score = Math.abs(turn) * 35;
+    for (const other of bubbles) {
+      if (other === bubble || !Number.isFinite(other.targetX)) continue;
+      const gap = Math.hypot(other.targetX - bubble.targetX, other.targetY - bubble.targetY);
+      score += Math.max(0, separation(bubble, other) - gap) ** 2;
+    }
+    if (score < best.score) best = { score, x: bubble.targetX, y: bubble.targetY };
+  }
+  bubble.targetX = best.x;
+  bubble.targetY = best.y;
+}
+
 function movePair(a, b, distance, dx, dy, gap, strength, held) {
   const pull = (distance - gap) * strength / distance;
   if (a.parent && a !== held) {
@@ -37,22 +92,13 @@ function movePair(a, b, distance, dx, dy, gap, strength, held) {
 
 export function settleBubbles(bubbles, width, height, held) {
   const nodes = [...bubbles.values()];
-  const gap = linkGap(width, height);
   for (let pass = 0; pass < 38; pass++) {
-    for (const child of nodes) {
-      const parent = bubbles.get(child.parent);
-      if (!parent) continue;
-      const dx = child.targetX - parent.targetX, dy = child.targetY - parent.targetY;
-      const distance = Math.hypot(dx, dy);
-      if (distance > 0) movePair(parent, child, distance, dx, dy, parent.radius + child.radius + gap, .11, held);
-    }
     for (const [index, a] of nodes.entries()) {
       for (let next = index + 1; next < nodes.length; next++) {
         const b = nodes[next];
         const dx = b.targetX - a.targetX || .01, dy = b.targetY - a.targetY;
         const distance = Math.hypot(dx, dy);
-        const clearance = Math.max(a.radius, a.labelOutside ? 23 : MIN_BUBBLE_HIT_RADIUS) +
-          Math.max(b.radius, b.labelOutside ? 23 : MIN_BUBBLE_HIT_RADIUS) + 12;
+        const clearance = separation(a, b);
         if (distance < clearance) movePair(a, b, distance, dx, dy, clearance, .54, held);
       }
     }

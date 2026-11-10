@@ -217,15 +217,27 @@
   inset: 7px 7% auto;
   transform: none;
 }
-.scene-map-edge { stroke: var(--scene-ink); stroke-opacity: .54; pointer-events: none; }
-.scene-map-edge:not([data-depth="1"]) { stroke-opacity: .42; }
-.scene-map-edge.scene-map-edge-cross { stroke-opacity: .38; }
+.scene-map-edge { stroke: #aaa5af; stroke-opacity: .64; stroke-linecap: round; pointer-events: none; }
+.scene-map-edge[data-depth="2"] { stroke-opacity: .46; }
+.scene-map-edge.scene-map-edge-cross { stroke-opacity: .34; }
 .scene-map-edge-control { cursor: pointer; }
-.scene-map-edge-hit { stroke: transparent; stroke-width: 20px; stroke-linecap: round; pointer-events: stroke; }
-.scene-map-edge-control[aria-expanded="true"] .scene-map-edge,
-.scene-map-edge-control:focus-visible .scene-map-edge { stroke: var(--scene-accent); stroke-opacity: 1; }
+.scene-map-edge-hit { stroke: transparent; stroke-width: 14px; stroke-linecap: round; pointer-events: stroke; }
+.scene-map-view .scene-map-edge-control:focus-visible { outline: none; }
+.scene-map-edge-control:focus-visible:not([aria-expanded="true"]) .scene-map-edge {
+  stroke: var(--scene-ink);
+  stroke-opacity: .85;
+  stroke-dasharray: 3 2;
+}
+.scene-map-edge-control[aria-expanded="true"] .scene-map-edge {
+  stroke: var(--scene-accent);
+  stroke-opacity: 1;
+  stroke-width: 2.75;
+}
+.scene-map-canvas:has(.scene-map-edge-control[aria-expanded="true"]) .scene-map-edge-control[aria-expanded="false"] .scene-map-edge {
+  opacity: .6;
+}
 @media (pointer: coarse) {
-  .scene-map-edge-hit { stroke-width: 26px; }
+  .scene-map-edge-hit { stroke-width: 24px; }
 }
 .scene-map-view .scene-map-node { cursor: pointer; outline: none; }
 .scene-map-node[data-depth="2"] { opacity: .76; }
