@@ -313,12 +313,25 @@ function createBubble(map, item) {
   const title = svgNode("title");
   const circle = svgNode("circle", { class: "scene-map-node-disc" });
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
+  const photo = item.kind === "party" ? window.QDPProfileMetadata.profileImage(item.kind, item) : null;
   const bubble = {
-    item, element, title, circle, hit,
+    item, element, title, circle, hit, photo,
     opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
   };
-  const artwork = BUBBLE_ARTWORK[item.key];
+  const artwork = photo ? null : BUBBLE_ARTWORK[item.key];
   element.append(title, circle, hit);
+  if (photo) {
+    const id = "scene-map-party-photo-" + item.id;
+    const pattern = svgNode("pattern", { id, width: 1, height: 1, patternContentUnits: "objectBoundingBox" });
+    pattern.append(
+      svgNode("rect", { width: 1, height: 1, fill: "var(--scene-kind-color)" }),
+      svgNode("image", { href: photo.src, width: 1, height: 1, preserveAspectRatio: "xMidYMid slice" })
+    );
+    const defs = svgNode("defs", { "aria-hidden": "true" });
+    defs.append(pattern);
+    element.append(defs);
+    circle.style.fill = `url(#${id})`;
+  }
   if (artwork) {
     bubble.logo = svgNode("image", { class: "scene-map-node-logo", href: artwork.src, "aria-hidden": "true" });
     bubble.logoScale = artwork.scale;
@@ -443,7 +456,7 @@ function fitCaption(bubble, maxLabelWidth) {
   const fullWidth = first.getComputedTextLength();
   let insideSize = fullWidth > width ? base * width / fullWidth - .25 : base;
   let lines;
-  if (radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
+  if (!bubble.photo && radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
     const style = getComputedStyle(caption);
     const split = splitCaption(name, `${style.fontWeight} ${base}px ${style.fontFamily}`);
     if (split) {
@@ -455,7 +468,7 @@ function fitCaption(bubble, maxLabelWidth) {
       }
     }
   }
-  bubble.labelOutside = radius < OUTSIDE_LABEL_RADIUS || insideSize < MIN_CAPTION_SIZE;
+  bubble.labelOutside = Boolean(bubble.photo) || radius < OUTSIDE_LABEL_RADIUS || insideSize < MIN_CAPTION_SIZE;
   bubble.labelFontSize = Math.max(1, insideSize);
   if (bubble.labelOutside) {
     const naturalWidth = fullWidth * 12 / base;
