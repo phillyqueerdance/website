@@ -281,9 +281,14 @@
   font-size: clamp(12px, 1.7cqw, 15px);
 }
 .scene-map-detail:not([hidden]) { display: flex; flex-direction: column; }
-.scene-map-detail-heading { display: flex; align-items: center; gap: 6px; }
+.scene-map-detail-heading { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 5px; }
 .scene-map-detail-heading strong { font-size: clamp(14px, 2.25cqw, 20px); }
+.scene-map-profile-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.scene-map-profile-heading strong { overflow-wrap: anywhere; }
+.scene-map-profile-link { color: var(--scene-accent); font-size: 12px; white-space: nowrap; }
+.scene-map-relationship-profiles { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .scene-map-close {
+  flex: none;
   margin-left: auto;
   padding: 0 6px;
   border: 0;

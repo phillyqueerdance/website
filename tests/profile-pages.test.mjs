@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { onRequestGet as page } from '../functions/index.js';
-import { renderArtistDrawer, renderProfileInfo, renderProfileEvents } from '../functions/profile-page.js';
+import { renderProfileDrawer, renderProfileInfo, renderProfileEvents } from '../functions/profile-page.js';
 import { onRequestGet as sitemap } from '../functions/sitemap.xml.js';
 import { shard } from '../functions/event-records.js';
 
@@ -95,9 +95,14 @@ for (const kind of Object.keys(meta.kinds)) {
       const body = recorded.get('#archiveStack');
       if (kind === 'artist') {
         assert.match(body, /class="archive-profile-summary archive-artist-summary"/);
-        assert.ok(body.indexOf('archive-artist-drawer') < body.indexOf('archive-artist-summary'));
       } else {
         assert.match(body, /class="archive-profile-summary"/);
+      }
+      if (kind === 'artist' || kind === 'party') {
+        assert.match(body, /class="archive-profile-drawer"><img class="archive-profile-portrait"/);
+        assert.ok(body.indexOf('archive-profile-drawer') < body.indexOf('archive-profile-summary'));
+      } else {
+        assert.doesNotMatch(body, /archive-profile-drawer/);
       }
       assert.ok(body.indexOf('Approved profile bio') < body.indexOf('archive-event-period'));
       assert.equal(recorded.has('#archiveMenuProfile'), false);
@@ -199,12 +204,13 @@ test('profile markup escapes text, rejects unsafe links, and groups local dates 
 test('the compatibility portrait is a separate drawer; artist details have no duplicate photo or name', () => {
   const { imageUrl, ...legacy } = profile;
   const person = { ...legacy, id: 'CALLAIA-001', name: 'Callaia' };
-  const drawer = renderArtistDrawer(person);
-  assert.match(drawer, /<div class="archive-artist-drawer"><img class="archive-artist-portrait" src="\/artist-images\/callaia.jpg" alt="Callaia" width="2048" height="2016"/);
+  const drawer = renderProfileDrawer('artist', person);
+  assert.match(drawer, /<div class="archive-profile-drawer"><img class="archive-profile-portrait" src="\/artist-images\/callaia.jpg" alt="Callaia" width="2048" height="2016"/);
   const info = renderProfileInfo('artist', person, 'https://massive.example');
   assert.doesNotMatch(info, /<img|archive-profile-heading/);
   assert.ok(info.indexOf('archive-profile-related') < info.indexOf('archive-profile-links'));
-  assert.equal(renderArtistDrawer({ ...legacy, name: 'Callaia' }), '');
+  assert.equal(renderProfileDrawer('artist', { ...legacy, name: 'Callaia' }), '');
+  assert.equal(renderProfileDrawer('party', person), '');
   assert.doesNotMatch(renderProfileInfo('venue', { ...profile, id: 'CALLAIA-001' }, 'https://massive.example'), /<img/);
 });
 

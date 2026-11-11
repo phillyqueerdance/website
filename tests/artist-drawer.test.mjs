@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../archive.js', import.meta.url), 'utf8');
-const from = source.indexOf('  function updateArtistDrawerCorners()');
+const from = source.indexOf('  function updateProfileDrawerCorners()');
 const to = source.indexOf('\n  function profileInfo(', from);
 assert.ok(from >= 0 && to > from);
 
@@ -19,7 +19,7 @@ function fixture() {
     getComputedStyle: () => ({ borderTopLeftRadius: `${state.radius}px` })
   });
   vm.runInContext(source.slice(from, to), context);
-  return { state, styles, update: () => context.updateArtistDrawerCorners() };
+  return { state, styles, update: () => context.updateProfileDrawerCorners() };
 }
 
 test('photo corners follow the calendar midpoint rule and restore when scrolling back', () => {

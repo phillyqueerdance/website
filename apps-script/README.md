@@ -25,10 +25,10 @@ displays the same carousel below its description. Photos also open in a larger
 viewer. Blank PhotoURLs cells retain the existing event layout.
 The normal event publication gates and artist flags continue to apply.
 
-## Artist image preview
+## Artist and party profile images
 
-The preview reads each approved artist's `ArtistImage_URL` from the Artists
-tab. On desktop and mobile, the portrait sits directly beneath the name
+The site reads `ArtistImage_URL` from approved Artists rows and `PartyImage_URL`
+from approved Parties rows. On desktop and mobile, the image sits directly beneath the name
 header inside the frame, with matching width and side borders. Queer profiles
 use purple headers and photo frames; other profiles use red. The portrait's bottom
 corners match the header's curves. It scrolls into the header like a closing
@@ -41,13 +41,12 @@ right edge and leaves a small gap on the left. These name tabs appear only on
 desktop. Descriptions, related profiles, and external links for all four profile
 types appear inside the main frame above their events on desktop and mobile.
 
-Install the supplied Core.gs v7.4.6 and PublicData.gs v7.4.2 in the existing
-Apps Script project. Keep the other files and settings. Reload the Index,
-then use **QDP > Update Artist Image URLs (from Raw_ArtistImage_URL)** to
-convert Drive file share links into `ArtistImage_URL`. This changes only the
-destination cells for valid, changed links; blank or invalid raw links leave
-existing values untouched. Column order does not matter. The existing flyer
-conversion and scraper menu remain available.
+Install Core.gs v7.4.8 and PublicData.gs v7.4.4 in the existing Apps Script
+project. Reload the Index, then use **QDP > Update Artist Image URLs (from
+Raw_ArtistImage_URL)** or **QDP > Update Party Image URLs (from
+Raw_PartyImage_URL)** to convert Drive file share links into the corresponding
+image column. The action writes destination cells only for valid, changed links.
+Column order does not matter.
 
 Use **QDP > Public data / Website > Publish archive changes** to publish the
 photos. Images must be viewable without signing in. The raw column is never

@@ -35,13 +35,14 @@
     return links;
   };
   const title = profile => `${profile.name} | Queer Dance Philly`;
-  const artistImage = profile => {
+  const profileImage = (kind, profile) => {
+    if (kind !== "artist" && kind !== "party") return null;
     if (Object.hasOwn(profile, "imageUrl")) {
       const src = globalThis.QDPEventMetadata.image({ flyerUrl: profile.imageUrl });
       return src ? { src } : null;
     }
     // Keep the preview portrait only until the publisher supplies the new field.
-    return profile.id === "CALLAIA-001"
+    return kind === "artist" && profile.id === "CALLAIA-001"
       ? { src: "/artist-images/callaia.jpg", width: 2048, height: 2016 } : null;
   };
   const directoryUrl = (kind, base = origin) => {
@@ -78,6 +79,6 @@
     ['meta[name="twitter:image"]', new URL("/qdp-share-card.jpg", base).href],
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
-  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, artistImage, description, isQueer, classification, tags,
+  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, profileImage, description, isQueer, classification, tags,
     homeDescription, directories, directoryUrl, directoryTags });
 })();

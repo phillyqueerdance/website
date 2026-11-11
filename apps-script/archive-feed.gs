@@ -114,6 +114,7 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
         } : kind === 'parties' ? {
           ...shared,
           queerParty: qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['PartyQueer', 'QueerParty'])),
+          imageUrl: qdpArchiveLink_(qdpArchiveText_(row, data.index, ['PartyImage_URL'])),
           artistIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['PartyArtists'])),
           collectiveIds: qdpArchiveIds_(qdpArchiveValue_(row, data.index, ['PartyColls']))
         } : {

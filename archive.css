@@ -24,7 +24,7 @@
 /* Photo headers sit above the list, so end exactly at its clipping edge. */
 .archive-header { cursor: default; height: var(--qdp-date-height); background: var(--archive-profile-header-color, #fa2b5a); }
 .archive-header:hover, .archive-header:focus-visible { background: var(--archive-profile-header-color, #fa2b5a); color: #ffeff2; }
-.archive-page:has(.archive-artist-drawer) .archive-header { z-index: 3; }
+.archive-page:has(.archive-profile-drawer) .archive-header { z-index: 3; }
 .archive-back {
   display: none;
 }
@@ -332,7 +332,7 @@
 .archive-menu-profile:not([hidden]) { margin: 12px 0 28px; }
 .archive-menu.has-profile .archive-menu-profile { max-height: min(65dvh, 800px); opacity: 1; overflow-y: auto; }
 .archive-profile-info { overflow-wrap: anywhere; }
-.archive-artist-drawer {
+.archive-profile-drawer {
   box-sizing: border-box;
   width: var(--archive-portrait-width, 43.42cqw);
   margin-left: var(--archive-portrait-left, 33.03cqw);
@@ -341,7 +341,7 @@
   border-radius: 0 0 var(--archive-portrait-radius, 5cqw) var(--archive-portrait-radius, 5cqw);
   overflow: hidden;
 }
-.archive-artist-drawer .archive-artist-portrait {
+.archive-profile-drawer .archive-profile-portrait {
   display: block;
   width: 100%;
   height: auto;
