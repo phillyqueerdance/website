@@ -12,6 +12,10 @@ const AUTO_BRANCHES = 4;
 const MAX_BUBBLES = 1 + ROOT_LINKS + AUTO_BRANCHES;
 const OUTSIDE_LABEL_RADIUS = 26;
 const GRAPH_MOTION_MS = 260;
+const BUBBLE_ARTWORK = {
+  "collective:QDP-001": { src: "/start-here-logo.png", scale: 1, replacesDisc: true },
+  "party:MELT-001": { src: "/melt-logo.png", scale: .85 }
+};
 
 function node(tag, className = "", value = "") {
   const element = document.createElement(tag);
@@ -317,16 +321,26 @@ function createBubble(map, item) {
   const title = svgNode("title");
   const circle = svgNode("circle", { class: "scene-map-node-disc" });
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
-  const caption = svgNode("foreignObject", { class: "scene-map-caption", "aria-hidden": "true" });
-  const captionBody = node("div", "scene-map-caption-body");
-  const captionName = node("span", "scene-map-caption-name", item.name);
-  captionBody.append(captionName);
-  caption.append(captionBody);
-  element.append(title, circle, hit, caption);
   const bubble = {
-    item, element, title, circle, hit, caption, captionBody, captionName,
+    item, element, title, circle, hit,
     opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
   };
+  const artwork = BUBBLE_ARTWORK[item.key];
+  element.append(title, circle, hit);
+  if (artwork) {
+    bubble.logo = svgNode("image", { class: "scene-map-node-logo", href: artwork.src, "aria-hidden": "true" });
+    bubble.logoScale = artwork.scale;
+    if (artwork.replacesDisc) element.classList.add("scene-map-node-globe");
+    element.append(bubble.logo);
+  } else {
+    const caption = svgNode("foreignObject", { class: "scene-map-caption", "aria-hidden": "true" });
+    const captionBody = node("div", "scene-map-caption-body");
+    const captionName = node("span", "scene-map-caption-name", item.name);
+    captionBody.append(captionName);
+    caption.append(captionBody);
+    element.append(caption);
+    Object.assign(bubble, { caption, captionBody, captionName });
+  }
   element.addEventListener("click", event => {
     if (!map.skipClick || event.detail === 0) activateBubble(map, bubble);
   });
@@ -366,16 +380,24 @@ function resizeBubble(bubble, shortSide, maxDirect, maxIndirect, labelWidth) {
   const indirect = bubble.depth === 2;
   const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
   bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(bubble.link.count) * scale : shortSide * .148;
-  bubble.labelOutside = bubble.radius < OUTSIDE_LABEL_RADIUS;
+  bubble.labelOutside = !bubble.logo && bubble.radius < OUTSIDE_LABEL_RADIUS;
   if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius * bubble.opacity);
-  fitCaption(bubble, labelWidth);
+  if (!bubble.logo) fitCaption(bubble, labelWidth);
 }
 
 function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
-  paintCaption(bubble, radius);
+  if (bubble.logo) {
+    const halfSize = radius * bubble.logoScale;
+    bubble.logo.setAttribute("x", -halfSize);
+    bubble.logo.setAttribute("y", -halfSize);
+    bubble.logo.setAttribute("width", halfSize * 2);
+    bubble.logo.setAttribute("height", halfSize * 2);
+  } else {
+    paintCaption(bubble, radius);
+  }
 }
 
 function paintCaption(bubble, radius) {

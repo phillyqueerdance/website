@@ -244,7 +244,7 @@
   color: #fff1f4;
 }
 .archive-menu-badge[data-tab-color="collective"][aria-current="page"] { border-width: 2px; }
-.archive-menu-badge[aria-current="page"]::after {
+:is(.archive-menu-badge, .archive-menu-discovery)[aria-current="page"]::after {
   content: "✦";
   position: absolute;
   right: 12px;

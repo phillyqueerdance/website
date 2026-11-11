@@ -217,7 +217,7 @@
         }))) + 26.8;
         menuTrack.style.setProperty("--archive-tab-label-width", `${labelWidth}px`);
         menuTrack.style.setProperty("--archive-tab-length", `${Math.max(0, Math.min(labelWidth + menuInset + 14, menuInset + expandedWidth - 12))}px`);
-        menuTrack.style.setProperty("--archive-nav-compact-width", `${Math.min(expandedWidth, labelWidth + 30.4)}px`);
+        menuTrack.style.setProperty("--archive-nav-compact-width", `${Math.min(expandedWidth, labelWidth + 50.4)}px`);
       }
     }
   }
@@ -863,7 +863,7 @@
     message(params.view === "scene-map" ? "Loading the Discovery Map…" : "Loading archive…");
     if (params.view === "scene-map") {
       try {
-        const module = await import("./scene-map.js?v=20261110-scene-map-14");
+        const module = await import("./scene-map.js?v=20261110-scene-map-15");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
