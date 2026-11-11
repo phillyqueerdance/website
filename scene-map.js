@@ -313,12 +313,28 @@ function createBubble(map, item) {
   const title = svgNode("title");
   const circle = svgNode("circle", { class: "scene-map-node-disc" });
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
+  const photo = item.kind === "party" ? window.QDPProfileMetadata.profileImage(item.kind, item) : null;
   const bubble = {
     item, element, title, circle, hit,
     opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
   };
-  const artwork = BUBBLE_ARTWORK[item.key];
-  element.append(title, circle, hit);
+  const artwork = photo ? null : BUBBLE_ARTWORK[item.key];
+  element.append(title);
+  if (photo) {
+    const id = "scene-map-party-photo-" + item.id;
+    const pattern = svgNode("pattern", { id, width: 1, height: 1, patternContentUnits: "objectBoundingBox" });
+    const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: "xMidYMid slice" });
+    image.addEventListener("error", () => image.remove(), { once: true });
+    image.setAttribute("href", photo.src);
+    pattern.append(image);
+    const defs = svgNode("defs");
+    defs.append(pattern);
+    bubble.photo = svgNode("circle", { fill: `url(#${id})` });
+    const photoGroup = svgNode("g", { class: "scene-map-node-photo", "aria-hidden": "true" });
+    photoGroup.append(circle, bubble.photo);
+    element.append(defs, photoGroup);
+  } else element.append(circle);
+  element.append(hit);
   if (artwork) {
     bubble.logo = svgNode("image", { class: "scene-map-node-logo", href: artwork.src, "aria-hidden": "true" });
     bubble.logoScale = artwork.scale;
@@ -384,6 +400,7 @@ function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
+  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(5, radius * .16));
   if (bubble.ring) {
     bubble.ring.setAttribute("r", radius * .9);
     bubble.ring.setAttribute("stroke-width", Math.min(4, radius * .12));
@@ -443,7 +460,7 @@ function fitCaption(bubble, maxLabelWidth) {
   const fullWidth = first.getComputedTextLength();
   let insideSize = fullWidth > width ? base * width / fullWidth - .25 : base;
   let lines;
-  if (radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
+  if (!bubble.photo && radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
     const style = getComputedStyle(caption);
     const split = splitCaption(name, `${style.fontWeight} ${base}px ${style.fontFamily}`);
     if (split) {
@@ -455,7 +472,7 @@ function fitCaption(bubble, maxLabelWidth) {
       }
     }
   }
-  bubble.labelOutside = radius < OUTSIDE_LABEL_RADIUS || insideSize < MIN_CAPTION_SIZE;
+  bubble.labelOutside = Boolean(bubble.photo) || radius < OUTSIDE_LABEL_RADIUS || insideSize < MIN_CAPTION_SIZE;
   bubble.labelFontSize = Math.max(1, insideSize);
   if (bubble.labelOutside) {
     const naturalWidth = fullWidth * 12 / base;
