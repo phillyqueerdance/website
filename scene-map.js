@@ -11,6 +11,7 @@ const ROOT_LINKS = 9;
 const AUTO_BRANCHES = 4;
 const MAX_BUBBLES = 1 + ROOT_LINKS + AUTO_BRANCHES;
 const OUTSIDE_LABEL_RADIUS = 26;
+const GRAPH_MOTION_MS = 260;
 
 function node(tag, className = "", value = "") {
   const element = document.createElement(tag);
@@ -322,7 +323,10 @@ function createBubble(map, item) {
   captionBody.append(captionName);
   caption.append(captionBody);
   element.append(title, circle, hit, caption);
-  const bubble = { item, element, title, circle, hit, caption, captionBody, captionName, phase: map.phase++ * 1.7 };
+  const bubble = {
+    item, element, title, circle, hit, caption, captionBody, captionName,
+    opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
+  };
   element.addEventListener("click", event => {
     if (!map.skipClick || event.detail === 0) activateBubble(map, bubble);
   });
@@ -363,7 +367,7 @@ function resizeBubble(bubble, shortSide, maxDirect, maxIndirect, labelWidth) {
   const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
   bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(bubble.link.count) * scale : shortSide * .148;
   bubble.labelOutside = bubble.radius < OUTSIDE_LABEL_RADIUS;
-  if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius);
+  if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius * bubble.opacity);
   fitCaption(bubble, labelWidth);
 }
 
@@ -443,38 +447,80 @@ function positionNewBubbles(map) {
       placeOuterBubble(bubble, parent, center, bubbles, width, height);
     }
     const x = parent?.x ?? bubble.targetX, y = parent?.y ?? bubble.targetY;
-    bubble.x ??= x + (bubble.targetX - x) * .66;
-    bubble.y ??= y + (bubble.targetY - y) * .66;
+    bubble.x ??= x + (bubble.targetX - x) * .22;
+    bubble.y ??= y + (bubble.targetY - y) * .22;
   }
+}
+
+function paintBubble(bubble) {
+  bubble.element.setAttribute("transform", "translate(" + bubble.x.toFixed(2) + " " + bubble.y.toFixed(2) + ")");
+  bubble.element.style.opacity = bubble.opacity;
+  bubble.element.classList.toggle("is-arriving", bubble.opacity < .35);
 }
 
 function paintGraph(map, time) {
   if (!map.width || !map.height) return;
+  const reduced = map.reduceMotion.matches;
+  let movement = 0;
+  if (time !== undefined) {
+    const elapsed = Math.min(64, time - (map.lastFrameTime ?? time - 1000 / 60));
+    movement = 1 - Math.exp(-elapsed / GRAPH_MOTION_MS);
+    map.lastFrameTime = time;
+  }
   for (const bubble of map.bubbles.values()) {
-    if (map.reduceMotion.matches) {
+    if (reduced) {
       bubble.x = bubble.targetX;
       bubble.y = bubble.targetY;
+      bubble.opacity = 1;
       if (bubble.drawRadius !== bubble.radius) paintRadius(bubble, bubble.radius);
-    } else if (time !== undefined && bubble !== map.dragged) {
-      const steady = bubble.depth === 0 || bubble === map.hovered || bubble.element === document.activeElement ||
-        bubble === map.activeLine?.source || bubble === map.activeLine?.target;
-      const float = steady ? 0 : 4;
-      const x = bubble.targetX + float * Math.sin(time / 1600 + bubble.phase);
-      const y = bubble.targetY + float * Math.cos(time / 1900 + bubble.phase);
-      bubble.x += (x - bubble.x) * .16;
-      bubble.y += (y - bubble.y) * .16;
+    } else if (movement) {
+      if (bubble !== map.dragged) {
+        const steady = bubble.depth === 0 || bubble === map.hovered || bubble.element === document.activeElement ||
+          bubble === map.activeLine?.source || bubble === map.activeLine?.target;
+        const float = steady ? 0 : 4;
+        const x = bubble.targetX + float * Math.sin(time / 1600 + bubble.phase);
+        const y = bubble.targetY + float * Math.cos(time / 1900 + bubble.phase);
+        bubble.x += (x - bubble.x) * movement;
+        bubble.y += (y - bubble.y) * movement;
+      }
+      bubble.opacity = bubble.opacity > .98 ? 1 : bubble.opacity + (1 - bubble.opacity) * movement;
       if (bubble.drawRadius !== bubble.radius) {
         const change = bubble.radius - bubble.drawRadius;
-        paintRadius(bubble, Math.abs(change) < .2 ? bubble.radius : bubble.drawRadius + change * .16);
+        paintRadius(bubble, Math.abs(change) < .2 ? bubble.radius : bubble.drawRadius + change * movement);
       }
     }
-    bubble.element.setAttribute("transform", "translate(" + bubble.x.toFixed(2) + " " + bubble.y.toFixed(2) + ")");
+    paintBubble(bubble);
   }
-  for (const line of map.lines) {
-    const { element, hit, source, target } = line;
+  for (const [key, bubble] of map.retiringBubbles) {
+    bubble.opacity *= 1 - movement;
+    if (reduced || bubble.opacity < .02) {
+      bubble.element.remove();
+      map.retiringBubbles.delete(key);
+      continue;
+    }
+    if (movement) {
+      const parent = map.bubbles.get(bubble.parent) || map.bubbles.get(map.scene?.origin.key);
+      bubble.x += ((parent?.x ?? map.width / 2) - bubble.x) * movement;
+      bubble.y += ((parent?.y ?? map.height / 2) - bubble.y) * movement;
+      paintRadius(bubble, bubble.drawRadius * (1 - movement));
+    }
+    paintBubble(bubble);
+  }
+  for (const line of [...map.retiringLines.values(), ...map.lines]) {
+    const { control, element, hit, source, target } = line;
+    if (map.retiringLines.has(line.key) && (!source.element.isConnected || !target.element.isConnected ||
+        (!map.retiringBubbles.has(source.item.key) && !map.retiringBubbles.has(target.item.key)))) {
+      control.remove();
+      map.retiringLines.delete(line.key);
+      continue;
+    }
     const dx = target.x - source.x, dy = target.y - source.y;
     const distance = Math.hypot(dx, dy) || 1;
-    const trim = Math.max(0, Math.min(3, (distance - source.drawRadius - target.drawRadius) / 2));
+    const gap = distance - source.drawRadius - target.drawRadius;
+    const opacity = gap > 0 ? Math.min(source.opacity, target.opacity) : 0;
+    control.style.opacity = opacity;
+    control.classList.toggle("is-arriving", opacity < .35);
+    const trim = Math.max(0, Math.min(3, gap / 2));
     const start = (source.drawRadius + trim) / distance, end = (target.drawRadius + trim) / distance;
     const x1 = source.x + dx * start, y1 = source.y + dy * start;
     const x2 = target.x - dx * end, y2 = target.y - dy * end;
@@ -490,12 +536,14 @@ function paintGraph(map, time) {
 }
 
 function animateGraph(map) {
-  if (map.frameRequest || map.reduceMotion.matches || !map.width || !map.height || !map.bubbles.size) return;
+  const visible = () => map.bubbles.size || map.retiringBubbles.size;
+  if (map.frameRequest || map.reduceMotion.matches || !map.width || !map.height || !visible()) return;
+  map.lastFrameTime = undefined;
   const tick = time => {
     map.frameRequest = 0;
-    if (!map.root.isConnected || !map.width || !map.height || !map.bubbles.size) return;
+    if (!map.root.isConnected || !map.width || !map.height || !visible()) return;
     paintGraph(map, time);
-    if (!map.reduceMotion.matches) map.frameRequest = requestAnimationFrame(tick);
+    if (!map.reduceMotion.matches && visible()) map.frameRequest = requestAnimationFrame(tick);
   };
   map.frameRequest = requestAnimationFrame(tick);
 }
@@ -529,6 +577,10 @@ function layoutGraph(map, reflow = false) {
       bubble.targetY = reflow ? undefined : bubble.targetY * scaleY;
     }
   }
+  for (const bubble of map.retiringBubbles.values()) {
+    bubble.x *= scaleX;
+    bubble.y *= scaleY;
+  }
   map.width = width;
   map.height = height;
   positionNewBubbles(map);
@@ -546,6 +598,8 @@ function addVisibleConnections(map, scene) {
   const seen = new Set(map.lines.map(line => line.key));
   for (const [key, { source, target, link, cross }] of visibleRelationships(map.bubbles, scene.branches)) {
     if (seen.has(key)) continue;
+    map.retiringLines.get(key)?.control.remove();
+    map.retiringLines.delete(key);
     const line = createLine(map, map.bubbles.get(source), map.bubbles.get(target), link, cross);
     line.key = key;
     map.lines.push(line);
@@ -561,17 +615,47 @@ function renderMap(map, reflow = false) {
   const network = scene ? buildNetwork(map, scene) : new Map();
   const bubbles = new Map();
   for (const [key, vertex] of network) {
-    const bubble = map.bubbles.get(key) || createBubble(map, vertex.item);
+    const retiring = map.retiringBubbles.get(key);
+    const bubble = map.bubbles.get(key) || retiring || createBubble(map, vertex.item);
+    if (retiring) {
+      map.retiringBubbles.delete(key);
+      bubble.element.classList.remove("is-retiring");
+      bubble.element.removeAttribute("aria-hidden");
+      bubble.element.setAttribute("tabindex", "0");
+    }
     Object.assign(bubble, vertex);
     bubbles.set(key, bubble);
   }
   for (const [key, bubble] of map.bubbles) {
-    if (!bubbles.has(key)) bubble.element.remove();
+    if (bubbles.has(key)) continue;
+    if (map.hovered === bubble) map.hovered = null;
+    if (map.reduceMotion.matches || !Number.isFinite(bubble.x)) {
+      bubble.element.remove();
+      continue;
+    }
+    bubble.element.classList.add("is-retiring");
+    bubble.element.setAttribute("aria-hidden", "true");
+    bubble.element.setAttribute("tabindex", "-1");
+    map.nodeLayer.prepend(bubble.element);
+    map.retiringBubbles.set(key, bubble);
   }
   map.bubbles = bubbles;
+  const previousLines = map.lines;
   map.lines = [];
-  map.edgeLayer.replaceChildren();
   if (scene) addVisibleConnections(map, scene);
+  const visibleLines = new Set(map.lines.map(line => line.key));
+  for (const line of previousLines) {
+    const retiring = map.retiringBubbles.has(line.source.item.key) || map.retiringBubbles.has(line.target.item.key);
+    if (!retiring || visibleLines.has(line.key)) {
+      line.control.remove();
+      continue;
+    }
+    line.control.classList.add("is-retiring");
+    line.control.setAttribute("aria-hidden", "true");
+    line.control.setAttribute("tabindex", "-1");
+    map.edgeLayer.prepend(line.control);
+    map.retiringLines.set(line.key, line);
+  }
   if (previousLine) {
     const currentLine = map.lines.find(line => line.key === previousLine.key && line.link === previousLine.link);
     if (currentLine) {
@@ -676,7 +760,7 @@ async function startScene(map, item, exploring = false) {
       return;
     }
     // Preserve current screen positions while the new center animates in.
-    for (const bubble of map.bubbles.values()) {
+    for (const bubble of [...map.bubbles.values(), ...map.retiringBubbles.values()]) {
       if (!Number.isFinite(bubble.x)) continue;
       bubble.x += map.dx;
       bubble.y += map.dy;
@@ -803,7 +887,7 @@ export async function mountSceneMap(host) {
   const top = node("div", "scene-map-top");
   const input = node("input", "scene-map-search");
   input.type = "search";
-  input.placeholder = "Search the scene…";
+  input.placeholder = "What will you find?";
   input.disabled = true;
   input.setAttribute("aria-label", "Search artists, parties, venues and collectives");
   const results = node("div", "scene-map-results");
@@ -838,7 +922,8 @@ export async function mountSceneMap(host) {
   host.replaceChildren(root);
 
   const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, lineInfo, message, search: input, results,
-    scene: null, pendingScene: null, bubbles: new Map(), lines: [], phase: 0, allowed: new Set(KINDS), queerOnly: false,
+    scene: null, pendingScene: null, bubbles: new Map(), lines: [], retiringBubbles: new Map(), retiringLines: new Map(),
+    phase: 0, allowed: new Set(KINDS), queerOnly: false,
     dx: 0, dy: 0, width: 0, height: 0, frameRequest: 0, dragged: null, hovered: null, skipClick: false,
     activeLine: null, searchOpen: false,
     reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)") };

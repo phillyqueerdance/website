@@ -855,15 +855,15 @@
     });
     closeDatePopover();
     archiveStack.hidden = false;
-    header(params.view === "scene-map" ? "Explore the Scene" : params.view === "events" ?
+    header(params.view === "scene-map" ? "Discovery Map" : params.view === "events" ?
       (params.month ? `${monthName(params.month)} ${params.month.slice(0, 4)}` : "Past Events") :
       params.view[0].toUpperCase() + params.view.slice(1));
     if (!window.QDPInfoView?.active) document.title = window.QDPProfileMetadata?.directories?.[params.view]?.title ||
       `${archiveHeader.textContent} | Queer Dance Philly`;
-    message(params.view === "scene-map" ? "Loading the Scene Map…" : "Loading archive…");
+    message(params.view === "scene-map" ? "Loading the Discovery Map…" : "Loading archive…");
     if (params.view === "scene-map") {
       try {
-        const module = await import("./scene-map.js?v=20261110-scene-map-13");
+        const module = await import("./scene-map.js?v=20261110-scene-map-14");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
@@ -1118,6 +1118,10 @@
   });
   window.addEventListener("pageshow", event => {
     if (event.persisted && archive.active) route();
+  });
+  const frame = document.getElementById("poster");
+  frame.addEventListener("transitionend", event => {
+    if (event.target === frame && event.propertyName === "width" && !menuTrack.hidden) positionMenu();
   });
   window.addEventListener("resize", () => {
     if (!menuTrack.hidden) positionMenu();
