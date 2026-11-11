@@ -4,7 +4,7 @@ import { connectionsFor, networkFor, visibleRelationships } from "../scene-map-g
 
 test("the strongest direct connections keep their places when exploring from another bubble", () => {
   const origin = { key: "artist:focus", kind: "artist" };
-  const strongest = [19, 9, 5, 4, 4, 4].map((count, index) => ({
+  const strongest = [19, 9, 8, 7, 6, 5, 4, 4].map((count, index) => ({
     key: "artist:co-bill-" + index, kind: "artist", count
   }));
   const previous = [
@@ -14,9 +14,9 @@ test("the strongest direct connections keep their places when exploring from ano
     }))
   ];
   const branch = {
-    links: [...strongest, ...previous], limit: 9, preferred: previous.map(link => link.key)
+    links: [...strongest, ...previous], limit: 11, preferred: previous.map(link => link.key)
   };
-  const graph = networkFor(origin, new Map([[origin.key, branch]]), () => true, 14);
+  const graph = networkFor(origin, new Map([[origin.key, branch]]), () => true, 16);
   const direct = [...graph.values()].filter(vertex => vertex.depth === 1);
   assert.deepEqual(direct.map(vertex => vertex.item), [...strongest, ...previous.slice(0, 3)]);
   assert.ok(direct.every(vertex => vertex.parent === origin.key));

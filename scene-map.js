@@ -7,7 +7,7 @@ import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbor
 const NS = "http://www.w3.org/2000/svg";
 const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };
 const known = new Map(), cache = new Map();
-const ROOT_LINKS = 9;
+const ROOT_LINKS = 11;
 const AUTO_BRANCHES = 4;
 const MAX_BUBBLES = 1 + ROOT_LINKS + AUTO_BRANCHES;
 const OUTSIDE_LABEL_RADIUS = 26;
@@ -239,7 +239,7 @@ function toggleRelationship(map, line, keyboard = false) {
   };
   heading.append(node("strong", "", line.source.item.name + " · " + line.target.item.name), close);
   const link = line.link;
-  const count = (line.associated ? "Profile association · " : "") + sharedEvents(link.count) +
+  const count = sharedEvents(link.count) +
     (link.upcoming ? " · " + link.upcoming + " upcoming" : "");
   map.lineInfo.replaceChildren(heading, node("p", "scene-map-note", count));
   if (link.events.length) map.lineInfo.append(renderSceneEvents(link.events, "Shared events"));
@@ -648,7 +648,6 @@ function addVisibleConnections(map, scene) {
       if (cross) map.edgeLayer.prepend(line.control);
       else map.edgeLayer.append(line.control);
     }
-    line.associated = associated;
     line.element.classList.toggle("scene-map-edge-associated", associated);
     if (associated) line.control.setAttribute("aria-description", "Profile association");
   }
