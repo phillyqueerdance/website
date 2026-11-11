@@ -7,7 +7,7 @@ const NS = "http://www.w3.org/2000/svg";
 const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };
 const known = new Map(), cache = new Map();
 const DESKTOP_LIMITS = { total: 16, direct: 11, context: 3 };
-const MOBILE_LIMITS = { total: 8, direct: 5, context: 2 };
+const MOBILE_LIMITS = { total: 10, direct: 7, context: 2 };
 const AUTO_BRANCHES = 4;
 const OUTSIDE_LABEL_RADIUS = 26;
 const MIN_CAPTION_SIZE = 11;

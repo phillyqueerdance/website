@@ -18,7 +18,7 @@ test("desktop and mobile keep the strongest direct connections within their bubb
   }]));
   branches.set(origin.key, { links: [...strongest, ...previous], preferred: previous.map(link => link.key) });
 
-  for (const limits of [{ total: 16, direct: 11, context: 3 }, { total: 8, direct: 5, context: 2 }]) {
+  for (const limits of [{ total: 16, direct: 11, context: 3 }, { total: 10, direct: 7, context: 2 }]) {
     const graph = networkFor(origin, branches, () => true, limits);
     const direct = [...graph.values()].filter(vertex => vertex.depth === 1);
     const expected = [...strongest.slice(0, limits.direct - limits.context), ...previous.slice(0, limits.context)];

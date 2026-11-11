@@ -912,7 +912,7 @@
     message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261111-scene-map-23");
+        const module = await import("./scene-map.js?v=20261111-scene-map-24");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
