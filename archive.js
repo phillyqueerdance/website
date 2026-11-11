@@ -655,14 +655,21 @@
       }
     }
     const links = node("div", "archive-profile-links");
-    for (const [key, label] of [["maps", "Map"], ["website", "Website"],
-      ["instagram", "Instagram"], ["music", "Music"]]) {
-      if (!person[key]) continue;
+    for (const { href, label, external } of window.QDPProfileMetadata.profileLinks(kind, person, location.origin)) {
+      const item = node("span", "archive-profile-link");
+      if (links.childElementCount) {
+        const separator = node("span", "archive-profile-link-separator", "✦");
+        separator.setAttribute("aria-hidden", "true");
+        item.append(separator);
+      }
       const link = node("a", "", label);
-      link.href = person[key];
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      links.appendChild(link);
+      link.href = href;
+      if (external) {
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      } else link.setAttribute("data-archive-link", "");
+      item.append(link);
+      links.append(item);
     }
     if (links.childNodes.length) info.appendChild(links);
     return info;

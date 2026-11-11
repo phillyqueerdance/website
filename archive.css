@@ -66,6 +66,7 @@
 }
 .archive-search::placeholder { color: #bcb5bc; }
 .archive-search:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
+.archive-directory-search .archive-search:focus-visible { outline: none; border-color: #fff1f4; }
 @media (max-width: 760px) {
   .archive-search-bar { padding: 0 4px 4px; }
   .archive-search { border-radius: 12px; padding: 7px 9px; }
@@ -391,6 +392,8 @@
   text-decoration: none !important;
 }
 .archive-profile-links { display: flex; flex-wrap: wrap; justify-content: center; text-align: center; gap: .35em .75em; margin-top: 1.6em; }
+.archive-profile-link { display: inline-flex; align-items: center; column-gap: inherit; }
+.archive-profile-link-separator { color: #ffea86; font-size: .75em; }
 .archive-profile-links a { color: #ffea86; text-decoration: none !important; }
 .archive-profile-identity { display: inline-block; margin: 0 0 .5em; padding: 5px 10px; border-radius: 12px; background: #922185; color: #fff1f4; font: 700 .85em/1.2 "QDP Fraunces", Georgia, serif; }
 

@@ -19,6 +19,21 @@
     result.searchParams.set("id", id);
     return result.href;
   };
+  const profileLinks = (kind, profile, base = origin) => {
+    const links = [];
+    for (const [key, label] of [["maps", "Map"], ["website", "Website"],
+      ["instagram", "Instagram"], ["music", "Music"]]) {
+      const href = globalThis.QDPEventMetadata.safeUrl(profile[key]);
+      if (href) links.push({ href, label, external: true });
+    }
+    if (Object.hasOwn(kinds, kind) && validId(profile.id)) {
+      const mapUrl = new URL("/", base);
+      mapUrl.searchParams.set("archive", "scene-map");
+      mapUrl.searchParams.set("focus", `${kind}:${profile.id}`);
+      links.push({ href: mapUrl.href, label: "See in discovery map", external: false });
+    }
+    return links;
+  };
   const title = profile => `${profile.name} | Queer Dance Philly`;
   const artistImage = profile => {
     if (Object.hasOwn(profile, "imageUrl")) {
@@ -63,6 +78,6 @@
     ['meta[name="twitter:image"]', new URL("/qdp-share-card.jpg", base).href],
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
-  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, title, artistImage, description, isQueer, classification, tags,
+  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, artistImage, description, isQueer, classification, tags,
     homeDescription, directories, directoryUrl, directoryTags });
 })();
