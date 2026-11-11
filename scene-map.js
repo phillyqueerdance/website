@@ -315,23 +315,26 @@ function createBubble(map, item) {
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
   const photo = item.kind === "party" ? window.QDPProfileMetadata.profileImage(item.kind, item) : null;
   const bubble = {
-    item, element, title, circle, hit, photo,
+    item, element, title, circle, hit,
     opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
   };
   const artwork = photo ? null : BUBBLE_ARTWORK[item.key];
-  element.append(title, circle, hit);
+  element.append(title);
   if (photo) {
     const id = "scene-map-party-photo-" + item.id;
     const pattern = svgNode("pattern", { id, width: 1, height: 1, patternContentUnits: "objectBoundingBox" });
-    pattern.append(
-      svgNode("rect", { width: 1, height: 1, fill: "var(--scene-kind-color)" }),
-      svgNode("image", { href: photo.src, width: 1, height: 1, preserveAspectRatio: "xMidYMid slice" })
-    );
-    const defs = svgNode("defs", { "aria-hidden": "true" });
+    const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: "xMidYMid slice" });
+    image.addEventListener("error", () => image.remove(), { once: true });
+    image.setAttribute("href", photo.src);
+    pattern.append(image);
+    const defs = svgNode("defs");
     defs.append(pattern);
-    element.append(defs);
-    circle.style.fill = `url(#${id})`;
-  }
+    bubble.photo = svgNode("circle", { fill: `url(#${id})` });
+    const photoGroup = svgNode("g", { class: "scene-map-node-photo", "aria-hidden": "true" });
+    photoGroup.append(circle, bubble.photo);
+    element.append(defs, photoGroup);
+  } else element.append(circle);
+  element.append(hit);
   if (artwork) {
     bubble.logo = svgNode("image", { class: "scene-map-node-logo", href: artwork.src, "aria-hidden": "true" });
     bubble.logoScale = artwork.scale;
@@ -397,6 +400,7 @@ function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
+  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(5, radius * .16));
   if (bubble.ring) {
     bubble.ring.setAttribute("r", radius * .9);
     bubble.ring.setAttribute("stroke-width", Math.min(4, radius * .12));
