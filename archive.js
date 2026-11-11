@@ -12,6 +12,8 @@
   const archiveStack = document.getElementById("archiveStack");
   const archiveHeader = document.getElementById("archiveHeader");
   const archiveBack = document.getElementById("archiveBack");
+  const frameImage = document.querySelector(".poster > .frame");
+  const frameAlt = frameImage.alt;
   const headerLabel = node("span", "archive-header-label");
   const incomingYear = node("span", "archive-header-incoming");
   incomingYear.hidden = true;
@@ -59,7 +61,8 @@
     const view = params.get("archive") || "";
     const id = params.get("id") || "";
     const month = params.get("month") || "";
-    return { view, id, month, key: [view, id, month].join("|") };
+    const focus = view === "scene-map" ? params.get("focus") || "" : "";
+    return { view, id, month, key: [view, id, month, focus].join("|") };
   }
 
   function archiveUrl(view, value = "") {
@@ -91,7 +94,8 @@
   });
 
   function message(label) {
-    archiveStack.replaceChildren(node("p", "event-feed-message", label));
+    archiveStack.replaceChildren();
+    if (label) archiveStack.append(node("p", "event-feed-message", label));
     profileName = "";
     yearHeadings = [];
     yearEndSpacer = null;
@@ -313,6 +317,7 @@
     archiveBack.hidden = true;
     archivePage.classList.remove("is-open");
     archiveStack.classList.remove("scene-map-stack");
+    frameImage.alt = frameAlt;
     clearTimeout(pageExitTimer);
     pageExitTimer = setTimeout(() => {
       if (!archive.active) archiveViewport.hidden = true;
@@ -789,7 +794,7 @@
     }
   }
 
-  async function route() {
+  async function route({ resetScene = false } = {}) {
     const params = routeParams();
     if (!params.view) {
       if (!new Set(["#about", "#melt"]).has(location.hash)) {
@@ -806,7 +811,7 @@
       return;
     }
 
-    if (archive.active && renderedKey === params.key) {
+    if (archive.active && renderedKey === params.key && !resetScene) {
       if (window.QDPInfoView?.active && !["#about", "#melt"].includes(location.hash)) {
         window.QDPInfoView.close({ historyEntry: false });
       }
@@ -840,7 +845,9 @@
     document.body.classList.add("archive-mode");
     document.documentElement.classList.add("archive-open");
     archiveStack.classList.toggle("profile-events", Boolean(profileViews[params.view]));
-    archiveStack.classList.toggle("scene-map-stack", params.view === "scene-map");
+    const sceneMap = params.view === "scene-map";
+    archiveStack.classList.toggle("scene-map-stack", sceneMap);
+    frameImage.alt = sceneMap ? "Queer Dance Philly" : frameAlt;
     setProfile("");
     window.QDPEventLinks?.clear();
     archiveViewport.hidden = false;
@@ -861,10 +868,10 @@
       params.view[0].toUpperCase() + params.view.slice(1));
     if (!window.QDPInfoView?.active) document.title = window.QDPProfileMetadata?.directories?.[params.view]?.title ||
       `${archiveHeader.textContent} | Queer Dance Philly`;
-    message(params.view === "scene-map" ? "Loading the Discovery Map…" : "Loading archive…");
-    if (params.view === "scene-map") {
+    message(sceneMap ? "" : "Loading archive…");
+    if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261110-scene-map-17");
+        const module = await import("./scene-map.js?v=20261110-scene-map-18");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
@@ -1063,29 +1070,6 @@
   window.QDPArchive = archive;
   if (window.QDPInfoView?.active === "melt") loadMeltDates();
 
-  discoverLink.addEventListener("click", event => {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    if (window.QDPMobile?.active) {
-      window.QDPMobile.openDiscover();
-      return;
-    }
-    if (window.QDPInfoView?.active) {
-      const url = new URL(location.href);
-      url.hash = "";
-      const { qdpInfo, ...returnState } = history.state || {};
-      history.replaceState(returnState, "", url);
-      window.QDPInfoView.close({ historyEntry: false, preserveMenu: true });
-    }
-    resetMenu();
-    requestAnimationFrame(() => {
-      positionMenu();
-      if (window.matchMedia("(max-width: 760px)").matches) {
-        menuTrack.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
-    });
-  });
-
   archiveStack.addEventListener("scroll", () => {
     syncYearHeadings();
     archive.updateControls();
@@ -1107,7 +1091,7 @@
     if (url.origin !== location.origin) return;
     event.preventDefault();
     if (url.href !== location.href) history.pushState({ qdpArchive: true }, "", url);
-    route();
+    route({ resetScene: anchor.matches("#discoverLink, .archive-menu-discovery") });
     if (!url.searchParams.has("archive")) {
       hideMenu();
       window.QDPShowCurrentCalendar?.();

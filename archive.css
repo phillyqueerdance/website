@@ -261,6 +261,11 @@
   margin-top: 8px;
   color: #ffea86;
 }
+@media (min-width: 761px) {
+  .archive-menu > .archive-menu-discovery[aria-current="page"] {
+    padding-inline: calc(var(--archive-menu-inset, 33px) + 6px) 34px;
+  }
+}
 .archive-menu > a:focus-visible, .side-nav a:focus-visible {
   outline: 2px solid #ffea86;
   outline-offset: 3px;

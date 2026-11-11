@@ -1,5 +1,5 @@
-import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, upcomingFor,
-  networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-17";
+import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, orderSceneEvents,
+  networkFor, visibleRelationships } from "./scene-map-graph.js?v=20261110-scene-map-18";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbors, placeOuterBubble,
   MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT,
   SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-12a";
@@ -14,7 +14,7 @@ const OUTSIDE_LABEL_RADIUS = 26;
 const GRAPH_MOTION_MS = 260;
 const BUBBLE_ARTWORK = {
   "collective:QDP-001": { src: "/start-here-logo.png", scale: 1, replacesDisc: true },
-  "party:MELT-001": { src: "/melt-logo.png", scale: .85 }
+  "party:MELT-001": { src: "/melt-logo.png", scale: .73, innerBorder: true }
 };
 
 function node(tag, className = "", value = "") {
@@ -29,17 +29,6 @@ function svgNode(tag, attributes = {}, value = "") {
   for (const [key, attributeValue] of Object.entries(attributes)) element.setAttribute(key, attributeValue);
   element.textContent = value;
   return element;
-}
-
-function qdpUrl(item, event = false) {
-  const url = new URL("/", location.origin);
-  if (event) {
-    url.searchParams.set("event", item.eventId || item.id);
-  } else {
-    url.searchParams.set("archive", item.kind);
-    url.searchParams.set("id", item.id);
-  }
-  return url.href;
 }
 
 async function resource(kind, id) {
@@ -100,13 +89,6 @@ function typePill(kind) {
   return pill;
 }
 
-function anchor(text, url) {
-  const link = node("a", "scene-map-link", text);
-  link.href = url;
-  link.dataset.archiveLink = "";
-  return link;
-}
-
 function setMessage(map, text) {
   map.message.textContent = text;
   map.message.hidden = !text;
@@ -117,45 +99,37 @@ function sharedEvents(count) {
 }
 
 function closeDetails(map) {
+  if (!map.info.hidden && window.QDPArchive) window.QDPArchive.events = [];
   map.info.hidden = true;
   map.svg.querySelector(".scene-map-node.focus")?.setAttribute("aria-expanded", "false");
 }
 
-function toggleDetails(map, bubble) {
+function toggleDetails(map, bubble, keyboard = false) {
   closeRelationship(map);
   if (!map.info.hidden) {
     closeDetails(map);
     return;
   }
   const item = bubble.item;
+  const events = map.scene.branches.get(item.key)?.events;
+  if (!events) return;
   const heading = node("div", "scene-map-detail-heading");
   const close = node("button", "scene-map-close", "×");
   close.type = "button";
   close.setAttribute("aria-label", "Close profile details");
   close.onclick = () => {
     closeDetails(map);
-    bubble.element.focus();
+    bubble.element.focus({ preventScroll: true });
   };
-  heading.append(node("strong", "", item.name), typePill(item.kind), close);
-  map.info.replaceChildren(heading);
-
-  const branch = map.scene.branches.get(item.key);
-  const arrival = branch?.links?.find(link => link.key === map.scene.arrival && visibleConnection(map, link));
-  if (arrival) {
-    map.info.append(node("p", "scene-map-note", arrival.name + " · " + relationshipText(item, arrival)));
-    for (const event of arrival.events.slice(0, 2)) {
-      map.info.append(anchor(event.title, qdpUrl(event, true)));
-    }
-  }
-  const events = branch?.events;
-  if (events) {
-    const upcoming = upcomingFor(item, events, Date.now(), 2);
-    for (const event of upcoming) map.info.append(anchor("Upcoming: " + event.title, qdpUrl(event, true)));
-    if (!upcoming.length) map.info.append(node("p", "scene-map-note", "No upcoming events listed here."));
-  }
-  map.info.append(anchor("View QDP profile", qdpUrl(item)));
+  heading.append(node("strong", "", item.name), close);
+  const list = events.length
+    ? renderSceneEvents(orderSceneEvents(events), item.name + " events")
+    : node("p", "scene-map-note", "No events listed.");
+  map.info.replaceChildren(heading, list);
   map.info.hidden = false;
+  fitPosterTitles(map.info);
   bubble.element.setAttribute("aria-expanded", "true");
+  if (keyboard) close.focus({ preventScroll: true });
 }
 
 function closeRelationship(map) {
@@ -205,11 +179,11 @@ function positionRelationship(map) {
   popup.style.top = best.top + "px";
 }
 
-function renderRelationshipEvents(events) {
-  const list = node("div", "scene-map-relationship-events");
+function renderSceneEvents(events, label) {
+  const list = node("div", "scene-map-events");
   list.tabIndex = 0;
   list.setAttribute("role", "region");
-  list.setAttribute("aria-label", "Shared events");
+  list.setAttribute("aria-label", label);
   const days = new Map();
   for (const event of events) {
     const date = dateKey(new Date(event.start));
@@ -266,7 +240,7 @@ function toggleRelationship(map, line, keyboard = false) {
   const count = (line.associated ? "Profile association · " : "") + sharedEvents(link.count) +
     (link.upcoming ? " · " + link.upcoming + " upcoming" : "");
   map.lineInfo.replaceChildren(heading, node("p", "scene-map-note", count));
-  if (link.events.length) map.lineInfo.append(renderRelationshipEvents(link.events));
+  if (link.events.length) map.lineInfo.append(renderSceneEvents(link.events, "Shared events"));
   map.lineInfo.hidden = false;
   fitPosterTitles(map.lineInfo);
   positionRelationship(map);
@@ -299,17 +273,20 @@ function createLine(map, source, target, link, cross) {
   return line;
 }
 
-function bindRelationshipDetails(map) {
+function bindDetails(map) {
   map.root.addEventListener("pointerdown", event => {
     if (map.activeLine && !map.lineInfo.contains(event.target) && !event.target.closest(".scene-map-edge-control")) {
       closeRelationship(map);
     }
   });
   map.root.addEventListener("keydown", event => {
-    if (event.key !== "Escape" || !map.activeLine) return;
-    const restore = map.lineInfo.contains(document.activeElement) ? map.activeLine.control : null;
-    closeRelationship(map);
-    restore?.focus();
+    if (event.key !== "Escape" || (!map.activeLine && map.info.hidden)) return;
+    const popup = map.activeLine ? map.lineInfo : map.info;
+    const trigger = map.activeLine?.control || map.svg.querySelector(".scene-map-node.focus");
+    const restore = popup.contains(document.activeElement);
+    if (map.activeLine) closeRelationship(map);
+    else closeDetails(map);
+    if (restore) trigger?.focus({ preventScroll: true });
     event.stopPropagation();
     event.preventDefault();
   });
@@ -332,6 +309,10 @@ function createBubble(map, item) {
     bubble.logo = svgNode("image", { class: "scene-map-node-logo", href: artwork.src, "aria-hidden": "true" });
     bubble.logoScale = artwork.scale;
     if (artwork.replacesDisc) element.classList.add("scene-map-node-globe");
+    if (artwork.innerBorder) {
+      bubble.ring = svgNode("circle", { class: "scene-map-node-ring", "aria-hidden": "true" });
+      element.append(bubble.ring);
+    }
     element.append(bubble.logo);
   } else {
     const caption = svgNode("foreignObject", { class: "scene-map-caption", "aria-hidden": "true" });
@@ -343,12 +324,12 @@ function createBubble(map, item) {
     Object.assign(bubble, { caption, captionBody, captionName });
   }
   element.addEventListener("click", event => {
-    if (!map.skipClick || event.detail === 0) activateBubble(map, bubble);
+    if (!map.skipClick || event.detail === 0) activateBubble(map, bubble, event.detail === 0);
   });
   element.addEventListener("keydown", event => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      activateBubble(map, bubble);
+      activateBubble(map, bubble, true);
     }
   });
   element.addEventListener("pointerenter", () => { map.hovered = bubble; });
@@ -390,6 +371,10 @@ function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
+  if (bubble.ring) {
+    bubble.ring.setAttribute("r", radius * .9);
+    bubble.ring.setAttribute("stroke-width", Math.min(4, radius * .12));
+  }
   if (bubble.logo) {
     const halfSize = radius * bubble.logoScale;
     bubble.logo.setAttribute("x", -halfSize);
@@ -640,6 +625,7 @@ function renderMap(map, reflow = false) {
   const previousLine = map.activeLine;
   const restoreLineFocus = previousLine?.control === document.activeElement;
   const scene = map.scene;
+  const events = scene?.branches.get(scene.origin.key)?.events;
   const network = scene ? buildNetwork(map, scene) : new Map();
   const bubbles = new Map();
   for (const [key, vertex] of network) {
@@ -693,10 +679,12 @@ function renderMap(map, reflow = false) {
     } else closeRelationship(map);
   }
   updateBubbles(map);
+  if (events) map.filters.hidden = false;
+  map.svg.setAttribute("aria-hidden", String(!bubbles.size));
   layoutGraph(map, reflow);
   if (map.pendingScene && map.pendingScene !== scene) setMessage(map, "Loading " + map.pendingScene.origin.name + "…");
-  else if (!scene) setMessage(map, "Search for something you know to begin.");
-  else if (!scene.branches.get(scene.origin.key)?.events) setMessage(map, "Loading " + scene.origin.name + "…");
+  else if (!scene) setMessage(map, "");
+  else if (!events) setMessage(map, "Loading " + scene.origin.name + "…");
   else setMessage(map, bubbles.size > 1 ? "" : "No connections match these filters.");
 }
 
@@ -808,9 +796,9 @@ async function startScene(map, item, exploring = false) {
   }
 }
 
-function activateBubble(map, bubble) {
+function activateBubble(map, bubble, keyboard = false) {
   if (!map.scene || map.bubbles.get(bubble.item.key) !== bubble) return;
-  if (bubble.depth === 0) toggleDetails(map, bubble);
+  if (bubble.depth === 0) toggleDetails(map, bubble, keyboard);
   else void startScene(map, bubble.item, true);
 }
 
@@ -920,6 +908,7 @@ export async function mountSceneMap(host) {
   input.setAttribute("aria-label", "Search artists, parties, venues and collectives");
   const results = node("div", "scene-map-results");
   const filters = node("div", "scene-map-filters");
+  filters.hidden = true;
   top.append(input, filters, results);
   for (const kind of KINDS) {
     const directory = DIRECTORY_FOR[kind];
@@ -932,11 +921,14 @@ export async function mountSceneMap(host) {
   filters.append(queerLabel);
   const queerToggle = queerLabel.querySelector("input");
   const wrap = node("div", "scene-map-canvas-wrap");
-  const svg = svgNode("svg", { class: "scene-map-canvas", role: "group", "aria-label": "Scene connections" });
+  const svg = svgNode("svg", {
+    class: "scene-map-canvas", role: "group", "aria-label": "Scene connections", "aria-hidden": "true"
+  });
   const graph = svgNode("g"), edgeLayer = svgNode("g"), nodeLayer = svgNode("g");
   graph.append(edgeLayer, nodeLayer);
   svg.append(graph);
-  const message = node("p", "scene-map-message", "Loading public QDP directory…");
+  const message = node("p", "scene-map-message");
+  message.hidden = true;
   message.setAttribute("role", "status");
   const info = node("section", "scene-map-detail");
   info.hidden = true;
@@ -949,7 +941,7 @@ export async function mountSceneMap(host) {
   root.append(top, wrap);
   host.replaceChildren(root);
 
-  const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, lineInfo, message, search: input, results,
+  const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, lineInfo, message, search: input, results, filters,
     scene: null, pendingScene: null, bubbles: new Map(), lines: [], retiringBubbles: new Map(), retiringLines: new Map(),
     phase: 0, allowed: new Set(KINDS), queerOnly: false,
     dx: 0, dy: 0, width: 0, height: 0, frameRequest: 0, dragged: null, hovered: null, skipClick: false,
@@ -1004,7 +996,7 @@ export async function mountSceneMap(host) {
     }
   });
   bindDrag(map);
-  bindRelationshipDetails(map);
+  bindDetails(map);
   const resize = new ResizeObserver(() => {
     if (root.isConnected) layoutGraph(map);
     else resize.disconnect();

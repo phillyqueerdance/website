@@ -30,6 +30,13 @@ export function connects(kindA, kindB, event = {}) {
   return !fullDay && !midnightToMidnight;
 }
 
+export function orderSceneEvents(events, now = Date.now()) {
+  return [...events].sort((a, b) => {
+    const first = Date.parse(a.start) || 0, second = Date.parse(b.start) || 0;
+    return first >= now && second >= now ? first - second : second - first;
+  });
+}
+
 export function connectionsFor(focus, events, known, now = Date.now()) {
   const found = new Map();
   const connection = key => {
@@ -62,12 +69,7 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
       link.events.push(event);
     }
   }
-  for (const link of found.values()) {
-    link.events.sort((a, b) => {
-      const first = Date.parse(a.start) || 0, second = Date.parse(b.start) || 0;
-      return first >= now && second >= now ? first - second : second - first;
-    });
-  }
+  for (const link of found.values()) link.events = orderSceneEvents(link.events, now);
   return [...found.values()].sort((a, b) =>
     b.count - a.count || b.upcoming - a.upcoming ||
     b.recent - a.recent || a.name.localeCompare(b.name));
@@ -137,29 +139,4 @@ export function visibleRelationships(nodes, branches) {
     }
   }
   return edges;
-}
-
-export function upcomingFor(focus, events, now = Date.now(), max = 5) {
-  return [...new Map((events || []).filter(event => event?.eventId &&
-    participants(event).includes(focus.key) &&
-    Number.isFinite(Date.parse(event.start)) && Date.parse(event.start) >= now)
-    .map(event => [event.eventId, event])).values()]
-    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start)).slice(0, max);
-}
-
-export function relationshipText(source, target) {
-  if (target.associated && !target.count) return "Profile association";
-  const pair = [source.kind, target.kind].sort().join("+");
-  const n = target.count;
-  const appearances = `${n} documented ${n === 1 ? "event" : "events"}`;
-  const labels = {
-    "artist+artist": "Listed together at",
-    "artist+venue": "Performed at",
-    "artist+party": "Appeared at",
-    "artist+collective": "Appeared on an event with",
-    "party+venue": "Hosted at",
-    "collective+party": "Appeared together at",
-    "collective+venue": "Appeared together at"
-  };
-  return `${labels[pair] || "Connected through"} ${appearances}`;
 }
