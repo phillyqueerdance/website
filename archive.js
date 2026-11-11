@@ -479,26 +479,23 @@
     return card;
   }
 
-  function renderDirectory(kind, items) {
-    if (!Array.isArray(items)) throw new Error("Invalid directory feed");
-    archive.events = [];
-    archiveStack.replaceChildren();
+  function renderDirectoryCards(kind, profiles, results, emptyMessage) {
+    results.replaceChildren();
     cards = [];
     corners = [];
-    const profiles = sortProfiles(items, kind);
+    const singular = { artists: "artist", venues: "venue", parties: "party",
+      collectives: "collective" }[kind];
     let lastLetter = "";
     let current = null;
     for (const item of profiles) {
       const letter = initial(directorySortName(item.name, kind));
       if (letter !== lastLetter) {
         finishGroup(current);
-        current = group(letter, "archive-directory");
+        current = group(letter, "archive-directory", results);
         current.section.dataset.letter = letter;
         lastLetter = letter;
       }
       const subtitle = kind === "venues" ? item.address || "" : "";
-      const singular = { artists: "artist", venues: "venue", parties: "party",
-        collectives: "collective" }[kind];
       const card = stripCard(item.name, subtitle,
         archiveUrl(singular, item.id).href);
       if (kind === "parties" && String(item.id).trim().toUpperCase() === "MELT-001") {
@@ -515,14 +512,51 @@
       addCard(current, card);
     }
     finishGroup(current);
-    const available = new Set([...archiveStack.querySelectorAll(".archive-section[data-letter]")]
+    const available = new Set([...results.querySelectorAll(".archive-section[data-letter]")]
       .map(section => section.dataset.letter));
     alphabet.querySelectorAll("button").forEach(button => {
       button.disabled = !available.has(button.dataset.letter);
       button.setAttribute("aria-label", `Jump to ${button.dataset.letter} in ${kind}`);
     });
-    if (!profiles.length) message(`No ${kind} in the archive yet.`);
+    if (!profiles.length) results.append(node("p", "event-feed-message", emptyMessage));
     archive.updateLayout();
+    window.QDPMobile?.updateAlphabet?.();
+  }
+
+  function directorySearchText(text) {
+    return text.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase().trim();
+  }
+
+  function renderDirectory(kind, items) {
+    if (!Array.isArray(items)) throw new Error("Invalid directory feed");
+    archive.events = [];
+    let input = archiveStack.querySelector(".archive-directory-search input");
+    let results = archiveStack.querySelector(".archive-directory-results");
+    if (!input) {
+      const searchBar = node("div", "archive-search-bar archive-directory-search");
+      input = node("input", "archive-search");
+      input.type = "search";
+      input.placeholder = "What will you find?";
+      input.autocomplete = "off";
+      input.setAttribute("aria-label", `Search ${kind}`);
+      searchBar.append(input);
+      results = node("div", "archive-directory-results");
+      archiveStack.replaceChildren(searchBar, results);
+    }
+    const profiles = sortProfiles(items, kind);
+    const searchIndex = profiles.map(item => ({
+      item, text: directorySearchText(item.name + (kind === "venues" ? " " + (item.address || "") : ""))
+    }));
+    const renderMatches = () => {
+      const query = directorySearchText(input.value);
+      const matches = query ? searchIndex.filter(entry => entry.text.includes(query)).map(entry => entry.item) : profiles;
+      renderDirectoryCards(kind, matches, results, query ? `No matching ${kind}.` : `No ${kind} in the archive yet.`);
+    };
+    input.oninput = () => {
+      archiveStack.scrollTop = 0;
+      renderMatches();
+    };
+    renderMatches();
   }
 
   function monthName(month) {
@@ -788,7 +822,7 @@
       const notice = node("div", "archive-refresh-error", errorLabel(error));
       notice.setAttribute("role", "status");
       notice.appendChild(retryButton(() => refreshCurrentRoute(params)));
-      archiveStack.prepend(notice);
+      (archiveStack.querySelector(".archive-directory-results") || archiveStack).prepend(notice);
     } finally {
       if (serial === requestNumber) loadingKey = "";
     }
@@ -871,7 +905,7 @@
     message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261110-scene-map-18");
+        const module = await import("./scene-map.js?v=20261110-scene-map-19");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
@@ -1061,7 +1095,8 @@
     return { groups, index };
   }
   function offset(card) {
-    return card.getBoundingClientRect().top - archiveStack.getBoundingClientRect().top + archiveStack.scrollTop;
+    const searchHeight = archiveStack.querySelector(".archive-directory-search")?.offsetHeight || 0;
+    return card.getBoundingClientRect().top - archiveStack.getBoundingClientRect().top + archiveStack.scrollTop - searchHeight;
   }
   archive.showMenu = showMenu;
   archive.resetMenu = resetMenu;

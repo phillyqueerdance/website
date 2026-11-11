@@ -45,6 +45,31 @@
 .archive-stack > .archive-back[hidden] { display: none; }
 .archive-back:hover, .archive-back:focus-visible { color: #ffea86; }
 .archive-stack { z-index: 2; }
+.archive-search-bar { padding: 0 1cqw .75cqw; }
+.archive-directory-search {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #000;
+}
+.archive-search {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 35px;
+  padding: .8cqw 2cqw;
+  border: 2px solid #ffea86;
+  border-radius: 2.5cqw;
+  background: #000;
+  color: #fff1f4;
+  font: 400 clamp(16px, 2.35cqw, 19px)/normal "QDP Fraunces", Georgia, serif;
+}
+.archive-search::placeholder { color: #bcb5bc; }
+.archive-search:focus-visible { outline: 2px solid #ffea86; outline-offset: 2px; }
+@media (max-width: 760px) {
+  .archive-search-bar { padding: 0 4px 4px; }
+  .archive-search { border-radius: 12px; padding: 7px 9px; }
+}
 .archive-page:has(.archive-back:not([hidden])) .archive-stack {
   bottom: var(--qdp-list-bottom);
 }

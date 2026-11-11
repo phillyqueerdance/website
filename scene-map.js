@@ -900,8 +900,8 @@ function bindDrag(map) {
 
 export async function mountSceneMap(host) {
   const root = node("section", "scene-map-view");
-  const top = node("div", "scene-map-top");
-  const input = node("input", "scene-map-search");
+  const top = node("div", "scene-map-top archive-search-bar");
+  const input = node("input", "archive-search");
   input.type = "search";
   input.placeholder = "What will you find?";
   input.disabled = true;
