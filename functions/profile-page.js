@@ -15,9 +15,9 @@ const dateFormat = new Intl.DateTimeFormat("en-CA", {
 const monthFormat = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "long" });
 const suffix = day => day % 100 >= 11 && day % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[day % 10] || "th");
 
-export function renderArtistDrawer(profile) {
-  const image = meta.artistImage(profile);
-  return image ? `<div class="archive-artist-drawer"><img class="archive-artist-portrait" src="${escape(image.src)}" alt="${escape(profile.name)}"${image.width && image.height ? ` width="${image.width}" height="${image.height}"` : ""} decoding="async"></div>` : "";
+export function renderProfileDrawer(kind, profile) {
+  const image = meta.profileImage(kind, profile);
+  return image ? `<div class="archive-profile-drawer"><img class="archive-profile-portrait" src="${escape(image.src)}" alt="${escape(profile.name)}"${image.width && image.height ? ` width="${image.width}" height="${image.height}"` : ""} decoding="async"></div>` : "";
 }
 
 export function renderProfileInfo(kind, profile, base) {
@@ -88,7 +88,7 @@ export function renderProfilePage(context, page, result, kind, id) {
   const base = new URL(context.request.url).origin;
   const info = profile ? renderProfileInfo(kind, profile, base) : "";
   const markup = profile
-    ? (kind === "artist" ? renderArtistDrawer(profile) : "") +
+    ? renderProfileDrawer(kind, profile) +
       `<section class="archive-profile-summary${kind === "artist" ? " archive-artist-summary" : ""}">${info}</section>` + renderProfileEvents(kind, profile, result.payload.events, base)
     : `<p class="event-feed-message">${escape(result.error)}</p>`;
   const directory = meta.kinds[kind];

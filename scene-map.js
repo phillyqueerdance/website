@@ -106,6 +106,16 @@ function closeDetails(map) {
   map.svg.querySelector(".scene-map-node.focus")?.setAttribute("aria-expanded", "false");
 }
 
+function profileHeading(item) {
+  const heading = node("div", "scene-map-profile-heading");
+  const link = node("a", "scene-map-profile-link", "Visit Profile");
+  link.href = window.QDPProfileMetadata.url(item.kind, item.id, location.origin);
+  link.setAttribute("data-archive-link", "");
+  link.setAttribute("aria-label", "Visit Profile for " + item.name);
+  heading.append(node("strong", "", item.name), link);
+  return heading;
+}
+
 function toggleDetails(map, bubble, keyboard = false) {
   closeRelationship(map);
   if (!map.info.hidden) {
@@ -123,7 +133,7 @@ function toggleDetails(map, bubble, keyboard = false) {
     closeDetails(map);
     bubble.element.focus({ preventScroll: true });
   };
-  heading.append(node("strong", "", item.name), close);
+  heading.append(profileHeading(item), close);
   const list = events.length
     ? renderSceneEvents(orderSceneEvents(events), item.name + " events")
     : node("p", "scene-map-note", "No events listed.");
@@ -237,7 +247,9 @@ function toggleRelationship(map, line, keyboard = false) {
     closeRelationship(map);
     control?.focus({ preventScroll: true });
   };
-  heading.append(node("strong", "", line.source.item.name + " · " + line.target.item.name), close);
+  const profiles = node("div", "scene-map-relationship-profiles");
+  profiles.append(profileHeading(line.source.item), node("strong", "", "&"), profileHeading(line.target.item));
+  heading.append(profiles, close);
   const link = line.link;
   const count = sharedEvents(link.count) +
     (link.upcoming ? " · " + link.upcoming + " upcoming" : "");

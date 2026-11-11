@@ -589,11 +589,11 @@
     archive.updateLayout();
   }
 
-  function artistDrawer(person) {
-    const image = window.QDPProfileMetadata.artistImage(person);
+  function profileDrawer(kind, person) {
+    const image = window.QDPProfileMetadata.profileImage(kind, person);
     if (!image) return null;
-    const drawer = node("div", "archive-artist-drawer");
-    const portrait = node("img", "archive-artist-portrait");
+    const drawer = node("div", "archive-profile-drawer");
+    const portrait = node("img", "archive-profile-portrait");
     portrait.src = image.src;
     portrait.alt = person.name;
     if (image.width && image.height) {
@@ -606,8 +606,8 @@
     return drawer;
   }
 
-  function measureArtistDrawer() {
-    const drawer = archiveStack.querySelector(".archive-artist-drawer");
+  function measureProfileDrawer() {
+    const drawer = archiveStack.querySelector(".archive-profile-drawer");
     if (!drawer) return;
     const tab = archiveHeader.getBoundingClientRect();
     const stack = archiveStack.getBoundingClientRect();
@@ -617,8 +617,8 @@
     drawer.style.setProperty("--archive-portrait-radius", style.borderTopLeftRadius);
   }
 
-  function updateArtistDrawerCorners() {
-    const drawer = archiveStack.querySelector(".archive-artist-drawer");
+  function updateProfileDrawerCorners() {
+    const drawer = archiveStack.querySelector(".archive-profile-drawer");
     if (!drawer) return;
     const box = drawer.getBoundingClientRect();
     if (box.height <= 0) return;
@@ -697,10 +697,8 @@
     archive.events = person ? [...upcoming, ...past] : [...events].reverse();
     setProfile(kind, person);
     if (person) {
-      if (kind === "artist") {
-        const drawer = artistDrawer(person);
-        if (drawer) archiveStack.appendChild(drawer);
-      }
+      const drawer = profileDrawer(kind, person);
+      if (drawer) archiveStack.appendChild(drawer);
       const summary = node("section", `archive-profile-summary${kind === "artist" ? " archive-artist-summary" : ""}`);
       summary.appendChild(profileInfo(kind, person));
       archiveStack.appendChild(summary);
@@ -912,7 +910,7 @@
     message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261111-scene-map-24");
+        const module = await import("./scene-map.js?v=20261111-party-images-1");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
@@ -1042,7 +1040,7 @@
     },
     updateControls() {
       if (!this.active || archiveStack.hidden) return;
-      updateArtistDrawerCorners();
+      updateProfileDrawerCorners();
       if (corners.length) {
         const radius = parseFloat(getComputedStyle(corners[0].card).borderBottomRightRadius) || 0;
         for (const { time, card } of corners) {
@@ -1086,7 +1084,7 @@
       if (!archiveBack.hidden && archiveStack.lastElementChild !== archiveBack) archiveStack.appendChild(archiveBack);
       fitPosterTitles(archiveStack);
       fitProfileHeaders();
-      measureArtistDrawer();
+      measureProfileDrawer();
       measureYearEndSpacer();
       syncYearHeadings();
       this.updateControls();
