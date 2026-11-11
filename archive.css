@@ -244,7 +244,7 @@
   color: #fff1f4;
 }
 .archive-menu-badge[data-tab-color="collective"][aria-current="page"] { border-width: 2px; }
-:is(.archive-menu-badge, .archive-menu-discovery)[aria-current="page"]::after {
+.archive-menu-badge[aria-current="page"]::after {
   content: "✦";
   position: absolute;
   right: 12px;
@@ -257,7 +257,7 @@
   font-size: .78em;
 }
 .archive-menu > .archive-menu-map[hidden] { display: none; }
-.archive-menu > .archive-menu-past-events {
+.archive-menu > :is(.archive-menu-discovery, .archive-menu-past-events) {
   margin-top: 8px;
   color: #ffea86;
 }

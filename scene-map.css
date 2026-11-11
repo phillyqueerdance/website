@@ -52,16 +52,6 @@
   .poster { transition-duration: 0s; }
 }
 
-.archive-menu > .archive-menu-discovery {
-  display: block;
-  box-sizing: border-box;
-  width: calc(100% + var(--archive-overlap, 64px) - var(--archive-menu-inset, 33px) + 24px);
-  margin: 10px 0 0 calc(var(--archive-menu-inset, 33px) - var(--archive-overlap, 64px) - 12px);
-  padding: 3px 26px 3px 12px;
-  color: #ffea86;
-  text-align: center;
-}
-
 .scene-map-view {
   --scene-ink: #fff1f4;
   --scene-accent: #ffea86;
@@ -212,9 +202,10 @@
   inset: 7px 7% auto;
   transform: none;
 }
-.scene-map-edge { stroke: var(--scene-accent); stroke-opacity: .9; stroke-linecap: round; pointer-events: none; }
-.scene-map-edge[data-depth="2"] { stroke-opacity: .58; }
+.scene-map-edge { stroke: #aaa5af; stroke-opacity: .64; stroke-linecap: round; pointer-events: none; }
+.scene-map-edge[data-depth="2"] { stroke-opacity: .46; }
 .scene-map-edge.scene-map-edge-cross { stroke-opacity: .34; }
+.scene-map-edge.scene-map-edge-associated { stroke: var(--scene-accent); stroke-opacity: 1; }
 .scene-map-edge-control { cursor: pointer; }
 .scene-map-edge-hit { stroke: transparent; stroke-width: 14px; stroke-linecap: round; pointer-events: stroke; }
 .scene-map-edge-control:is(.is-arriving, .is-retiring) .scene-map-edge-hit { pointer-events: none; }
@@ -225,7 +216,7 @@
 }
 .scene-map-canvas, .scene-map-node, .scene-map-edge-control { -webkit-tap-highlight-color: transparent; }
 .scene-map-edge-control:focus-visible:not([aria-expanded="true"]) .scene-map-edge {
-  stroke: var(--scene-ink);
+  stroke: var(--scene-accent);
   stroke-opacity: .85;
   stroke-dasharray: 3 2;
 }
@@ -238,7 +229,7 @@
   opacity: .6;
 }
 @media (hover: hover) {
-  .scene-map-canvas:not(.is-dragging) .scene-map-edge-control:hover .scene-map-edge[data-depth="1"]:not(.scene-map-edge-cross) {
+  .scene-map-canvas:not(.is-dragging) .scene-map-edge-control:hover .scene-map-edge {
     stroke: var(--scene-accent);
     stroke-opacity: 1;
     opacity: 1;
@@ -365,17 +356,6 @@
 .scene-map-results :focus-visible { outline-offset: -2px; }
 
 @media (max-width: 760px) {
-  .archive-menu > .archive-menu-discovery {
-    grid-column: 1 / -1;
-    grid-row: 5;
-    width: 100%;
-    min-height: 44px;
-    margin: 6px 0 0;
-    padding: 11px 0;
-    font-size: 17.1px;
-  }
-  .archive-menu > a.archive-menu-past-events { grid-row: 6; }
-  .archive-menu > a.archive-menu-past-events[aria-current="page"] { grid-row: 6; }
   .scene-map-top { padding: 6px 4px 4px; }
   .scene-map-search { border-radius: 12px; padding: 7px 9px; }
   .scene-map-results { left: 4px; right: 4px; }

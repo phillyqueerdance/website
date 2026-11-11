@@ -32,6 +32,16 @@ export function connects(kindA, kindB, event = {}) {
 
 export function connectionsFor(focus, events, known, now = Date.now()) {
   const found = new Map();
+  const connection = key => {
+    if (!found.has(key)) {
+      found.set(key, { ...known.get(key), key, count: 0, upcoming: 0, recent: 0, events: [] });
+    }
+    return found.get(key);
+  };
+  for (const related of focus.related || []) {
+    const key = keyOf(related.kind, related.id);
+    if (key !== focus.key && known.has(key)) connection(key).associated = true;
+  }
   const seenEvents = new Set();
   for (const event of events || []) {
     if (!event || !event.eventId || seenEvents.has(event.eventId)) continue;
@@ -43,12 +53,7 @@ export function connectionsFor(focus, events, known, now = Date.now()) {
       if (member === focus.key || !known.has(member)) continue;
       const target = known.get(member);
       if (!connects(focus.kind, target.kind, event)) continue;
-      let link = found.get(member);
-      if (!link) {
-        link = { ...target, key: member, count: 0, upcoming: 0,
-          recent: 0, events: [] };
-        found.set(member, link);
-      }
+      const link = connection(member);
       link.count++;
       if (Number.isFinite(start)) {
         link.recent = Math.max(link.recent, start);
@@ -93,10 +98,11 @@ export function networkFor(origin, branches, eligible, maxBubbles) {
   const direct = new Map(root.links.map(link => [link.key, link]));
   const ranked = root.links.filter(eligible);
   const directLimit = Math.min(root.limit, maxBubbles - 1);
-  // Shared-event counts lead. Reserve up to three slots for context from the previous view.
+  // Shared-event counts lead. Use the remaining slots for Index associations and recent context.
   const strongest = ranked.slice(0, Math.max(1, directLimit - 3));
+  const associations = ranked.filter(link => link.associated);
   const context = (root.preferred || []).map(key => direct.get(key)).filter(link => link && eligible(link));
-  const neighbors = [...new Set([...strongest, ...context, ...ranked])].slice(0, directLimit);
+  const neighbors = [...new Set([...strongest, ...associations, ...context, ...ranked])].slice(0, directLimit);
   for (const link of neighbors) {
     nodes.set(link.key, { item: link, parent: origin.key, link, depth: 1 });
   }
@@ -117,7 +123,9 @@ export function visibleRelationships(nodes, branches) {
   const edges = new Map();
   const add = (source, target, link, cross) => {
     const key = source < target ? source + "|" + target : target + "|" + source;
-    if (!edges.has(key)) edges.set(key, { source, target, link, cross });
+    const edge = edges.get(key);
+    if (!edge) edges.set(key, { source, target, link, cross, associated: Boolean(link.associated) });
+    else if (link.associated) edge.associated = true;
   };
   // Preserve layout parents first, then add every proven pair among these bubbles.
   for (const [key, vertex] of nodes) {
@@ -140,6 +148,7 @@ export function upcomingFor(focus, events, now = Date.now(), max = 5) {
 }
 
 export function relationshipText(source, target) {
+  if (target.associated && !target.count) return "Profile association";
   const pair = [source.kind, target.kind].sort().join("+");
   const n = target.count;
   const appearances = `${n} documented ${n === 1 ? "event" : "events"}`;

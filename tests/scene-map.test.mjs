@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { connectionsFor, networkFor } from "../scene-map-graph.js";
+import { connectionsFor, networkFor, visibleRelationships } from "../scene-map-graph.js";
 
 test("the strongest direct connections keep their places when exploring from another bubble", () => {
   const origin = { key: "artist:focus", kind: "artist" };
@@ -39,4 +39,43 @@ test("a relationship keeps every distinct shared listing in display order", () =
   assert.equal(link.count, 5);
   assert.equal(link.upcoming, 2);
   assert.deepEqual(link.events, [shared[3], shared[1], shared[2], shared[4], shared[0]]);
+});
+
+test("only declared profile associations are flagged, even when a guest shares more events", () => {
+  const party = { key: "party:night", kind: "party", name: "Night", related: [
+    { kind: "artist", id: "resident" }, { kind: "collective", id: "crew" }, { kind: "artist", id: "private" }
+  ] };
+  const resident = { key: "artist:resident", kind: "artist", name: "Resident" };
+  const guest = { key: "artist:guest", kind: "artist", name: "Guest" };
+  const crew = { key: "collective:crew", kind: "collective", name: "Crew" };
+  const venue = { key: "venue:space", kind: "venue", name: "Space" };
+  const known = new Map([party, resident, guest, crew, venue].map(profile => [profile.key, profile]));
+  const events = [
+    { eventId: "one", partyId: "night", artistIds: ["resident", "guest"], venueId: "space" },
+    { eventId: "two", partyId: "night", artistIds: ["guest"] }
+  ];
+
+  const links = connectionsFor(party, events, known);
+  assert.deepEqual(links.map(link => [link.key, link.count, Boolean(link.associated)]), [
+    [guest.key, 2, false], [resident.key, 1, true], [venue.key, 1, false], [crew.key, 0, true]
+  ]);
+  const branches = new Map([[party.key, { links, limit: 3 }]]);
+  const graph = networkFor(party, branches, () => true, 4);
+  assert.ok(graph.has(crew.key));
+});
+
+test("a declaration from either endpoint flags the existing edge without losing shared events", () => {
+  const party = { key: "party:night", kind: "party", name: "Night" };
+  const artist = { key: "artist:resident", kind: "artist", name: "Resident",
+    related: [{ kind: "party", id: "night" }] };
+  const event = { eventId: "one", partyId: "night", artistIds: ["resident"] };
+  const known = new Map([[party.key, party], [artist.key, artist]]);
+  const branches = new Map([[party.key, { links: connectionsFor(party, [event], known), limit: 9 }]]);
+  const graph = networkFor(party, branches, () => true, 14);
+  assert.equal([...visibleRelationships(graph, branches).values()][0].associated, false);
+
+  branches.set(artist.key, { links: connectionsFor(artist, [event], known), limit: 0 });
+  const [edge] = visibleRelationships(graph, branches).values();
+  assert.equal(edge.associated, true);
+  assert.deepEqual(edge.link.events, [event]);
 });

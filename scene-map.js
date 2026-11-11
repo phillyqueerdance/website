@@ -1,5 +1,5 @@
 import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, upcomingFor,
-  networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-11";
+  networkFor, visibleRelationships, relationshipText } from "./scene-map-graph.js?v=20261110-scene-map-17";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbors, placeOuterBubble,
   MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT,
   SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-12a";
@@ -263,11 +263,12 @@ function toggleRelationship(map, line, keyboard = false) {
   };
   heading.append(node("strong", "", line.source.item.name + " · " + line.target.item.name), close);
   const link = line.link;
-  const count = sharedEvents(link.count) + (link.upcoming ? " · " + link.upcoming + " upcoming" : "");
-  const events = renderRelationshipEvents(link.events);
-  map.lineInfo.replaceChildren(heading, node("p", "scene-map-note", count), events);
+  const count = (line.associated ? "Profile association · " : "") + sharedEvents(link.count) +
+    (link.upcoming ? " · " + link.upcoming + " upcoming" : "");
+  map.lineInfo.replaceChildren(heading, node("p", "scene-map-note", count));
+  if (link.events.length) map.lineInfo.append(renderRelationshipEvents(link.events));
   map.lineInfo.hidden = false;
-  fitPosterTitles(events);
+  fitPosterTitles(map.lineInfo);
   positionRelationship(map);
   if (keyboard) close.focus();
 }
@@ -281,7 +282,7 @@ function createLine(map, source, target, link, cross) {
   const element = svgNode("line", {
     class: cross ? "scene-map-edge scene-map-edge-cross" : "scene-map-edge",
     "data-depth": Math.max(source.depth, target.depth),
-    "stroke-width": cross ? 1.15 : 1.3 + relationshipStrength(link.count) * 1.35
+    "stroke-width": cross ? 1.15 : 1.3 + relationshipStrength(Math.max(1, link.count)) * 1.35
   });
   const hit = svgNode("line", { class: "scene-map-edge-hit", "aria-hidden": "true" });
   control.append(element, hit);
@@ -379,7 +380,7 @@ function resizeBubble(bubble, shortSide, maxDirect, maxIndirect, labelWidth) {
   // Circle area encodes the count, with a smaller scale for second-degree links.
   const indirect = bubble.depth === 2;
   const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
-  bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(bubble.link.count) * scale : shortSide * .148;
+  bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(Math.max(1, bubble.link.count)) * scale : shortSide * .148;
   bubble.labelOutside = !bubble.logo && bubble.radius < OUTSIDE_LABEL_RADIUS;
   if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius * bubble.opacity);
   if (!bubble.logo) fitCaption(bubble, labelWidth);
@@ -617,16 +618,21 @@ function buildNetwork(map, scene) {
 }
 
 function addVisibleConnections(map, scene) {
-  const seen = new Set(map.lines.map(line => line.key));
-  for (const [key, { source, target, link, cross }] of visibleRelationships(map.bubbles, scene.branches)) {
-    if (seen.has(key)) continue;
-    map.retiringLines.get(key)?.control.remove();
-    map.retiringLines.delete(key);
-    const line = createLine(map, map.bubbles.get(source), map.bubbles.get(target), link, cross);
-    line.key = key;
-    map.lines.push(line);
-    if (cross) map.edgeLayer.prepend(line.control);
-    else map.edgeLayer.append(line.control);
+  const existing = new Map(map.lines.map(line => [line.key, line]));
+  for (const [key, { source, target, link, cross, associated }] of visibleRelationships(map.bubbles, scene.branches)) {
+    let line = existing.get(key);
+    if (!line) {
+      map.retiringLines.get(key)?.control.remove();
+      map.retiringLines.delete(key);
+      line = createLine(map, map.bubbles.get(source), map.bubbles.get(target), link, cross);
+      line.key = key;
+      map.lines.push(line);
+      if (cross) map.edgeLayer.prepend(line.control);
+      else map.edgeLayer.append(line.control);
+    }
+    line.associated = associated;
+    line.element.classList.toggle("scene-map-edge-associated", associated);
+    if (associated) line.control.setAttribute("aria-description", "Profile association");
   }
 }
 
@@ -705,7 +711,7 @@ async function loadBranch(scene, item, limit) {
   const data = await profile(item);
   if (!branch.links) {
     branch.events = data.events;
-    branch.links = connectionsFor(item, data.events, known);
+    branch.links = connectionsFor({ ...item, related: data.profile.related }, data.events, known);
   }
 }
 
