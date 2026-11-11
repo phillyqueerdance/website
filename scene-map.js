@@ -1,5 +1,5 @@
 import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, orderSceneEvents,
-  networkFor, visibleRelationships } from "./scene-map-graph.js?v=20261110-scene-map-18";
+  networkFor, visibleRelationships } from "./scene-map-graph.js?v=20261110-scene-map-22";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbors, placeOuterBubble,
   MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT,
   SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-12a";
@@ -7,9 +7,9 @@ import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbor
 const NS = "http://www.w3.org/2000/svg";
 const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };
 const known = new Map(), cache = new Map();
-const ROOT_LINKS = 11;
+const DESKTOP_LIMITS = { total: 16, direct: 11, context: 3 };
+const MOBILE_LIMITS = { total: 8, direct: 5, context: 2 };
 const AUTO_BRANCHES = 4;
-const MAX_BUBBLES = 1 + ROOT_LINKS + AUTO_BRANCHES;
 const OUTSIDE_LABEL_RADIUS = 26;
 const MIN_CAPTION_SIZE = 11;
 const GRAPH_MOTION_MS = 260;
@@ -632,7 +632,7 @@ function layoutGraph(map, reflow = false) {
 }
 
 function buildNetwork(map, scene) {
-  return networkFor(scene.origin, scene.branches, item => visibleConnection(map, item), MAX_BUBBLES);
+  return networkFor(scene.origin, scene.branches, item => visibleConnection(map, item), map.limits);
 }
 
 function addVisibleConnections(map, scene) {
@@ -749,15 +749,27 @@ async function loadVisibleConnections(map, scene) {
 }
 
 async function addSecondHop(map, scene) {
+  const limits = map.limits;
   const direct = [...buildNetwork(map, scene).values()].filter(vertex => vertex.depth === 1);
   const arrival = direct.find(vertex => vertex.item.key === scene.arrival);
   const first = [...new Set([...(arrival ? [arrival] : []), ...direct])].slice(0, AUTO_BRANCHES);
   await Promise.allSettled(first.map(vertex => loadBranch(scene, vertex.item, 1)));
   if (!map.root.isConnected || (map.scene !== scene && map.pendingScene !== scene)) return;
+  if (map.limits !== limits) return addSecondHop(map, scene);
   const current = [...buildNetwork(map, scene).values()];
   if (current.some(vertex => vertex.depth === 2)) return;
   const rest = current.filter(vertex => vertex.depth === 1 && !first.some(seen => seen.item.key === vertex.item.key));
   await Promise.allSettled(rest.map(vertex => loadBranch(scene, vertex.item, 1)));
+}
+
+async function refreshNetwork(map) {
+  renderMap(map, true);
+  const scene = map.scene;
+  if (!scene?.branches.get(scene.origin.key)?.links) return;
+  await addSecondHop(map, scene);
+  if (!map.root.isConnected || map.scene !== scene) return;
+  renderMap(map, true);
+  void loadVisibleConnections(map, scene);
 }
 
 async function startScene(map, item, exploring = false) {
@@ -796,7 +808,7 @@ async function startScene(map, item, exploring = false) {
     renderMap(map);
   }
   try {
-    await loadBranch(scene, item, ROOT_LINKS);
+    await loadBranch(scene, item, 0);
     if (!map.root.isConnected || map.pendingScene !== scene) return;
     if (map.scene === scene) renderMap(map);
     await addSecondHop(map, scene);
@@ -973,11 +985,13 @@ export async function mountSceneMap(host) {
   root.append(top, wrap);
   host.replaceChildren(root);
 
+  const mobile = window.matchMedia("(max-width: 760px)");
   const map = { root, wrap, svg, graph, edgeLayer, nodeLayer, info, lineInfo, message, search: input, results, filters,
     scene: null, pendingScene: null, bubbles: new Map(), lines: [], retiringBubbles: new Map(), retiringLines: new Map(),
     phase: 0, allowed: new Set(KINDS), queerOnly: false,
     dx: 0, dy: 0, width: 0, height: 0, frameRequest: 0, dragged: null, hovered: null, skipClick: false,
     activeLine: null, searchOpen: false,
+    limits: mobile.matches ? MOBILE_LIMITS : DESKTOP_LIMITS,
     reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)") };
   const openSearch = () => {
     if (map.searchOpen) return;
@@ -1014,24 +1028,22 @@ export async function mountSceneMap(host) {
     if (map.pendingScene && !matchesQueerFilter(map, map.pendingScene.origin)) map.pendingScene = null;
     closeDetails(map);
     search(map);
-    if (!input.disabled) {
-      renderMap(map, true);
-      const scene = map.scene;
-      if (scene?.branches.get(scene.origin.key)?.links) {
-        void addSecondHop(map, scene).then(() => {
-          if (map.root.isConnected && map.scene === scene) {
-            renderMap(map, true);
-            void loadVisibleConnections(map, scene);
-          }
-        });
-      }
-    }
+    if (!input.disabled) void refreshNetwork(map);
   });
   bindDrag(map);
   bindDetails(map);
+  const changeDensity = ({ matches }) => {
+    if (!root.isConnected) return;
+    map.limits = matches ? MOBILE_LIMITS : DESKTOP_LIMITS;
+    void refreshNetwork(map);
+  };
+  mobile.addEventListener("change", changeDensity);
   const resize = new ResizeObserver(() => {
     if (root.isConnected) layoutGraph(map);
-    else resize.disconnect();
+    else {
+      mobile.removeEventListener("change", changeDensity);
+      resize.disconnect();
+    }
   });
   resize.observe(wrap);
   document.fonts?.ready.then(() => {

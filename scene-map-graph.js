@@ -93,15 +93,15 @@ export function pickConnections(connections, limit = 12, preferred = []) {
   return result;
 }
 
-export function networkFor(origin, branches, eligible, maxBubbles) {
+export function networkFor(origin, branches, eligible, limits) {
   const nodes = new Map([[origin.key, { item: origin, parent: null, link: null, depth: 0 }]]);
   const root = branches.get(origin.key);
-  if (!root?.links || !root.limit || maxBubbles <= 1) return nodes;
+  if (!root?.links || !limits.direct || limits.total <= 1) return nodes;
   const direct = new Map(root.links.map(link => [link.key, link]));
   const ranked = root.links.filter(eligible);
-  const directLimit = Math.min(root.limit, maxBubbles - 1);
+  const directLimit = Math.min(limits.direct, limits.total - 1);
   // Shared-event counts lead. Use the remaining slots for Index associations and recent context.
-  const strongest = ranked.slice(0, Math.max(1, directLimit - 3));
+  const strongest = ranked.slice(0, Math.max(1, directLimit - limits.context));
   const associations = ranked.filter(link => link.associated);
   const context = (root.preferred || []).map(key => direct.get(key)).filter(link => link && eligible(link));
   const neighbors = [...new Set([...strongest, ...associations, ...context, ...ranked])].slice(0, directLimit);
@@ -110,10 +110,10 @@ export function networkFor(origin, branches, eligible, maxBubbles) {
   }
   for (const neighbor of neighbors) {
     const branch = branches.get(neighbor.key);
-    if (!branch?.links || !branch.limit || nodes.size >= maxBubbles) continue;
+    if (!branch?.links || !branch.limit || nodes.size >= limits.total) continue;
     const candidates = branch.links.filter(link => !nodes.has(link.key) && !direct.has(link.key) && eligible(link));
     const contextual = candidates.filter(link => link.kind !== neighbor.kind || branch.preferred?.includes(link.key));
-    const limit = Math.min(branch.limit, maxBubbles - nodes.size);
+    const limit = Math.min(branch.limit, limits.total - nodes.size);
     for (const link of pickConnections(contextual.length ? contextual : candidates, limit, branch.preferred)) {
       nodes.set(link.key, { item: link, parent: neighbor.key, link, depth: 2 });
     }

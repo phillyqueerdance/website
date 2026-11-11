@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { connectionsFor, networkFor, visibleRelationships } from "../scene-map-graph.js";
 
-test("the strongest direct connections keep their places when exploring from another bubble", () => {
+test("desktop and mobile keep the strongest direct connections within their bubble limits", () => {
   const origin = { key: "artist:focus", kind: "artist" };
   const strongest = [19, 9, 8, 7, 6, 5, 4, 4].map((count, index) => ({
     key: "artist:co-bill-" + index, kind: "artist", count
@@ -13,13 +13,19 @@ test("the strongest direct connections keep their places when exploring from ano
       key: "artist:previous-" + index, kind: "artist", count: 1
     }))
   ];
-  const branch = {
-    links: [...strongest, ...previous], limit: 11, preferred: previous.map(link => link.key)
-  };
-  const graph = networkFor(origin, new Map([[origin.key, branch]]), () => true, 16);
-  const direct = [...graph.values()].filter(vertex => vertex.depth === 1);
-  assert.deepEqual(direct.map(vertex => vertex.item), [...strongest, ...previous.slice(0, 3)]);
-  assert.ok(direct.every(vertex => vertex.parent === origin.key));
+  const branches = new Map(strongest.map((link, index) => [link.key, {
+    links: [{ key: "venue:outer-" + index, kind: "venue", count: 1 }], limit: 1
+  }]));
+  branches.set(origin.key, { links: [...strongest, ...previous], preferred: previous.map(link => link.key) });
+
+  for (const limits of [{ total: 16, direct: 11, context: 3 }, { total: 8, direct: 5, context: 2 }]) {
+    const graph = networkFor(origin, branches, () => true, limits);
+    const direct = [...graph.values()].filter(vertex => vertex.depth === 1);
+    const expected = [...strongest.slice(0, limits.direct - limits.context), ...previous.slice(0, limits.context)];
+    assert.equal(graph.size, limits.total);
+    assert.deepEqual(direct.map(vertex => vertex.item), expected);
+    assert.ok(direct.every(vertex => vertex.parent === origin.key));
+  }
 });
 
 test("a relationship keeps every distinct shared listing in display order", () => {
@@ -59,8 +65,8 @@ test("only declared profile associations are flagged, even when a guest shares m
   assert.deepEqual(links.map(link => [link.key, link.count, Boolean(link.associated)]), [
     [guest.key, 2, false], [resident.key, 1, true], [venue.key, 1, false], [crew.key, 0, true]
   ]);
-  const branches = new Map([[party.key, { links, limit: 3 }]]);
-  const graph = networkFor(party, branches, () => true, 4);
+  const branches = new Map([[party.key, { links }]]);
+  const graph = networkFor(party, branches, () => true, { total: 4, direct: 3, context: 3 });
   assert.ok(graph.has(crew.key));
 });
 
@@ -70,8 +76,8 @@ test("a declaration from either endpoint flags the existing edge without losing 
     related: [{ kind: "party", id: "night" }] };
   const event = { eventId: "one", partyId: "night", artistIds: ["resident"] };
   const known = new Map([[party.key, party], [artist.key, artist]]);
-  const branches = new Map([[party.key, { links: connectionsFor(party, [event], known), limit: 9 }]]);
-  const graph = networkFor(party, branches, () => true, 14);
+  const branches = new Map([[party.key, { links: connectionsFor(party, [event], known) }]]);
+  const graph = networkFor(party, branches, () => true, { total: 16, direct: 11, context: 3 });
   assert.equal([...visibleRelationships(graph, branches).values()][0].associated, false);
 
   branches.set(artist.key, { links: connectionsFor(artist, [event], known), limit: 0 });
