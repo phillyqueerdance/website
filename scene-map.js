@@ -1,8 +1,7 @@
 import { DIRECTORY_FOR, KINDS, keyOf, participants, connectionsFor, orderSceneEvents,
   networkFor, visibleRelationships } from "./scene-map-graph.js?v=20261110-scene-map-22";
 import { relationshipStrength, linkGap, keepInView, settleBubbles, orderNeighbors, placeOuterBubble,
-  MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_HEIGHT,
-  SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-12a";
+  MIN_BUBBLE_HIT_RADIUS, SMALL_BUBBLE_LABEL_WIDTH, SMALL_BUBBLE_LABEL_GAP } from "./scene-map-layout.js?v=20261110-scene-map-12a";
 
 const NS = "http://www.w3.org/2000/svg";
 const labels = { artist: "Artist", party: "Party", venue: "Venue", collective: "Collective" };
@@ -12,6 +11,7 @@ const MOBILE_LIMITS = { total: 8, direct: 5, context: 2 };
 const AUTO_BRANCHES = 4;
 const OUTSIDE_LABEL_RADIUS = 26;
 const MIN_CAPTION_SIZE = 11;
+const CAPTION_LINE_HEIGHT = 1.07;
 const GRAPH_MOTION_MS = 260;
 let captionMeasure;
 const BUBBLE_ARTWORK = {
@@ -317,13 +317,12 @@ function createBubble(map, item) {
     }
     element.append(bubble.logo);
   } else {
-    const caption = svgNode("foreignObject", { class: "scene-map-caption", "aria-hidden": "true" });
-    const captionBody = node("div", "scene-map-caption-body");
-    const captionName = node("span", "scene-map-caption-name", item.name);
-    captionBody.append(captionName);
-    caption.append(captionBody);
-    element.append(caption);
-    Object.assign(bubble, { caption, captionBody, captionName });
+    const caption = svgNode("text", { class: "scene-map-caption", "aria-hidden": "true" });
+    const captionLines = [svgNode("tspan", { x: 0 }), svgNode("tspan", { x: 0 })];
+    caption.append(...captionLines);
+    const captionHit = svgNode("rect", { class: "scene-map-caption-hit", "aria-hidden": "true" });
+    element.append(captionHit, caption);
+    Object.assign(bubble, { caption, captionLines, captionHit });
   }
   element.addEventListener("click", event => {
     if (!map.skipClick || event.detail === 0) activateBubble(map, bubble, event.detail === 0);
@@ -364,9 +363,9 @@ function resizeBubble(bubble, shortSide, maxDirect, maxIndirect, labelWidth) {
   const indirect = bubble.depth === 2;
   const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
   bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(Math.max(1, bubble.link.count)) * scale : shortSide * .148;
-  bubble.labelOutside = !bubble.logo && bubble.radius < OUTSIDE_LABEL_RADIUS;
+  if (bubble.caption) fitCaption(bubble, labelWidth);
   if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius * bubble.opacity);
-  if (!bubble.logo) fitCaption(bubble, labelWidth);
+  else if (bubble.caption) paintCaption(bubble, bubble.drawRadius);
 }
 
 function paintRadius(bubble, radius) {
@@ -389,19 +388,20 @@ function paintRadius(bubble, radius) {
 }
 
 function paintCaption(bubble, radius) {
-  const outside = bubble.labelOutside;
-  const width = outside ? bubble.labelWidth || SMALL_BUBBLE_LABEL_WIDTH : radius * 1.65;
-  const height = outside ? SMALL_BUBBLE_LABEL_HEIGHT : radius;
-  bubble.caption.setAttribute("data-outside", outside);
-  bubble.caption.setAttribute("x", -width / 2);
-  bubble.caption.setAttribute("y", outside ? radius + SMALL_BUBBLE_LABEL_GAP : -height / 2);
-  bubble.caption.setAttribute("width", width);
-  bubble.caption.setAttribute("height", height);
-  let size = Math.max(MIN_CAPTION_SIZE, Math.min(25, radius * .39));
-  if (bubble.labelFontSize) {
-    size = outside ? bubble.labelFontSize : bubble.labelFontSize * radius / bubble.radius;
+  const { caption, captionHit, captionLines: [first, second], labelOutside, labelFontSize, labelWidth } = bubble;
+  const size = labelOutside ? labelFontSize : labelFontSize * radius / bubble.radius;
+  const lineHeight = size * CAPTION_LINE_HEIGHT;
+  const top = labelOutside ? radius + SMALL_BUBBLE_LABEL_GAP : -lineHeight * (second.textContent ? 1 : .5);
+  caption.style.fontSize = size + "px";
+  caption.setAttribute("data-outside", labelOutside);
+  first.setAttribute("y", top + lineHeight / 2);
+  second.setAttribute("y", top + lineHeight * 1.5);
+  captionHit.setAttribute("width", labelOutside ? labelWidth : 0);
+  if (labelOutside) {
+    captionHit.setAttribute("x", -labelWidth / 2);
+    captionHit.setAttribute("y", top);
+    captionHit.setAttribute("height", lineHeight);
   }
-  bubble.captionBody.style.fontSize = size + "px";
 }
 
 function splitCaption(name, font) {
@@ -415,31 +415,30 @@ function splitCaption(name, font) {
     const first = words.slice(0, split).join(" ");
     const second = words.slice(split).join(" ");
     const width = Math.max(measure.measureText(first).width, measure.measureText(second).width);
-    if (!best || width < best.width) best = { text: first + "\n" + second, width };
+    if (!best || width < best.width) best = { lines: [first, second], width };
   }
   return best;
 }
 
 function fitCaption(bubble, maxLabelWidth) {
-  const { captionBody, captionName, radius, drawRadius } = bubble;
+  const { caption, captionLines: [first, second], radius } = bubble;
   const name = bubble.item.name.replace(/\s+/g, " ").trim();
-  if (captionName.textContent !== name) captionName.textContent = name;
-  bubble.labelOutside = false;
-  bubble.labelFontSize = null;
-  paintCaption(bubble, radius);
-  const base = parseFloat(captionBody.style.fontSize);
-  const width = captionBody.clientWidth;
-  const fullWidth = captionName.scrollWidth || width;
-  let insideSize = fullWidth > width && width ? base * width / fullWidth - .25 : base;
-  let captionText = name;
+  if (first.textContent !== name) first.textContent = name;
+  if (second.textContent) second.textContent = "";
+  const base = Math.max(MIN_CAPTION_SIZE, Math.min(25, radius * .39));
+  caption.style.fontSize = base + "px";
+  const width = radius * 1.65;
+  const fullWidth = first.getComputedTextLength();
+  let insideSize = fullWidth > width ? base * width / fullWidth - .25 : base;
+  let lines;
   if (radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
-    const style = getComputedStyle(captionBody);
+    const style = getComputedStyle(caption);
     const split = splitCaption(name, `${style.fontWeight} ${base}px ${style.fontFamily}`);
     if (split) {
-      const heightLimit = base * (captionBody.clientHeight - 2) / (2 * parseFloat(style.lineHeight));
+      const heightLimit = (radius - 2) / (2 * CAPTION_LINE_HEIGHT);
       const twoLineSize = Math.min(base, base * (width - 2) / split.width, heightLimit);
       if (twoLineSize >= MIN_CAPTION_SIZE && (insideSize < MIN_CAPTION_SIZE || twoLineSize >= insideSize + 1.5)) {
-        captionText = split.text;
+        lines = split.lines;
         insideSize = twoLineSize;
       }
     }
@@ -451,12 +450,16 @@ function fitCaption(bubble, maxLabelWidth) {
     bubble.labelWidth = Math.min(maxLabelWidth, Math.max(SMALL_BUBBLE_LABEL_WIDTH, Math.ceil(naturalWidth) + 2));
     bubble.labelFontSize = naturalWidth > bubble.labelWidth
       ? Math.max(1, 12 * (bubble.labelWidth - 2) / naturalWidth) : 12;
-  } else if (captionText !== name) captionName.textContent = captionText;
-  paintCaption(bubble, radius);
-  if (captionBody.clientWidth && captionName.scrollWidth > captionBody.clientWidth) {
-    bubble.labelFontSize = Math.max(1, bubble.labelFontSize * captionBody.clientWidth / captionName.scrollWidth - .25);
+  } else if (lines) {
+    first.textContent = lines[0];
+    second.textContent = lines[1];
   }
-  paintCaption(bubble, drawRadius);
+  caption.style.fontSize = bubble.labelFontSize + "px";
+  const fittedWidth = Math.max(first.getComputedTextLength(), second.getComputedTextLength());
+  const availableWidth = bubble.labelOutside ? bubble.labelWidth : width;
+  if (fittedWidth > availableWidth) {
+    bubble.labelFontSize = Math.max(1, bubble.labelFontSize * availableWidth / fittedWidth - .25);
+  }
 }
 
 function positionNewBubbles(map) {
