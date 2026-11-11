@@ -23,18 +23,18 @@ export function renderArtistDrawer(profile) {
 export function renderProfileInfo(kind, profile, base) {
   const related = (profile.related || []).filter(item => colors[item.kind] && meta.validId(item.id) && item.name)
     .map(item => `<a class="event-detail-related-bubble event-detail-related-bubble--${colors[item.kind]}" href="${escape(meta.url(item.kind, item.id, base))}" data-archive-link>${escape(item.name)}</a>`).join("");
-  const links = [["maps", "Map"], ["website", "Website"], ["instagram", "Instagram"], ["music", "Music"]]
-    .map(([key, label]) => {
-      const href = globalThis.QDPEventMetadata.safeUrl(profile[key]);
-      return href ? `<a href="${escape(href)}" target="_blank" rel="noopener noreferrer">${label}</a>` : "";
-    }).join("");
+  const links = meta.profileLinks(kind, profile, base).map(({ href, label, external }, index) => {
+    const separator = index ? '<span class="archive-profile-link-separator" aria-hidden="true">✦</span>' : "";
+    const attributes = external ? 'target="_blank" rel="noopener noreferrer"' : "data-archive-link";
+    return `<span class="archive-profile-link">${separator}<a href="${escape(href)}" ${attributes}>${escape(label)}</a></span>`;
+  }).join("");
   const more = related ? `<section class="archive-profile-related"><h3>See More</h3><div class="archive-profile-related-links">${related}</div></section>` : "";
-  const external = links ? `<div class="archive-profile-links">${links}</div>` : "";
+  const linkRow = links ? `<div class="archive-profile-links">${links}</div>` : "";
   return `<section class="archive-profile-info" aria-label="${kind[0].toUpperCase() + kind.slice(1)} information">
     ${meta.classification(kind, profile) ? `<span class="sr-only">${meta.classification(kind, profile)}</span>` : ""}
     ${kind === "venue" && profile.address ? `<address>${escape(profile.address)}</address>` : ""}
     ${profile.bio ? `<p>${escape(profile.bio)}</p>` : ""}
-    ${more + external}</section>`;
+    ${more + linkRow}</section>`;
 }
 
 export function renderProfileEvents(kind, profile, items, base, now = Date.now()) {

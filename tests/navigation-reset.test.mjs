@@ -15,15 +15,15 @@ const currentCalendar = between(app, 'async function showCurrentCalendar()', '\n
 const archiveClicks = between(archive, '  document.addEventListener("click",', '\n  window.addEventListener("popstate",');
 const menuSource = between(archive, '  function showMenu(', '\n  function hideMenu()') + '\n' +
   between(archive, '  function clearMenuProfile()', '\n  function leave()');
-const discoverClick = between(archive, '  discoverLink.addEventListener("click",', '\n  archiveStack.addEventListener(');
 const mobileOpen = between(mobile, '  function openDiscover(', '\n  function updateAlphabet()');
 
 function click(target, modifiers = {}) {
   return { target, button: 0, defaultPrevented: false, ...modifiers,
     preventDefault() { this.defaultPrevented = true; } };
 }
-function calendarFixture({ url = 'https://example.test/', pages, detail = false, info = '' } = {}) {
-  const actions = [];
+function calendarFixture({ url = 'https://example.test/', pages, detail = false, info = '',
+  targetUrl = 'https://example.test/', entry = '' } = {}) {
+  const actions = [], routes = [];
   const location = { href: url, origin: 'https://example.test' };
   let handler;
   const context = { URL, URLSearchParams, Date, location,
@@ -37,14 +37,18 @@ function calendarFixture({ url = 'https://example.test/', pages, detail = false,
     closeDatePopover() { actions.push(['close-dates']); },
     scrollToPage(index, behavior) { actions.push(['scroll', index, behavior]); },
     async ensureLiveEvents() {}, hideMenu() { actions.push(['hide-menu']); },
-    route() { context.window.QDPArchive.active = false; context.infoView.active = ''; },
+    route(options) {
+      routes.push(options.resetScene);
+      context.window.QDPArchive.active = false;
+      context.infoView.active = '';
+    },
     document: { addEventListener(type, fn) { assert.equal(type, 'click'); handler = fn; } }
   };
   vm.createContext(context);
   vm.runInContext(currentCalendar + '\n' + archiveClicks, context);
-  const anchor = { href: 'https://example.test/' };
+  const anchor = { href: targetUrl, matches: selector => selector.split(', ').includes(entry) };
   const target = { closest: () => anchor };
-  return { context, actions, handler, target };
+  return { context, actions, routes, handler, target };
 }
 
 test('Calendar at the home URL resets a previously selected date without adding history', () => {
@@ -98,6 +102,27 @@ test('modified Calendar clicks retain normal browser navigation', () => {
   assert.deepEqual(f.actions, []);
 });
 
+test('both Discovery Map entries reset the map, including when its URL is already open', () => {
+  const mapUrl = 'https://example.test/?archive=scene-map';
+  for (const entry of ['#discoverLink', '.archive-menu-discovery']) {
+    for (const url of [mapUrl, mapUrl + '&focus=party%3AMELT-001']) {
+      const f = calendarFixture({ url, targetUrl: mapUrl, entry });
+      f.handler(click(f.target));
+      assert.equal(f.context.location.href, mapUrl);
+      assert.deepEqual(f.routes, [true]);
+      assert.equal(f.actions.filter(action => action[0] === 'push').length, Number(url !== mapUrl));
+    }
+  }
+});
+
+test('returning from an event preserves the current map', () => {
+  const mapUrl = 'https://example.test/?archive=scene-map';
+  const f = calendarFixture({ url: mapUrl + '&event=MELT', targetUrl: mapUrl });
+  f.handler(click(f.target));
+  assert.equal(f.context.location.href, mapUrl);
+  assert.deepEqual(f.routes, [false]);
+});
+
 function element() {
   const attributes = new Map(), classes = new Set();
   return { attributes, classes, hidden: false, scrollTop: 250, children: [], dataset: {},
@@ -125,8 +150,6 @@ function menuFixture({ open = true } = {}) {
   menu.querySelector = selector => links[['artists', 'venues', 'parties', 'collectives']
     .findIndex(view => selector === `.archive-menu-badge--${view}`)];
   const actions = [], frames = [];
-  let handler;
-  discoverLink.addEventListener = (type, fn) => { assert.equal(type, 'click'); handler = fn; };
   const context = { URL, menu, menuProfile, menuTrack, discoverLink, archivePage: element(),
     venueMap: element(), alphabet: element(), exitTimer: 0, menuMotionSerial: 0, menuReset: false,
     directoryViews: new Set(['artists', 'venues', 'parties', 'collectives']),
@@ -141,15 +164,15 @@ function menuFixture({ open = true } = {}) {
     location: { href: 'https://example.test/?archive=artist&id=CALLAIA' }
   };
   vm.createContext(context);
-  vm.runInContext(menuSource + '\n' + discoverClick + '\narchive.resetMenu = resetMenu;', context);
-  return { context, handler, person, links, frames, actions };
+  vm.runInContext(menuSource + '\narchive.resetMenu = resetMenu;', context);
+  return { context, person, links, frames, actions };
 }
 
 for (const open of [true, false]) {
-  test(`Discover clears profile details and returns to the main menu when ${open ? 'open' : 'closed'}`, () => {
+  test(`Resetting Discover clears profile details when the menu is ${open ? 'open' : 'closed'}`, () => {
     const f = menuFixture({ open });
     const url = f.context.location.href;
-    f.handler(click());
+    f.context.resetMenu();
     f.frames.forEach(fn => fn());
     assert.equal(f.context.menuProfile.hidden, true);
     assert.equal(f.context.menuProfile.children.length, 0);

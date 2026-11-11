@@ -71,7 +71,8 @@
   function updateAlphabet() {
     if (!media.matches || context.hidden || alphabet.hidden) return;
     const sections = [...archiveStack.querySelectorAll(".archive-section[data-letter]")];
-    const boundary = archiveStack.getBoundingClientRect().top + 4;
+    const searchHeight = archiveStack.querySelector(".archive-directory-search")?.offsetHeight || 0;
+    const boundary = archiveStack.getBoundingClientRect().top + searchHeight + 4;
     let current = sections[0]?.dataset.letter;
     for (const section of sections) {
       if (section.getBoundingClientRect().top <= boundary) current = section.dataset.letter;
@@ -148,7 +149,7 @@
     }
   }
 
-  window.QDPMobile = { get active() { return media.matches; }, openDiscover, closeDiscover };
+  window.QDPMobile = { get active() { return media.matches; }, openDiscover, closeDiscover, updateAlphabet };
   discoverButton.addEventListener("click", event => { event.stopPropagation(); openDiscover(); });
   discoverClose.addEventListener("click", event => { event.stopPropagation(); closeDiscover({ restoreFocus: true, historyEntry: true }); });
   moreClose.addEventListener("click", event => { event.stopPropagation(); closeMore({ restoreFocus: true, historyEntry: true }); });

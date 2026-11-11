@@ -208,6 +208,20 @@ test('the compatibility portrait is a separate drawer; artist details have no du
   assert.doesNotMatch(renderProfileInfo('venue', { ...profile, id: 'CALLAIA-001' }, 'https://massive.example'), /<img/);
 });
 
+test('each profile link row separates links with sparkles and ends with the focused map', () => {
+  for (const kind of Object.keys(meta.kinds)) {
+    const info = renderProfileInfo(kind, profile, 'https://massive.example');
+    const row = info.match(/<div class="archive-profile-links">([\s\S]*?)<\/div>/)[1];
+    const labels = [...row.matchAll(/<a [^>]+>([^<]+)<\/a>/g)].map(match => match[1]);
+    assert.deepEqual(labels, ['Website', 'Instagram', 'See in discovery map']);
+    assert.equal((row.match(/aria-hidden="true">✦<\/span>/g) || []).length, labels.length - 1);
+    assert.ok(row.endsWith(`<a href="https://massive.example/?archive=scene-map&amp;focus=${kind}%3APUBLIC-1" data-archive-link>See in discovery map</a></span>`));
+  }
+  const info = renderProfileInfo('venue', { id: 'PUBLIC-1', name: 'Public Room' }, 'https://massive.example');
+  assert.match(info, /See in discovery map/);
+  assert.doesNotMatch(info, /archive-profile-link-separator/);
+});
+
 test('the profile tab follows the full height of year markers and restores the artist name when scrolling back up', () => {
   const source = archiveSource.slice(archiveSource.indexOf('  function syncYearHeadings()'), archiveSource.indexOf('  function positionMenu()'));
   const markers = [2026, 2025].map(year => ({ year: String(year), marker: { top: 0, style: {}, getBoundingClientRect() { return { top: this.top }; } } }));
