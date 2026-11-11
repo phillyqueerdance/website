@@ -272,6 +272,7 @@
   white-space: nowrap;
   overflow-wrap: normal;
 }
+.scene-map-caption[data-outside="false"] .scene-map-caption-name { white-space: pre; }
 .scene-map-caption[data-outside="true"] .scene-map-caption-body { align-items: start; }
 .scene-map-caption[data-outside="true"] .scene-map-caption-name {
   color: var(--scene-ink);
