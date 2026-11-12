@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import '../event-metadata.js';
 
 const source = fs.readFileSync(new URL('../admin/post-generator.js', import.meta.url), 'utf8');
 
@@ -29,6 +30,7 @@ async function generate(events, first = '2030-10-09', last = '2030-10-10',
   assert.notEqual(instrumented, source);
   vm.runInNewContext(instrumented, {
     Intl, Date, console, images, AbortController, navigator: {},
+    QDPEventMetadata: globalThis.QDPEventMetadata,
     document: { documentElement: {}, getElementById: element },
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
     window: { addEventListener() {} },

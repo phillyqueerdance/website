@@ -151,7 +151,7 @@ test('both the event strip and Go to event open the intended event without toggl
   const element = tag => tag === 'template' ? template : { className: '', dataset: {}, children: [],
     append(...children) { this.children.push(...children); }, appendChild(child) { this.children.push(child); },
     setAttribute() {}, addEventListener() {}, get outerHTML() { return `<a class="${this.className}" href="${this.href}"></a>`; } };
-  const context = vm.createContext({ QDPEventPhotos: photos, document: { createElement: element },
+  const context = vm.createContext({ QDPEventPhotos: photos, QDPEventMetadata: globalThis.QDPEventMetadata, document: { createElement: element },
     eventIdOf: e => e.eventId, eventPermalink: id => `/?archive=party&id=MELT-001&event=${id}`,
     displayTitle: e => e.title, eventVenue: () => '', eventAddress: () => '', openEventDetail: e => { opened = e; } });
   vm.runInContext(source, context);

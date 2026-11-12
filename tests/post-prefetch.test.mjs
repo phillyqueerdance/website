@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import '../event-metadata.js';
 
 const source = fs.readFileSync(new URL('../admin/post-generator.js', import.meta.url), 'utf8');
 
@@ -44,6 +45,7 @@ async function generate(events, { assetFailure = false } = {}) {
   })();`);
   vm.runInNewContext(instrumented, {
     Intl, Date, AbortController, slides, assetFailure, loadFlyer, navigator: {},
+    QDPEventMetadata: globalThis.QDPEventMetadata,
     console: { warn() {} },
     document: { documentElement: {}, getElementById: element },
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
