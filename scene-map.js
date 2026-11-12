@@ -313,7 +313,7 @@ function createBubble(map, item) {
   const title = svgNode("title");
   const circle = svgNode("circle", { class: "scene-map-node-disc" });
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
-  const photo = item.kind === "party" ? window.QDPProfileMetadata.profileImage(item.kind, item) : null;
+  const photo = window.QDPProfileMetadata.profileImage(item.kind, item);
   const bubble = {
     item, element, title, circle, hit,
     opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
@@ -321,11 +321,18 @@ function createBubble(map, item) {
   const artwork = photo ? null : BUBBLE_ARTWORK[item.key];
   element.append(title);
   if (photo) {
-    const id = "scene-map-party-photo-" + item.id;
+    const id = `scene-map-${item.kind}-photo-${item.id}`;
     const pattern = svgNode("pattern", { id, width: 1, height: 1, patternContentUnits: "objectBoundingBox" });
-    const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: "xMidYMid slice" });
+    // Only portrait images have excess height in the square crop.
+    const alignment = item.kind === "artist" ? "xMidYMin" : "xMidYMid";
+    const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: `${alignment} slice` });
     image.addEventListener("error", () => image.remove(), { once: true });
     image.setAttribute("href", photo.src);
+    if (item.kind === "artist") {
+      import("./scene-map-photo-crop.js?v=20261111-artist-map-photos-2")
+        .then(({ applyArtistPhotoCrop }) => applyArtistPhotoCrop(pattern, image, photo.src))
+        .catch(() => {});
+    }
     pattern.append(image);
     const defs = svgNode("defs");
     defs.append(pattern);
