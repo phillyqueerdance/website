@@ -430,28 +430,29 @@ function paintRadius(bubble, radius) {
 }
 
 function paintCaption(bubble, radius) {
-  const { caption, captionHit, captionLines: [first, second], labelOutside, labelFontSize, labelWidth } = bubble;
-  const size = labelOutside ? labelFontSize : labelFontSize * radius / bubble.radius;
+  const { caption, captionHit, captionLines: [first, second], labelOutside, labelFontSize,
+    labelWidth, labelAscent, labelDescent } = bubble;
+  const scale = labelOutside ? 1 : radius / bubble.radius;
+  const size = labelFontSize * scale;
   const lineHeight = size * CAPTION_LINE_HEIGHT;
-  const top = labelOutside ? radius + SMALL_BUBBLE_LABEL_GAP : -lineHeight * (second.textContent ? 1 : .5);
+  const height = (labelAscent + labelDescent) * scale;
+  const top = labelOutside ? radius + SMALL_BUBBLE_LABEL_GAP : -height / 2;
+  const baseline = top + labelAscent * scale;
   caption.style.fontSize = size + "px";
   caption.setAttribute("data-outside", labelOutside);
-  first.setAttribute("y", top + lineHeight / 2);
-  second.setAttribute("y", top + lineHeight * 1.5);
+  first.setAttribute("y", baseline);
+  second.setAttribute("y", baseline + lineHeight);
   captionHit.setAttribute("width", labelOutside ? labelWidth : 0);
   if (labelOutside) {
     captionHit.setAttribute("x", -labelWidth / 2);
     captionHit.setAttribute("y", top);
-    captionHit.setAttribute("height", lineHeight);
+    captionHit.setAttribute("height", Math.max(height, lineHeight));
   }
 }
 
-function splitCaption(name, font) {
+function splitCaption(name, measure) {
   const words = name.split(" ");
   if (words.length < 2) return null;
-  const measure = captionMeasure ||= document.createElement("canvas").getContext("2d");
-  if (!measure) return null;
-  measure.font = font;
   let best = null;
   for (let split = 1; split < words.length; split++) {
     const first = words.slice(0, split).join(" ");
@@ -471,11 +472,13 @@ function fitCaption(bubble, maxLabelWidth) {
   caption.style.fontSize = base + "px";
   const width = radius * 1.65;
   const fullWidth = first.getComputedTextLength();
+  const measure = captionMeasure ||= document.createElement("canvas").getContext("2d");
+  const { fontWeight, fontFamily } = getComputedStyle(caption);
   let insideSize = fullWidth > width ? base * width / fullWidth - .25 : base;
   let lines;
-  if (!bubble.photo && radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
-    const style = getComputedStyle(caption);
-    const split = splitCaption(name, `${style.fontWeight} ${base}px ${style.fontFamily}`);
+  if (measure && !bubble.photo && radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
+    measure.font = `${fontWeight} ${base}px ${fontFamily}`;
+    const split = splitCaption(name, measure);
     if (split) {
       const heightLimit = (radius - 2) / (2 * CAPTION_LINE_HEIGHT);
       const twoLineSize = Math.min(base, base * (width - 2) / split.width, heightLimit);
@@ -501,6 +504,19 @@ function fitCaption(bubble, maxLabelWidth) {
   const availableWidth = bubble.labelOutside ? bubble.labelWidth : width;
   if (fittedWidth > availableWidth) {
     bubble.labelFontSize = Math.max(1, bubble.labelFontSize * availableWidth / fittedWidth - .25);
+  }
+
+  // Measure the ink above and below the alphabetic baseline once per layout.
+  const size = bubble.labelFontSize;
+  if (measure) measure.font = `${fontWeight} ${size}px ${fontFamily}`;
+  const firstBounds = measure?.measureText(first.textContent);
+  bubble.labelAscent = firstBounds?.actualBoundingBoxAscent ?? size * .75;
+  bubble.labelDescent = firstBounds?.actualBoundingBoxDescent ?? size * .25;
+  if (second.textContent) {
+    const secondBounds = measure?.measureText(second.textContent);
+    const offset = size * CAPTION_LINE_HEIGHT;
+    bubble.labelAscent = Math.max(bubble.labelAscent, (secondBounds?.actualBoundingBoxAscent ?? size * .75) - offset);
+    bubble.labelDescent = Math.max(bubble.labelDescent, offset + (secondBounds?.actualBoundingBoxDescent ?? size * .25));
   }
 }
 

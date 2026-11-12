@@ -256,7 +256,7 @@
   fill: var(--scene-kind-ink, var(--scene-ink));
   font-weight: 700;
   text-anchor: middle;
-  dominant-baseline: central;
+  dominant-baseline: alphabetic;
   pointer-events: none;
 }
 .scene-map-caption[data-outside="true"] {
