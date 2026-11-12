@@ -328,6 +328,11 @@ function createBubble(map, item) {
     const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: `${alignment} slice` });
     image.addEventListener("error", () => image.remove(), { once: true });
     image.setAttribute("href", photo.src);
+    if (item.kind === "artist") {
+      import("./scene-map-photo-crop.js?v=20261111-artist-map-photos-2")
+        .then(({ applyArtistPhotoCrop }) => applyArtistPhotoCrop(pattern, image, photo.src))
+        .catch(() => {});
+    }
     pattern.append(image);
     const defs = svgNode("defs");
     defs.append(pattern);
