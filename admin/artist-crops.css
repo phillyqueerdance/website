@@ -1,0 +1,148 @@
+.crop-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.crop-artist {
+  display: grid;
+  width: min(100%, 24rem);
+  gap: 8px;
+  font-weight: 700;
+}
+
+.crop-artist select,
+.crop-actions button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--panel-raised);
+}
+
+.crop-artist select {
+  width: 100%;
+}
+
+.crop-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 23rem) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.crop-workspace[hidden] {
+  display: none;
+}
+
+.crop-preview {
+  margin: 0;
+}
+
+.crop-stage {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: var(--background);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.crop-stage:active {
+  cursor: grabbing;
+}
+
+.crop-stage img {
+  position: absolute;
+  left: var(--photo-left);
+  top: var(--photo-top);
+  width: var(--photo-width);
+  height: var(--photo-height);
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.crop-circle {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--yellow);
+  border-radius: 50%;
+  box-shadow: 0 0 0 16rem rgb(0 0 0 / .34);
+  pointer-events: none;
+}
+
+.crop-preview figcaption,
+.crop-controls p,
+.crop-status {
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
+.crop-preview figcaption {
+  margin-top: 8px;
+}
+
+.crop-controls {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.crop-controls legend {
+  padding: 0;
+  font-weight: 800;
+}
+
+.crop-controls p,
+.crop-status {
+  margin: 0;
+}
+
+.crop-controls label {
+  display: grid;
+  gap: 4px;
+  font-weight: 650;
+}
+
+.crop-controls input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--yellow);
+}
+
+.crop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.crop-actions button {
+  font-weight: 700;
+}
+
+#cropSave {
+  border-color: var(--yellow);
+  color: var(--background);
+  background: var(--yellow);
+}
+
+.crop-status[data-error] {
+  color: var(--red);
+}
+
+@media (max-width: 620px) {
+  .crop-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .crop-preview {
+    width: min(100%, 23rem);
+  }
+}

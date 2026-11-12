@@ -3,7 +3,8 @@
 import { DEFAULT_APPS_SCRIPT_URL } from "./events.js";
 import "../../event-photos.js";
 import { withKvScope, readArchiveManifest, readArchiveRecord,
-  cacheResponse, freshResponse } from "../kv-cache.js";
+  archiveCacheKey, cacheResponse, freshResponse } from "../kv-cache.js";
+import { addArtistPhotoCrops, cropStore } from "../artist-photo-crops.js";
 
 const RESOURCES = {
   artists: "archiveArtists",
@@ -183,16 +184,14 @@ export async function onRequestGet(context) {
     "X-Robots-Tag": "noindex, nofollow",
     "X-Content-Type-Options": "nosniff"
   };
-  const key = new URL("/api/archive", url);
-  key.searchParams.set("resource", resource);
-  if (id) key.searchParams.set(resource === "month" ? "month" : "id", id);
-  const cacheKey = new Request(key.href);
+  const cacheKey = archiveCacheKey(url, resource, id);
   const cache = typeof caches === "undefined" ? null : caches.default;
   const hit = freshResponse(await cache?.match(cacheKey), context);
   if (hit) return hit;
 
+  const kv = cropStore(context.env);
   try {
-    const prepared = await preparedPayload(context, context.env.QDP_ARCHIVE_KV || context.env.QDP_PUBLIC_FEED_KV, resource, id);
+    const prepared = await preparedPayload(context, kv, resource, id);
     if (prepared?.unpublished) {
       return Response.json({ error: "Directory is waiting for the sheet to be published." }, {
         status: 503, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
@@ -204,6 +203,7 @@ export async function onRequestGet(context) {
       });
     }
     if (prepared?.payload) {
+      if (resource === "artists") await addArtistPhotoCrops(context, kv, prepared.payload);
       const result = cacheResponse(context, Response.json(prepared.payload, {
         headers: { ...headers, "Cache-Control": "public, max-age=60",
           "X-QDP-Archive-Source": "prepared" }
@@ -234,6 +234,7 @@ export async function onRequestGet(context) {
     if (!response.ok) throw new Error(`Apps Script returned ${response.status}`);
     const payload = cleanPayload(resource, await response.json(), id);
     if (!payload) throw new Error("Apps Script archive resource is unavailable or has an invalid shape");
+    if (resource === "artists") await addArtistPhotoCrops(context, kv, payload);
     const result = cacheResponse(context, Response.json(payload, { headers }), CACHE_SECONDS);
     if (cache) {
       const write = cache.put(cacheKey, result.clone());

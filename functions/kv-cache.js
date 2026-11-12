@@ -101,6 +101,19 @@ export function freshResponse(response, context) {
   });
 }
 
+export function archiveCacheKey(requestUrl, resource, id = "") {
+  const url = new URL("/api/archive", requestUrl);
+  url.searchParams.set("resource", resource);
+  if (id) url.searchParams.set(resource === "month" ? "month" : "id", id);
+  return new Request(url.href);
+}
+
+export function directoryCacheKey(requestUrl, directory) {
+  const url = new URL("/_qdp/directory-v2", requestUrl);
+  url.searchParams.set("kind", directory);
+  return new Request(url.href);
+}
+
 export function readArchiveManifest(context, kv) {
   return readKvJson(context, kv, ARCHIVE_PREFIX + "manifest", {
     seconds: 60,

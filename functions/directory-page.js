@@ -1,5 +1,5 @@
 import { onRequestGet as archiveData } from "./api/archive.js";
-import { withKvScope, cacheResponse, freshResponse, inheritCacheDeadline } from "./kv-cache.js";
+import { withKvScope, directoryCacheKey, cacheResponse, freshResponse, inheritCacheDeadline } from "./kv-cache.js";
 import "../event-metadata.js";
 import "../profile-metadata.js";
 
@@ -46,7 +46,10 @@ export function renderDirectory(directory, items, base) {
     const address = directory === "venues" && item.address
       ? `<span class="event-venue">${escape(item.address)}</span>` : "";
     const photoSrc = meta.profileThumbnail(kind, item);
-    const photo = photoSrc ? `<img class="archive-directory-photo" src="${escape(photoSrc)}" alt="" loading="lazy" decoding="async">` : "";
+    const crop = kind === "artist" ? meta.photoCropStyle(item.imageCrop) : "";
+    const photo = photoSrc
+      ? `<span class="archive-directory-photo"${crop ? ` style="${crop}"` : ""}><img src="${escape(photoSrc)}" alt="" loading="lazy" decoding="async"></span>`
+      : "";
     rows.push(`<div class="event-row ${rows.length ? "same-time" : "has-time"}"><a class="${classes.join(" ")}" href="${escape(meta.url(kind, item.id, base))}" data-archive-link>${classification ? `<span class="sr-only">${classification} </span>` : ""}<span class="event-card-shape"></span>${photo}<span class="event-card-content"><span class="event-title">${escape(item.name)}</span>${address}</span></a></div>`);
   }
   flush();
@@ -90,10 +93,8 @@ export function renderDirectoryPage(context, page, result, directory) {
 
 export async function directoryPage(context, page, directory) {
   context = withKvScope(context);
-  const key = new URL("/_qdp/directory-v2", context.request.url);
-  key.searchParams.set("kind", directory);
   const cache = typeof caches === "undefined" ? null : caches.default;
-  const cacheKey = new Request(key.href);
+  const cacheKey = directoryCacheKey(context.request.url, directory);
   const hit = freshResponse(await cache?.match(cacheKey), context);
   if (hit) return hit;
   let result;

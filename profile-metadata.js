@@ -49,6 +49,26 @@
     const image = profileImage(kind, profile);
     return image ? image.src.replace(/^(https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+)=w\d+$/, "$1=w320") : "";
   };
+  const maxPhotoZoom = 4;
+  const photoCrop = value => {
+    const { x, y, zoom, aspect } = value || {};
+    if (![x, y, zoom, aspect].every(Number.isFinite) || x < 0 || x > 1 ||
+        y < 0 || y > 1 || zoom < 1 || zoom > maxPhotoZoom || aspect < 1 / 40 || aspect > 40) return null;
+    return { x, y, zoom, aspect };
+  };
+  // Coordinates are in units of the square crop. Position spans the available pan range.
+  const photoCropFrame = value => {
+    const crop = photoCrop(value);
+    if (!crop) return null;
+    const width = Math.max(1, crop.aspect) * crop.zoom;
+    const height = Math.max(1, 1 / crop.aspect) * crop.zoom;
+    return { width, height, x: (width - 1) * crop.x, y: (height - 1) * crop.y };
+  };
+  const photoCropStyle = value => {
+    const frame = photoCropFrame(value);
+    if (!frame) return "";
+    return `--photo-width:${frame.width * 100}%;--photo-height:${frame.height * 100}%;--photo-left:${-frame.x * 100}%;--photo-top:${-frame.y * 100}%`;
+  };
   const directoryUrl = (kind, base = origin) => {
     const result = new URL("/", base);
     result.searchParams.set("archive", kind);
@@ -84,5 +104,5 @@
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
   globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, profileImage, profileThumbnail, description, isQueer, classification, tags,
-    homeDescription, directories, directoryUrl, directoryTags });
+    homeDescription, directories, directoryUrl, directoryTags, maxPhotoZoom, photoCrop, photoCropFrame, photoCropStyle });
 })();
