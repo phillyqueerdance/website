@@ -405,18 +405,18 @@ function resizeBubble(bubble, shortSide, maxDirect, maxIndirect, labelWidth) {
   const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
   bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(Math.max(1, bubble.link.count)) * scale : shortSide * .148;
   if (bubble.caption) fitCaption(bubble, labelWidth);
-  if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius * bubble.opacity);
-  else if (bubble.caption) paintCaption(bubble, bubble.drawRadius);
+  paintRadius(bubble, bubble.drawRadius ?? bubble.radius * bubble.opacity);
 }
 
 function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
-  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(8, radius * .23));
+  const borderScale = bubble.depth === 0 ? 1 : .82;
+  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(8, radius * .23) * borderScale);
   if (bubble.ring) {
     bubble.ring.setAttribute("r", radius * .9);
-    bubble.ring.setAttribute("stroke-width", Math.min(6, radius * .18));
+    bubble.ring.setAttribute("stroke-width", Math.min(6, radius * .18) * borderScale);
   }
   if (bubble.logo) {
     const halfSize = radius * bubble.logoScale;

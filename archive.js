@@ -672,7 +672,7 @@
     const links = node("div", "archive-profile-links");
     for (const { href, label, external } of window.QDPProfileMetadata.profileLinks(kind, person, location.origin)) {
       const item = node("span", "archive-profile-link");
-      if (links.childElementCount) {
+      if (external && links.childElementCount) {
         const separator = node("span", "archive-profile-link-separator", "✦");
         separator.setAttribute("aria-hidden", "true");
         item.append(separator);
@@ -925,7 +925,7 @@
     message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261112-venue-profiles-1");
+        const module = await import("./scene-map.js?v=20261112-map-borders-1");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;
