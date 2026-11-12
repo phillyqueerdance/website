@@ -277,12 +277,6 @@
   color: inherit;
   font-size: .75em;
 }
-.archive-menu > .archive-menu-map {
-  margin: 7px 0;
-  padding-left: 0;
-  font-size: .78em;
-}
-.archive-menu > .archive-menu-map[hidden] { display: none; }
 .archive-menu > :is(.archive-menu-discovery, .archive-menu-past-events) {
   margin-top: 8px;
   color: #ffea86;
@@ -393,6 +387,7 @@
 }
 .archive-profile-links { display: flex; flex-wrap: wrap; justify-content: center; text-align: center; gap: .35em .75em; margin-top: 1.6em; }
 .archive-profile-link { display: inline-flex; align-items: center; column-gap: inherit; }
+.archive-profile-link:has(> a[data-archive-link]) { flex-basis: 100%; justify-content: center; }
 .archive-profile-link-separator { color: #ffea86; font-size: .75em; }
 .archive-profile-links a { color: #ffea86; text-decoration: none !important; }
 .archive-profile-identity { display: inline-block; margin: 0 0 .5em; padding: 5px 10px; border-radius: 12px; background: #922185; color: #fff1f4; font: 700 .85em/1.2 "QDP Fraunces", Georgia, serif; }
@@ -607,10 +602,6 @@ a.event-card.archive-card { text-decoration: none; }
   .archive-menu-badge-label { left: 50%; }
   .archive-menu-badge[aria-current="page"] .archive-menu-badge-label { left: 50%; }
   .archive-menu > .archive-menu-past-events { margin-left: 0; }
-  .archive-menu > .archive-menu-map {
-    margin: 3px 0;
-    padding: 3px;
-  }
   .archive-menu-profile { text-align: left; }
   .archive-menu-profile:not([hidden]) { margin: 8px 0 28px; }
   .archive-alphabet {

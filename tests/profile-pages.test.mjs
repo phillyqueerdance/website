@@ -98,7 +98,7 @@ for (const kind of Object.keys(meta.kinds)) {
       } else {
         assert.match(body, /class="archive-profile-summary"/);
       }
-      if (kind === 'artist' || kind === 'party') {
+      if (kind !== 'collective') {
         assert.match(body, /class="archive-profile-drawer"><img class="archive-profile-portrait"/);
         assert.ok(body.indexOf('archive-profile-drawer') < body.indexOf('archive-profile-summary'));
       } else {

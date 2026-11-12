@@ -88,14 +88,14 @@ for (const directory of Object.keys(titles)) {
       assert.doesNotMatch(body, /Private entry|Invalid entry|Discover queer|<h1|<script/);
       assert.equal(body.includes('123 Public St'), directory === 'venues');
       const photos = body.match(/<span class="archive-directory-photo"><img [^>]*><\/span>/g) || [];
-      assert.deepEqual(photos, ['artists', 'parties'].includes(directory)
+      assert.deepEqual(photos, directory !== 'collectives'
         ? ['<span class="archive-directory-photo"><img src="https://lh3.googleusercontent.com/d/PORTRAIT=w320" alt="" loading="lazy" decoding="async"></span>'] : []);
       assert.equal(recorded.get('#archiveStack:options').html, true);
       assert.equal(recorded.get('#archiveViewport:remove:hidden'), true);
       assert.match(recorded.get('html:class'), /archive-open discover-open/);
       assert.match(recorded.get('body:class'), /archive-mode discover-open/);
       assert.equal(recorded.get('#discoverLink:aria-expanded'), 'true');
-      assert.equal(recorded.get('#archiveVenueMap:remove:hidden') === true, directory === 'venues');
+      assert.doesNotMatch(html, /id="archiveVenueMap"/);
       const initial = JSON.parse(recorded.get('#qdpInitialArchive'));
       assert.equal(initial.kind, directory);
       assert.equal(initial.status, 200);

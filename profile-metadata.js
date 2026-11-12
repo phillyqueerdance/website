@@ -36,7 +36,7 @@
   };
   const title = profile => `${profile.name} | Queer Dance Philly`;
   const profileImage = (kind, profile) => {
-    if (kind !== "artist" && kind !== "party") return null;
+    if (kind !== "artist" && kind !== "party" && kind !== "venue") return null;
     if (Object.hasOwn(profile, "imageUrl")) {
       const src = globalThis.QDPEventMetadata.image({ flyerUrl: profile.imageUrl });
       return src ? { src } : null;

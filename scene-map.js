@@ -413,10 +413,10 @@ function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
-  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(5, radius * .16));
+  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(8, radius * .23));
   if (bubble.ring) {
     bubble.ring.setAttribute("r", radius * .9);
-    bubble.ring.setAttribute("stroke-width", Math.min(4, radius * .12));
+    bubble.ring.setAttribute("stroke-width", Math.min(6, radius * .18));
   }
   if (bubble.logo) {
     const halfSize = radius * bubble.logoScale;
