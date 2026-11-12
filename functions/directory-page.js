@@ -45,7 +45,9 @@ export function renderDirectory(directory, items, base) {
     if (classification) classes.push("archive-identity-card");
     const address = directory === "venues" && item.address
       ? `<span class="event-venue">${escape(item.address)}</span>` : "";
-    rows.push(`<div class="event-row ${rows.length ? "same-time" : "has-time"}"><a class="${classes.join(" ")}" href="${escape(meta.url(kind, item.id, base))}" data-archive-link>${classification ? `<span class="sr-only">${classification} </span>` : ""}<span class="event-card-shape"></span><span class="event-card-content"><span class="event-title">${escape(item.name)}</span>${address}</span></a></div>`);
+    const photoSrc = meta.profileThumbnail(kind, item);
+    const photo = photoSrc ? `<img class="archive-directory-photo" src="${escape(photoSrc)}" alt="" loading="lazy" decoding="async">` : "";
+    rows.push(`<div class="event-row ${rows.length ? "same-time" : "has-time"}"><a class="${classes.join(" ")}" href="${escape(meta.url(kind, item.id, base))}" data-archive-link>${classification ? `<span class="sr-only">${classification} </span>` : ""}<span class="event-card-shape"></span>${photo}<span class="event-card-content"><span class="event-title">${escape(item.name)}</span>${address}</span></a></div>`);
   }
   flush();
   return sections.join("");
@@ -88,7 +90,7 @@ export function renderDirectoryPage(context, page, result, directory) {
 
 export async function directoryPage(context, page, directory) {
   context = withKvScope(context);
-  const key = new URL("/_qdp/directory-v1", context.request.url);
+  const key = new URL("/_qdp/directory-v2", context.request.url);
   key.searchParams.set("kind", directory);
   const cache = typeof caches === "undefined" ? null : caches.default;
   const cacheKey = new Request(key.href);

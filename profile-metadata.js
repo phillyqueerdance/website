@@ -45,6 +45,10 @@
     return kind === "artist" && profile.id === "CALLAIA-001"
       ? { src: "/artist-images/callaia.jpg", width: 2048, height: 2016 } : null;
   };
+  const profileThumbnail = (kind, profile) => {
+    const image = profileImage(kind, profile);
+    return image ? image.src.replace(/^(https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+)=w\d+$/, "$1=w320") : "";
+  };
   const directoryUrl = (kind, base = origin) => {
     const result = new URL("/", base);
     result.searchParams.set("archive", kind);
@@ -79,6 +83,6 @@
     ['meta[name="twitter:image"]', new URL("/qdp-share-card.jpg", base).href],
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
-  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, profileImage, description, isQueer, classification, tags,
+  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, profileImage, profileThumbnail, description, isQueer, classification, tags,
     homeDescription, directories, directoryUrl, directoryTags });
 })();

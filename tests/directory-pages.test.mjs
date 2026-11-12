@@ -19,7 +19,8 @@ const titles = { artists: 'Queer Dance Philly | Artists', parties: 'Queer Dance 
   collectives: 'Queer Dance Philly | Collectives' };
 const items = [
   { id: 'BETA-1', name: 'The Beta', publicOk: true, address: '123 Public St' },
-  { id: 'ALPHA-1', name: 'Alpha & Friends', publicOk: 'Yes', queerArtist: true, queerParty: true, queerVenue: true, queerCollective: true },
+  { id: 'ALPHA-1', name: 'Alpha & Friends', publicOk: 'Yes', queerArtist: true, queerParty: true, queerVenue: true, queerCollective: true,
+    imageUrl: 'https://drive.google.com/uc?export=view&id=PORTRAIT' },
   { id: 'PRIVATE', name: 'Private entry', publicOk: false },
   { id: '../BAD', name: 'Invalid entry', publicOk: true }
 ];
@@ -86,6 +87,9 @@ for (const directory of Object.keys(titles)) {
       assert.match(body, new RegExp(`href="https://preview.example/\\?archive=${meta.directories[directory].kind}&amp;id=ALPHA-1"`));
       assert.doesNotMatch(body, /Private entry|Invalid entry|Discover queer|<h1|<script/);
       assert.equal(body.includes('123 Public St'), directory === 'venues');
+      const photos = body.match(/<img class="archive-directory-photo"[^>]*>/g) || [];
+      assert.deepEqual(photos, ['artists', 'parties'].includes(directory)
+        ? ['<img class="archive-directory-photo" src="https://lh3.googleusercontent.com/d/PORTRAIT=w320" alt="" loading="lazy" decoding="async">'] : []);
       assert.equal(recorded.get('#archiveStack:options').html, true);
       assert.equal(recorded.get('#archiveViewport:remove:hidden'), true);
       assert.match(recorded.get('html:class'), /archive-open discover-open/);
@@ -120,7 +124,7 @@ test('directory cache normalizes query noise and retains preview noindex and a c
     const second = await page(context);
     assert.equal(second.headers.get('X-QDP-Directory'), 'PREPARED');
     assert.equal(reads.length, 2);
-    assert.ok([...entries.keys()].some(key => key.includes('/_qdp/directory-v1?kind=venues')));
+    assert.ok([...entries.keys()].some(key => key.includes('/_qdp/directory-v2?kind=venues')));
     assert.ok(Number(second.headers.get('X-QDP-Cache-Until')) <= Number(first.headers.get('X-QDP-Cache-Until')));
   } finally { globalThis.HTMLRewriter = old.rewriter; globalThis.caches = old.caches; }
 });

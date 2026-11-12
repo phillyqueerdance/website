@@ -467,11 +467,23 @@
     if (grouping?.count > 1) corners.push({ time: grouping.badge, card: grouping.last });
   }
 
-  function stripCard(title, subtitle, href) {
+  function stripCard(title, subtitle, href, photoSrc = "") {
     const card = node("a", "event-card default archive-card");
     card.href = href;
     card.setAttribute("data-archive-link", "");
     card.appendChild(node("span", "event-card-shape"));
+    if (photoSrc) {
+      const photo = node("img", "archive-directory-photo");
+      photo.alt = "";
+      photo.loading = "lazy";
+      photo.decoding = "async";
+      photo.addEventListener("error", () => {
+        photo.remove();
+        fitPosterTitles(card);
+      }, { once: true });
+      photo.src = photoSrc;
+      card.appendChild(photo);
+    }
     const content = node("span", "event-card-content");
     content.appendChild(node("span", "event-title", title));
     if (subtitle) content.appendChild(node("span", "event-venue", subtitle));
@@ -485,6 +497,7 @@
     corners = [];
     const singular = { artists: "artist", venues: "venue", parties: "party",
       collectives: "collective" }[kind];
+    const meta = window.QDPProfileMetadata;
     let lastLetter = "";
     let current = null;
     for (const item of profiles) {
@@ -497,11 +510,11 @@
       }
       const subtitle = kind === "venues" ? item.address || "" : "";
       const card = stripCard(item.name, subtitle,
-        archiveUrl(singular, item.id).href);
+        archiveUrl(singular, item.id).href, meta.profileThumbnail(singular, item));
       if (kind === "parties" && String(item.id).trim().toUpperCase() === "MELT-001") {
         card.classList.add("melt");
       }
-      const classification = window.QDPProfileMetadata.classification(singular, item);
+      const classification = meta.classification(singular, item);
       if (classification) card.prepend(node("span", "sr-only", `${classification} `));
       if ((kind === "artists" && (item.queerArtist || item.transArtist)) ||
           (kind === "venues" && item.queerVenue) ||
