@@ -87,9 +87,9 @@ for (const directory of Object.keys(titles)) {
       assert.match(body, new RegExp(`href="https://preview.example/\\?archive=${meta.directories[directory].kind}&amp;id=ALPHA-1"`));
       assert.doesNotMatch(body, /Private entry|Invalid entry|Discover queer|<h1|<script/);
       assert.equal(body.includes('123 Public St'), directory === 'venues');
-      const photos = body.match(/<img class="archive-directory-photo"[^>]*>/g) || [];
+      const photos = body.match(/<span class="archive-directory-photo"><img [^>]*><\/span>/g) || [];
       assert.deepEqual(photos, ['artists', 'parties'].includes(directory)
-        ? ['<img class="archive-directory-photo" src="https://lh3.googleusercontent.com/d/PORTRAIT=w320" alt="" loading="lazy" decoding="async">'] : []);
+        ? ['<span class="archive-directory-photo"><img src="https://lh3.googleusercontent.com/d/PORTRAIT=w320" alt="" loading="lazy" decoding="async"></span>'] : []);
       assert.equal(recorded.get('#archiveStack:options').html, true);
       assert.equal(recorded.get('#archiveViewport:remove:hidden'), true);
       assert.match(recorded.get('html:class'), /archive-open discover-open/);

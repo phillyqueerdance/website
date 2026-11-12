@@ -15,6 +15,12 @@
     } catch { return ""; }
   };
   const undisclosed = value => /not disclosed|undisclosed|see organizer|\btba\b|\btbd\b|secret location/i.test(String(value || ""));
+  const usesValsMeltStrip = event => {
+    if (String(event.partyId || "").trim().toUpperCase() !== "MELT-001") return false;
+    const venueId = String(event.venueId || "").trim().toUpperCase();
+    if (venueId) return venueId === "VALS-001";
+    return /^val['’]?s(?: lesbian bar)?$/i.test(String(event.venue || "").trim());
+  };
   const image = event => {
     const source = safeUrl(event.flyerUrl);
     if (!source) return "";
@@ -50,5 +56,5 @@
   const serialize = value => JSON.stringify(value).replace(/</g, "\\u003c")
     .replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
   globalThis.QDPEventMetadata = Object.freeze({ origin, cleanTitle, url, safeUrl, undisclosed,
-    image, schema, description, serialize, title: event => `${cleanTitle(event)} | Queer Dance Philly` });
+    image, schema, description, serialize, usesValsMeltStrip, title: event => `${cleanTitle(event)} | Queer Dance Philly` });
 })();

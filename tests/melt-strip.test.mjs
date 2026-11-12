@@ -9,8 +9,9 @@ const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const generator = fs.readFileSync(new URL('../admin/post-generator.js', import.meta.url), 'utf8');
 const createCard = app.slice(app.indexOf('function createEventCard('), app.indexOf('\nfunction renderPoster('));
 const drawCard = generator.slice(generator.indexOf('  function eventCard('), generator.indexOf('  function calendarSlide('));
-const base = { eventId: 'MELT-NIGHT', title: 'Melt', partyId: 'MELT-001', venue: "Val's Lesbian Bar", address: '605 S. 3rd St.',
+const base = { eventId: 'MELT-NIGHT', title: 'Melt', partyId: 'MELT-001', venueId: 'VALS-001', venue: "Val's Lesbian Bar", address: '605 S. 3rd St.',
   start: '2030-10-14T22:00:00-04:00', explicitQueer: true, queerArtist: true, transArtist: true };
+const metadata = globalThis.QDPEventMetadata;
 
 function element(tag) {
   return { tag, className: '', dataset: {}, children: [], attributes: {},
@@ -18,12 +19,16 @@ function element(tag) {
     setAttribute(name, value) { this.attributes[name] = value; }, addEventListener() {} };
 }
 
-test('browser and server event strips select the same party ID and retain link labels and flags', () => {
+test('browser and server reserve the Val’s strip for Melt events at Val’s and retain link labels and flags', () => {
   const context = vm.createContext({ document: { createElement: element }, eventIdOf: e => e.eventId,
-    eventPermalink: id => `/?event=${id}`, displayTitle: e => e.title, eventVenue: e => e.venue, eventAddress: e => e.address });
+    eventPermalink: id => `/?event=${id}`, displayTitle: e => e.title, eventVenue: e => e.venue, eventAddress: e => e.address,
+    QDPEventMetadata: metadata });
   vm.runInContext(createCard, context);
-  for (const [partyId, expected] of [['MELT-001', true], [' melt-001 ', true], ['MELT-0012', false], ['', false]]) {
-    const event = { ...base, partyId };
+  for (const [fields, expected] of [[{}, true], [{ partyId: ' melt-001 ', venueId: ' vals-001 ' }, true],
+    [{ venueId: '', venue: 'Val’s Lesbian Bar' }, true], [{ partyId: 'MELT-0012' }, false],
+    [{ partyId: '' }, false], [{ venueId: 'OTHER-001', venue: 'Another venue' }, false],
+    [{ venueId: 'OTHER-001' }, false], [{ venueId: '', venue: '' }, false]]) {
+    const event = { ...base, ...fields };
     const card = context.createEventCard(event);
     assert.equal(card.className.split(' ').includes('melt'), expected);
     assert.equal(card.href, '/?event=MELT-NIGHT');
@@ -59,7 +64,8 @@ test('post strip renderer layers the artwork around flags without duplicate lett
       drawImage(...args) { operations.push(['art', ...args]); }, fillText(text) { operations.push(['text', text]); } };
     const context = vm.createContext({ Q: 17.27, CARD_X: 350, CARD_WIDTH: 1188.176, COLORS: {}, RAINBOW: [], TRANS: [],
       roundedPath() {}, stripes() { operations.push('flag'); }, stripFlags: value => value,
-      fitText() { return 20; }, wrapped: (_, value) => value ? [value] : [], ellipsis: (_, value) => value });
+      fitText() { return 20; }, wrapped: (_, value) => value ? [value] : [], ellipsis: (_, value) => value,
+      QDPEventMetadata: metadata });
     vm.runInContext(drawCard, context);
     context.eventCard(ctx, { ...base, queerArtist: flags[0], transArtist: flags[1] }, 100, 186.516, 0, 1, art);
     const images = operations.filter(value => Array.isArray(value) && value[0] === 'art');
@@ -73,14 +79,16 @@ test('post strip renderer layers the artwork around flags without duplicate lett
       assert.ok(operations.lastIndexOf(images.at(-1)) > operations.lastIndexOf('flag'));
     }
     operations.length = 0;
-    context.eventCard(ctx, { ...base, partyId: 'OTHER-001', queerArtist: flags[0], transArtist: flags[1] }, 100, 186.516, 0, 1, art);
+    context.eventCard(ctx, { ...base, venueId: 'OTHER-001', venue: 'Another venue',
+      queerArtist: flags[0], transArtist: flags[1] }, 100, 186.516, 0, 1, art);
     assert.equal(operations.some(value => Array.isArray(value) && value[0] === 'art'), false);
     assert.ok(operations.some(value => Array.isArray(value) && value[0] === 'text' && value[1] === 'Melt'));
   }
 });
 
-test('the full generation flow loads strip artwork only for selected Melt events and passes it to calendar slides', async () => {
-  for (const melt of [true, false]) {
+test('the full generation flow loads strip artwork only for selected Melt events at Val’s', async () => {
+  for (const [event, melt] of [[base, true], [{ ...base, partyId: 'OTHER-001' }, false],
+    [{ ...base, venueId: 'OTHER-001', venue: 'Another venue' }, false]]) {
     const assets = [], calendars = [], elements = new Map();
     const element = id => {
       if (!elements.has(id)) elements.set(id, { value: '', listeners: {},
@@ -95,10 +103,10 @@ test('the full generation flow loads strip artwork only for selected Melt events
       calendarSlide = (frame, days, artwork) => { calendars.push({ days, artwork }); return {}; };
       addImage = async () => {};
     })();`);
-    vm.runInNewContext(instrumented, { Intl, Date, AbortController, console, assets, calendars, navigator: {},
+    vm.runInNewContext(instrumented, { Intl, Date, AbortController, console, assets, calendars, navigator: {}, QDPEventMetadata: metadata,
       document: { documentElement: {}, getElementById: element }, window: { addEventListener() {} },
       getComputedStyle: () => ({ getPropertyValue: () => '' }),
-      fetch: async () => ({ ok: true, json: async () => ({ events: [{ ...base, partyId: melt ? 'MELT-001' : 'OTHER-001' }] }) }) });
+      fetch: async () => ({ ok: true, json: async () => ({ events: [event] }) }) });
     element('postStart').value = element('postEnd').value = '2030-10-14';
     await element('postForm').listeners.submit({ preventDefault() {} });
     assert.match(element('postStatus').textContent, /PNG images ready/);

@@ -451,6 +451,9 @@
 }
 a.event-card.archive-card { text-decoration: none; }
 .archive-card .event-card-content { pointer-events: none; }
+.archive-directory .event-card.melt {
+  background-image: url("melt-event-strip-generic.jpg?v=20261112-1");
+}
 .archive-directory-photo {
   position: absolute;
   top: 0;
@@ -459,8 +462,16 @@ a.event-card.archive-card { text-decoration: none; }
   display: block;
   width: var(--qdp-card-height);
   height: 100%;
-  object-fit: cover;
+  overflow: hidden;
   pointer-events: none;
+}
+.archive-directory-photo > img {
+  position: absolute;
+  width: var(--photo-width, 100%);
+  height: var(--photo-height, 100%);
+  left: var(--photo-left, 0);
+  top: var(--photo-top, 0);
+  object-fit: cover;
 }
 .archive-directory-photo + .event-card-content {
   width: calc(100% - var(--qdp-card-height));

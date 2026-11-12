@@ -103,6 +103,7 @@ test('generation loads Melt artwork only when the selected events need it and pa
       addImage = async () => {};
     })();`);
     vm.runInNewContext(source, { Intl, Date, AbortController, console, assets, rendered, navigator: {},
+      QDPEventMetadata: globalThis.QDPEventMetadata,
       window: { addEventListener() {} }, getComputedStyle: () => ({ getPropertyValue: () => '' }),
       document: { documentElement: {}, getElementById: element },
       fetch: async () => ({ ok: true, json: async () => ({ events: [{ ...base, partyId: linked ? 'MELT-001' : 'OTHER-001' }] }) }) });

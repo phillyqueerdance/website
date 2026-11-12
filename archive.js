@@ -467,22 +467,25 @@
     if (grouping?.count > 1) corners.push({ time: grouping.badge, card: grouping.last });
   }
 
-  function stripCard(title, subtitle, href, photoSrc = "") {
+  function stripCard(title, subtitle, href, photoSrc = "", cropStyle = "") {
     const card = node("a", "event-card default archive-card");
     card.href = href;
     card.setAttribute("data-archive-link", "");
     card.appendChild(node("span", "event-card-shape"));
     if (photoSrc) {
-      const photo = node("img", "archive-directory-photo");
+      const photoFrame = node("span", "archive-directory-photo");
+      if (cropStyle) photoFrame.setAttribute("style", cropStyle);
+      const photo = node("img");
       photo.alt = "";
       photo.loading = "lazy";
       photo.decoding = "async";
       photo.addEventListener("error", () => {
-        photo.remove();
+        photoFrame.remove();
         fitPosterTitles(card);
       }, { once: true });
       photo.src = photoSrc;
-      card.appendChild(photo);
+      photoFrame.append(photo);
+      card.appendChild(photoFrame);
     }
     const content = node("span", "event-card-content");
     content.appendChild(node("span", "event-title", title));
@@ -510,7 +513,8 @@
       }
       const subtitle = kind === "venues" ? item.address || "" : "";
       const card = stripCard(item.name, subtitle,
-        archiveUrl(singular, item.id).href, meta.profileThumbnail(singular, item));
+        archiveUrl(singular, item.id).href, meta.profileThumbnail(singular, item),
+        kind === "artists" ? meta.photoCropStyle(item.imageCrop) : "");
       if (kind === "parties" && String(item.id).trim().toUpperCase() === "MELT-001") {
         card.classList.add("melt");
       }
@@ -923,7 +927,7 @@
     message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261111-artist-map-photos-2");
+        const module = await import("./scene-map.js?v=20261112-artist-crops-1");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;

@@ -385,8 +385,7 @@
       length > 1 && index === length - 1 ? radius : 0];
     const base = event.explicitQueer ? COLORS.queerCard : COLORS.standardCard;
     const flagged = event.queerArtist || event.transArtist;
-    const artwork = String(event.partyId || "").trim().toUpperCase() === "MELT-001"
-      ? meltStrip : null;
+    const artwork = globalThis.QDPEventMetadata.usesValsMeltStrip(event) ? meltStrip : null;
     ctx.save();
     roundedPath(ctx, CARD_X, top, CARD_WIDTH, height, corner);
     ctx.clip();
@@ -788,7 +787,7 @@
         image("../queer-popup-background.png?v=a87c9d4"),
         needsMelt
           ? image("../melt-popup-background.jpg?v=20261014-01") : Promise.resolve(null),
-        needsMelt
+        selected.some(globalThis.QDPEventMetadata.usesValsMeltStrip)
           ? image("../melt-event-strip.jpg?v=20261015-01") : Promise.resolve(null),
         loadTitleFont()
       ]);

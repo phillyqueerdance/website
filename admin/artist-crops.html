@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#111114">
+  <title>Artist photo crops | QDP Admin</title>
+  <link rel="icon" type="image/png" href="/admin/favicon.png">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261112-artist-crops-1">
+  <link rel="stylesheet" href="/admin/artist-crops.css?v=20261112-1">
+  <script src="/event-metadata.js" defer></script>
+  <script src="/profile-metadata.js?v=20261112-artist-crops-1" defer></script>
+  <script src="/admin/artist-crops.js?v=20261112-1" defer></script>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-brand">
+      <img class="brand-mark" src="/admin/favicon.png" alt="" width="48" height="48">
+      <div>
+        <p class="eyebrow">Queer Dance Philly</p>
+        <h1>Artist photo crops</h1>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-shell">
+    <nav aria-label="Admin tools"><a class="admin-page-link" href="/admin/">Back to Admin</a></nav>
+    <section class="status-panel crop-panel" aria-label="Photo crop editor">
+      <label class="crop-artist">
+        Artist
+        <select id="cropArtist" disabled>
+          <option value="">Choose an artist</option>
+        </select>
+      </label>
+      <div id="cropWorkspace" class="crop-workspace" hidden>
+        <figure class="crop-preview">
+          <div id="cropStage" class="crop-stage">
+            <div class="crop-circle" aria-hidden="true"></div>
+          </div>
+          <figcaption id="cropGuide">The square is the Artists strip. The circle is the Discovery Map bubble.</figcaption>
+        </figure>
+        <fieldset id="cropControls" class="crop-controls" aria-describedby="cropGuide">
+          <legend>Framing</legend>
+          <p>Drag the photo or use the sliders to position it.</p>
+          <label>Zoom <input id="cropZoom" type="range" min="1" max="4" step=".01" value="1"></label>
+          <label>Horizontal position <input id="cropX" type="range" min="0" max="1" step=".001" value=".5"></label>
+          <label>Vertical position <input id="cropY" type="range" min="0" max="1" step=".001" value=".5"></label>
+          <div class="crop-actions">
+            <button id="cropSave" type="button">Save crop</button>
+            <button id="cropReset" type="button">Use automatic crop</button>
+          </div>
+        </fieldset>
+      </div>
+      <p id="cropStatus" class="crop-status" role="status">Loading artists…</p>
+    </section>
+  </main>
+</body>
+</html>
