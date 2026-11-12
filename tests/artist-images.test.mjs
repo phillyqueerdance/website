@@ -8,8 +8,10 @@ import { renderProfileDrawer, renderProfileInfo } from '../functions/profile-pag
 const meta = globalThis.QDPProfileMetadata;
 const imageKinds = [
   { kind: 'artist', directory: 'artists', sheet: 'Artists', image: 'ArtistImage_URL', id: 'ArtistID', name: 'StageName' },
-  { kind: 'party', directory: 'parties', sheet: 'Parties', image: 'PartyImage_URL', id: 'PartyID', name: 'PartyName' }
+  { kind: 'party', directory: 'parties', sheet: 'Parties', image: 'PartyImage_URL', id: 'PartyID', name: 'PartyName' },
+  { kind: 'venue', directory: 'venues', sheet: 'Venues', image: 'VenueImage_URL', id: 'VenueID', name: 'VenueName' }
 ];
+const config = { SHEET_ARTISTS: 'Artists', SHEET_PARTIES: 'Parties', SHEET_VENUES: 'Venues' };
 const publisherSources = [['repository publisher', fs.readFileSync(new URL('../apps-script/archive-feed.gs', import.meta.url), 'utf8')]];
 if (process.env.QDP_PUBLIC_DATA_FILE) publisherSources.push(['PublicData.gs release', fs.readFileSync(process.env.QDP_PUBLIC_DATA_FILE, 'utf8')]);
 
@@ -17,16 +19,16 @@ for (const [name, source] of publisherSources) {
   for (const { kind, directory, sheet, image, id, name: nameColumn } of imageKinds) {
     test(`${name}: publishes only approved ${kind} image URLs`, () => {
       const context = vm.createContext({ Map, Set, Date, Object, String, Array, JSON, RegExp,
-        CONFIG: { SHEET_ARTISTS: 'Artists', SHEET_PARTIES: 'Parties' }, trim: value => String(value ?? '').trim() });
+        CONFIG: config, trim: value => String(value ?? '').trim() });
       vm.runInContext(source, context);
       context.qdpPublicReadContext_ = () => ({});
       // Deliberately shuffled headers: raw links must never substitute for the public URL.
-      const headers = ['Raw_' + image, nameColumn, image, 'Public_OK', id];
+      const headers = ['Raw_' + image, nameColumn, image, 'Public_OK', id, 'Photo_URL'];
       context.qdpArchiveSheet_ = (_, sheetName) => {
         assert.equal(sheetName, sheet);
         return { index: Object.fromEntries(headers.map((h, i) => [h.toLowerCase(), i])), rows: [
           ['https://drive.google.com/file/d/RAW/view', 'Alpha', 'https://drive.google.com/uc?export=view&id=FINAL', 'Yes', 'A'],
-          ['https://drive.google.com/file/d/RAW_ONLY/view', 'No photo', '', 'Yes', 'B'],
+          ['https://drive.google.com/file/d/RAW_ONLY/view', 'No photo', '', 'Yes', 'B', 'https://example.com/legacy.jpg'],
           ['', 'Unsafe', 'javascript:alert(1)', 'Yes', 'C'],
           ['', 'Private', 'https://example.com/private.jpg', 'No', 'PRIVATE']
         ] };
@@ -37,12 +39,12 @@ for (const [name, source] of publisherSources) {
       assert.equal(profiles.get('C').imageUrl, '');
       assert.equal(profiles.has('PRIVATE'), false);
       const json = JSON.stringify([...profiles.values()]);
-      assert.doesNotMatch(json, /Raw_(Artist|Party)Image_URL|RAW_ONLY|\/RAW\/|private\.jpg/);
+      assert.doesNotMatch(json, /Raw_(Artist|Party|Venue)Image_URL|RAW_ONLY|\/RAW\/|legacy\.jpg|private\.jpg/);
     });
   }
 }
 
-test('archive API retains safe artist and party image URLs and omits the raw columns', async t => {
+test('archive API retains safe image URLs and omits the raw columns', async t => {
   t.mock.method(globalThis, 'fetch', () => { throw new Error('This fixture must not make network requests'); });
   let serial = 0;
   for (const { kind, directory, image } of imageKinds) {
@@ -84,10 +86,17 @@ test('an explicitly blank or unsafe image URL hides the photo, even for Callaia'
   for (const imageUrl of ['', 'javascript:alert(1)', 'data:image/png;base64,abc']) {
     const profile = { id: 'CALLAIA-001', name: 'Callaia', imageUrl };
     for (const { kind } of imageKinds) {
-      assert.equal(meta.profileImage(kind, profile), null);
+      assert.equal(meta.discoveryImage(kind, profile), null);
       assert.equal(renderProfileDrawer(kind, profile), '');
     }
   }
+});
+
+test('Discovery uses the published venue image in a bubble and a small rendition in the Venue strip', () => {
+  const venue = { id: 'A', imageUrl: 'https://drive.google.com/file/d/VENUE_PHOTO/view' };
+  assert.equal(meta.discoveryImage('venue', venue).src, 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w1600');
+  assert.equal(meta.profileThumbnail('venue', venue), 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w320');
+  assert.equal(meta.discoveryImage('venue', { id: 'A' }), null);
 });
 
 const corePath = process.env.QDP_CORE_FILE;
@@ -95,8 +104,10 @@ for (const { kind, sheet: sheetName, image } of imageKinds) {
   test(`Core release: ${kind} image conversion preserves blank, invalid, unchanged, and unrelated cells`, { skip: !corePath }, () => {
     const core = fs.readFileSync(corePath, 'utf8');
     new vm.Script(core); // Syntax-check the complete installable file.
-    assert.match(core, /\.addItem\('Update Artist Image URLs \(from Raw_ArtistImage_URL\)', 'updateArtistImageUrlsFromRawLinks'\)/);
-    assert.match(core, /\.addItem\('Update Party Image URLs \(from Raw_PartyImage_URL\)', 'updatePartyImageUrlsFromRawLinks'\)/);
+    const label = image.replace('Image_URL', '');
+    const convert = `update${label}ImageUrlsFromRawLinks`;
+    assert.ok(core.includes(`.addItem('Update ${label} Image URLs (from Raw_${image})', '${convert}')`));
+    if (kind === 'venue') assert.match(core, /photoUrl: 'VenueImage_URL'/);
     assert.match(core, /qdpShowApifyMenu\(\);/);
     const fn = name => { const start = core.indexOf(`function ${name}(`); assert.ok(start >= 0);
       const end = core.indexOf('\nfunction ', start + 1); return core.slice(start, end < 0 ? undefined : end); };
@@ -114,10 +125,9 @@ for (const { kind, sheet: sheetName, image } of imageKinds) {
     const sheet = { getLastRow: () => rows.length, getLastColumn: () => rows[0].length,
       getRange: (r, c, h, w) => ({ getValues: () => rows.slice(r - 1, r - 1 + h).map(row => row.slice(c - 1, c - 1 + w)),
         setValues: values => { writes.push([r, c, h, w]); values.forEach((row, i) => row.forEach((v, j) => { rows[r - 1 + i][c - 1 + j] = v; })); } }) };
-    const context = vm.createContext({ CONFIG: { SHEET_ARTISTS: 'Artists', SHEET_PARTIES: 'Parties' },
+    const context = vm.createContext({ CONFIG: config,
       ss_: () => ({ getSheetByName: name => { assert.equal(name, sheetName); return sheet; } }),
       trim: value => String(value ?? '').trim(), ui_: () => null, Logger: { log: text => logs.push(text) } });
-    const convert = kind === 'artist' ? 'updateArtistImageUrlsFromRawLinks' : 'updatePartyImageUrlsFromRawLinks';
     vm.runInContext(['getHeaderMap_', 'headerIndex_', 'directDriveImageUrl_', convert,
       'updateProfileImageUrlsFromRawLinks_'].map(fn).join('\n'), context);
     context[convert]();

@@ -151,7 +151,7 @@ function menuFixture({ open = true } = {}) {
     .findIndex(view => selector === `.archive-menu-badge--${view}`)];
   const actions = [], frames = [];
   const context = { URL, menu, menuProfile, menuTrack, discoverLink, archivePage: element(),
-    venueMap: element(), alphabet: element(), exitTimer: 0, menuMotionSerial: 0, menuReset: false,
+    alphabet: element(), exitTimer: 0, menuMotionSerial: 0, menuReset: false,
     directoryViews: new Set(['artists', 'venues', 'parties', 'collectives']),
     profileViews: { artist: 'artists', venue: 'venues', party: 'parties', collective: 'collectives' },
     archive: { active: true, profile: { kind: 'artist', person },
@@ -178,7 +178,6 @@ for (const open of [true, false]) {
     assert.equal(f.context.menuProfile.children.length, 0);
     assert.equal(f.context.menu.classes.has('has-profile'), false);
     assert.equal(f.context.alphabet.hidden, true);
-    assert.equal(f.context.venueMap.hidden, true);
     assert.ok(f.links.every(link => !link.getAttribute('aria-current')));
     assert.equal(f.context.menuTrack.scrollTop, 0);
     assert.equal(f.context.discoverLink.getAttribute('aria-expanded'), 'true');

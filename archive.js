@@ -5,7 +5,6 @@
   const menuTrack = document.getElementById("archiveMenuTrack");
   const discoverLink = document.getElementById("discoverLink");
   const alphabet = document.getElementById("archiveAlphabet");
-  const venueMap = document.getElementById("archiveVenueMap");
   const menuProfile = document.getElementById("archiveMenuProfile");
   const archiveViewport = document.getElementById("archiveViewport");
   const archivePage = document.getElementById("archivePage");
@@ -235,7 +234,6 @@
     document.documentElement.classList.add("discover-open");
     document.body.classList.add("discover-open");
     discoverLink.setAttribute("aria-expanded", "true");
-    venueMap.hidden = view !== "venue" && view !== "venues";
     alphabet.hidden = !directoryViews.has(view);
     if (!alphabet.hidden) {
       alphabet.setAttribute("aria-label", `${view[0].toUpperCase() + view.slice(1)} alphabet`);
@@ -927,7 +925,7 @@
     message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261112-artist-crops-1");
+        const module = await import("./scene-map.js?v=20261112-venue-photos-1");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;

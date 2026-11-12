@@ -280,12 +280,11 @@
     padding: 4px 0;
     font-size: 17.1px;
   }
-  .archive-menu > .archive-menu-discovery { grid-row: 5; }
-  .archive-menu > .archive-menu-past-events { grid-row: 6; }
+  .archive-menu > .archive-menu-discovery { grid-row: 4; }
+  .archive-menu > .archive-menu-past-events { grid-row: 5; }
   .archive-menu:not(.has-profile) > :is(.archive-menu-discovery, .archive-menu-past-events)[aria-current="page"] {
     width: calc(80% + 7.6px);
   }
-  .archive-menu > .archive-menu-map { grid-column: 1; grid-row: 4; min-height: 44px; margin: 4px 0 0; padding: 12px 0; font-size: 16px; }
   .archive-menu .archive-menu-profile { display: none; }
   .archive-profile-summary { font-size: 15px; }
   .archive-menu-profile { flex-shrink: 0; font-size: 15px; line-height: 1.6; }

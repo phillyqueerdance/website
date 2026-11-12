@@ -277,12 +277,6 @@
   color: inherit;
   font-size: .75em;
 }
-.archive-menu > .archive-menu-map {
-  margin: 7px 0;
-  padding-left: 0;
-  font-size: .78em;
-}
-.archive-menu > .archive-menu-map[hidden] { display: none; }
 .archive-menu > :is(.archive-menu-discovery, .archive-menu-past-events) {
   margin-top: 8px;
   color: #ffea86;
@@ -607,10 +601,6 @@ a.event-card.archive-card { text-decoration: none; }
   .archive-menu-badge-label { left: 50%; }
   .archive-menu-badge[aria-current="page"] .archive-menu-badge-label { left: 50%; }
   .archive-menu > .archive-menu-past-events { margin-left: 0; }
-  .archive-menu > .archive-menu-map {
-    margin: 3px 0;
-    padding: 3px;
-  }
   .archive-menu-profile { text-align: left; }
   .archive-menu-profile:not([hidden]) { margin: 8px 0 28px; }
   .archive-alphabet {

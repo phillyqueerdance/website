@@ -108,6 +108,7 @@ function qdpArchiveProfiles_(ss, kind, artistFlags) {
       : kind === 'venues' ? {
           ...shared,
           queerVenue: qdpArchiveYes_(qdpArchiveValue_(row, data.index, ['VenueQueer', 'QueerVenue', 'Queer'])),
+          imageUrl: qdpArchiveLink_(qdpArchiveText_(row, data.index, ['VenueImage_URL'])),
           neighborhood: qdpArchiveText_(row, data.index, ['Neighborhood']),
           address: qdpArchiveText_(row, data.index, ['Address']),
           maps: qdpArchiveLink_(qdpArchiveValue_(row, data.index, ['GMaps_URL']))

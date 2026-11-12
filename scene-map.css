@@ -250,8 +250,8 @@
 .scene-map-node[data-key="party:MELT-001"] > .scene-map-node-disc { fill: #000; }
 .scene-map-node-ring { fill: none; stroke: var(--scene-kind-color); pointer-events: none; }
 .scene-map-node-logo, .scene-map-node-photo { pointer-events: none; }
-.scene-map-node.focus .scene-map-node-disc { stroke: var(--scene-accent); stroke-width: 4; }
 .scene-map-node:hover .scene-map-node-disc, .scene-map-node:focus-visible .scene-map-node-disc { stroke: var(--scene-accent); stroke-width: 3; }
+.scene-map-node.focus .scene-map-node-disc { stroke: var(--scene-accent); stroke-width: 2; }
 .scene-map-caption {
   fill: var(--scene-kind-ink, var(--scene-ink));
   font-weight: 700;

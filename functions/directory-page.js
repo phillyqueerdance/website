@@ -76,9 +76,6 @@ export function renderDirectoryPage(context, page, result, directory) {
     .on("#discoverLink", { element(element) { element.setAttribute("aria-expanded", "true"); } })
     .on(`.archive-menu-badge--${directory}`, { element(element) { element.setAttribute("aria-current", "page"); } })
     .on("#qdpInitialArchive", { element(element) { element.setInnerContent(globalThis.QDPEventMetadata.serialize({ kind: directory, id: "", ...result })); } });
-  if (directory === "venues") rewriter = rewriter.on("#archiveVenueMap", {
-    element(element) { element.removeAttribute("hidden"); }
-  });
   for (const [selector, content] of meta.directoryTags(directory, origin)) rewriter = rewriter.on(selector, {
     element(element) { element.setAttribute("content", content); }
   });

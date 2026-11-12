@@ -313,7 +313,7 @@ function createBubble(map, item) {
   const title = svgNode("title");
   const circle = svgNode("circle", { class: "scene-map-node-disc" });
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
-  const photo = window.QDPProfileMetadata.profileImage(item.kind, item);
+  const photo = window.QDPProfileMetadata.discoveryImage(item.kind, item);
   const bubble = {
     item, element, title, circle, hit,
     opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
@@ -413,10 +413,10 @@ function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
-  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(5, radius * .16));
+  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(8, radius * .23));
   if (bubble.ring) {
     bubble.ring.setAttribute("r", radius * .9);
-    bubble.ring.setAttribute("stroke-width", Math.min(4, radius * .12));
+    bubble.ring.setAttribute("stroke-width", Math.min(6, radius * .18));
   }
   if (bubble.logo) {
     const halfSize = radius * bubble.logoScale;

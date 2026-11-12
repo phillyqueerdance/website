@@ -55,6 +55,16 @@ The temporary Callaia image remains only for older feeds that do not yet
 include the new image field. The repository `archive-feed.gs` remains a
 reference helper, not an additional file to install beside PublicData.gs.
 
+## Venue photos in Discover
+
+Use `VenueImage_URL` for published venue photos and `Raw_VenueImage_URL` for
+Drive share links. Core.gs v7.4.9 adds **QDP > Update Venue Image URLs (from
+Raw_VenueImage_URL)** and uses the renamed column for the existing Places tools.
+PublicData.gs v7.4.5 publishes the image URLs of approved venues. After saving
+both files, reload the Index, convert any raw links, and choose
+**QDP > Public data / Website > Publish archive changes**. The Discovery Map
+and Venues directory on the preview read the resulting image URLs.
+
 ## Current production update: v7.2
 
 For the existing four-file v7.1 project, replace **only PublicData.gs** with

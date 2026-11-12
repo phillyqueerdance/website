@@ -47,7 +47,7 @@ function profile(input, kind, publicIds = null, details = false) {
     bio: String(input.bio ?? "").trim(),
     website: safeUrl(input.website),
     instagram: safeUrl(input.instagram),
-    ...((kind === "artists" || kind === "parties") && Object.hasOwn(input, "imageUrl")
+    ...(["artists", "parties", "venues"].includes(kind) && Object.hasOwn(input, "imageUrl")
       ? { imageUrl: safeUrl(input.imageUrl) } : {}),
     ...(kind === "artists"
       ? {
