@@ -441,12 +441,6 @@
 .archive-directory-results .archive-directory > .event-time {
   top: var(--archive-directory-search-height, 0px);
 }
-/* Keep the space between groups inside the sticky boundary. */
-.archive-directory-results > .archive-section + .archive-section { margin-top: 0; }
-.archive-directory-results > .archive-section:not(:last-child) > .archive-directory { margin-bottom: 0; }
-.archive-directory-results > .archive-section:not(:last-child) > .archive-directory > .event-group-cards {
-  padding-bottom: var(--qdp-cards-next-time-gap);
-}
 .archive-year .event-time { font-size: calc(var(--qdp-time-font-size) * .68); }
 .archive-group .event-card { cursor: pointer; }
 .archive-group .event-row:first-child .event-card { border-top-right-radius: var(--qdp-card-radius); }
