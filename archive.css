@@ -440,11 +440,11 @@
 .archive-directory-results .archive-directory > .event-time {
   top: var(--archive-directory-search-height, 0px);
 }
-/* Keep the gap inside each sticky tab's group so the next tab pushes it out. */
-.archive-directory-results .archive-section + .archive-section { margin-top: 0; }
-.archive-directory-results .archive-section:not(:last-child) > .archive-directory { margin-bottom: 0; }
-.archive-directory-results .archive-section:not(:last-child) .event-group-cards {
-  padding-bottom: calc(2 * var(--qdp-cards-next-time-gap));
+/* Keep the space between groups inside the sticky boundary. */
+.archive-directory-results > .archive-section + .archive-section { margin-top: 0; }
+.archive-directory-results > .archive-section:not(:last-child) > .archive-directory { margin-bottom: 0; }
+.archive-directory-results > .archive-section:not(:last-child) > .archive-directory > .event-group-cards {
+  padding-bottom: var(--qdp-cards-next-time-gap);
 }
 .archive-year .event-time { font-size: calc(var(--qdp-time-font-size) * .68); }
 .archive-group .event-card { cursor: pointer; }
