@@ -97,6 +97,7 @@ test('venue profiles and bubbles use the published image and Venue strips use a 
   const venue = { id: 'A', imageUrl: 'https://drive.google.com/file/d/VENUE_PHOTO/view' };
   assert.equal(meta.profileImage('venue', venue).src, 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w1600');
   assert.equal(meta.profileThumbnail('venue', venue), 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w320');
+  assert.equal(meta.profileThumbnail('artist', venue, 640), 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w640');
   assert.equal(meta.profileImage('venue', { id: 'A' }), null);
 });
 

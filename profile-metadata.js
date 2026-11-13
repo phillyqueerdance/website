@@ -45,10 +45,11 @@
     return kind === "artist" && profile.id === "CALLAIA-001"
       ? { src: "/artist-images/callaia.jpg", width: 2048, height: 2016 } : null;
   };
-  const profileThumbnail = (kind, profile) => {
+  const profileThumbnail = (kind, profile, width = 320) => {
     const image = profileImage(kind, profile);
-    return image ? image.src.replace(/^(https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+)=w\d+$/, "$1=w320") : "";
+    return image ? image.src.replace(/^(https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+)=w\d+$/, `$1=w${width}`) : "";
   };
+  const directoryPhotoLoading = index => index < 6 ? "eager" : "lazy";
   const maxPhotoZoom = 4;
   const photoCrop = value => {
     const { x, y, zoom, aspect } = value || {};
@@ -104,5 +105,6 @@
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
   globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, profileImage, profileThumbnail, description, isQueer, classification, tags,
-    homeDescription, directories, directoryUrl, directoryTags, maxPhotoZoom, photoCrop, photoCropFrame, photoCropStyle });
+    homeDescription, directories, directoryUrl, directoryTags, directoryPhotoLoading,
+    maxPhotoZoom, photoCrop, photoCropFrame, photoCropStyle });
 })();

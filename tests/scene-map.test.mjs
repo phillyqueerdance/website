@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import { connectionsFor, networkFor, visibleRelationships } from "../scene-map-graph.js";
-import { photoFrame } from "../scene-map-photo-crop.js";
 
 function searchFixture() {
   const source = readFileSync(new URL("../scene-map.js", import.meta.url), "utf8");
@@ -95,26 +94,6 @@ test("the dropdown stays open during internal focus and closes on outside focus 
   assert.equal(f.map.searchOpen, true);
   f.emit(f.root, "pointerdown", { target: f.outside });
   assert.equal(f.map.searchOpen, false);
-});
-
-test("artist photo framing moves the circle to keep faces inside it", () => {
-  const top = photoFrame(240, 320, [{ xMin: 90, xMax: 147, yMin: 38, yMax: 94 }]);
-  assert.deepEqual(top, { x: 0, y: 0, size: 240, width: 240, height: 320 });
-
-  const lower = photoFrame(240, 320, [{ xMin: 65, xMax: 114, yMin: 137, yMax: 192 }]);
-  assert.equal(lower.size, 240);
-  assert.ok(lower.y > 40);
-
-  const edge = photoFrame(240, 240, [{ xMin: 32, xMax: 87, yMin: 34, yMax: 92 }]);
-  assert.ok(edge.size < 240);
-  assert.equal(edge.x, 0);
-
-  const wideGroup = [
-    { xMin: 0, xMax: 20, yMin: 100, yMax: 130 },
-    { xMin: 220, xMax: 240, yMin: 100, yMax: 130 }
-  ];
-  assert.equal(photoFrame(240, 240, wideGroup), null);
-  assert.equal(photoFrame(240, 320, []), null);
 });
 
 test("desktop and mobile keep the strongest direct connections within their bubble limits", () => {

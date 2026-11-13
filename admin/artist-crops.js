@@ -55,7 +55,7 @@
       stage.prepend(image);
       paint();
       workspace.hidden = false;
-      message(item.crop ? "Manual crop saved." : "Automatic crop is active. Save to use this framing.");
+      message(item.crop ? "Manual crop saved." : "Centered crop is active. Save to use your framing.");
     } catch {
       if (version === selection) message("Could not load this artist’s photo.", true);
     }
@@ -99,7 +99,7 @@
     saving = true;
     drag = null;
     artist.disabled = controls.disabled = true;
-    message(value ? "Saving crop…" : "Restoring automatic crop…");
+    message(value ? "Saving crop…" : "Restoring centered crop…");
     try {
       const response = await fetch("/admin/artist-photo-crop", {
         method: "POST",
@@ -116,7 +116,7 @@
       paint();
       message(item.crop
         ? "Crop saved. Public photos may take a few minutes to update."
-        : "Automatic crop restored. Public photos may take a few minutes to update.");
+        : "Centered crop restored. Public photos may take a few minutes to update.");
     } catch (error) {
       message(error instanceof SyntaxError ? "Could not save the crop. Reload and try again." : error.message, true);
     } finally {

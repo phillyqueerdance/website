@@ -99,7 +99,7 @@ test("admin saves and clears one public artist crop, with authorization and sour
   assert.equal(records.size, 0);
   assert.deepEqual(await directory().then(items => items.map(item => item.imageCrop)), [undefined, undefined]);
   assert.deepEqual(lists, [{ requested: prefix, cursor: undefined }, { requested: prefix, cursor: "next" }]);
-  const directoryKey = origin + "/_qdp/directory-v2?kind=artists";
+  const directoryKey = origin + "/_qdp/directory-v3?kind=artists";
   edge.set(directoryKey, new Response("before save"));
   const saved = await post({ id: "A", src, crop });
   assert.equal(saved.status, 200);

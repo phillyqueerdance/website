@@ -36,7 +36,7 @@ export function renderDirectory(directory, items, base) {
     if (rows.length) sections.push(`<section class="archive-section" data-letter="${letter}" aria-label="${letter} group"><div class="event-time-group archive-group archive-directory"><div class="event-time">${letter}</div><div class="event-group-cards">${rows.join("")}</div></div></section>`);
     rows = [];
   };
-  for (const item of profiles) {
+  for (const [index, item] of profiles.entries()) {
     const next = initial(sortName(item.name, directory));
     if (letter !== next) { flush(); letter = next; }
     const classification = meta.classification(kind, item);
@@ -48,7 +48,7 @@ export function renderDirectory(directory, items, base) {
     const photoSrc = meta.profileThumbnail(kind, item);
     const crop = kind === "artist" ? meta.photoCropStyle(item.imageCrop) : "";
     const photo = photoSrc
-      ? `<span class="archive-directory-photo"${crop ? ` style="${crop}"` : ""}><img src="${escape(photoSrc)}" alt="" loading="lazy" decoding="async"></span>`
+      ? `<span class="archive-directory-photo"${crop ? ` style="${crop}"` : ""}><img src="${escape(photoSrc)}" alt="" loading="${meta.directoryPhotoLoading(index)}" decoding="async"></span>`
       : "";
     rows.push(`<div class="event-row ${rows.length ? "same-time" : "has-time"}"><a class="${classes.join(" ")}" href="${escape(meta.url(kind, item.id, base))}" data-archive-link>${classification ? `<span class="sr-only">${classification} </span>` : ""}<span class="event-card-shape"></span>${photo}<span class="event-card-content"><span class="event-title">${escape(item.name)}</span>${address}</span></a></div>`);
   }
@@ -61,7 +61,10 @@ export function renderDirectoryPage(context, page, result, directory) {
   const base = new URL(context.request.url).origin;
   const label = directory[0].toUpperCase() + directory.slice(1);
   const ready = result.status === 200;
-  const markup = ready ? renderDirectory(directory, result.payload[directory], base)
+  const markup = ready
+    ? `<div class="archive-search-bar archive-directory-search">
+        <input class="archive-search" type="search" placeholder="What will you find?" autocomplete="off" aria-label="Search ${directory}">
+      </div><div class="archive-directory-results">${renderDirectory(directory, result.payload[directory], base)}</div>`
     : `<p class="event-feed-message">${escape(result.error)}</p>`;
   let rewriter = new HTMLRewriter()
     .on("title", { element(element) { element.setInnerContent(meta.directories[directory].title); } })

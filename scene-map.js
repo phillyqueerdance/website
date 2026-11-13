@@ -13,7 +13,9 @@ const OUTSIDE_LABEL_RADIUS = 26;
 const MIN_CAPTION_SIZE = 11;
 const CAPTION_LINE_HEIGHT = 1.07;
 const GRAPH_MOTION_MS = 260;
+const PHOTO_WIDTHS = [320, 640, 1280];
 let captionMeasure;
+let directoryLoad;
 const BUBBLE_ARTWORK = {
   "collective:QDP-001": { src: "/start-here-logo.png", scale: 1, replacesDisc: true },
   "party:MELT-001": { src: "/melt-logo.png", scale: .73, innerBorder: true }
@@ -43,7 +45,6 @@ async function resource(kind, id) {
 }
 
 async function loadDirectories() {
-  if (known.size) return;
   const results = await Promise.allSettled(KINDS.map(async kind => {
     const directory = DIRECTORY_FOR[kind];
     const data = await resource(directory);
@@ -57,6 +58,19 @@ async function loadDirectories() {
   if (results.some(result => result.status === "rejected")) {
     console.warn("A QDP directory was unavailable");
   }
+}
+
+export function prepareSceneMap(focusKey) {
+  const [kind, id, extra] = (focusKey || "").split(":");
+  if (KINDS.includes(kind) && window.QDPProfileMetadata.validId(id) && extra === undefined) {
+    // The public focus profile can load alongside the directories.
+    void profile({ kind, id, key: focusKey }).catch(() => {});
+  }
+  directoryLoad ??= loadDirectories().catch(error => {
+    directoryLoad = undefined;
+    throw error;
+  });
+  return directoryLoad;
 }
 
 function profile(item) {
@@ -313,7 +327,12 @@ function createBubble(map, item) {
   const title = svgNode("title");
   const circle = svgNode("circle", { class: "scene-map-node-disc" });
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
-  const photo = window.QDPProfileMetadata.profileImage(item.kind, item);
+  const meta = window.QDPProfileMetadata;
+  const frame = item.kind === "artist" ? meta.photoCropFrame(item.imageCrop) : null;
+  // Keep extra resolution for manual crops that magnify part of the photo.
+  const cropWidth = 256 * (frame?.width ?? 1);
+  const photoWidth = PHOTO_WIDTHS.find(width => width >= cropWidth) ?? PHOTO_WIDTHS.at(-1);
+  const photo = meta.profileThumbnail(item.kind, item, photoWidth);
   const bubble = {
     item, element, title, circle, hit,
     opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
@@ -323,21 +342,14 @@ function createBubble(map, item) {
   if (photo) {
     const id = `scene-map-${item.kind}-photo-${item.id}`;
     const pattern = svgNode("pattern", { id, width: 1, height: 1, patternContentUnits: "objectBoundingBox" });
-    // Only portrait images have excess height in the square crop.
-    const alignment = item.kind === "artist" ? "xMidYMin" : "xMidYMid";
-    const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: `${alignment} slice` });
+    const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: "xMidYMid slice" });
     image.addEventListener("error", () => image.remove(), { once: true });
-    image.setAttribute("href", photo.src);
-    const frame = item.kind === "artist" ? window.QDPProfileMetadata.photoCropFrame(item.imageCrop) : null;
+    image.setAttribute("href", photo);
     if (frame) {
       pattern.setAttribute("viewBox", `${frame.x} ${frame.y} 1 1`);
       image.setAttribute("width", frame.width);
       image.setAttribute("height", frame.height);
       image.setAttribute("preserveAspectRatio", "none");
-    } else if (item.kind === "artist") {
-      import("./scene-map-photo-crop.js?v=20261111-artist-map-photos-2")
-        .then(({ applyArtistPhotoCrop }) => applyArtistPhotoCrop(pattern, image, photo.src))
-        .catch(() => {});
     }
     pattern.append(image);
     const defs = svgNode("defs");
@@ -554,10 +566,20 @@ function positionNewBubbles(map) {
   }
 }
 
+function paintOpacity(view, element, opacity) {
+  if (view.paintedOpacity === opacity) return;
+  element.style.opacity = opacity;
+  element.classList.toggle("is-arriving", opacity < .35);
+  view.paintedOpacity = opacity;
+}
+
 function paintBubble(bubble) {
-  bubble.element.setAttribute("transform", "translate(" + bubble.x.toFixed(2) + " " + bubble.y.toFixed(2) + ")");
-  bubble.element.style.opacity = bubble.opacity;
-  bubble.element.classList.toggle("is-arriving", bubble.opacity < .35);
+  const transform = `translate(${bubble.x.toFixed(1)} ${bubble.y.toFixed(1)})`;
+  if (bubble.paintedTransform !== transform) {
+    bubble.element.setAttribute("transform", transform);
+    bubble.paintedTransform = transform;
+  }
+  paintOpacity(bubble, bubble.element, bubble.opacity);
 }
 
 function paintGraph(map, time) {
@@ -619,13 +641,16 @@ function paintGraph(map, time) {
     const dx = target.x - source.x, dy = target.y - source.y;
     const distance = Math.hypot(dx, dy) || 1;
     const gap = distance - source.drawRadius - target.drawRadius;
-    const opacity = gap > 0 ? Math.min(source.opacity, target.opacity) : 0;
-    control.style.opacity = opacity;
-    control.classList.toggle("is-arriving", opacity < .35);
+    paintOpacity(line, control, gap > 0 ? Math.min(source.opacity, target.opacity) : 0);
     const trim = Math.max(0, Math.min(3, gap / 2));
     const start = (source.drawRadius + trim) / distance, end = (target.drawRadius + trim) / distance;
-    const x1 = source.x + dx * start, y1 = source.y + dy * start;
-    const x2 = target.x - dx * end, y2 = target.y - dy * end;
+    // Skip SVG writes for motion smaller than a tenth of a pixel.
+    const x1 = Math.round((source.x + dx * start) * 10) / 10;
+    const y1 = Math.round((source.y + dy * start) * 10) / 10;
+    const x2 = Math.round((target.x - dx * end) * 10) / 10;
+    const y2 = Math.round((target.y - dy * end) * 10) / 10;
+    if (line.x1 === x1 && line.y1 === y1 && line.x2 === x2 && line.y2 === y2) continue;
+    Object.assign(line, { x1, y1, x2, y2 });
     line.midX = (x1 + x2) / 2;
     line.midY = (y1 + y2) / 2;
     for (const stroke of [element, hit]) {
@@ -1067,7 +1092,7 @@ function bindDrag(map) {
   });
 }
 
-export async function mountSceneMap(host) {
+export async function mountSceneMap(host, focusKey, directories) {
   const root = node("section", "scene-map-view");
   const top = node("div", "scene-map-top archive-search-bar");
   const input = node("input", "archive-search");
@@ -1137,11 +1162,10 @@ export async function mountSceneMap(host) {
   };
   mobile.addEventListener("change", changeDensity);
   const resize = new ResizeObserver(() => {
-    if (root.isConnected) layoutGraph(map);
-    else {
+    if (!root.isConnected) {
       mobile.removeEventListener("change", changeDensity);
       resize.disconnect();
-    }
+    } else if (wrap.clientWidth !== map.width || wrap.clientHeight !== map.height) layoutGraph(map);
   });
   resize.observe(wrap);
   document.fonts?.ready.then(() => {
@@ -1149,10 +1173,10 @@ export async function mountSceneMap(host) {
   });
 
   try {
-    await loadDirectories();
+    await directories;
     if (!root.isConnected) return;
     input.disabled = false;
-    const focus = known.get(new URL(location.href).searchParams.get("focus"));
+    const focus = known.get(focusKey);
     if (focus && matchesQueerFilter(map, focus)) await startScene(map, focus);
     else renderMap(map);
   } catch (error) {
