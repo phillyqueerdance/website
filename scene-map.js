@@ -922,9 +922,11 @@ function search(map) {
     button.type = "button";
     button.append(node("span", "scene-map-result-name", item.name), typePill(item.kind));
     button.onclick = () => {
+      if (!map.searchOpen || !map.results.contains(button)) return;
       map.search.value = "";
       closeSearch(map);
-      startScene(map, item);
+      map.search.blur();
+      void startScene(map, item);
     };
     map.results.append(button);
   }
@@ -933,6 +935,68 @@ function search(map) {
 function closeSearch(map) {
   map.searchOpen = false;
   map.results.replaceChildren();
+}
+
+function bindSearch(map, top) {
+  const { search: input, results, root } = map;
+  const openSearch = () => {
+    if (map.searchOpen) return;
+    map.searchOpen = true;
+    search(map);
+  };
+  input.addEventListener("focus", openSearch);
+  input.addEventListener("click", openSearch);
+  input.addEventListener("input", () => {
+    map.searchOpen = true;
+    search(map);
+  });
+  input.addEventListener("keydown", event => {
+    if (event.key === "Escape" && map.searchOpen) {
+      closeSearch(map);
+      event.stopPropagation();
+    }
+    if (event.key === "ArrowDown") {
+      openSearch();
+      results.querySelector("button")?.focus();
+      event.preventDefault();
+    }
+  });
+
+  // Activate a completed tap before the browser's synthesized click.
+  // Leave scrolling and canceled gestures to the browser.
+  let tap = null;
+  const changedTouch = event => Array.from(event.changedTouches).find(touch => touch.identifier === tap.touch.identifier);
+  const moved = touch => Math.hypot(touch.clientX - tap.touch.clientX, touch.clientY - tap.touch.clientY) > 10;
+  results.addEventListener("touchstart", event => {
+    const button = event.target.closest?.(".scene-map-result");
+    tap = button && event.touches.length === 1
+      ? { button, touch: event.changedTouches[0], scrollTop: results.scrollTop } : null;
+  }, { passive: true });
+  results.addEventListener("touchmove", event => {
+    const touch = tap && changedTouch(event);
+    if (touch && moved(touch)) tap = null;
+  }, { passive: true });
+  results.addEventListener("touchcancel", () => { tap = null; }, { passive: true });
+  results.addEventListener("touchend", event => {
+    const touch = tap && changedTouch(event);
+    if (!touch) return;
+    const { button, scrollTop } = tap;
+    const select = !event.touches.length && !moved(touch) && results.scrollTop === scrollTop && results.contains(button);
+    tap = null;
+    if (select) {
+      if (event.cancelable) event.preventDefault();
+      button.click();
+    }
+  }, { passive: false });
+
+  top.addEventListener("focusout", event => {
+    if (!tap && event.relatedTarget && !top.contains(event.relatedTarget)) closeSearch(map);
+  });
+  root.addEventListener("pointerdown", event => {
+    if (top.contains(event.target)) return;
+    tap = null;
+    closeSearch(map);
+  });
 }
 
 function checkbox(text, value, checked) {
@@ -1054,35 +1118,7 @@ export async function mountSceneMap(host) {
     activeLine: null, searchOpen: false,
     limits: mobile.matches ? MOBILE_LIMITS : DESKTOP_LIMITS,
     reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)") };
-  const openSearch = () => {
-    if (map.searchOpen) return;
-    map.searchOpen = true;
-    search(map);
-  };
-  input.addEventListener("focus", openSearch);
-  input.addEventListener("click", openSearch);
-  input.addEventListener("input", () => {
-    map.searchOpen = true;
-    search(map);
-  });
-  input.addEventListener("keydown", event => {
-    if (event.key === "Escape" && map.searchOpen) {
-      closeSearch(map);
-      event.stopPropagation();
-    }
-    if (event.key === "ArrowDown") {
-      openSearch();
-      map.results.querySelector("button")?.focus();
-      event.preventDefault();
-    }
-  });
-  top.addEventListener("focusout", event => {
-    // Safari can blur the search field without focusing the tapped result.
-    if (event.relatedTarget && !top.contains(event.relatedTarget)) closeSearch(map);
-  });
-  root.addEventListener("pointerdown", event => {
-    if (!top.contains(event.target)) closeSearch(map);
-  });
+  bindSearch(map, top);
   filters.addEventListener("change", () => {
     map.allowed = new Set([...filters.querySelectorAll("label[data-kind] input:checked")].map(box => box.value));
     map.queerOnly = queerToggle.checked;

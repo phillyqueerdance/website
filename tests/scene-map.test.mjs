@@ -5,35 +5,96 @@ import { runInNewContext } from "node:vm";
 import { connectionsFor, networkFor, visibleRelationships } from "../scene-map-graph.js";
 import { photoFrame } from "../scene-map-photo-crop.js";
 
-test("search results survive a blur before a tap, while focus and clicks outside dismiss them", () => {
+function searchFixture() {
   const source = readFileSync(new URL("../scene-map.js", import.meta.url), "utf8");
-  const start = source.indexOf('  top.addEventListener("focusout"');
-  const end = source.indexOf('  filters.addEventListener("change"', start);
+  const start = source.indexOf("function search(map)");
+  const end = source.indexOf("function checkbox(", start);
   assert.ok(start >= 0 && end > start);
-  const result = {};
+  const artist = { key: "artist:focus", kind: "artist", name: "Focus" };
+  const selections = [];
   const outside = {};
-  const top = new EventTarget();
-  const root = new EventTarget();
-  top.contains = target => target === result;
-  const map = { searchOpen: true };
-  runInNewContext(source.slice(start, end), {
-    top, root, map, closeSearch: current => { current.searchOpen = false; }
+  const top = new EventTarget(), root = new EventTarget();
+  const input = Object.assign(new EventTarget(), {
+    value: "focus", blur() { this.blurred = true; }
   });
-
-  for (const relatedTarget of [null, result]) {
-    top.dispatchEvent(Object.assign(new Event("focusout"), { relatedTarget }));
-    assert.equal(map.searchOpen, true);
+  const results = Object.assign(new EventTarget(), {
+    children: [], scrollTop: 0,
+    replaceChildren() { this.children = []; },
+    append(button) { this.children.push(button); },
+    contains(button) { return this.children.includes(button); }
+  });
+  top.contains = target => target === input || results.contains(target);
+  const map = { search: input, results, root, searchOpen: false };
+  runInNewContext(source.slice(start, end) + "\nbindSearch(map, top);", {
+    top, map, known: new Map([[artist.key, artist]]), matchesQueerFilter: () => true,
+    node: () => ({ append() {}, click() { this.onclick(); } }),
+    typePill: () => ({}), startScene: (current, item) => selections.push(item.key)
+  });
+  input.dispatchEvent(new Event("focus"));
+  const [result] = results.children;
+  assert.ok(result);
+  function emit(element, type, attributes) {
+    const event = new Event(type, { cancelable: true });
+    for (const [key, value] of Object.entries(attributes)) Object.defineProperty(event, key, { value });
+    element.dispatchEvent(event);
+    return event;
   }
-  top.dispatchEvent(Object.assign(new Event("focusout"), { relatedTarget: outside }));
-  assert.equal(map.searchOpen, false);
+  const touch = (type, { x = 0, y = 0, remaining = Number(type !== "touchend") } = {}) => {
+    const contact = { identifier: 1, clientX: x, clientY: y };
+    return emit(results, type, {
+      target: { closest: () => result }, changedTouches: [contact], touches: Array(remaining).fill(contact)
+    });
+  };
+  return { map, input, results, result, outside, top, root, selections, emit, touch };
+}
 
-  map.searchOpen = true;
-  for (const [target, open] of [[result, true], [outside, false]]) {
-    const event = new Event("pointerdown");
-    Object.defineProperty(event, "target", { value: target });
-    root.dispatchEvent(event);
-    assert.equal(map.searchOpen, open);
+test("a tap selects a search result even if the field blurs and the browser skips click", () => {
+  const f = searchFixture();
+  f.touch("touchstart");
+  for (const relatedTarget of [null, f.outside]) f.emit(f.top, "focusout", { relatedTarget });
+  assert.equal(f.map.searchOpen, true);
+  assert.equal(f.touch("touchend", { x: 2, y: 3 }).defaultPrevented, true);
+  assert.deepEqual(f.selections, ["artist:focus"]);
+  assert.equal(f.input.value, "");
+  assert.equal(f.input.blurred, true);
+  assert.equal(f.map.searchOpen, false);
+  assert.equal(f.results.children.length, 0);
+  f.result.click();
+  assert.deepEqual(f.selections, ["artist:focus"]);
+});
+
+test("scrolling and canceling a touch leave the search results open", () => {
+  for (const finishGesture of [
+    f => f.touch("touchmove", { y: 30 }),
+    f => { f.results.scrollTop += 25; },
+    f => f.touch("touchcancel"),
+    f => f.touch("touchstart", { remaining: 2 })
+  ]) {
+    const f = searchFixture();
+    f.touch("touchstart");
+    finishGesture(f);
+    assert.equal(f.touch("touchend").defaultPrevented, false);
+    assert.deepEqual(f.selections, []);
+    assert.equal(f.map.searchOpen, true);
+    f.result.click();
+    assert.deepEqual(f.selections, ["artist:focus"]);
   }
+});
+
+test("the dropdown stays open during internal focus and closes on outside focus or press", () => {
+  const f = searchFixture();
+  for (const relatedTarget of [null, f.result]) {
+    f.emit(f.top, "focusout", { relatedTarget });
+    assert.equal(f.map.searchOpen, true);
+  }
+  f.emit(f.top, "focusout", { relatedTarget: f.outside });
+  assert.equal(f.map.searchOpen, false);
+
+  f.input.dispatchEvent(new Event("focus"));
+  f.emit(f.root, "pointerdown", { target: f.input });
+  assert.equal(f.map.searchOpen, true);
+  f.emit(f.root, "pointerdown", { target: f.outside });
+  assert.equal(f.map.searchOpen, false);
 });
 
 test("artist photo framing moves the circle to keep faces inside it", () => {
