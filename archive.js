@@ -11,7 +11,8 @@
   const archiveStack = document.getElementById("archiveStack");
   const archiveHeader = document.getElementById("archiveHeader");
   const archiveBack = document.getElementById("archiveBack");
-  const frameImage = document.querySelector(".poster > .frame");
+  const frame = document.getElementById("poster");
+  const frameImage = frame.querySelector(".frame");
   const frameAlt = frameImage.alt;
   const headerLabel = node("span", "archive-header-label");
   const incomingYear = node("span", "archive-header-incoming");
@@ -925,6 +926,14 @@
     message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
+        // Let the poster reach its final width before laying out the graph.
+        while (serial === requestNumber) {
+          const expansion = frame.getAnimations().find(animation =>
+            animation.transitionProperty === "width" && animation.playState !== "finished");
+          if (!expansion) break;
+          await expansion.finished.catch(() => {});
+        }
+        if (serial !== requestNumber) return;
         const module = await import("./scene-map.js?v=20261112-label-centering-1");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
@@ -1162,7 +1171,6 @@
   window.addEventListener("pageshow", event => {
     if (event.persisted && archive.active) route();
   });
-  const frame = document.getElementById("poster");
   frame.addEventListener("transitionend", event => {
     if (event.target === frame && event.propertyName === "width" && !menuTrack.hidden) positionMenu();
   });

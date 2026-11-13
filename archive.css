@@ -281,6 +281,7 @@
   margin-top: 8px;
   color: #ffea86;
 }
+.archive-menu > .archive-menu-past-events { margin-top: 2px; }
 @media (min-width: 761px) {
   .archive-menu > .archive-menu-discovery[aria-current="page"] {
     padding-inline: calc(var(--archive-menu-inset, 33px) + 6px) 34px;

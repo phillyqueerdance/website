@@ -281,7 +281,11 @@
     font-size: 17.1px;
   }
   .archive-menu > .archive-menu-discovery { grid-row: 4; }
-  .archive-menu > .archive-menu-past-events { grid-row: 5; }
+  .archive-menu > .archive-menu-past-events,
+  .archive-menu > .archive-menu-past-events[aria-current="page"] {
+    grid-row: 5;
+    margin-top: 4px;
+  }
   .archive-menu:not(.has-profile) > :is(.archive-menu-discovery, .archive-menu-past-events)[aria-current="page"] {
     width: calc(80% + 7.6px);
   }
