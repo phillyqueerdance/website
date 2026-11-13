@@ -1,7 +1,40 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import { connectionsFor, networkFor, visibleRelationships } from "../scene-map-graph.js";
 import { photoFrame } from "../scene-map-photo-crop.js";
+
+test("search results survive a blur before a tap, while focus and clicks outside dismiss them", () => {
+  const source = readFileSync(new URL("../scene-map.js", import.meta.url), "utf8");
+  const start = source.indexOf('  top.addEventListener("focusout"');
+  const end = source.indexOf('  filters.addEventListener("change"', start);
+  assert.ok(start >= 0 && end > start);
+  const result = {};
+  const outside = {};
+  const top = new EventTarget();
+  const root = new EventTarget();
+  top.contains = target => target === result;
+  const map = { searchOpen: true };
+  runInNewContext(source.slice(start, end), {
+    top, root, map, closeSearch: current => { current.searchOpen = false; }
+  });
+
+  for (const relatedTarget of [null, result]) {
+    top.dispatchEvent(Object.assign(new Event("focusout"), { relatedTarget }));
+    assert.equal(map.searchOpen, true);
+  }
+  top.dispatchEvent(Object.assign(new Event("focusout"), { relatedTarget: outside }));
+  assert.equal(map.searchOpen, false);
+
+  map.searchOpen = true;
+  for (const [target, open] of [[result, true], [outside, false]]) {
+    const event = new Event("pointerdown");
+    Object.defineProperty(event, "target", { value: target });
+    root.dispatchEvent(event);
+    assert.equal(map.searchOpen, open);
+  }
+});
 
 test("artist photo framing moves the circle to keep faces inside it", () => {
   const top = photoFrame(240, 320, [{ xMin: 90, xMax: 147, yMin: 38, yMax: 94 }]);

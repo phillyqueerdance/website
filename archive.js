@@ -934,7 +934,7 @@
           await expansion.finished.catch(() => {});
         }
         if (serial !== requestNumber) return;
-        const module = await import("./scene-map.js?v=20261112-label-centering-1");
+        const module = await import("./scene-map.js?v=20261113-map-search-1");
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack);
         if (serial !== requestNumber) return;

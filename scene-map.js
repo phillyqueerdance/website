@@ -1077,7 +1077,8 @@ export async function mountSceneMap(host) {
     }
   });
   top.addEventListener("focusout", event => {
-    if (!top.contains(event.relatedTarget)) closeSearch(map);
+    // Safari can blur the search field without focusing the tapped result.
+    if (event.relatedTarget && !top.contains(event.relatedTarget)) closeSearch(map);
   });
   root.addEventListener("pointerdown", event => {
     if (!top.contains(event.target)) closeSearch(map);

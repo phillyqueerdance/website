@@ -261,7 +261,10 @@
 }
 .scene-map-caption[data-outside="true"] {
   fill: var(--scene-ink);
-  text-shadow: 0 1px 2px #000, 0 0 4px #000;
+  stroke: #000;
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 .scene-map-caption-hit { fill: transparent; pointer-events: all; }
 .scene-map-node:is(.is-arriving, .is-retiring),
