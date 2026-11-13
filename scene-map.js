@@ -13,7 +13,9 @@ const OUTSIDE_LABEL_RADIUS = 26;
 const MIN_CAPTION_SIZE = 11;
 const CAPTION_LINE_HEIGHT = 1.07;
 const GRAPH_MOTION_MS = 260;
+const PHOTO_WIDTHS = [320, 640, 1280];
 let captionMeasure;
+let directoryLoad;
 const BUBBLE_ARTWORK = {
   "collective:QDP-001": { src: "/start-here-logo.png", scale: 1, replacesDisc: true },
   "party:MELT-001": { src: "/melt-logo.png", scale: .73, innerBorder: true }
@@ -43,7 +45,6 @@ async function resource(kind, id) {
 }
 
 async function loadDirectories() {
-  if (known.size) return;
   const results = await Promise.allSettled(KINDS.map(async kind => {
     const directory = DIRECTORY_FOR[kind];
     const data = await resource(directory);
@@ -57,6 +58,19 @@ async function loadDirectories() {
   if (results.some(result => result.status === "rejected")) {
     console.warn("A QDP directory was unavailable");
   }
+}
+
+export function prepareSceneMap(focusKey) {
+  const [kind, id, extra] = (focusKey || "").split(":");
+  if (KINDS.includes(kind) && window.QDPProfileMetadata.validId(id) && extra === undefined) {
+    // The public focus profile can load alongside the directories.
+    void profile({ kind, id, key: focusKey }).catch(() => {});
+  }
+  directoryLoad ??= loadDirectories().catch(error => {
+    directoryLoad = undefined;
+    throw error;
+  });
+  return directoryLoad;
 }
 
 function profile(item) {
@@ -313,7 +327,12 @@ function createBubble(map, item) {
   const title = svgNode("title");
   const circle = svgNode("circle", { class: "scene-map-node-disc" });
   const hit = svgNode("circle", { class: "scene-map-node-hit", "aria-hidden": "true" });
-  const photo = window.QDPProfileMetadata.discoveryImage(item.kind, item);
+  const meta = window.QDPProfileMetadata;
+  const frame = item.kind === "artist" ? meta.photoCropFrame(item.imageCrop) : null;
+  // Keep extra resolution for manual crops that magnify part of the photo.
+  const cropWidth = 256 * (frame?.width ?? 1);
+  const photoWidth = PHOTO_WIDTHS.find(width => width >= cropWidth) ?? PHOTO_WIDTHS.at(-1);
+  const photo = meta.profileThumbnail(item.kind, item, photoWidth);
   const bubble = {
     item, element, title, circle, hit,
     opacity: map.reduceMotion.matches ? 1 : 0, phase: map.phase++ * 1.7
@@ -323,21 +342,14 @@ function createBubble(map, item) {
   if (photo) {
     const id = `scene-map-${item.kind}-photo-${item.id}`;
     const pattern = svgNode("pattern", { id, width: 1, height: 1, patternContentUnits: "objectBoundingBox" });
-    // Only portrait images have excess height in the square crop.
-    const alignment = item.kind === "artist" ? "xMidYMin" : "xMidYMid";
-    const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: `${alignment} slice` });
+    const image = svgNode("image", { width: 1, height: 1, preserveAspectRatio: "xMidYMid slice" });
     image.addEventListener("error", () => image.remove(), { once: true });
-    image.setAttribute("href", photo.src);
-    const frame = item.kind === "artist" ? window.QDPProfileMetadata.photoCropFrame(item.imageCrop) : null;
+    image.setAttribute("href", photo);
     if (frame) {
       pattern.setAttribute("viewBox", `${frame.x} ${frame.y} 1 1`);
       image.setAttribute("width", frame.width);
       image.setAttribute("height", frame.height);
       image.setAttribute("preserveAspectRatio", "none");
-    } else if (item.kind === "artist") {
-      import("./scene-map-photo-crop.js?v=20261111-artist-map-photos-2")
-        .then(({ applyArtistPhotoCrop }) => applyArtistPhotoCrop(pattern, image, photo.src))
-        .catch(() => {});
     }
     pattern.append(image);
     const defs = svgNode("defs");
@@ -405,18 +417,18 @@ function resizeBubble(bubble, shortSide, maxDirect, maxIndirect, labelWidth) {
   const scale = indirect ? .82 / Math.sqrt(Math.max(maxDirect, maxIndirect)) : 1 / Math.sqrt(maxDirect);
   bubble.radius = bubble.link ? shortSide * .116 * Math.sqrt(Math.max(1, bubble.link.count)) * scale : shortSide * .148;
   if (bubble.caption) fitCaption(bubble, labelWidth);
-  if (bubble.drawRadius === undefined) paintRadius(bubble, bubble.radius * bubble.opacity);
-  else if (bubble.caption) paintCaption(bubble, bubble.drawRadius);
+  paintRadius(bubble, bubble.drawRadius ?? bubble.radius * bubble.opacity);
 }
 
 function paintRadius(bubble, radius) {
   bubble.drawRadius = radius;
   bubble.circle.setAttribute("r", radius);
   bubble.hit.setAttribute("r", Math.max(radius, MIN_BUBBLE_HIT_RADIUS));
-  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(8, radius * .23));
+  const borderScale = bubble.depth === 0 ? 1 : .82;
+  if (bubble.photo) bubble.photo.setAttribute("r", radius - Math.min(8, radius * .23) * borderScale);
   if (bubble.ring) {
     bubble.ring.setAttribute("r", radius * .9);
-    bubble.ring.setAttribute("stroke-width", Math.min(6, radius * .18));
+    bubble.ring.setAttribute("stroke-width", Math.min(6, radius * .18) * borderScale);
   }
   if (bubble.logo) {
     const halfSize = radius * bubble.logoScale;
@@ -430,28 +442,29 @@ function paintRadius(bubble, radius) {
 }
 
 function paintCaption(bubble, radius) {
-  const { caption, captionHit, captionLines: [first, second], labelOutside, labelFontSize, labelWidth } = bubble;
-  const size = labelOutside ? labelFontSize : labelFontSize * radius / bubble.radius;
+  const { caption, captionHit, captionLines: [first, second], labelOutside, labelFontSize,
+    labelWidth, labelAscent, labelDescent } = bubble;
+  const scale = labelOutside ? 1 : radius / bubble.radius;
+  const size = labelFontSize * scale;
   const lineHeight = size * CAPTION_LINE_HEIGHT;
-  const top = labelOutside ? radius + SMALL_BUBBLE_LABEL_GAP : -lineHeight * (second.textContent ? 1 : .5);
+  const height = (labelAscent + labelDescent) * scale;
+  const top = labelOutside ? radius + SMALL_BUBBLE_LABEL_GAP : -height / 2;
+  const baseline = top + labelAscent * scale;
   caption.style.fontSize = size + "px";
   caption.setAttribute("data-outside", labelOutside);
-  first.setAttribute("y", top + lineHeight / 2);
-  second.setAttribute("y", top + lineHeight * 1.5);
+  first.setAttribute("y", baseline);
+  second.setAttribute("y", baseline + lineHeight);
   captionHit.setAttribute("width", labelOutside ? labelWidth : 0);
   if (labelOutside) {
     captionHit.setAttribute("x", -labelWidth / 2);
     captionHit.setAttribute("y", top);
-    captionHit.setAttribute("height", lineHeight);
+    captionHit.setAttribute("height", Math.max(height, lineHeight));
   }
 }
 
-function splitCaption(name, font) {
+function splitCaption(name, measure) {
   const words = name.split(" ");
   if (words.length < 2) return null;
-  const measure = captionMeasure ||= document.createElement("canvas").getContext("2d");
-  if (!measure) return null;
-  measure.font = font;
   let best = null;
   for (let split = 1; split < words.length; split++) {
     const first = words.slice(0, split).join(" ");
@@ -471,11 +484,13 @@ function fitCaption(bubble, maxLabelWidth) {
   caption.style.fontSize = base + "px";
   const width = radius * 1.65;
   const fullWidth = first.getComputedTextLength();
+  const measure = captionMeasure ||= document.createElement("canvas").getContext("2d");
+  const { fontWeight, fontFamily } = getComputedStyle(caption);
   let insideSize = fullWidth > width ? base * width / fullWidth - .25 : base;
   let lines;
-  if (!bubble.photo && radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
-    const style = getComputedStyle(caption);
-    const split = splitCaption(name, `${style.fontWeight} ${base}px ${style.fontFamily}`);
+  if (measure && !bubble.photo && radius >= OUTSIDE_LABEL_RADIUS && insideSize < base) {
+    measure.font = `${fontWeight} ${base}px ${fontFamily}`;
+    const split = splitCaption(name, measure);
     if (split) {
       const heightLimit = (radius - 2) / (2 * CAPTION_LINE_HEIGHT);
       const twoLineSize = Math.min(base, base * (width - 2) / split.width, heightLimit);
@@ -501,6 +516,19 @@ function fitCaption(bubble, maxLabelWidth) {
   const availableWidth = bubble.labelOutside ? bubble.labelWidth : width;
   if (fittedWidth > availableWidth) {
     bubble.labelFontSize = Math.max(1, bubble.labelFontSize * availableWidth / fittedWidth - .25);
+  }
+
+  // Measure the ink above and below the alphabetic baseline once per layout.
+  const size = bubble.labelFontSize;
+  if (measure) measure.font = `${fontWeight} ${size}px ${fontFamily}`;
+  const firstBounds = measure?.measureText(first.textContent);
+  bubble.labelAscent = firstBounds?.actualBoundingBoxAscent ?? size * .75;
+  bubble.labelDescent = firstBounds?.actualBoundingBoxDescent ?? size * .25;
+  if (second.textContent) {
+    const secondBounds = measure?.measureText(second.textContent);
+    const offset = size * CAPTION_LINE_HEIGHT;
+    bubble.labelAscent = Math.max(bubble.labelAscent, (secondBounds?.actualBoundingBoxAscent ?? size * .75) - offset);
+    bubble.labelDescent = Math.max(bubble.labelDescent, offset + (secondBounds?.actualBoundingBoxDescent ?? size * .25));
   }
 }
 
@@ -538,10 +566,20 @@ function positionNewBubbles(map) {
   }
 }
 
+function paintOpacity(view, element, opacity) {
+  if (view.paintedOpacity === opacity) return;
+  element.style.opacity = opacity;
+  element.classList.toggle("is-arriving", opacity < .35);
+  view.paintedOpacity = opacity;
+}
+
 function paintBubble(bubble) {
-  bubble.element.setAttribute("transform", "translate(" + bubble.x.toFixed(2) + " " + bubble.y.toFixed(2) + ")");
-  bubble.element.style.opacity = bubble.opacity;
-  bubble.element.classList.toggle("is-arriving", bubble.opacity < .35);
+  const transform = `translate(${bubble.x.toFixed(1)} ${bubble.y.toFixed(1)})`;
+  if (bubble.paintedTransform !== transform) {
+    bubble.element.setAttribute("transform", transform);
+    bubble.paintedTransform = transform;
+  }
+  paintOpacity(bubble, bubble.element, bubble.opacity);
 }
 
 function paintGraph(map, time) {
@@ -603,13 +641,16 @@ function paintGraph(map, time) {
     const dx = target.x - source.x, dy = target.y - source.y;
     const distance = Math.hypot(dx, dy) || 1;
     const gap = distance - source.drawRadius - target.drawRadius;
-    const opacity = gap > 0 ? Math.min(source.opacity, target.opacity) : 0;
-    control.style.opacity = opacity;
-    control.classList.toggle("is-arriving", opacity < .35);
+    paintOpacity(line, control, gap > 0 ? Math.min(source.opacity, target.opacity) : 0);
     const trim = Math.max(0, Math.min(3, gap / 2));
     const start = (source.drawRadius + trim) / distance, end = (target.drawRadius + trim) / distance;
-    const x1 = source.x + dx * start, y1 = source.y + dy * start;
-    const x2 = target.x - dx * end, y2 = target.y - dy * end;
+    // Skip SVG writes for motion smaller than a tenth of a pixel.
+    const x1 = Math.round((source.x + dx * start) * 10) / 10;
+    const y1 = Math.round((source.y + dy * start) * 10) / 10;
+    const x2 = Math.round((target.x - dx * end) * 10) / 10;
+    const y2 = Math.round((target.y - dy * end) * 10) / 10;
+    if (line.x1 === x1 && line.y1 === y1 && line.x2 === x2 && line.y2 === y2) continue;
+    Object.assign(line, { x1, y1, x2, y2 });
     line.midX = (x1 + x2) / 2;
     line.midY = (y1 + y2) / 2;
     for (const stroke of [element, hit]) {
@@ -906,9 +947,11 @@ function search(map) {
     button.type = "button";
     button.append(node("span", "scene-map-result-name", item.name), typePill(item.kind));
     button.onclick = () => {
+      if (!map.searchOpen || !map.results.contains(button)) return;
       map.search.value = "";
       closeSearch(map);
-      startScene(map, item);
+      map.search.blur();
+      void startScene(map, item);
     };
     map.results.append(button);
   }
@@ -917,6 +960,68 @@ function search(map) {
 function closeSearch(map) {
   map.searchOpen = false;
   map.results.replaceChildren();
+}
+
+function bindSearch(map, top) {
+  const { search: input, results, root } = map;
+  const openSearch = () => {
+    if (map.searchOpen) return;
+    map.searchOpen = true;
+    search(map);
+  };
+  input.addEventListener("focus", openSearch);
+  input.addEventListener("click", openSearch);
+  input.addEventListener("input", () => {
+    map.searchOpen = true;
+    search(map);
+  });
+  input.addEventListener("keydown", event => {
+    if (event.key === "Escape" && map.searchOpen) {
+      closeSearch(map);
+      event.stopPropagation();
+    }
+    if (event.key === "ArrowDown") {
+      openSearch();
+      results.querySelector("button")?.focus();
+      event.preventDefault();
+    }
+  });
+
+  // Activate a completed tap before the browser's synthesized click.
+  // Leave scrolling and canceled gestures to the browser.
+  let tap = null;
+  const changedTouch = event => Array.from(event.changedTouches).find(touch => touch.identifier === tap.touch.identifier);
+  const moved = touch => Math.hypot(touch.clientX - tap.touch.clientX, touch.clientY - tap.touch.clientY) > 10;
+  results.addEventListener("touchstart", event => {
+    const button = event.target.closest?.(".scene-map-result");
+    tap = button && event.touches.length === 1
+      ? { button, touch: event.changedTouches[0], scrollTop: results.scrollTop } : null;
+  }, { passive: true });
+  results.addEventListener("touchmove", event => {
+    const touch = tap && changedTouch(event);
+    if (touch && moved(touch)) tap = null;
+  }, { passive: true });
+  results.addEventListener("touchcancel", () => { tap = null; }, { passive: true });
+  results.addEventListener("touchend", event => {
+    const touch = tap && changedTouch(event);
+    if (!touch) return;
+    const { button, scrollTop } = tap;
+    const select = !event.touches.length && !moved(touch) && results.scrollTop === scrollTop && results.contains(button);
+    tap = null;
+    if (select) {
+      if (event.cancelable) event.preventDefault();
+      button.click();
+    }
+  }, { passive: false });
+
+  top.addEventListener("focusout", event => {
+    if (!tap && event.relatedTarget && !top.contains(event.relatedTarget)) closeSearch(map);
+  });
+  root.addEventListener("pointerdown", event => {
+    if (top.contains(event.target)) return;
+    tap = null;
+    closeSearch(map);
+  });
 }
 
 function checkbox(text, value, checked) {
@@ -987,7 +1092,7 @@ function bindDrag(map) {
   });
 }
 
-export async function mountSceneMap(host) {
+export async function mountSceneMap(host, focusKey, directories) {
   const root = node("section", "scene-map-view");
   const top = node("div", "scene-map-top archive-search-bar");
   const input = node("input", "archive-search");
@@ -1038,34 +1143,7 @@ export async function mountSceneMap(host) {
     activeLine: null, searchOpen: false,
     limits: mobile.matches ? MOBILE_LIMITS : DESKTOP_LIMITS,
     reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)") };
-  const openSearch = () => {
-    if (map.searchOpen) return;
-    map.searchOpen = true;
-    search(map);
-  };
-  input.addEventListener("focus", openSearch);
-  input.addEventListener("click", openSearch);
-  input.addEventListener("input", () => {
-    map.searchOpen = true;
-    search(map);
-  });
-  input.addEventListener("keydown", event => {
-    if (event.key === "Escape" && map.searchOpen) {
-      closeSearch(map);
-      event.stopPropagation();
-    }
-    if (event.key === "ArrowDown") {
-      openSearch();
-      map.results.querySelector("button")?.focus();
-      event.preventDefault();
-    }
-  });
-  top.addEventListener("focusout", event => {
-    if (!top.contains(event.relatedTarget)) closeSearch(map);
-  });
-  root.addEventListener("pointerdown", event => {
-    if (!top.contains(event.target)) closeSearch(map);
-  });
+  bindSearch(map, top);
   filters.addEventListener("change", () => {
     map.allowed = new Set([...filters.querySelectorAll("label[data-kind] input:checked")].map(box => box.value));
     map.queerOnly = queerToggle.checked;
@@ -1084,11 +1162,10 @@ export async function mountSceneMap(host) {
   };
   mobile.addEventListener("change", changeDensity);
   const resize = new ResizeObserver(() => {
-    if (root.isConnected) layoutGraph(map);
-    else {
+    if (!root.isConnected) {
       mobile.removeEventListener("change", changeDensity);
       resize.disconnect();
-    }
+    } else if (wrap.clientWidth !== map.width || wrap.clientHeight !== map.height) layoutGraph(map);
   });
   resize.observe(wrap);
   document.fonts?.ready.then(() => {
@@ -1096,10 +1173,10 @@ export async function mountSceneMap(host) {
   });
 
   try {
-    await loadDirectories();
+    await directories;
     if (!root.isConnected) return;
     input.disabled = false;
-    const focus = known.get(new URL(location.href).searchParams.get("focus"));
+    const focus = known.get(focusKey);
     if (focus && matchesQueerFilter(map, focus)) await startScene(map, focus);
     else renderMap(map);
   } catch (error) {

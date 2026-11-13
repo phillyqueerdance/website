@@ -24,7 +24,7 @@ export function renderProfileInfo(kind, profile, base) {
   const related = (profile.related || []).filter(item => colors[item.kind] && meta.validId(item.id) && item.name)
     .map(item => `<a class="event-detail-related-bubble event-detail-related-bubble--${colors[item.kind]}" href="${escape(meta.url(item.kind, item.id, base))}" data-archive-link>${escape(item.name)}</a>`).join("");
   const links = meta.profileLinks(kind, profile, base).map(({ href, label, external }, index) => {
-    const separator = index ? '<span class="archive-profile-link-separator" aria-hidden="true">✦</span>' : "";
+    const separator = external && index ? '<span class="archive-profile-link-separator" aria-hidden="true">✦</span>' : "";
     const attributes = external ? 'target="_blank" rel="noopener noreferrer"' : "data-archive-link";
     return `<span class="archive-profile-link">${separator}<a href="${escape(href)}" ${attributes}>${escape(label)}</a></span>`;
   }).join("");

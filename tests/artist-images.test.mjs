@@ -66,7 +66,7 @@ test('archive API retains safe image URLs and omits the raw columns', async t =>
   }
 });
 
-test('artist and party pages use the same drawer for published images', () => {
+test('artist, party, and venue pages use the same drawer for published images', () => {
   for (const id of ['A', 'CALLAIA-001']) {
     const profile = { id, name: 'Artist & Name', imageUrl: 'https://drive.google.com/uc?export=view&id=FINAL' };
     assert.equal(meta.profileImage('artist', profile).src, 'https://lh3.googleusercontent.com/d/FINAL=w1600');
@@ -74,7 +74,8 @@ test('artist and party pages use the same drawer for published images', () => {
     assert.match(html, /src="https:\/\/lh3\.googleusercontent\.com\/d\/FINAL=w1600" alt="Artist &amp; Name"/);
     assert.match(html, /^<div class="archive-profile-drawer"><img/);
     assert.equal(renderProfileDrawer('party', profile), html);
-    assert.equal(renderProfileDrawer('venue', profile), '');
+    assert.equal(renderProfileDrawer('venue', profile), html);
+    assert.equal(renderProfileDrawer('collective', profile), '');
     assert.doesNotMatch(renderProfileInfo('artist', profile, 'https://images.example'), /<img|archive-profile-heading/);
     assert.doesNotMatch(html, /callaia\.jpg|width="undefined"|height="undefined"/);
     assert.doesNotMatch(renderProfileInfo('venue', profile, 'https://images.example'), /<img/);
@@ -86,17 +87,18 @@ test('an explicitly blank or unsafe image URL hides the photo, even for Callaia'
   for (const imageUrl of ['', 'javascript:alert(1)', 'data:image/png;base64,abc']) {
     const profile = { id: 'CALLAIA-001', name: 'Callaia', imageUrl };
     for (const { kind } of imageKinds) {
-      assert.equal(meta.discoveryImage(kind, profile), null);
+      assert.equal(meta.profileImage(kind, profile), null);
       assert.equal(renderProfileDrawer(kind, profile), '');
     }
   }
 });
 
-test('Discovery uses the published venue image in a bubble and a small rendition in the Venue strip', () => {
+test('venue profiles and bubbles use the published image and Venue strips use a small rendition', () => {
   const venue = { id: 'A', imageUrl: 'https://drive.google.com/file/d/VENUE_PHOTO/view' };
-  assert.equal(meta.discoveryImage('venue', venue).src, 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w1600');
+  assert.equal(meta.profileImage('venue', venue).src, 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w1600');
   assert.equal(meta.profileThumbnail('venue', venue), 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w320');
-  assert.equal(meta.discoveryImage('venue', { id: 'A' }), null);
+  assert.equal(meta.profileThumbnail('artist', venue, 640), 'https://lh3.googleusercontent.com/d/VENUE_PHOTO=w640');
+  assert.equal(meta.profileImage('venue', { id: 'A' }), null);
 });
 
 const corePath = process.env.QDP_CORE_FILE;

@@ -243,25 +243,28 @@
   .scene-map-node > :is(.scene-map-node-disc, .scene-map-caption, .scene-map-node-logo, .scene-map-node-ring, .scene-map-node-photo) { transition: opacity 640ms ease; }
 }
 .scene-map-view .scene-map-canvas.is-dragging, .scene-map-view .is-dragging .scene-map-node { cursor: grabbing; }
-.scene-map-node-disc { fill: var(--scene-kind-color); stroke-width: 2; }
+.scene-map-node-disc { fill: var(--scene-kind-color); stroke-width: 1.65; }
 .scene-map-node-hit { fill: transparent; pointer-events: all; }
 .scene-map-node[data-kind="collective"] .scene-map-node-disc { stroke: var(--scene-ink); }
 .scene-map-node.scene-map-node-globe .scene-map-node-disc { fill: none; stroke: none; }
 .scene-map-node[data-key="party:MELT-001"] > .scene-map-node-disc { fill: #000; }
 .scene-map-node-ring { fill: none; stroke: var(--scene-kind-color); pointer-events: none; }
 .scene-map-node-logo, .scene-map-node-photo { pointer-events: none; }
-.scene-map-node:hover .scene-map-node-disc, .scene-map-node:focus-visible .scene-map-node-disc { stroke: var(--scene-accent); stroke-width: 3; }
+.scene-map-node:hover .scene-map-node-disc, .scene-map-node:focus-visible .scene-map-node-disc { stroke: var(--scene-accent); stroke-width: 2.5; }
 .scene-map-node.focus .scene-map-node-disc { stroke: var(--scene-accent); stroke-width: 2; }
 .scene-map-caption {
   fill: var(--scene-kind-ink, var(--scene-ink));
   font-weight: 700;
   text-anchor: middle;
-  dominant-baseline: central;
+  dominant-baseline: alphabetic;
   pointer-events: none;
 }
 .scene-map-caption[data-outside="true"] {
   fill: var(--scene-ink);
-  text-shadow: 0 1px 2px #000, 0 0 4px #000;
+  stroke: #000;
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 .scene-map-caption-hit { fill: transparent; pointer-events: all; }
 .scene-map-node:is(.is-arriving, .is-retiring),

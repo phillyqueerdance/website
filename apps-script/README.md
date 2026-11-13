@@ -62,8 +62,8 @@ Drive share links. Core.gs v7.4.9 adds **QDP > Update Venue Image URLs (from
 Raw_VenueImage_URL)** and uses the renamed column for the existing Places tools.
 PublicData.gs v7.4.5 publishes the image URLs of approved venues. After saving
 both files, reload the Index, convert any raw links, and choose
-**QDP > Public data / Website > Publish archive changes**. The Discovery Map
-and Venues directory on the preview read the resulting image URLs.
+**QDP > Public data / Website > Publish archive changes**. Venue profiles,
+Venue strips, and the Discovery Map use the published image URLs.
 
 ## Current production update: v7.2
 

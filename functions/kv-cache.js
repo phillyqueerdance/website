@@ -109,7 +109,7 @@ export function archiveCacheKey(requestUrl, resource, id = "") {
 }
 
 export function directoryCacheKey(requestUrl, directory) {
-  const url = new URL("/_qdp/directory-v2", requestUrl);
+  const url = new URL("/_qdp/directory-v3", requestUrl);
   url.searchParams.set("kind", directory);
   return new Request(url.href);
 }

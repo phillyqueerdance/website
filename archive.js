@@ -11,7 +11,8 @@
   const archiveStack = document.getElementById("archiveStack");
   const archiveHeader = document.getElementById("archiveHeader");
   const archiveBack = document.getElementById("archiveBack");
-  const frameImage = document.querySelector(".poster > .frame");
+  const frame = document.getElementById("poster");
+  const frameImage = frame.querySelector(".frame");
   const frameAlt = frameImage.alt;
   const headerLabel = node("span", "archive-header-label");
   const incomingYear = node("span", "archive-header-incoming");
@@ -28,6 +29,7 @@
   const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
   const profileViews = { artist: "artists", venue: "venues", party: "parties",
     collective: "collectives" };
+  let preparedDirectory = "";
   try {
     const text = document.getElementById("qdpInitialArchive")?.content.textContent.trim();
     const initial = text ? JSON.parse(text) : null;
@@ -40,6 +42,7 @@
       cache.set(endpoint(initial.kind, initial.id || ""), {
         at: Date.now(), pending: false, promise: Promise.resolve(initial.payload)
       });
+      if (directory) preparedDirectory = initial.kind;
     }
   } catch (error) { console.warn("Initial profile unavailable:", error); }
   const directoryViews = new Set(["artists", "venues", "parties", "collectives"]);
@@ -61,7 +64,7 @@
     const id = params.get("id") || "";
     const month = params.get("month") || "";
     const focus = view === "scene-map" ? params.get("focus") || "" : "";
-    return { view, id, month, key: [view, id, month, focus].join("|") };
+    return { view, id, month, focus, key: [view, id, month, focus].join("|") };
   }
 
   function archiveUrl(view, value = "") {
@@ -465,7 +468,7 @@
     if (grouping?.count > 1) corners.push({ time: grouping.badge, card: grouping.last });
   }
 
-  function stripCard(title, subtitle, href, photoSrc = "", cropStyle = "") {
+  function stripCard(title, subtitle, href, photoSrc = "", cropStyle = "", loading = "lazy") {
     const card = node("a", "event-card default archive-card");
     card.href = href;
     card.setAttribute("data-archive-link", "");
@@ -475,12 +478,8 @@
       if (cropStyle) photoFrame.setAttribute("style", cropStyle);
       const photo = node("img");
       photo.alt = "";
-      photo.loading = "lazy";
+      photo.loading = loading;
       photo.decoding = "async";
-      photo.addEventListener("error", () => {
-        photoFrame.remove();
-        fitPosterTitles(card);
-      }, { once: true });
       photo.src = photoSrc;
       photoFrame.append(photo);
       card.appendChild(photoFrame);
@@ -501,7 +500,7 @@
     const meta = window.QDPProfileMetadata;
     let lastLetter = "";
     let current = null;
-    for (const item of profiles) {
+    for (const [index, item] of profiles.entries()) {
       const letter = initial(directorySortName(item.name, kind));
       if (letter !== lastLetter) {
         finishGroup(current);
@@ -512,7 +511,7 @@
       const subtitle = kind === "venues" ? item.address || "" : "";
       const card = stripCard(item.name, subtitle,
         archiveUrl(singular, item.id).href, meta.profileThumbnail(singular, item),
-        kind === "artists" ? meta.photoCropStyle(item.imageCrop) : "");
+        kind === "artists" ? meta.photoCropStyle(item.imageCrop) : "", meta.directoryPhotoLoading(index));
       if (kind === "parties" && String(item.id).trim().toUpperCase() === "MELT-001") {
         card.classList.add("melt");
       }
@@ -527,13 +526,17 @@
       addCard(current, card);
     }
     finishGroup(current);
+    if (!profiles.length) results.append(node("p", "event-feed-message", emptyMessage));
+    updateDirectoryControls(kind, results);
+  }
+
+  function updateDirectoryControls(kind, results) {
     const available = new Set([...results.querySelectorAll(".archive-section[data-letter]")]
       .map(section => section.dataset.letter));
     alphabet.querySelectorAll("button").forEach(button => {
       button.disabled = !available.has(button.dataset.letter);
       button.setAttribute("aria-label", `Jump to ${button.dataset.letter} in ${kind}`);
     });
-    if (!profiles.length) results.append(node("p", "event-feed-message", emptyMessage));
     archive.updateLayout();
     window.QDPMobile?.updateAlphabet?.();
   }
@@ -542,7 +545,7 @@
     return text.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase().trim();
   }
 
-  function renderDirectory(kind, items) {
+  function renderDirectory(kind, items, hydrate = false) {
     if (!Array.isArray(items)) throw new Error("Invalid directory feed");
     archive.events = [];
     let input = archiveStack.querySelector(".archive-directory-search input");
@@ -571,7 +574,18 @@
       archiveStack.scrollTop = 0;
       renderMatches();
     };
-    renderMatches();
+    if (hydrate && !input.value) {
+      // Keep the server-rendered cards so their photos can finish loading in place.
+      cards = [...results.querySelectorAll(".archive-card")];
+      corners = [...results.querySelectorAll(".archive-directory")].flatMap(group => {
+        const [time, list] = group.children;
+        return list.children.length > 1 ? [{ time, card: list.lastElementChild.firstElementChild }] : [];
+      });
+      for (const photo of results.querySelectorAll(".archive-directory-photo > img")) {
+        if (photo.complete && !photo.naturalWidth) photo.parentElement.remove();
+      }
+      updateDirectoryControls(kind, results);
+    } else renderMatches();
   }
 
   function monthName(month) {
@@ -672,7 +686,7 @@
     const links = node("div", "archive-profile-links");
     for (const { href, label, external } of window.QDPProfileMetadata.profileLinks(kind, person, location.origin)) {
       const item = node("span", "archive-profile-link");
-      if (links.childElementCount) {
+      if (external && links.childElementCount) {
         const separator = node("span", "archive-profile-link-separator", "✦");
         separator.setAttribute("aria-hidden", "true");
         item.append(separator);
@@ -798,10 +812,10 @@
     archive.updateLayout();
   }
 
-  function displayRouteData(params, resource, data) {
+  function displayRouteData(params, resource, data, hydrateDirectory = false) {
     if (directoryViews.has(resource)) {
       if (!Array.isArray(data[resource])) throw Object.assign(new Error("Invalid directory"), { invalid: true });
-      renderDirectory(resource, data[resource]);
+      renderDirectory(resource, data[resource], hydrateDirectory);
       if (!requestedEventId()) archive.restoreMetadata();
     } else if (resource === "months") renderMonths(data.months);
     else if (resource === "month") renderEvents(data.events);
@@ -876,6 +890,9 @@
       return;
     }
     const serial = ++requestNumber;
+    const hydrateDirectory = params.view === preparedDirectory &&
+      Boolean(archiveStack.querySelector(".archive-directory-results"));
+    preparedDirectory = "";
     profileNavigation = null;
     menuReset = false;
     const directory = profileViews[params.view];
@@ -906,15 +923,19 @@
     window.QDPEventLinks?.clear();
     archiveViewport.hidden = false;
     clearTimeout(pageExitTimer);
-    archivePage.style.transition = "none";
-    archivePage.classList.remove("is-open");
+    if (!hydrateDirectory) {
+      archivePage.style.transition = "none";
+      archivePage.classList.remove("is-open");
+    }
     showMenu(params.view, menuTrack.hidden || !menuTrack.classList.contains("is-open"));
     if (window.QDPInfoView?.active) hideMenu();
-    void archivePage.offsetHeight;
-    archivePage.style.transition = "";
-    requestAnimationFrame(() => {
-      if (serial === requestNumber) archivePage.classList.add("is-open");
-    });
+    if (!hydrateDirectory) {
+      void archivePage.offsetHeight;
+      archivePage.style.transition = "";
+      requestAnimationFrame(() => {
+        if (serial === requestNumber) archivePage.classList.add("is-open");
+      });
+    }
     closeDatePopover();
     archiveStack.hidden = false;
     header(params.view === "scene-map" ? "Discovery Map" : params.view === "events" ?
@@ -922,12 +943,22 @@
       params.view[0].toUpperCase() + params.view.slice(1));
     if (!window.QDPInfoView?.active) document.title = window.QDPProfileMetadata?.directories?.[params.view]?.title ||
       `${archiveHeader.textContent} | Queer Dance Philly`;
-    message(sceneMap ? "" : "Loading archive…");
+    if (!hydrateDirectory) message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261112-venue-photos-1");
+        const module = await import("./scene-map.js?v=20261113-discover-perf-1");
         if (serial !== requestNumber) return;
-        await module.mountSceneMap(archiveStack);
+        const directories = module.prepareSceneMap(params.focus);
+        void directories.catch(() => {});
+        // Let the poster reach its final width before laying out the graph.
+        while (serial === requestNumber) {
+          const expansion = frame.getAnimations().find(animation =>
+            animation.transitionProperty === "width" && animation.playState !== "finished");
+          if (!expansion) break;
+          await expansion.finished.catch(() => {});
+        }
+        if (serial !== requestNumber) return;
+        await module.mountSceneMap(archiveStack, params.focus, directories);
         if (serial !== requestNumber) return;
         renderedAt = Date.now();
         loadingKey = "";
@@ -948,7 +979,7 @@
     try {
       const data = await load(resource, value);
       if (serial !== requestNumber) return;
-      displayRouteData(params, resource, data);
+      displayRouteData(params, resource, data, hydrateDirectory);
       archiveStack.scrollTop = 0;
       loadingKey = "";
       syncPopup();
@@ -1097,6 +1128,9 @@
     },
     updateLayout() {
       if (!archiveBack.hidden && archiveStack.lastElementChild !== archiveBack) archiveStack.appendChild(archiveBack);
+      const directorySearch = archiveStack.querySelector(".archive-directory-search");
+      if (directorySearch) archiveStack.style.setProperty("--archive-directory-search-height",
+        `${directorySearch.getBoundingClientRect().height}px`);
       fitPosterTitles(archiveStack);
       fitProfileHeaders();
       measureProfileDrawer();
@@ -1129,6 +1163,12 @@
     syncYearHeadings();
     archive.updateControls();
   }, { passive: true });
+  archiveStack.addEventListener("error", ({ target: photo }) => {
+    if (!photo.matches?.(".archive-directory-photo > img")) return;
+    const card = photo.closest(".archive-card");
+    photo.parentElement.remove();
+    fitPosterTitles(card);
+  }, true);
 
   alphabet.addEventListener("click", event => {
     const button = event.target.closest("button[data-letter]");
@@ -1159,7 +1199,6 @@
   window.addEventListener("pageshow", event => {
     if (event.persisted && archive.active) route();
   });
-  const frame = document.getElementById("poster");
   frame.addEventListener("transitionend", event => {
     if (event.target === frame && event.propertyName === "width" && !menuTrack.hidden) positionMenu();
   });

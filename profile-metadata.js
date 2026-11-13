@@ -35,22 +35,21 @@
     return links;
   };
   const title = profile => `${profile.name} | Queer Dance Philly`;
-  const publishedImage = profile => {
-    const src = globalThis.QDPEventMetadata.image({ flyerUrl: profile.imageUrl });
-    return src ? { src } : null;
-  };
   const profileImage = (kind, profile) => {
-    if (kind !== "artist" && kind !== "party") return null;
-    if (Object.hasOwn(profile, "imageUrl")) return publishedImage(profile);
+    if (kind !== "artist" && kind !== "party" && kind !== "venue") return null;
+    if (Object.hasOwn(profile, "imageUrl")) {
+      const src = globalThis.QDPEventMetadata.image({ flyerUrl: profile.imageUrl });
+      return src ? { src } : null;
+    }
     // Keep the preview portrait only until the publisher supplies the new field.
     return kind === "artist" && profile.id === "CALLAIA-001"
       ? { src: "/artist-images/callaia.jpg", width: 2048, height: 2016 } : null;
   };
-  const discoveryImage = (kind, profile) => kind === "venue" ? publishedImage(profile) : profileImage(kind, profile);
-  const profileThumbnail = (kind, profile) => {
-    const image = discoveryImage(kind, profile);
-    return image ? image.src.replace(/^(https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+)=w\d+$/, "$1=w320") : "";
+  const profileThumbnail = (kind, profile, width = 320) => {
+    const image = profileImage(kind, profile);
+    return image ? image.src.replace(/^(https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+)=w\d+$/, `$1=w${width}`) : "";
   };
+  const directoryPhotoLoading = index => index < 6 ? "eager" : "lazy";
   const maxPhotoZoom = 4;
   const photoCrop = value => {
     const { x, y, zoom, aspect } = value || {};
@@ -105,6 +104,7 @@
     ['meta[name="twitter:image"]', new URL("/qdp-share-card.jpg", base).href],
     ['meta[property="og:image:alt"]', "Queer Dance Philly — find the next move"]
   ];
-  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, profileImage, discoveryImage, profileThumbnail, description, isQueer, classification, tags,
-    homeDescription, directories, directoryUrl, directoryTags, maxPhotoZoom, photoCrop, photoCropFrame, photoCropStyle });
+  globalThis.QDPProfileMetadata = Object.freeze({ origin, kinds, validId, url, profileLinks, title, profileImage, profileThumbnail, description, isQueer, classification, tags,
+    homeDescription, directories, directoryUrl, directoryTags, directoryPhotoLoading,
+    maxPhotoZoom, photoCrop, photoCropFrame, photoCropStyle });
 })();

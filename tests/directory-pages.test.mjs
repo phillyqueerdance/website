@@ -87,9 +87,11 @@ for (const directory of Object.keys(titles)) {
       assert.match(body, new RegExp(`href="https://preview.example/\\?archive=${meta.directories[directory].kind}&amp;id=ALPHA-1"`));
       assert.doesNotMatch(body, /Private entry|Invalid entry|Discover queer|<h1|<script/);
       assert.equal(body.includes('123 Public St'), directory === 'venues');
+      assert.match(body, /placeholder="What will you find\?"/);
+      assert.match(body, /class="archive-directory-results"/);
       const photos = body.match(/<span class="archive-directory-photo"><img [^>]*><\/span>/g) || [];
       assert.deepEqual(photos, directory !== 'collectives'
-        ? ['<span class="archive-directory-photo"><img src="https://lh3.googleusercontent.com/d/PORTRAIT=w320" alt="" loading="lazy" decoding="async"></span>'] : []);
+        ? ['<span class="archive-directory-photo"><img src="https://lh3.googleusercontent.com/d/PORTRAIT=w320" alt="" loading="eager" decoding="async"></span>'] : []);
       assert.equal(recorded.get('#archiveStack:options').html, true);
       assert.equal(recorded.get('#archiveViewport:remove:hidden'), true);
       assert.match(recorded.get('html:class'), /archive-open discover-open/);
@@ -124,7 +126,7 @@ test('directory cache normalizes query noise and retains preview noindex and a c
     const second = await page(context);
     assert.equal(second.headers.get('X-QDP-Directory'), 'PREPARED');
     assert.equal(reads.length, 2);
-    assert.ok([...entries.keys()].some(key => key.includes('/_qdp/directory-v2?kind=venues')));
+    assert.ok([...entries.keys()].some(key => key.includes('/_qdp/directory-v3?kind=venues')));
     assert.ok(Number(second.headers.get('X-QDP-Cache-Until')) <= Number(first.headers.get('X-QDP-Cache-Until')));
   } finally { globalThis.HTMLRewriter = old.rewriter; globalThis.caches = old.caches; }
 });
@@ -186,12 +188,23 @@ test('embedded directory data hydrates without a second request; malformed data 
       fetch: async url => { requests.push(url); return Response.json({ [directory]: items }); }
     });
     vm.runInContext(`const cache = new Map(); const CLIENT_CACHE_MS = 60000;
+      let preparedDirectory = "";
       const profileViews = { artist: 'artists', venue: 'venues', party: 'parties', collective: 'collectives' };
       ${seed}\n${loader}`, context);
     await context.load(directory, '');
     await context.load(directory, '');
     assert.equal(requests.length, valid ? 0 : 1);
   }
+});
+
+test('directory strip photos only load eagerly near the top', () => {
+  const photos = Array.from({ length: 8 }, (_, index) => ({
+    id: `VENUE-${index}`, name: `Venue ${index}`,
+    imageUrl: `https://drive.google.com/uc?export=view&id=PHOTO-${index}`
+  }));
+  const body = renderDirectory('venues', photos, 'https://preview.example');
+  const loading = [...body.matchAll(/<img [^>]* loading="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(loading, [...Array(6).fill('eager'), 'lazy', 'lazy']);
 });
 
 test('directory metadata survives event open/close and changes correctly when navigating between directories and home', () => {

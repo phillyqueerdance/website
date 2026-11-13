@@ -1,26 +1,99 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import { connectionsFor, networkFor, visibleRelationships } from "../scene-map-graph.js";
-import { photoFrame } from "../scene-map-photo-crop.js";
 
-test("artist photo framing moves the circle to keep faces inside it", () => {
-  const top = photoFrame(240, 320, [{ xMin: 90, xMax: 147, yMin: 38, yMax: 94 }]);
-  assert.deepEqual(top, { x: 0, y: 0, size: 240, width: 240, height: 320 });
+function searchFixture() {
+  const source = readFileSync(new URL("../scene-map.js", import.meta.url), "utf8");
+  const start = source.indexOf("function search(map)");
+  const end = source.indexOf("function checkbox(", start);
+  assert.ok(start >= 0 && end > start);
+  const artist = { key: "artist:focus", kind: "artist", name: "Focus" };
+  const selections = [];
+  const outside = {};
+  const top = new EventTarget(), root = new EventTarget();
+  const input = Object.assign(new EventTarget(), {
+    value: "focus", blur() { this.blurred = true; }
+  });
+  const results = Object.assign(new EventTarget(), {
+    children: [], scrollTop: 0,
+    replaceChildren() { this.children = []; },
+    append(button) { this.children.push(button); },
+    contains(button) { return this.children.includes(button); }
+  });
+  top.contains = target => target === input || results.contains(target);
+  const map = { search: input, results, root, searchOpen: false };
+  runInNewContext(source.slice(start, end) + "\nbindSearch(map, top);", {
+    top, map, known: new Map([[artist.key, artist]]), matchesQueerFilter: () => true,
+    node: () => ({ append() {}, click() { this.onclick(); } }),
+    typePill: () => ({}), startScene: (current, item) => selections.push(item.key)
+  });
+  input.dispatchEvent(new Event("focus"));
+  const [result] = results.children;
+  assert.ok(result);
+  function emit(element, type, attributes) {
+    const event = new Event(type, { cancelable: true });
+    for (const [key, value] of Object.entries(attributes)) Object.defineProperty(event, key, { value });
+    element.dispatchEvent(event);
+    return event;
+  }
+  const touch = (type, { x = 0, y = 0, remaining = Number(type !== "touchend") } = {}) => {
+    const contact = { identifier: 1, clientX: x, clientY: y };
+    return emit(results, type, {
+      target: { closest: () => result }, changedTouches: [contact], touches: Array(remaining).fill(contact)
+    });
+  };
+  return { map, input, results, result, outside, top, root, selections, emit, touch };
+}
 
-  const lower = photoFrame(240, 320, [{ xMin: 65, xMax: 114, yMin: 137, yMax: 192 }]);
-  assert.equal(lower.size, 240);
-  assert.ok(lower.y > 40);
+test("a tap selects a search result even if the field blurs and the browser skips click", () => {
+  const f = searchFixture();
+  f.touch("touchstart");
+  for (const relatedTarget of [null, f.outside]) f.emit(f.top, "focusout", { relatedTarget });
+  assert.equal(f.map.searchOpen, true);
+  assert.equal(f.touch("touchend", { x: 2, y: 3 }).defaultPrevented, true);
+  assert.deepEqual(f.selections, ["artist:focus"]);
+  assert.equal(f.input.value, "");
+  assert.equal(f.input.blurred, true);
+  assert.equal(f.map.searchOpen, false);
+  assert.equal(f.results.children.length, 0);
+  f.result.click();
+  assert.deepEqual(f.selections, ["artist:focus"]);
+});
 
-  const edge = photoFrame(240, 240, [{ xMin: 32, xMax: 87, yMin: 34, yMax: 92 }]);
-  assert.ok(edge.size < 240);
-  assert.equal(edge.x, 0);
+test("scrolling and canceling a touch leave the search results open", () => {
+  for (const finishGesture of [
+    f => f.touch("touchmove", { y: 30 }),
+    f => { f.results.scrollTop += 25; },
+    f => f.touch("touchcancel"),
+    f => f.touch("touchstart", { remaining: 2 })
+  ]) {
+    const f = searchFixture();
+    f.touch("touchstart");
+    finishGesture(f);
+    assert.equal(f.touch("touchend").defaultPrevented, false);
+    assert.deepEqual(f.selections, []);
+    assert.equal(f.map.searchOpen, true);
+    f.result.click();
+    assert.deepEqual(f.selections, ["artist:focus"]);
+  }
+});
 
-  const wideGroup = [
-    { xMin: 0, xMax: 20, yMin: 100, yMax: 130 },
-    { xMin: 220, xMax: 240, yMin: 100, yMax: 130 }
-  ];
-  assert.equal(photoFrame(240, 240, wideGroup), null);
-  assert.equal(photoFrame(240, 320, []), null);
+test("the dropdown stays open during internal focus and closes on outside focus or press", () => {
+  const f = searchFixture();
+  for (const relatedTarget of [null, f.result]) {
+    f.emit(f.top, "focusout", { relatedTarget });
+    assert.equal(f.map.searchOpen, true);
+  }
+  f.emit(f.top, "focusout", { relatedTarget: f.outside });
+  assert.equal(f.map.searchOpen, false);
+
+  f.input.dispatchEvent(new Event("focus"));
+  f.emit(f.root, "pointerdown", { target: f.input });
+  assert.equal(f.map.searchOpen, true);
+  f.emit(f.root, "pointerdown", { target: f.outside });
+  assert.equal(f.map.searchOpen, false);
 });
 
 test("desktop and mobile keep the strongest direct connections within their bubble limits", () => {

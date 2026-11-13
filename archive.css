@@ -281,6 +281,7 @@
   margin-top: 8px;
   color: #ffea86;
 }
+.archive-menu > .archive-menu-past-events { margin-top: 2px; }
 @media (min-width: 761px) {
   .archive-menu > .archive-menu-discovery[aria-current="page"] {
     padding-inline: calc(var(--archive-menu-inset, 33px) + 6px) 34px;
@@ -387,6 +388,7 @@
 }
 .archive-profile-links { display: flex; flex-wrap: wrap; justify-content: center; text-align: center; gap: .35em .75em; margin-top: 1.6em; }
 .archive-profile-link { display: inline-flex; align-items: center; column-gap: inherit; }
+.archive-profile-link:has(> a[data-archive-link]) { flex-basis: 100%; justify-content: center; }
 .archive-profile-link-separator { color: #ffea86; font-size: .75em; }
 .archive-profile-links a { color: #ffea86; text-decoration: none !important; }
 .archive-profile-identity { display: inline-block; margin: 0 0 .5em; padding: 5px 10px; border-radius: 12px; background: #922185; color: #fff1f4; font: 700 .85em/1.2 "QDP Fraunces", Georgia, serif; }
@@ -436,6 +438,9 @@
 .archive-section + .archive-section { margin-top: var(--qdp-cards-next-time-gap); }
 .archive-group { margin-bottom: var(--qdp-cards-next-time-gap); }
 .archive-group .event-time { font: var(--qdp-time-font-weight) var(--qdp-time-font-size)/var(--qdp-time-line-height) "QDP Fraunces", Georgia, serif; }
+.archive-directory-results .archive-directory > .event-time {
+  top: var(--archive-directory-search-height, 0px);
+}
 .archive-year .event-time { font-size: calc(var(--qdp-time-font-size) * .68); }
 .archive-group .event-card { cursor: pointer; }
 .archive-group .event-row:first-child .event-card { border-top-right-radius: var(--qdp-card-radius); }
