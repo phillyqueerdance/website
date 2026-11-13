@@ -1097,6 +1097,9 @@
     },
     updateLayout() {
       if (!archiveBack.hidden && archiveStack.lastElementChild !== archiveBack) archiveStack.appendChild(archiveBack);
+      const directorySearch = archiveStack.querySelector(".archive-directory-search");
+      if (directorySearch) archiveStack.style.setProperty("--archive-directory-search-height",
+        `${directorySearch.getBoundingClientRect().height}px`);
       fitPosterTitles(archiveStack);
       fitProfileHeaders();
       measureProfileDrawer();

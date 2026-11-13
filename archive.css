@@ -437,6 +437,15 @@
 .archive-section + .archive-section { margin-top: var(--qdp-cards-next-time-gap); }
 .archive-group { margin-bottom: var(--qdp-cards-next-time-gap); }
 .archive-group .event-time { font: var(--qdp-time-font-weight) var(--qdp-time-font-size)/var(--qdp-time-line-height) "QDP Fraunces", Georgia, serif; }
+.archive-directory-results .archive-directory > .event-time {
+  top: var(--archive-directory-search-height, 0px);
+}
+/* Keep the gap inside each sticky tab's group so the next tab pushes it out. */
+.archive-directory-results .archive-section + .archive-section { margin-top: 0; }
+.archive-directory-results .archive-section:not(:last-child) > .archive-directory { margin-bottom: 0; }
+.archive-directory-results .archive-section:not(:last-child) .event-group-cards {
+  padding-bottom: calc(2 * var(--qdp-cards-next-time-gap));
+}
 .archive-year .event-time { font-size: calc(var(--qdp-time-font-size) * .68); }
 .archive-group .event-card { cursor: pointer; }
 .archive-group .event-row:first-child .event-card { border-top-right-radius: var(--qdp-card-radius); }
