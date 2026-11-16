@@ -1,4 +1,4 @@
-import { readScrapeWorkbook, REVIEW_FIELDS } from "./apify-workbook.js?v=20261116-01";
+import { readScrapeWorkbook, REVIEW_FIELDS } from "./apify-workbook.js?v=20261116-02";
 
 const elements = Object.fromEntries([
   "workbook", "workbook-status", "events-tab", "corrections-tab", "event-count",
@@ -42,47 +42,41 @@ function httpsUrl(value) {
 }
 
 function openLink(label, value) {
+  const url = httpsUrl(value);
+  if (!url) return null;
   const anchor = element("a", "apify-link", label);
+  anchor.href = url;
   anchor.target = "_blank";
   anchor.rel = "noopener noreferrer";
-  setLink(anchor, value);
   return anchor;
 }
 
-function setLink(anchor, value) {
-  const url = httpsUrl(value);
-  anchor.hidden = !url;
-  if (url) anchor.href = url;
-  else anchor.removeAttribute("href");
-}
-
-function flyerPreview(value, alt) {
+function flyerPreview(value, alt, useAdminProxy = false) {
   const frame = element("figure", "apify-flyer");
+  const url = httpsUrl(value);
+  const status = element("figcaption", "apify-muted", value ? "Flyer preview unavailable." : "No flyer supplied");
+  if (!url) {
+    frame.append(status);
+    return frame;
+  }
+
   const image = element("img");
-  const status = element("figcaption", "apify-muted");
   image.alt = alt;
   image.loading = "lazy";
   image.decoding = "async";
   image.referrerPolicy = "no-referrer";
+  status.hidden = true;
   image.addEventListener("error", () => {
+    if (useAdminProxy && image.getAttribute("src") !== url) {
+      image.src = url;
+      return;
+    }
     image.hidden = true;
     status.hidden = false;
-    status.textContent = "Flyer preview unavailable. You can verify the source post.";
   });
-
-  function setFlyer(next) {
-    const url = httpsUrl(next);
-    if (url && url === image.getAttribute("src")) return;
-    image.hidden = !url;
-    status.hidden = Boolean(url);
-    status.textContent = next ? "Enter a direct HTTPS image URL to preview the flyer." : "No flyer supplied";
-    if (url) image.src = url;
-    else image.removeAttribute("src");
-  }
-
+  image.src = useAdminProxy ? "/admin/flyer?url=" + encodeURIComponent(url) : url;
   frame.append(image, status);
-  setFlyer(value);
-  return { frame, setFlyer };
+  return frame;
 }
 
 function sheetDate(value) {
@@ -124,14 +118,8 @@ function candidateField(field, candidate, onChange) {
 
   control.addEventListener("input", () => {
     candidate.fields[field.name] = control.value;
-    if (field.type !== "url") onChange(field.name);
+    onChange(field.name);
   });
-  if (field.type === "url") {
-    control.addEventListener("change", () => {
-      candidate.fields[field.name] = control.value;
-      onChange(field.name);
-    });
-  }
   label.append(element("span", "", field.label), control);
   return label;
 }
@@ -171,11 +159,15 @@ function candidateCard(candidate) {
   const layout = element("div", "apify-review-layout");
   const media = element("div", "apify-media");
   const preview = flyerPreview(fields.RawFlyerURL, "Flyer for " + fields["Title (internal)"]);
-  const instagram = openLink("Open Instagram post", fields.Instagram_URL || instagramEventUrl(fields.Event_URL));
-  const eventLink = openLink("Open event link", alternateEventUrl(fields));
   const mediaLinks = element("div", "apify-links");
-  mediaLinks.append(instagram, eventLink);
-  media.append(preview.frame, mediaLinks);
+  for (const field of REVIEW_FIELDS.filter(field => field.type === "link")) {
+    const value = field.name === "Instagram_URL"
+      ? fields.Instagram_URL || instagramEventUrl(fields.Event_URL)
+      : fields[field.name];
+    const link = openLink(field.label, value);
+    if (link) mediaLinks.append(link);
+  }
+  media.append(preview, mediaLinks);
 
   const editor = element("fieldset", "apify-editor");
   const synchronizeSummary = () => {
@@ -183,18 +175,10 @@ function candidateCard(candidate) {
     legend.textContent = "Import decision for " + title.textContent;
     date.textContent = [sheetDate(fields.StartDate), fields.Location].filter(Boolean).join(" · ");
   };
-  for (const field of REVIEW_FIELDS) {
+  for (const field of REVIEW_FIELDS.filter(field => field.type !== "link")) {
     editor.append(candidateField(field, candidate, name => {
       if (name === "Title (internal)" || name === "StartDate" || name === "Location") {
         synchronizeSummary();
-      }
-      if (name === "RawFlyerURL") {
-        preview.setFlyer(fields.RawFlyerURL);
-        updateControls();
-      }
-      if (name === "Instagram_URL" || name === "Event_URL") {
-        setLink(instagram, fields.Instagram_URL || instagramEventUrl(fields.Event_URL));
-        setLink(eventLink, alternateEventUrl(fields));
       }
     }));
   }
@@ -208,11 +192,6 @@ function candidateCard(candidate) {
 
 function instagramEventUrl(value) {
   return /^https:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\//i.test(value || "") ? value : "";
-}
-
-function alternateEventUrl(fields) {
-  const instagram = fields.Instagram_URL || instagramEventUrl(fields.Event_URL);
-  return httpsUrl(fields.Event_URL) === httpsUrl(instagram) ? "" : fields.Event_URL;
 }
 
 function selectedCandidates() {
@@ -336,10 +315,10 @@ function correctionCard(correction) {
     element("h2", "", workbookTitle)
   );
   const links = element("div", "apify-links");
-  links.append(
+  links.append(...[
     openLink("View QDP listing", correction["Public listing"]),
     openLink("Open Instagram post", correction["Instagram source"])
-  );
+  ].filter(Boolean));
   heading.append(summary, links);
 
   const compare = element("div", "apify-compare");
@@ -353,7 +332,7 @@ function correctionCard(correction) {
     if (timing) current.append(element("p", "apify-current-detail", timing));
     if (place) current.append(element("p", "apify-current-detail", place));
     if (live.description) current.append(element("p", "apify-description", live.description));
-    if (live.flyerUrl) current.append(flyerPreview(live.flyerUrl, "Current flyer").frame);
+    if (live.flyerUrl) current.append(flyerPreview(live.flyerUrl, "Current flyer", true));
   } else {
     current.append(element(
       "p", "apify-muted",
@@ -373,7 +352,7 @@ function correctionCard(correction) {
       element("p", "apify-description", correction["Suggested Description"])
     );
   }
-  if (correction.RawFlyerURL) proposed.append(flyerPreview(correction.RawFlyerURL, "Proposed flyer").frame);
+  if (correction.RawFlyerURL) proposed.append(flyerPreview(correction.RawFlyerURL, "Proposed flyer"));
   compare.append(current, proposed);
   article.append(heading, compare);
   if (correction["Apply to existing event only"]) {

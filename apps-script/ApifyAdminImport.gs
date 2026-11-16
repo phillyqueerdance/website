@@ -59,10 +59,9 @@ function qdpAdminApifyImport_(rows) {
       } catch {
         data['Import readiness'] = 'Check event dates and times';
       }
-      // Use literal string cells so workbook text is never evaluated as a formula.
       const values = Array.from({ length: width }, () => ({}));
       for (const [name, value] of Object.entries(data)) {
-        if (value) values[columns[name] - 1] = { userEnteredValue: { stringValue: value } };
+        if (value) values[columns[name] - 1] = qdpAdminApifyCell_(name, value, timezone);
       }
       append.push({ values });
     }
@@ -73,7 +72,7 @@ function qdpAdminApifyImport_(rows) {
           appendCells: {
             sheetId: sheet.getSheetId(),
             rows: append,
-            fields: 'userEnteredValue'
+            fields: 'userEnteredValue,userEnteredFormat.numberFormat'
           }
         }]
       }, ss.getId());
@@ -82,4 +81,31 @@ function qdpAdminApifyImport_(rows) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function qdpAdminApifyCell_(name, value, timezone) {
+  // Keep other fields literal and leave invalid date or time text visible for review.
+  const literal = { userEnteredValue: { stringValue: value } };
+  const isDate = name === 'StartDate' || name === 'EndDate';
+  const isTime = name === 'StartTime' || name === 'EndTime';
+  if (!isDate && !isTime) return literal;
+
+  let numberValue;
+  let numberFormat;
+  try {
+    if (isDate) {
+      const key = qdpScanDateKey_(value, timezone);
+      const midnight = new Date(key + 'T00:00:00Z');
+      if (isNaN(midnight) || midnight.toISOString().slice(0, 10) !== key) return literal;
+      numberValue = (midnight.getTime() - Date.UTC(1899, 11, 30)) / 86400000;
+      numberFormat = { type: 'DATE', pattern: 'MM/dd/yy' };
+    } else {
+      const [hours, minutes, seconds] = qdpScanClock_(value, timezone).split(':').map(Number);
+      numberValue = (hours * 3600 + minutes * 60 + seconds) / 86400;
+      numberFormat = { type: 'TIME', pattern: 'hh:mm am/pm' };
+    }
+  } catch {
+    return literal;
+  }
+  return { userEnteredValue: { numberValue }, userEnteredFormat: { numberFormat } };
 }

@@ -3,6 +3,7 @@ const MAX_XML_BYTES = 16 * 1024 * 1024;
 const PACKAGE_ORIGIN = "https://workbook.invalid";
 const WORKBOOK_PART = "xl/workbook.xml";
 const utf8 = new TextDecoder("utf-8", { fatal: true });
+const EXCEL_NUMBER = /^[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
 
 export const REVIEW_FIELDS = [
   { name: "Title (internal)", label: "Event title", wide: true },
@@ -15,9 +16,9 @@ export const REVIEW_FIELDS = [
   { name: "Location", label: "Location", wide: true },
   { name: "Description", label: "Description", type: "textarea", wide: true },
   { name: "Lineup_Raw", label: "Lineup", type: "textarea", wide: true },
-  { name: "Instagram_URL", label: "Instagram post URL", type: "url", wide: true },
-  { name: "Event_URL", label: "Event URL", type: "url", wide: true },
-  { name: "RawFlyerURL", label: "Flyer image URL", type: "url", wide: true },
+  { name: "Instagram_URL", label: "Open Instagram post", type: "link" },
+  { name: "Event_URL", label: "Open event link", type: "link" },
+  { name: "RawFlyerURL", label: "Open flyer image", type: "link" },
   { name: "Review_notes", label: "Review notes", type: "textarea", wide: true }
 ];
 
@@ -175,9 +176,10 @@ function readTable(rows, expected, required, name) {
 }
 
 function formattedDate(value, date1904) {
-  if (/^\d+(\.\d+)?$/.test(value)) {
+  const number = Number(value);
+  if (EXCEL_NUMBER.test(value) && Number.isFinite(number)) {
     const base = date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
-    const date = new Date(base + Math.floor(Number(value)) * 86400000);
+    const date = new Date(base + Math.floor(number) * 86400000);
     return Number.isFinite(+date) ? date.toISOString().split("T")[0] : value;
   }
   const iso = /^(\d{4}-\d{2}-\d{2})(?:$|T|\s)/.exec(value);
@@ -188,8 +190,9 @@ function formattedDate(value, date1904) {
 }
 
 function formattedTime(value) {
-  if (/^(?:\d+(\.\d+)?|\.\d+)$/.test(value)) {
-    const seconds = Math.round((Number(value) % 1) * 86400) % 86400;
+  const number = Number(value);
+  if (EXCEL_NUMBER.test(value) && Number.isFinite(number)) {
+    const seconds = Math.round((number % 1) * 86400) % 86400;
     return [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
       .map(part => String(part).padStart(2, "0")).join(":");
   }
