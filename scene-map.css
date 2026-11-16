@@ -285,10 +285,14 @@
 }
 .scene-map-detail:not([hidden]) { display: flex; flex-direction: column; }
 .scene-map-detail-heading { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 5px; }
-.scene-map-detail-heading strong { font-size: clamp(14px, 2.25cqw, 20px); }
-.scene-map-profile-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.scene-map-profile-heading strong { overflow-wrap: anywhere; }
-.scene-map-profile-link:any-link { color: var(--scene-accent); font-size: 12px; white-space: nowrap; }
+.scene-map-detail-heading :is(strong, .scene-map-profile-link) { font-size: clamp(14px, 2.25cqw, 20px); }
+.scene-map-profile-link:any-link {
+  min-width: 0;
+  color: var(--scene-accent);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+}
 .scene-map-relationship-profiles { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .scene-map-close {
   flex: none;
@@ -305,7 +309,7 @@
   z-index: 3;
   inset: auto;
 }
-.scene-map-relationship .scene-map-detail-heading strong { font-size: clamp(13px, 2cqw, 16px); }
+.scene-map-relationship .scene-map-detail-heading :is(strong, .scene-map-profile-link) { font-size: clamp(13px, 2cqw, 16px); }
 .scene-map-relationship .scene-map-note { margin-bottom: 7px; }
 .scene-map-events {
   container-type: inline-size;

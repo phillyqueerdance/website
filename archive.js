@@ -946,7 +946,7 @@
     if (!hydrateDirectory) message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261113-discover-perf-1");
+        const module = await import("./scene-map.js?v=20261116-profile-links");
         if (serial !== requestNumber) return;
         const directories = module.prepareSceneMap(params.focus);
         void directories.catch(() => {});
