@@ -6,6 +6,7 @@ const ALLOWED_ACTIONS = new Set([
   "admin.status",
   "admin.save",
   "admin.savebatch",
+  "admin.apifyimport",
   "admin.pull",
   "admin.push"
 ]);

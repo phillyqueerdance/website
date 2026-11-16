@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#111114">
+  <title>Apify Import | QDP Admin</title>
+  <link rel="icon" type="image/png" href="/admin/favicon.png">
+  <link rel="stylesheet" href="/poster-theme.css?v=20260926-01">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261112-artist-crops-1">
+  <link rel="stylesheet" href="/admin/apify-import.css?v=20261116-01">
+  <script type="module" src="/admin/apify-import.js?v=20261116-01"></script>
+</head>
+<body class="apify-page">
+  <header class="admin-header">
+    <div class="admin-brand">
+      <img class="brand-mark" src="/admin/favicon.png" width="48" height="48" alt="">
+      <div>
+        <p class="eyebrow">Queer Dance Philly</p>
+        <h1>Apify Import</h1>
+      </div>
+    </div>
+    <a class="admin-page-link" href="/admin/">Back to Admin</a>
+  </header>
+
+  <main class="admin-shell">
+    <section class="apify-upload" aria-labelledby="workbook-label">
+      <label id="workbook-label" for="workbook">Upload a scrape workbook</label>
+      <input id="workbook" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+      <p id="workbook-status" class="apify-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <nav class="apify-nav" aria-label="Scrape review">
+      <a id="events-tab" href="#new-events" aria-current="page">New events <span id="event-count"></span></a>
+      <a id="corrections-tab" href="#corrections">Corrections <span id="correction-count"></span></a>
+    </nav>
+
+    <section id="events-view" aria-labelledby="events-tab">
+      <p id="events-empty" class="apify-empty">Choose a workbook to review its candidates.</p>
+      <div id="candidates" class="apify-list"></div>
+      <footer id="save-panel" class="apify-save" hidden>
+        <div>
+          <p id="save-count">0 events selected</p>
+          <p id="save-status" class="apify-status" role="status" aria-live="polite"></p>
+        </div>
+        <button id="save-apify" class="save-all-button" type="button" disabled>Save to Apify Sheet</button>
+      </footer>
+    </section>
+
+    <section id="corrections-view" aria-labelledby="corrections-tab" hidden>
+      <p id="corrections-empty" class="apify-empty">Choose a workbook to view its corrections.</p>
+      <p id="corrections-status" class="apify-status" role="status" aria-live="polite"></p>
+      <div id="corrections" class="apify-list"></div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,326 @@
+.apify-upload,
+.apify-card,
+.apify-save {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.apify-upload,
+.apify-save {
+  padding: 18px 22px;
+}
+
+.apify-upload label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 750;
+}
+
+.apify-upload input {
+  width: 100%;
+  max-width: 420px;
+}
+
+.apify-upload input::file-selector-button {
+  margin-right: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--panel-raised);
+  cursor: pointer;
+}
+
+.apify-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 23px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.apify-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 46px;
+  padding: 0 2px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-weight: 740;
+  text-decoration: none;
+}
+
+.apify-nav a[aria-current] {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.apify-nav span:not(:empty) {
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 12px;
+  background: var(--panel-raised);
+  color: var(--muted);
+  font-size: .76rem;
+  text-align: center;
+}
+
+.apify-page a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.apify-list {
+  display: grid;
+  gap: 18px;
+}
+
+.apify-card {
+  padding: clamp(16px, 2.8vw, 28px);
+}
+
+.apify-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px 18px;
+  padding-bottom: 17px;
+  border-bottom: 1px solid var(--border);
+}
+
+.apify-summary {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.apify-card h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+  letter-spacing: -.025em;
+  line-height: 1.1;
+}
+
+.apify-card-date {
+  margin: 0;
+  color: var(--yellow);
+  font-size: .84rem;
+  font-weight: 720;
+}
+
+.apify-muted,
+.apify-status,
+.apify-empty {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.apify-muted,
+.apify-status {
+  font-size: .9rem;
+  margin: 7px 0 0;
+}
+
+.apify-status:empty {
+  display: none;
+}
+
+.apify-status.is-error {
+  color: var(--red);
+}
+
+.apify-decisions,
+.apify-editor {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.apify-decisions,
+.apify-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.apify-decision {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0 11px;
+  background: var(--panel-raised);
+  color: var(--text);
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .055em;
+}
+
+.apify-decision[aria-pressed="true"][data-decision="INCLUDE"] {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.apify-decision[aria-pressed="true"][data-decision="EXCLUDE"] {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.apify-saved {
+  margin: 0;
+  color: var(--green);
+  font-size: .86rem;
+  font-weight: 700;
+}
+
+.apify-review-layout,
+.apify-compare {
+  display: grid;
+  align-items: start;
+  gap: 20px;
+  margin-top: 18px;
+}
+
+.apify-review-layout {
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+}
+
+.apify-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.apify-editor .field {
+  min-width: 0;
+  margin: 0;
+}
+
+.apify-editor .field > :is(input, textarea, select) {
+  width: 100%;
+  min-width: 0;
+}
+
+.apify-wide {
+  grid-column: 1 / -1;
+}
+
+.apify-flyer {
+  margin: 0 0 11px;
+}
+
+.apify-flyer img {
+  display: block;
+  width: 100%;
+  max-height: 570px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--background);
+}
+
+.apify-flyer figcaption:not([hidden]) {
+  display: grid;
+  min-height: 84px;
+  padding: 12px;
+  place-items: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.apify-link {
+  color: var(--yellow);
+  font-size: .87rem;
+  font-weight: 720;
+  text-underline-offset: 3px;
+}
+
+.apify-save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 18px 0 0;
+}
+
+#save-count {
+  margin: 0;
+  font-weight: 740;
+}
+
+.apify-compare {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px;
+}
+
+.apify-comparison {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel-raised);
+  overflow-wrap: anywhere;
+}
+
+.apify-proposed {
+  border-top: 3px solid var(--orange);
+}
+
+.apify-comparison h3 {
+  margin: 0 0 13px;
+  font-size: 1rem;
+}
+
+.apify-proposed h3 {
+  color: var(--orange);
+}
+
+.apify-comparison h4 {
+  margin: 16px 0 5px;
+  font-size: .9rem;
+}
+
+.apify-comparison p:not(.apify-muted) {
+  margin: 0 0 10px;
+}
+
+.apify-description {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.apify-current-detail,
+.apify-correction-note {
+  color: var(--muted);
+  font-size: .86rem;
+}
+
+.apify-correction-note {
+  margin: 12px 0 0;
+}
+
+@media (max-width: 680px) {
+  .apify-review-layout,
+  .apify-compare {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .apify-flyer img {
+    max-height: 440px;
+  }
+
+  .apify-page .admin-header .admin-page-link {
+    margin-bottom: 0;
+    font-size: .78rem;
+  }
+}
+
+.apify-page [hidden] {
+  display: none;
+}
