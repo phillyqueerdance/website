@@ -7,6 +7,9 @@ const ALLOWED_ACTIONS = new Set([
   "admin.save",
   "admin.savebatch",
   "admin.apifyimport",
+  "admin.apifycorrection.review",
+  "admin.apifycorrection.apply",
+  "admin.apifycorrection.finish",
   "admin.pull",
   "admin.push"
 ]);
