@@ -1,4 +1,4 @@
-import { readScrapeWorkbook, REVIEW_FIELDS } from "./apify-workbook.js?v=20261116-corrections-1";
+import { readScrapeWorkbook, REVIEW_FIELDS } from "./apify-workbook.js?v=20261116-corrections-2";
 import { suggestedCorrectionTimes } from "./apify-correction-times.js?v=20261116-corrections-1";
 
 const elements = Object.fromEntries([
@@ -207,7 +207,7 @@ function updateControls() {
   const selected = selectedCandidates();
   const withoutFlyer = selected.filter(candidate => !candidate.fields.RawFlyerURL.trim()).length;
   elements.workbook.disabled = state.busy || state.correctionBusy;
-  elements["save-apify"].disabled = state.busy || !selected.length;
+  elements["save-apify"].disabled = state.busy || state.correctionBusy || !selected.length;
   elements["save-count"].textContent = selected.length + (selected.length === 1 ? " event" : " events")
     + " selected" + (withoutFlyer ? " · " + withoutFlyer + " without a flyer" : "");
   for (const { candidate, article, decisions, buttons, editor, saved } of state.controls) {
@@ -258,7 +258,7 @@ async function loadWorkbook() {
 
 async function saveSelected() {
   const selected = selectedCandidates();
-  if (!selected.length || state.busy) return;
+  if (!selected.length || state.busy || state.correctionBusy) return;
   state.busy = true;
   updateControls();
   setStatus(elements["save-status"], "Saving to Apify Import…");
@@ -329,9 +329,7 @@ function correctionCard(correction) {
   const current = element("section", "apify-comparison apify-current");
   current.append(element("h3", "", "Current QDP listing"));
   const eventId = publicEventId(correction["Public listing"]);
-  const published = state.listings?.get(eventId);
-  const index = state.correctionEdits.get(correction)?.review?.index;
-  const live = index ? { ...published, ...index, flyerUrl: index.flyer || published?.flyerUrl } : published;
+  const live = state.listings?.get(eventId);
   if (live) {
     if (live.title && live.title !== workbookTitle) current.append(element("strong", "", live.title));
     const timing = listingTiming(live);
@@ -365,7 +363,8 @@ function correctionCard(correction) {
   if (correction["Apply to existing event only"]) {
     article.append(element("p", "apify-correction-note", correction["Apply to existing event only"]));
   }
-  if (eventId) article.append(correctionEditor(correction, eventId));
+  if (eventId) article.append(correctionEditor(correction, eventId, live));
+  else article.append(element("p", "apify-muted", "A QDP listing link with an EventID is required to save this correction."));
   return article;
 }
 
@@ -376,179 +375,126 @@ const CORRECTION_OPTIONS = [
   ["flyer", "Flyer"]
 ];
 
-function correctionValueLabel(value, field) {
-  if (!value) return "Blank";
-  if (field !== "start" && field !== "end") return value;
-  if (!value.includes("T")) return sheetDate(value) + " (all day)";
-  const instant = new Date(value);
-  return Number.isFinite(+instant) ? localDay.format(instant) + " · " + localTime.format(instant) : value;
+const philadelphiaDateTime = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit",
+  minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZone: "America/New_York"
+});
+
+function correctionDateTime(value) {
+  const date = new Date(value || "");
+  if (!Number.isFinite(+date)) return "";
+  const parts = Object.fromEntries(philadelphiaDateTime.formatToParts(date).map(part => [part.type, part.value]));
+  return [parts.year, parts.month, parts.day].join("-") + "T" +
+    [parts.hour, parts.minute, parts.second].join(":");
 }
 
-function correctionEditor(correction, eventId) {
+function correctionEditor(correction, eventId, live) {
   let edit = state.correctionEdits.get(correction);
   if (!edit) {
-    edit = { chosen: new Set(), draft: null, review: null, message: "", error: false, busy: false };
+    edit = { chosen: new Set(), draft: {}, message: "", error: false };
     state.correctionEdits.set(correction, edit);
   }
 
+  const current = { start: correctionDateTime(live?.start), end: correctionDateTime(live?.end) };
+  const suggested = suggestedCorrectionTimes(correction, current);
+  const draft = {
+    description: correction["Suggested Description"] || live?.description || "",
+    start: suggested.start || current.start,
+    end: suggested.end || current.end,
+    flyer: httpsUrl(correction.RawFlyerURL),
+    ...edit.draft
+  };
+
   const section = element("section", "apify-correction-editor");
-  const actions = element("div", "apify-correction-actions");
+  const fields = element("fieldset", "apify-correction-fields");
+  fields.disabled = state.busy || state.correctionBusy;
+  fields.append(element("legend", "", "Choose correction fields to save"));
+  fields.append(element("p", "apify-muted", "Times use Philadelphia time."));
+
   const status = element("p", "apify-status");
   status.setAttribute("role", "status");
   setStatus(status, edit.message, edit.error);
 
-  function button(label, handler, primary = false) {
-    const control = element("button", primary ? "save-all-button" : "apify-decision", label);
-    control.type = "button";
-    control.disabled = state.busy || state.correctionBusy;
-    control.addEventListener("click", handler);
-    return control;
-  }
-  actions.append(button(edit.review ? "Refresh values" : "Review changes", () =>
-    void runCorrection(correction, eventId, edit, "review")
-  ));
-  if (!edit.review) {
-    section.append(actions, status);
-    return section;
+  const save = element("button", "save-all-button", "Save correction to Apify Import");
+  save.type = "button";
+  save.addEventListener("click", () => void saveCorrection(correction, eventId, edit, draft));
+  function updateSave() {
+    save.disabled = fields.disabled || !edit.chosen.size;
   }
 
-  const pending = edit.review.pendingFields;
-  const isPending = pending.length > 0;
-  const fields = element("fieldset", "apify-correction-fields");
-  fields.disabled = edit.busy;
-  fields.append(element("legend", "", isPending ? "Pending correction" : "Choose changes to apply"));
-  fields.append(element("p", "apify-muted", isPending
-    ? "Review the Index and Calendar values below before finishing the earlier approval."
-    : "Check each field you want to apply. Times use Philadelphia time."));
-  if (edit.review.calendarMessage) fields.append(element("p", "apify-muted", edit.review.calendarMessage));
-
-  const apply = button(isPending ? "Finish pending correction" : "Apply checked changes", () =>
-    void runCorrection(correction, eventId, edit, isPending ? "finish" : "apply"), true
-  );
-  function updateApply() {
-    apply.disabled = state.busy || state.correctionBusy || (!isPending && !edit.chosen.size);
-  }
   for (const [field, label] of CORRECTION_OPTIONS) {
-    if (isPending ? !pending.includes(field) : field === "flyer" && !edit.draft.flyer) continue;
+    if (field === "flyer" && !draft.flyer) continue;
     const row = element("div", "apify-correction-choice");
     const header = element("label", "apify-correction-label");
-    if (!isPending) {
-      const toggle = element("input");
-      toggle.type = "checkbox";
-      toggle.checked = edit.chosen.has(field);
-      toggle.disabled = !edit.review.available[field];
-      toggle.addEventListener("change", () => {
-        if (toggle.checked) edit.chosen.add(field);
-        else edit.chosen.delete(field);
-        updateApply();
-      });
-      header.append(toggle);
-    }
-    header.append(element("span", "", label));
+    const toggle = element("input");
+    toggle.type = "checkbox";
+    toggle.checked = edit.chosen.has(field);
+    toggle.addEventListener("change", () => {
+      if (toggle.checked) edit.chosen.add(field);
+      else edit.chosen.delete(field);
+      updateSave();
+    });
+    header.append(toggle, element("span", "", label));
     row.append(header);
 
-    const index = edit.review.index[field];
-    const calendar = edit.review.calendar?.[field];
-    if (isPending || (calendar !== undefined && calendar !== index)) {
-      if (field === "flyer") {
-        const link = openLink("Current Index flyer", index);
-        if (link) row.append(link);
-      } else {
-        row.append(element("p", "apify-correction-value", "Index · " + correctionValueLabel(index, field)));
-        if (calendar !== undefined) {
-          row.append(element("p", "apify-correction-value", "Calendar · " + correctionValueLabel(calendar, field)));
-        }
-      }
-    }
-    if (!isPending && edit.review.available[field]) {
-      if (field === "flyer") {
-        const link = openLink("Open replacement flyer", edit.draft.flyer);
-        if (link) row.append(link);
-      } else {
-        const editor = element(field === "description" ? "textarea" : "input");
-        if (field === "description") editor.rows = 3;
-        else { editor.type = "datetime-local"; editor.step = 1; }
-        editor.value = edit.draft[field];
-        editor.setAttribute("aria-label", "Proposed " + label.toLowerCase());
-        editor.addEventListener("input", () => { edit.draft[field] = editor.value; });
-        row.append(editor);
-      }
+    if (field === "flyer") {
+      row.append(openLink("Open replacement flyer", draft.flyer));
+    } else {
+      const editor = element(field === "description" ? "textarea" : "input");
+      if (field === "description") editor.rows = 3;
+      else { editor.type = "datetime-local"; editor.step = 1; }
+      editor.value = draft[field];
+      editor.setAttribute("aria-label", "Proposed " + label.toLowerCase());
+      editor.addEventListener("input", () => {
+        draft[field] = editor.value;
+        edit.draft[field] = editor.value;
+      });
+      row.append(editor);
     }
     fields.append(row);
   }
-  updateApply();
-  actions.append(apply);
-  section.append(fields, actions, status);
+
+  updateSave();
+  section.append(fields, save, status);
   return section;
 }
 
-async function correctionRequest(action, body) {
-  const response = await fetch("/admin/api", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "admin.apifycorrection." + action, ...body })
-  });
-  const result = await response.json().catch(() => null);
-  if (result?.error === "Unknown admin action.") {
-    throw new Error("Applying corrections needs the updated Apps Script web app.");
-  }
-  if (!response.ok || result?.ok !== "yes" || !result.review) {
-    throw new Error(result?.error || "The correction request could not be confirmed.");
-  }
-  return result;
-}
-
-function updateCorrectionReview(correction, edit, review) {
-  edit.review = review;
-  if (!edit.draft) {
-    const suggested = suggestedCorrectionTimes(correction, review.localTime);
-    edit.draft = {
-      description: correction["Suggested Description"] || review.index.description,
-      start: suggested.start || review.localTime.start,
-      end: suggested.end || review.localTime.end,
-      flyer: httpsUrl(correction.RawFlyerURL)
-    };
-  }
-  for (const field of edit.chosen) {
-    if (!review.available[field]) edit.chosen.delete(field);
-  }
-}
-
-async function runCorrection(correction, eventId, edit, action) {
-  if (state.busy || state.correctionBusy) return;
-  const changes = Object.fromEntries([...edit.chosen].map(field => [field, edit.draft[field]]));
-  const revisions = edit.review?.revisions;
-  if (action === "apply" && !Object.keys(changes).length) return;
+async function saveCorrection(correction, eventId, edit, draft) {
+  if (state.busy || state.correctionBusy || !edit.chosen.size) return;
   state.correctionBusy = true;
-  edit.busy = true;
   edit.error = false;
-  edit.message = action === "review" ? "Checking the Index and Calendar…" : "Applying the selected fields…";
+  edit.message = "Saving to Apify Import…";
   updateControls();
   renderCorrections();
   try {
-    const result = await correctionRequest(action, action === "apply"
-      ? { eventId, changes, revisions } : { eventId });
-    updateCorrectionReview(correction, edit, result.review);
-    if (action !== "review") edit.chosen.clear();
-    edit.message = result.message || "";
-  } catch (error) {
-    edit.message = error.message || "The correction could not be confirmed.";
-    edit.error = true;
-    if (action !== "review") {
-      // Check for a pending write after a lost or failed response. Reading the
-      // latest values never approves or retries the correction.
-      try {
-        const latest = await correctionRequest("review", { eventId });
-        if (!latest.review.pendingFields.length) {
-          for (const field of edit.chosen) {
-            if (revisions?.[field] !== latest.review.revisions[field]) edit.chosen.delete(field);
-          }
-        }
-        updateCorrectionReview(correction, edit, latest.review);
-      } catch {}
+    const response = await fetch("/admin/api", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "admin.apifycorrection.stage",
+        key: correction.intakeKey,
+        eventId,
+        title: correction["Current title"],
+        listingUrl: httpsUrl(correction["Public listing"]),
+        sourceUrl: httpsUrl(correction["Instagram source"]),
+        changes: Object.fromEntries([...edit.chosen].map(field => [field, draft[field]]))
+      })
+    });
+    const result = await response.json().catch(() => null);
+    if (result?.error === "Unknown admin action.") {
+      throw new Error("Saving corrections needs the updated Apps Script web app.");
     }
+    if (!response.ok || result?.ok !== "yes" || typeof result.alreadySaved !== "boolean") {
+      throw new Error(result?.error || "The correction could not be confirmed. You can retry this selection.");
+    }
+    edit.chosen.clear();
+    edit.message = result.alreadySaved
+      ? "This selection is already in Apify Import."
+      : "Selected correction fields saved to Apify Import.";
+  } catch (error) {
+    edit.message = error.message || "The correction could not be confirmed. You can retry this selection.";
+    edit.error = true;
   } finally {
-    edit.busy = false;
     state.correctionBusy = false;
     updateControls();
     renderCorrections();

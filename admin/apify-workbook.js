@@ -230,10 +230,11 @@ function candidates(rows, workbookKey, date1904) {
     });
 }
 
-function corrections(rows, date1904) {
+function corrections(rows, workbookKey, date1904) {
   return readTable(rows, CORRECTION_FIELDS, ["Current title", "Correction"], "Corrections")
     .filter(row => row.values["Current title"])
-    .map(({ values }) => {
+    .map(({ rowNumber, values }) => {
+      values.intakeKey = workbookKey + ":" + rowNumber;
       for (const name of ["Date", "Suggested StartDate", "Suggested EndDate"]) {
         values[name] = formattedDate(values[name], date1904);
       }
@@ -277,6 +278,6 @@ export async function readScrapeWorkbook(file) {
   const workbookKey = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
   return {
     candidates: candidates(newRows ?? [], workbookKey, date1904),
-    corrections: corrections(correctionRows ?? [], date1904)
+    corrections: corrections(correctionRows ?? [], workbookKey, date1904)
   };
 }

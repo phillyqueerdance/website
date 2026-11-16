@@ -356,8 +356,7 @@
   background: var(--panel-raised);
 }
 
-.apify-correction-label,
-.apify-correction-actions {
+.apify-correction-label {
   display: flex;
   gap: 10px;
   align-items: center;
@@ -382,14 +381,6 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 9px 11px;
-}
-
-.apify-correction-value {
-  margin: 0;
-  font-size: .86rem;
-  color: var(--muted);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 @media (min-width: 700px) {

@@ -1,50 +1,15 @@
-# Activate Corrections in QDP Admin
+# Save corrections to Apify Import
 
-Add the contents of [ApifyAdminCorrections.gs](ApifyAdminCorrections.gs) as a new file named **ApifyAdminCorrections** in the Index’s existing Apps Script project. The integration uses the existing Calendar and Sheets advanced services, as well as the Apify importer’s Drive folder and image download helper.
-
-## Route the Admin actions
-
-In **Core.gs**, find **qdpAdminHandlePost_**. Add these lines after the token check and the line that defines **action**. Place them before the final Unknown admin action error.
+1. Add [ApifyAdminCorrections.gs](ApifyAdminCorrections.gs) to the Index’s Apps Script project as **ApifyAdminCorrections**. If you tried the earlier draft, replace the contents of that file and remove its three correction routes and the pending-correction guards from Pull and Push in **Core.gs**.
+2. In **Core.gs**, find **qdpAdminHandlePost_**. Add the following line after the token check and the line that defines **action**, before the Unknown admin action error.
 
 ~~~js
-  if (action === 'admin.apifycorrection.review') return { ok: 'yes', review: qdpApifyCorrectionReview_(body) };
-  if (action === 'admin.apifycorrection.apply') return { ok: 'yes', ...qdpApifyCorrectionApply_(body) };
-  if (action === 'admin.apifycorrection.finish') return { ok: 'yes', ...qdpApifyCorrectionFinish_(body) };
+if (action === 'admin.apifycorrection.stage') return { ok: 'yes', ...qdpApifyCorrectionStage_(body) };
 ~~~
 
-## Protect interrupted corrections during sync
+3. Save, then use **Deploy → Manage deployments** to deploy a new version of the existing Apps Script web app. Keep the same deployment URL. The handler uses the Google Sheets advanced service and the date/time cell formatter from the current **ApifyAdminImport.gs**.
+4. Once the updated website is deployed, open **Admin → Apify Import → Corrections**. Upload the workbook, check the fields you want, and choose **Save correction to Apify Import**.
 
-In **pullCalendarToSheetCore_**, add the following near the top of the function, after it defines **singleEvent**.
+The correction is appended to **Apify Import** with its EventID, **Review** set to **Correction**, and just the approved changes. The approved-field list is in **Review_notes** and **ImportSourceSnapshot**. A selected blank description is recorded in the snapshot, so it can be distinguished from an unchecked description.
 
-~~~js
-const pendingCorrections = qdpApifyCorrectionPendingIds_();
-~~~
-
-In the same function’s Calendar results loop, immediately after **const calId = eventIdForApi_(it.id);**, add this guard. Place it before the cancelled event handling.
-
-~~~js
-if (pendingCorrections.has(calId)) {
-  if (singleEvent) throw new Error('Finish this event’s pending correction in QDP Admin first.');
-  continue;
-}
-~~~
-
-In **pushSheetToCalendarCore_**, add the following just below its initial **FLAGS.PUSH_ENABLED** check.
-
-~~~js
-const pendingCorrections = qdpApifyCorrectionPendingIds_();
-~~~
-
-In that function’s row loop, replace the **if (!calId) continue;** immediately before **const srv = server.get(...)** with this guard.
-
-~~~js
-if (!calId || pendingCorrections.has(eventIdForApi_(calId))) continue;
-~~~
-
-These guards allow the rest of the calendar to sync while a correction’s write is being confirmed. When Admin shows **Finish pending correction**, that action can complete the same approved changes. If a selected field changed after approval, the current values are shown so it can be reconciled before finishing.
-
-## Deploy and check
-
-1. Save the Apps Script changes. Use **Deploy → Manage deployments**, edit the existing web app, select **New version**, and deploy with the same URL.
-2. Once the website branch is deployed, open **Admin → Apify Import → Corrections** and upload the scrape workbook. Choose **Review changes** on the event you want to correct.
-3. Check individual fields and use **Apply checked changes**. A flyer-only correction saves the image through the Apify Drive folder. Schedule and description changes update the linked Calendar event and the matching Events row. The website picks up the Events row through its regular publication.
+The existing new-event importer accepts rows marked **Include**. Use the **Correction** rows as your record when you decide which corrections to make separately.
