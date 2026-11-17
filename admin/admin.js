@@ -1,5 +1,4 @@
 const ADMIN_API_URL = "/admin/api";
-const WEEK_PREVIEW_LIMIT = 5;
 const COVERAGE_DAYS = 28;
 const DUPLICATE_START_WINDOW_MS = 3 * 60 * 60 * 1000;
 
@@ -27,11 +26,9 @@ const elements = {
   dashboardContent: document.getElementById("dashboardContent"),
   reviewButtons: document.querySelectorAll(".review-row"),
   flyerCoverage: document.getElementById("flyerCoverage"),
-  weekList: document.getElementById("weekList"),
-  weekEmpty: document.getElementById("weekEmpty"),
-  viewWeek: document.getElementById("viewWeek"),
   coverageBody: document.getElementById("coverageBody"),
   coverageDateOption: document.getElementById("coverageDateOption"),
+  integrityEventOption: document.getElementById("integrityEventOption"),
   eventsPanel: document.getElementById("events"),
   pullButton: document.getElementById("pullButton"),
   pushButton: document.getElementById("pushButton"),
@@ -67,6 +64,8 @@ const state = {
   status: null,
   artists: [],
   venues: [],
+  parties: [],
+  integrityEventId: "",
   artistById: new Map(),
   venueById: new Map(),
   drafts: new Map(),
@@ -201,21 +200,12 @@ function calendarCoverage(events, now) {
 
 function dashboardEventViews(events, feedFlyers, now = new Date()) {
   const active = events.filter(event => !event.removedFromSheet);
+  const integrityEvents = active.filter(event => !/^\(DELETED ENTRY\)/i.test(event.publicTitle || event.title));
   const today = phillyDateKey(now);
   const upcoming = active.filter(event => isUpcoming(event, today));
-  const weekEnd = new Date(`${today}T00:00:00Z`);
-  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
-  const weekEndKey = weekEnd.toISOString().slice(0, 10);
-  const week = upcoming.filter(event => {
-    const start = Date.parse(event.start);
-    const end = Date.parse(event.end);
-    return Math.max(start, Number.isFinite(end) ? end : start) >= now &&
-      phillyDateKey(start) < weekEndKey;
-  });
-
   const missingFlyers = [];
   let unknownFlyers = 0;
-  for (const event of upcoming) {
+  for (const event of integrityEvents) {
     if (!Object.hasOwn(event, "flyerUrl") && !feedFlyers.has(event.eventId)) {
       unknownFlyers++;
     } else if (!eventFlyerUrl(event, feedFlyers)) {
@@ -225,15 +215,15 @@ function dashboardEventViews(events, feedFlyers, now = new Date()) {
 
   return {
     views: new Map([
-      ["next-seven-days", week],
       ["needs-push", active.filter(event => event.needsPush)],
       ["hidden-upcoming", upcoming.filter(event => !event.publishToWeb)],
       ["missing-flyer", missingFlyers],
       ["missing-venue", upcoming.filter(event => !event.venueId?.trim())],
-      ["missing-description", upcoming.filter(event => !event.description?.trim())],
-      ["possible-duplicate", findPossibleDuplicates(active, today, now)]
+      ["missing-description", integrityEvents.filter(event => !event.description?.trim())],
+      ["possible-duplicate", findPossibleDuplicates(integrityEvents, today, now)]
     ]),
     coverage: calendarCoverage(active, now),
+    integrityEvents,
     unknownFlyers
   };
 }
@@ -445,6 +435,8 @@ function baseDraft(event) {
     publishToWeb: event.publishToWeb,
     artistIds: [...event.artistIds],
     venueId: event.venueId,
+    partyId: event.partyId,
+    flyerSource: event.flyerSource,
     explicitQueer: event.explicitQueer,
     explicitQueerTouched: false
   };
@@ -464,6 +456,9 @@ function draftIsDirty(
     draft.description !== event.description ||
     draft.publishToWeb !== event.publishToWeb ||
     draft.venueId !== event.venueId ||
+    draft.partyId !== event.partyId ||
+    draft.flyerSource !== event.flyerSource ||
+    (event.explicitQueerValue === "" && draft.explicitQueerTouched) ||
     draft.explicitQueer !== event.explicitQueer ||
     !sameIds(draft.artistIds, event.artistIds)
   );
@@ -486,6 +481,9 @@ function draftMatchesEvent(draft, event) {
     normalizedDescription === event.description &&
     draft.publishToWeb === event.publishToWeb &&
     draft.venueId === event.venueId &&
+    draft.partyId === event.partyId &&
+    draft.flyerSource?.trim() === event.flyerSource &&
+    (event.explicitQueerValue !== "" || !draft.explicitQueerTouched) &&
     draft.explicitQueer === event.explicitQueer &&
     sameIds(draft.artistIds, event.artistIds)
   );
@@ -499,6 +497,7 @@ function calendarFieldsAreDirty(
     draft.publicTitle !== event.publicTitle ||
     draft.description !== event.description ||
     draft.venueId !== event.venueId ||
+    draft.partyId !== event.partyId ||
     draft.explicitQueer !== event.explicitQueer ||
     !sameIds(draft.artistIds, event.artistIds)
   );
@@ -612,6 +611,7 @@ function visibleEvents() {
   const events = state.dashboardViews.get(filter) || state.events;
 
   return events.filter(event => {
+    if (filter === "integrity-event") return event.eventId === state.integrityEventId;
     const draft = draftFor(event);
     const venue = state.venueById.get(draft.venueId);
     const artistText = draft.artistIds
@@ -694,6 +694,8 @@ function updateCardState(
   event
 ) {
   const draft = draftFor(event);
+  card.querySelector(".classify-standard").hidden =
+    event.relevanceClassified !== false || draft.explicitQueerTouched || draft.explicitQueer;
   const dirty = draftIsDirty(event, draft);
   const calendarDirty =
     calendarFieldsAreDirty(event, draft);
@@ -870,6 +872,21 @@ function renderEvent(event, venueOptions) {
 
   const venueInput =
     card.querySelector(".venue-input");
+  const partyInput = card.querySelector(".party-input");
+  const flyerInput = card.querySelector(".flyer-source-input");
+  if (typeof event.partyId === "string") {
+    card.querySelector(".party-field").hidden = false;
+    partyInput.append(new Option("No linked party", ""));
+    for (const party of state.parties) partyInput.append(new Option(`${party.name} · ${party.id}`, party.id));
+    if (draft.partyId && !state.parties.some(party => party.id === draft.partyId)) {
+      partyInput.append(new Option(`Unknown PartyID · ${draft.partyId}`, draft.partyId));
+    }
+    partyInput.value = draft.partyId;
+  }
+  if (typeof event.flyerSource === "string") {
+    card.querySelector(".flyer-source-field").hidden = false;
+    flyerInput.value = draft.flyerSource;
+  }
 
   const artistPicker =
     card.querySelector(".artist-picker");
@@ -967,6 +984,8 @@ function renderEvent(event, venueOptions) {
         publishToWeb: publishInput.checked,
         artistIds: checkedArtistIds(),
         venueId: venueInput.value,
+        partyId: event.partyId === undefined ? undefined : partyInput.value,
+        flyerSource: event.flyerSource === undefined ? undefined : flyerInput.value,
         explicitQueer: explicitInput.checked,
         explicitQueerTouched
       }
@@ -977,6 +996,13 @@ function renderEvent(event, venueOptions) {
   }
 
   publicTitleInput.addEventListener("input", storeDraft);
+  partyInput.addEventListener("change", storeDraft);
+  flyerInput.addEventListener("input", storeDraft);
+  card.querySelector(".classify-standard").addEventListener("click", () => {
+    explicitInput.checked = false;
+    explicitQueerTouched = true;
+    storeDraft();
+  });
 
   descriptionInput.addEventListener(
     "input",
@@ -1179,7 +1205,7 @@ function renderCalendarCoverage(coverage, views) {
 }
 
 function renderDashboard() {
-  const { views, coverage, unknownFlyers } = dashboardEventViews(state.events, state.feedFlyers);
+  const { views, coverage, integrityEvents, unknownFlyers } = dashboardEventViews(state.events, state.feedFlyers);
   state.dashboardViews = views;
   renderCalendarCoverage(coverage, views);
   for (const button of elements.reviewButtons) {
@@ -1190,36 +1216,10 @@ function renderDashboard() {
 
   elements.flyerCoverage.hidden = unknownFlyers === 0;
   elements.flyerCoverage.textContent = unknownFlyers
-    ? `Flyer data unavailable for ${unknownFlyers} upcoming ${unknownFlyers === 1 ? "event" : "events"}.`
+    ? `Flyer data unavailable for ${unknownFlyers} ${unknownFlyers === 1 ? "event" : "events"}.`
     : "";
 
-  const week = views.get("next-seven-days");
-  const preview = week.slice(0, WEEK_PREVIEW_LIMIT).map(event => {
-    const item = document.createElement("li");
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "dashboard-row week-row";
-    button.dataset.eventView = "next-seven-days";
-    button.dataset.eventId = event.eventId;
-    button.disabled = state.busy;
-
-    const title = document.createElement("strong");
-    title.textContent = event.publicTitle || event.title || event.eventId;
-    const details = document.createElement("span");
-    const venue = state.venueById.get(event.venueId)?.name || event.venueName || event.location;
-    details.textContent = [
-      formatEventDate(event),
-      venue,
-      event.publishToWeb ? "" : "Hidden from website"
-    ].filter(Boolean).join(" · ");
-    button.append(title, details);
-    item.append(button);
-    return item;
-  });
-  elements.weekList.replaceChildren(...preview);
-  elements.weekEmpty.hidden = week.length > 0;
-  elements.viewWeek.hidden = week.length <= WEEK_PREVIEW_LIMIT;
-  elements.viewWeek.textContent = `View all ${week.length} events`;
+  window.QDPAdminIntegrity?.updateEvents(integrityEvents, views, state.artistById);
   elements.dashboardState.hidden = true;
   elements.dashboardContent.hidden = false;
 }
@@ -1354,6 +1354,7 @@ function applyDashboard(result, { preserveDrafts = false } = {}) {
   if (result.references) {
     state.artists = result.references.artists || [];
     state.venues = result.references.venues || [];
+    state.parties = result.references.parties || [];
     state.artistById = new Map(state.artists.map(artist => [artist.id, artist]));
     state.venueById = new Map(state.venues.map(venue => [venue.id, venue]));
   }
@@ -1381,6 +1382,7 @@ async function refreshDashboard({ discardDrafts = false, preserveDrafts = false,
     const result = await adminRequest('admin.bootstrap', { referencesVersion: state.referencesVersion });
     applyDashboard(result, { preserveDrafts });
     void refreshFeedFlyers();
+    void window.QDPAdminIntegrity?.refresh();
   } catch (error) {
     if (!state.dashboardViews.size) {
       elements.dashboardState.textContent = "Overview unavailable. Use Refresh to retry.";
@@ -1429,6 +1431,12 @@ elements.pushButton.addEventListener(
 );
 
 elements.dashboardContent.addEventListener("click", event => {
+  const link = event.target.closest("a[data-integrity-event-id]");
+  if (link && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+    event.preventDefault();
+    editIntegrityEvent(link.dataset.integrityEventId);
+    return;
+  }
   const button = event.target.closest("button[data-event-view]");
   if (!button) return;
 
@@ -1446,6 +1454,24 @@ elements.dashboardContent.addEventListener("click", event => {
   target.focus({ preventScroll: true });
   target.scrollIntoView({ block: "start" });
 });
+
+function editIntegrityEvent(eventId) {
+  const event = state.events.find(item => item.eventId === eventId);
+  if (!event) {
+    showToast("That event is no longer in Events.", true);
+    return;
+  }
+  state.integrityEventId = eventId;
+  elements.integrityEventOption.hidden = false;
+  elements.integrityEventOption.textContent = event.publicTitle || eventId;
+  elements.searchInput.value = "";
+  elements.filterSelect.value = "integrity-event";
+  renderEvents();
+  const card = state.cards.get(eventId)?.card;
+  const target = card?.parentElement === elements.eventList ? card : elements.eventsPanel;
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({ block: "start" });
+}
 
 elements.searchInput.addEventListener(
   "input",
@@ -1472,6 +1498,9 @@ window.addEventListener(
 
 refreshDashboard({
   discardDrafts: true
+}).then(() => {
+  const eventId = new URLSearchParams(window.location.search).get("editEvent");
+  if (eventId && state.dashboardViews.size) editIntegrityEvent(eventId);
 });
 
 
@@ -1480,7 +1509,7 @@ function eventSavePayload(event) {
   const draft = draftFor(event);
   return { eventId: event.eventId, expectedRevision: draft.expectedRevision || event.revision,
     publicTitle: draft.publicTitle, description: draft.description, publishToWeb: draft.publishToWeb,
-    artistIds: [...draft.artistIds], venueId: draft.venueId,
+    artistIds: [...draft.artistIds], venueId: draft.venueId, partyId: draft.partyId, flyerSource: draft.flyerSource,
     explicitQueer: draft.explicitQueer, explicitQueerTouched: draft.explicitQueerTouched };
 }
 

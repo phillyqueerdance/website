@@ -16,6 +16,11 @@ const ALLOWED_ACTIONS = new Set([
   "admin.profiles.list",
   "admin.profile.read",
   "admin.profile.save",
+  "admin.profile.schema",
+  "admin.profile.create",
+  "admin.integrity",
+  "admin.integrity.dismiss",
+  "admin.integrity.links",
   "admin.pull",
   "admin.push"
 ]);
@@ -350,6 +355,45 @@ export async function requestAppsScriptAdmin(env, body) {
   return response.json();
 }
 
+function publicProfileLink(value) {
+  if (typeof value !== "string" || value.length > 3000) return null;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
+    if (!["http:", "https:"].includes(url.protocol) || url.port || url.username || url.password ||
+        !/^(?:[a-z0-9-]+\.)+[a-z][a-z0-9-]*$/.test(host) ||
+        /(?:^|\.)(localhost|local|internal|lan|test|invalid|example|onion)$/.test(host)) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+async function checkProfileLink(value) {
+  let url = publicProfileLink(value);
+  if (!url) return "unverified";
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4500);
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const response = await fetch(url.toString(), {
+        method: "HEAD", redirect: "manual", signal: controller.signal
+      });
+      if (response.status === 404 || response.status === 410) return "broken";
+      if (response.ok) return "reachable";
+      const location = response.headers.get("Location");
+      if (![301, 302, 303, 307, 308].includes(response.status) || !location) break;
+      url = publicProfileLink(new URL(location, url).toString());
+      if (!url) break;
+    }
+    return "unverified";
+  } catch {
+    return "unverified";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function onRequestPost(
   context
 ) {
@@ -404,6 +448,13 @@ export async function onRequestPost(
         { error: "Unknown admin action." },
         400
       );
+    }
+
+    if (action === "admin.integrity.links") {
+      if (!Array.isArray(body.links) || body.links.length > 8) {
+        return jsonResponse({ error: "Check up to eight links at a time." }, 400);
+      }
+      return jsonResponse({ ok: "yes", statuses: await Promise.all(body.links.map(checkProfileLink)) });
     }
 
     const upstreamPayload = await requestAppsScriptAdmin(context.env, { ...body, action });

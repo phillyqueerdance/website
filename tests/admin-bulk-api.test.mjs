@@ -7,10 +7,19 @@ const source = fs.readFileSync(new URL('../functions/admin/api.js', import.meta.
   .replace(/^export /gm, '');
 function setup({
  upstream = {ok:'yes',events:[{eventId:'ONE',revision:'new'}]},
- authorize = async () => ({email:'test@example.com'})
+ authorize = async () => ({email:'test@example.com'}),
+ head = async () => new Response(null)
 } = {}){
  const requests=[];
- const ctx=vm.createContext({Request,Response,URL,TextEncoder,crypto,console:{error(){}},fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>upstream};}});
+ const ctx = vm.createContext({
+   Request, Response, URL, TextEncoder, crypto, AbortController, setTimeout, clearTimeout,
+   console: {error() {}},
+   fetch: async (url, options) => {
+     if (options.method === 'HEAD') return head(url, options);
+     requests.push({url, body: JSON.parse(options.body)});
+     return {ok: true, json: async () => upstream};
+   }
+ });
  vm.runInContext(source,ctx);ctx.verifyAccess=authorize;
  const call=(body,origin='https://qdp.example')=>ctx.onRequestPost({request:new Request('https://qdp.example/admin/api',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify(body)}),env:{QDP_ADMIN_SHARED_SECRET:'fixture-secret'}});
  return {requests,call};
@@ -36,7 +45,11 @@ test('profile editors use the existing private Apps Script proxy', async () => {
     {
       action: 'admin.profile.save', kind: 'collective', profileId: 'COLLECT-001',
       expectedRevision: 'old', fields: {CollBio: 'Updated bio'}
-    }
+    },
+    {action: 'admin.profile.schema', kind: 'artist'},
+    {action: 'admin.profile.create', kind: 'venue', fields: {VenueName: 'Fixture'}},
+    {action: 'admin.integrity'},
+    {action: 'admin.integrity.dismiss', key: 'artist:ARTIST-001:missing-photo'}
   ];
   for (const body of calls) {
     const response = await call(body);
@@ -57,5 +70,31 @@ test('profile saves require Admin access', async () => {
     action: 'admin.profile.save', kind: 'venue', profileId: 'VENUE-001', fields: {Address: '123 Main St'}
   });
   assert.equal(response.status, 403);
+  assert.equal(requests.length, 0);
+});
+
+test('external link checks distinguish a confirmed missing page from blocked requests', async () => {
+  const calls = [];
+  const {call, requests} = setup({
+    head: async (url, options) => {
+      calls.push(url);
+      assert.equal(options.redirect, 'manual');
+      if (url.endsWith('/gone')) return new Response(null, {status: 410});
+      if (url.endsWith('/blocked')) return new Response(null, {status: 403});
+      if (url.endsWith('/redirect')) return new Response(null, {
+        status: 302, headers: {Location: 'http://127.0.0.1/'}
+      });
+      return new Response(null);
+    }
+  });
+  const links = [
+    'https://example.com/gone', 'https://example.com/blocked', 'https://example.com/',
+    'http://127.0.0.1/', 'https://example.com/redirect'
+  ];
+  const response = await call({action: 'admin.integrity.links', links});
+  assert.deepEqual((await response.json()).statuses, [
+    'broken', 'unverified', 'reachable', 'unverified', 'unverified'
+  ]);
+  assert.deepEqual(calls, links.filter(link => link.startsWith('https:')));
   assert.equal(requests.length, 0);
 });

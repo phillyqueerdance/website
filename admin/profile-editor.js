@@ -1,69 +1,34 @@
 (() => {
-  const kind = document.querySelector("[data-profile-kind]").dataset.profileKind;
-  const picker = document.getElementById("profilePicker");
-  const loadStatus = document.getElementById("profileLoadStatus");
-  const form = document.getElementById("profileForm");
-  const recordId = document.getElementById("profileId");
-  const fields = document.getElementById("profileFields");
-  const save = document.getElementById("profileSave");
-  const saveStatus = document.getElementById("profileSaveStatus");
-  const inputs = new Map();
-  let current = null;
-  let busy = false;
-
   function message(node, text, error = false) {
     node.textContent = text;
     node.toggleAttribute("data-error", error);
   }
 
-  async function admin(action, data = {}) {
+  async function request(action, data = {}) {
     const response = await fetch("/admin/api", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ action, kind, ...data })
+      body: JSON.stringify({ action, ...data })
     });
     const result = await response.json().catch(() => null);
     if (response.redirected || response.status === 401 || response.status === 403) {
-      throw new Error("Sign in to QDP Admin to edit profiles.");
+      throw new Error("Sign in to QDP Admin to manage profiles.");
     }
     if (!response.ok || result?.ok !== "yes") {
       if (/^unknown admin action\.?$/i.test(result?.error || "")) {
-        throw new Error("Deploy the updated Core.gs to use this editor.");
+        throw new Error("Deploy the updated Core.gs to use this feature.");
       }
       throw new Error(result?.error || "Could not reach the Index. Try again.");
     }
     return result;
   }
 
-  function optionLabel(profile) {
-    return profile.name === profile.id ? profile.id : `${profile.name} · ${profile.id}`;
-  }
-
-  function changedFields() {
-    return Object.fromEntries(
-      Array.from(inputs)
-        .filter(([, { input, original }]) => input.value !== original)
-        .map(([key, { input }]) => [key, input.value])
-    );
-  }
-
-  function updateSaveButton() {
-    save.disabled = busy || !current || !Object.keys(changedFields()).length;
-  }
-
-  function setBusy(value) {
-    busy = picker.disabled = fields.disabled = value;
-    updateSaveButton();
-  }
-
-  function renderProfile(profile) {
+  function renderFields(container, fields) {
     const groups = new Map();
-    current = profile;
-    recordId.textContent = `${profile.idHeader} ${profile.id}`;
-    inputs.clear();
-    fields.replaceChildren();
-    for (const field of profile.fields) {
+    const inputs = new Map();
+    container.replaceChildren();
+    for (const field of fields) {
       if (!groups.has(field.group)) {
         const group = document.createElement("fieldset");
         const legend = document.createElement("legend");
@@ -72,7 +37,7 @@
         legend.textContent = field.group;
         grid.className = "profile-grid";
         group.append(legend, grid);
-        fields.append(group);
+        container.append(group);
         groups.set(field.group, grid);
       }
 
@@ -106,6 +71,59 @@
       }
       groups.get(field.group).append(label);
     }
+    return inputs;
+  }
+
+  const paths = { artist: 'artist-crops', venue: 'venues', party: 'parties', collective: 'collectives' };
+  function editUrl(kind, id) {
+    return "/admin/" + paths[kind] + "?id=" + encodeURIComponent(id);
+  }
+
+  window.QDPAdminProfiles = { request, renderFields, editUrl, message };
+  const panel = document.querySelector("[data-profile-kind]");
+  if (!panel) return;
+  const kind = panel.dataset.profileKind;
+
+  function admin(action, data = {}) {
+    return request(action, { kind, ...data });
+  }
+
+  const picker = document.getElementById("profilePicker");
+  const loadStatus = document.getElementById("profileLoadStatus");
+  const form = document.getElementById("profileForm");
+  const recordId = document.getElementById("profileId");
+  const fields = document.getElementById("profileFields");
+  const save = document.getElementById("profileSave");
+  const saveStatus = document.getElementById("profileSaveStatus");
+  let inputs = new Map();
+  let current = null;
+  let busy = false;
+
+  function optionLabel(profile) {
+    return profile.name === profile.id ? profile.id : `${profile.name} · ${profile.id}`;
+  }
+
+  function changedFields() {
+    return Object.fromEntries(
+      Array.from(inputs)
+        .filter(([, { input, original }]) => input.value !== original)
+        .map(([key, { input }]) => [key, input.value])
+    );
+  }
+
+  function updateSaveButton() {
+    save.disabled = busy || !current || !Object.keys(changedFields()).length;
+  }
+
+  function setBusy(value) {
+    busy = picker.disabled = fields.disabled = value;
+    updateSaveButton();
+  }
+
+  function renderProfile(profile) {
+    current = profile;
+    recordId.textContent = `${profile.idHeader} ${profile.id}`;
+    inputs = renderFields(fields, profile.fields);
     form.hidden = false;
     updateSaveButton();
   }
@@ -116,12 +134,17 @@
       for (const profile of profiles) picker.add(new Option(optionLabel(profile), profile.id));
       picker.disabled = profiles.length === 0;
       message(loadStatus, profiles.length ? "" : "No profiles found in the Index.");
+      const requested = new URLSearchParams(window.location.search).get("id");
+      if (profiles.some(profile => profile.id === requested)) {
+        picker.value = requested;
+        await loadSelectedProfile();
+      }
     } catch (error) {
       message(loadStatus, error.message, true);
     }
   }
 
-  picker.addEventListener("change", async () => {
+  async function loadSelectedProfile() {
     if (busy) return;
     if (Object.keys(changedFields()).length && !window.confirm("Discard your unsaved profile changes?")) {
       picker.value = current.id;
@@ -148,8 +171,9 @@
     } finally {
       setBusy(false);
     }
-  });
+  }
 
+  picker.addEventListener("change", loadSelectedProfile);
   form.addEventListener("input", updateSaveButton);
   form.addEventListener("change", updateSaveButton);
   form.addEventListener("submit", async event => {

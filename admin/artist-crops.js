@@ -307,6 +307,11 @@
       }
       artist.disabled = !catalog.size;
       message(artistStatus, indexMode ? (catalog.size ? "" : "No artists in the Index.") : needsDeployment);
+      const requested = new URLSearchParams(window.location.search).get("id");
+      if (catalog.has(requested)) {
+        artist.value = requested;
+        await loadArtist();
+      }
     } catch (error) {
       message(artistStatus, error.message || "Could not load artists. Reload and try again.", true);
     }

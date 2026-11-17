@@ -280,13 +280,6 @@ select:focus-visible {
   color: var(--yellow);
 }
 
-.week-row {
-  flex-direction: column;
-  justify-content: center;
-  overflow-wrap: anywhere;
-}
-
-.week-row span,
 .dashboard-note {
   color: var(--muted);
   font-size: 0.78rem;
@@ -297,19 +290,84 @@ select:focus-visible {
   margin: 10px 0 0;
 }
 
-.dashboard-more {
-  min-height: 44px;
-  padding: 0 2px;
-  border: 0;
-  color: var(--yellow);
-  background: transparent;
-  font-size: 0.84rem;
-  font-weight: 700;
-  text-align: left;
+.database-integrity {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
 }
 
-.dashboard-more:hover {
-  text-decoration: underline;
+.database-integrity > summary {
+  min-height: 44px;
+  padding: 9px 0;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.integrity-columns {
+  display: grid;
+  gap: 18px;
+  margin-top: 10px;
+}
+
+.integrity-columns section {
+  min-width: 0;
+}
+
+.integrity-check {
+  border-bottom: 1px solid var(--border);
+}
+
+.integrity-check summary {
+  padding: 12px 2px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  font-size: .89rem;
+}
+
+.integrity-check summary strong {
+  float: right;
+  margin-left: 8px;
+  color: var(--yellow);
+  font-variant-numeric: tabular-nums;
+}
+
+.integrity-check ul {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.integrity-check li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0 4px 12px;
+  overflow-wrap: anywhere;
+}
+
+.integrity-check a {
+  color: var(--text);
+}
+
+.integrity-check small {
+  display: block;
+  color: var(--muted);
+}
+
+.integrity-check button,
+.classify-standard {
+  min-height: 40px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--panel-raised);
+}
+
+.database-integrity .dashboard-note:empty,
+.event-card .field[hidden],
+#createdProfile[hidden] {
+  display: none;
 }
 
 .calendar-coverage {
@@ -1040,7 +1098,7 @@ select:focus-visible {
     padding: 25px;
   }
 
-  .dashboard-content {
+  .integrity-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

@@ -57,17 +57,6 @@ test("legacy flyer data distinguishes missing flyers from unverified listings", 
   assert.equal(unknownFlyers, 1);
 });
 
-test("the week includes ongoing events and ends at the Philadelphia date boundary", () => {
-  const events = [
-    event("OVERNIGHT", { start: "2026-11-16T22:00:00-05:00", end: "2026-11-17T15:00:00Z" }),
-    event("ENDED", { start: "2026-11-17T05:00:00-05:00", end: "2026-11-17T13:00:00Z" }),
-    event("LAST-NIGHT", { start: "2026-11-24T04:59:00Z" }),
-    event("NEXT-WEEK", { start: "2026-11-24T05:00:00Z" })
-  ];
-  const { views } = context.dashboardEventViews(events, new Map(), now);
-  assert.deepEqual(ids(views, "next-seven-days"), ["OVERNIGHT", "LAST-NIGHT"]);
-});
-
 test("review queues use saved active rows and flag both sides of a possible duplicate", () => {
   const events = [
     event("ORIGINAL", { publicTitle: "🏳️‍🌈 Late   Show", needsPush: true }),

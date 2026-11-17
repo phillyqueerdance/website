@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
   <link rel="stylesheet" href="../poster-theme.css?v=20260926-01">
-  <link rel="stylesheet" href="admin.css?v=20261117-coverage">
+  <link rel="stylesheet" href="admin.css?v=20261117-integrity">
   <link rel="stylesheet" href="post-generator.css?v=20261020-queer-filter-1">
 </head>
 
@@ -54,15 +54,12 @@
       </div>
 
       <nav class="dashboard-links" aria-label="Quick actions">
-        <a class="admin-page-link" href="#events">Events</a>
-        <a class="admin-page-link" href="#calendar-sync">Calendar sync</a>
-        <a class="admin-page-link" href="#generate-post">Generate Post</a>
         <a class="admin-page-link" href="/admin/artist-crops">Artists</a>
         <a class="admin-page-link" href="/admin/venues">Venues</a>
         <a class="admin-page-link" href="/admin/parties">Parties</a>
         <a class="admin-page-link" href="/admin/collectives">Collectives</a>
         <a class="admin-page-link" href="/admin/apify-import">Apify Import</a>
-        <a class="admin-page-link" href="/">Public calendar</a>
+        <a class="admin-page-link" href="/admin/create-entity">Create entity</a>
       </nav>
 
       <p id="dashboardState" class="dashboard-note" role="status">Loading overview…</p>
@@ -72,20 +69,25 @@
           <ul class="dashboard-list">
             <li><button class="dashboard-row review-row" type="button" data-event-view="needs-push">Needs push <strong></strong></button></li>
             <li><button class="dashboard-row review-row" type="button" data-event-view="hidden-upcoming">Hidden upcoming <strong></strong></button></li>
-            <li><button class="dashboard-row review-row" type="button" data-event-view="missing-flyer" aria-describedby="flyerCoverage">Missing flyers <strong></strong></button></li>
             <li><button class="dashboard-row review-row" type="button" data-event-view="missing-venue">Missing Venue IDs <strong></strong></button></li>
-            <li><button class="dashboard-row review-row" type="button" data-event-view="missing-description">Missing descriptions <strong></strong></button></li>
-            <li><button class="dashboard-row review-row" type="button" data-event-view="possible-duplicate" title="Matching titles within 3 hours on the same night. A shared venue allows minor title differences.">Possible duplicates <strong></strong></button></li>
           </ul>
-          <p id="flyerCoverage" class="dashboard-note" hidden></p>
         </section>
 
-        <section aria-labelledby="upcomingHeading">
-          <h3 id="upcomingHeading">Next 7 days</h3>
-          <ul id="weekList" class="dashboard-list"></ul>
-          <p id="weekEmpty" class="dashboard-note" hidden>No events scheduled in the next 7 days.</p>
-          <button id="viewWeek" class="dashboard-more" type="button" data-event-view="next-seven-days" hidden></button>
-        </section>
+        <details id="databaseIntegrity" class="database-integrity">
+          <summary>Database integrity</summary>
+          <p id="integrityStatus" class="dashboard-note" role="status"></p>
+          <div class="integrity-columns">
+            <section aria-labelledby="eventIntegrityHeading">
+              <h3 id="eventIntegrityHeading">Events</h3>
+              <div id="eventIntegrity"></div>
+              <p id="flyerCoverage" class="dashboard-note" hidden></p>
+            </section>
+            <section aria-labelledby="entityIntegrityHeading">
+              <h3 id="entityIntegrityHeading">Entities</h3>
+              <div id="entityIntegrity"></div>
+            </section>
+          </div>
+        </details>
 
         <section class="calendar-coverage" aria-labelledby="coverageHeading">
           <div class="section-heading coverage-heading">
@@ -258,11 +260,11 @@
           <span class="sr-only">Filter events</span>
           <select id="filterSelect">
             <option value="upcoming">Upcoming</option>
-            <option value="next-seven-days">Next 7 days</option>
             <option value="published">Showing on website</option>
             <option value="hidden">Hidden from website</option>
             <option value="all">All active rows</option>
             <option id="coverageDateOption" value="" hidden>Website events by date</option>
+            <option id="integrityEventOption" value="integrity-event" hidden>Selected event</option>
             <optgroup label="Needs attention">
               <option value="needs-push">Needs push</option>
               <option value="hidden-upcoming">Hidden upcoming</option>
@@ -349,6 +351,13 @@
           <textarea class="description-input" rows="5" maxlength="20000"></textarea>
         </label>
 
+        <label class="field flyer-source-field" hidden>
+          <span>Flyer link</span>
+          <input class="flyer-source-input" type="text" inputmode="url" maxlength="3000">
+        </label>
+
+        <button class="classify-standard" type="button" hidden>Mark as standard</button>
+
         <div class="linked-fields">
           <label class="field venue-field">
             <span>Venue ID</span>
@@ -357,6 +366,11 @@
               Uses the Sheet's venue autofill rules for address, neighborhood,
               and queer venues.
             </small>
+          </label>
+
+          <label class="field party-field" hidden>
+            <span>Party ID</span>
+            <select class="party-input"></select>
           </label>
 
           <div class="field artist-field">
@@ -412,7 +426,9 @@
 
   <script src="../event-metadata.js?v=20261112-vals-melt-strip-1"></script>
   <script src="../live-calendar.js?v=20261019-calendar-cutoff-1"></script>
-  <script src="admin.js?v=20261117-coverage"></script>
+  <script src="profile-editor.js?v=20261117-integrity"></script>
+  <script src="integrity.js?v=20261117-integrity"></script>
+  <script src="admin.js?v=20261117-integrity"></script>
   <script src="post-generator.js?v=20261112-vals-melt-strip-1"></script>
 </body>
 </html>
