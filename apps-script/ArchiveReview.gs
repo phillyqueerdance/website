@@ -1,8 +1,8 @@
 /**
- * Queer Dance Philly — Archive Updates v7.4.19
+ * Queer Dance Philly — Archive Updates v7.4.20
  * ArchiveReview.gs: Archive ID review, Admin Archive Updates, saved rejects,
  * approvals, resumable jobs, and artist-indicator recalculation.
- * Replace only ArchiveReview.gs for this batch-review update. Keep the
+ * Replace only ArchiveReview.gs for this event-editor update. Keep the
  * existing Archive Updates Core.gs and PublicData.gs installations.
  * Use the supplied PublicData.gs to publish every Archive YYYY tab.
  * Keep Imports.gs, scraper.gs, the manifest, services, properties, deployment
@@ -1261,14 +1261,12 @@ function qdpArchiveAdminPage_(body) {
     const headers = rows[0] || [];
     const column = names => headers.findIndex(h => names.includes(String(h).trim()));
     const idColumn = column(['EventID', 'Event ID']);
-    const sheet = ss.getSheetByName(event.sheet);
-    if (sheet) event.editUrl = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(ss.getId()) +
-      '/edit#gid=' + sheet.getSheetId();
+    event.editUrl = '/admin/event.html?eventId=' + encodeURIComponent(event.eventId) + '&sheet=' + encodeURIComponent(event.sheet);
     const matches = rows.slice(1).map((row, i) => ({ row, number: i + 2 }))
       .filter(item => String(item.row[idColumn] || '').trim() === event.eventId);
     if (matches.length !== 1) { event.sourceIssue = 'Event missing or duplicated; scan again after correcting the source.'; return; }
-    const { row, number } = matches[0];
-    event.editUrl += '&range=' + number + ':' + number;
+    const { row } = matches[0];
+    event.description = String(row[column(['Description'])] == null ? '' : row[column(['Description'])]);
     event.date = qdpArchiveAdminDate_(row[column(['StartDate', 'Start Date'])]);
     const flyer = row[column(['FlyerURL', 'Flyer URL', 'Flyer_URL'])] ||
       row[column(['RawFlyerURL', 'Raw Flyer URL'])] ||
@@ -1284,6 +1282,163 @@ function qdpArchiveAdminPage_(body) {
     events, totalEvents: all.length, offset, pageSize: QDP_ARCHIVE_ADMIN_.pageSize };
   if (body.references) payload.references = qdpArchiveAdminReferences_();
   return payload;
+}
+
+/* The individual event editor resolves the source by sheet and EventID on
+ * every read/save. Historical records stay in their original archive tab. */
+function qdpArchiveAdminEventTarget_(body) {
+  const ss = qdpArchiveSpreadsheet_();
+  const name = String(body.sheet || '').trim(), id = String(body.eventId || '').trim();
+  if (!qdpArchiveSheets_(ss, true).includes(name) || !id || id.length > 200) {
+    throw new Error('Choose a recorded event from Archive Updates.');
+  }
+  const sheet = ss.getSheetByName(name), layout = qdpArchiveLayout_(sheet);
+  const rows = sheet.getDataRange().getValues();
+  const matches = rows.slice(1).map((row, i) => ({ row, number: i + 2 }))
+    .filter(item => String(item.row[layout.columns.eventId - 1] || '').trim() === id);
+  if (matches.length !== 1) throw new Error(matches.length ? 'This event is duplicated in its source tab. Correct the duplicate before editing.' :
+    'This event is no longer in its source tab. Refresh Archive Updates.');
+  const target = { ss, sheet, layout, ...matches[0], eventId: id };
+  target.formulas = sheet.getRange(target.number, 1, 1, layout.width).getFormulas()[0];
+  target.revision = qdpArchiveDigest_(JSON.stringify([name, id, layout.headers, target.row, target.formulas]));
+  return target;
+}
+
+function qdpArchiveAdminEventFields_(target) {
+  const specs = [
+    [['Title (internal)', 'Title'], 'Title', 'Event', 'text', 500],
+    [['Title_Public (auto w/ emojis)', 'Title Public (auto w/ emojis)', 'Title_Public'], 'Public title', 'Event', 'text', 500],
+    [['Description'], 'Description', 'Event', 'long', 50000],
+    [['Status'], 'Status', 'Event', 'text', 100],
+    [['StartDate', 'Start Date'], 'Start date', 'Date and time', 'date', 10],
+    [['StartTime', 'Start Time'], 'Start time', 'Date and time', 'time', 20],
+    [['EndDate', 'End Date'], 'End date', 'Date and time', 'date', 10],
+    [['EndTime', 'End Time'], 'End time', 'Date and time', 'time', 20],
+    [['Timezone', 'Time zone'], 'Time zone', 'Date and time', 'text', 100],
+    [['VenueID', 'Venue ID', 'Venue Id'], 'Venue', 'Location', 'venue', 80],
+    [['Location'], 'Location', 'Location', 'text', 3000],
+    [['Address (from Venue)', 'Address from Venue', 'Address'], 'Address', 'Location', 'text', 1000],
+    [['Neighborhood (from Venue)', 'Neighborhood from Venue', 'Neighborhood'], 'Neighborhood', 'Location', 'neighborhood', 300],
+    [['ArtistIDs (comma-separated)', 'ArtistIDs', 'Artist IDs'], 'Artists', 'Associations', 'artist', 10000],
+    [['HostCollectiveIDs (comma-separated)', 'HostCollectiveIDs', 'Host Collective IDs'], 'Collectives', 'Associations', 'collective', 10000],
+    [['PartyID', 'Party ID', 'Party Id'], 'Party', 'Associations', 'party', 80],
+    [['ExplicitQueer (Yes/No)', 'Explicit Queer (Yes/No)', 'ExplicitQueer'], 'Explicitly queer event', 'Visibility', 'flag', 3],
+    [['Publish_To_Web', 'Publish To Web'], 'Show on website', 'Visibility', 'flag', 3],
+    [['Event_URL', 'Event URL', 'EventURL', 'Event Link', 'EventLink'], 'Event link', 'Links and photos', 'url', 3000],
+    [['Ticket_URL', 'Ticket URL', 'TicketURL'], 'Ticket link', 'Links and photos', 'url', 3000],
+    [['Source_URL', 'Source URL'], 'Source link', 'Links and photos', 'url', 3000],
+    [['Instagram_URL', 'Instagram URL'], 'Instagram link', 'Links and photos', 'url', 3000],
+    [['Flyer_URL', 'Flyer URL', 'FlyerURL'], 'Flyer image URL', 'Links and photos', 'url', 3000],
+    [['RawFlyerURL', 'Raw Flyer URL'], 'Original flyer link', 'Links and photos', 'url', 3000],
+    [['PhotoURLs', 'Photo URLs'], 'Photo URLs', 'Links and photos', 'long', 50000]
+  ];
+  const headers = target.layout.headers;
+  const tzColumn = headers.findIndex(h => ['Timezone', 'Time zone'].includes(h));
+  const zone = String(target.row[tzColumn] || 'America/New_York');
+  return specs.map(([aliases, label, group, type, maxLength]) => {
+    const key = aliases.find(alias => headers.includes(alias));
+    if (!key) return null;
+    const column = headers.indexOf(key) + 1, raw = target.row[column - 1];
+    let value = raw instanceof Date && !isNaN(+raw) ? Utilities.formatDate(raw, zone,
+      type === 'date' ? 'yyyy-MM-dd' : type === 'time' ? 'HH:mm:ss' : 'yyyy-MM-dd HH:mm:ss') : String(raw == null ? '' : raw);
+    if (type === 'time' && typeof raw === 'number' && raw >= 0 && raw < 1) {
+      const seconds = Math.round(raw * 86400) % 86400;
+      value = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
+        .map(n => String(n).padStart(2, '0')).join(':');
+    }
+    return { key, label, group, type, maxLength, column, value, readOnly: !!target.formulas[column - 1],
+      manualLocation: ['Location', 'Address', 'Neighborhood'].includes(label) };
+  }).filter(Boolean);
+}
+
+function qdpArchiveAdminEventRecord_(target) {
+  return { eventId: target.eventId, sheet: target.layout.name, revision: target.revision,
+    title: String(target.row[target.layout.columns.title - 1] || target.eventId),
+    fields: qdpArchiveAdminEventFields_(target).map(({column, ...field}) => field) };
+}
+
+function qdpArchiveAdminReadEvent_(body) {
+  const target = qdpArchiveAdminEventTarget_(body);
+  return { event: qdpArchiveAdminEventRecord_(target), references: qdpArchiveAdminReferences_() };
+}
+
+function qdpArchiveAdminSaveEvent_(body) {
+  qdpArchiveAdminReady_();
+  if (typeof Sheets === 'undefined') throw new Error('Enable Google Sheets API under Apps Script Services before saving.');
+  const sync = typeof qdpAdminReadSyncJob_ === 'function' ? qdpAdminReadSyncJob_() : null;
+  if (sync && ['queued', 'running'].includes(sync.state)) throw new Error('A Calendar sync is running. Keep your edits here and save when it finishes.');
+  const target = qdpArchiveAdminEventTarget_(body);
+  if (body.expectedRevision !== target.revision) throw new Error('This event changed since you opened it. Your edits were not saved. Reload the event and review the changes.');
+  if (!body.fields || typeof body.fields !== 'object' || Array.isArray(body.fields)) throw new Error('Choose event fields to save.');
+  const fields = qdpArchiveAdminEventFields_(target), byKey = new Map(fields.map(field => [field.key, field]));
+  const lookups = qdpArchiveLookups_(target.ss), changed = new Set(), updates = new Map();
+  const row = target.row.slice(), c = target.layout.columns;
+  function set(column, value) {
+    if (column && !target.formulas[column - 1] && String(row[column - 1] == null ? '' : row[column - 1]) !== String(value)) {
+      row[column - 1] = value; updates.set(column, value);
+    }
+  }
+  for (const [key, raw] of Object.entries(body.fields)) {
+    const field = byKey.get(key);
+    if (!field || field.readOnly) throw new Error('That event field cannot be edited: ' + key);
+    if (typeof raw !== 'string' || raw.length > field.maxLength) throw new Error(field.label + ' contains invalid or excessive text.');
+    let value = field.type === 'long' ? raw.replace(/\r\n?/g, '\n') : raw.trim();
+    if (value === field.value) continue;
+    if (field.label === 'Title' && !value) throw new Error('Enter an event title.');
+    if (field.label === 'Start date' && !value) throw new Error('Enter a start date.');
+    if (field.type === 'flag' && !['', 'Yes', 'No'].includes(value)) throw new Error('Choose Yes, No, or Unspecified for ' + field.label + '.');
+    if (field.type === 'url' && value && !qdpArchiveLink_(value)) throw new Error('Enter an HTTP or HTTPS URL for ' + field.label + '.');
+    if (field.type === 'date' && value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || isNaN(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) throw new Error('Enter a valid ' + field.label.toLowerCase() + '.');
+    if (field.type === 'time' && value && !/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value)) throw new Error('Use a 24-hour time for ' + field.label + '.');
+    if (field.type === 'neighborhood' && value && typeof QDP_NEIGHBORHOODS_ !== 'undefined' && !QDP_NEIGHBORHOODS_.includes(value)) throw new Error('Choose a neighborhood from the list.');
+    const lookupKey = {artist: 'artists', collective: 'collectives', venue: 'venue', party: 'party'}[field.type];
+    if (lookupKey) {
+      const ids = qdpArchiveIds_(value), original = qdpArchiveIds_(field.value);
+      if (['venue', 'party'].includes(field.type) && ids.length > 1) throw new Error('Choose one ' + field.label.toLowerCase() + '.');
+      const unknown = ids.filter(id => !lookups[lookupKey].ids.has(id) && !original.includes(id) &&
+        !(field.type === 'venue' && ['SECLOC-001', 'TOBEAN-001'].includes(id)));
+      if (unknown.length) throw new Error('Unknown ' + field.label.toLowerCase() + ': ' + unknown.join(', '));
+      value = ids.join(', ');
+    }
+    changed.add(key); set(field.column, value);
+  }
+  const venueId = String(row[c.venue - 1] || '').trim();
+  if (venueId && fields.some(field => field.manualLocation && changed.has(field.key))) throw new Error('Clear the venue before entering a manual location.');
+  const venueChanged = updates.has(c.venue), artistsChanged = updates.has(c.artists), partyChanged = updates.has(c.party);
+  const column = aliases => target.layout.headers.findIndex(h => aliases.includes(h)) + 1;
+  if (venueChanged && venueId) {
+    const venue = lookups.core.venueById[venueId];
+    if (venue) {
+      set(c.location, venue.publicName || venue.internal || venue.name || venueId);
+      set(column(['Address (from Venue)', 'Address from Venue', 'Address']), venue.address || '');
+      set(column(['Neighborhood (from Venue)', 'Neighborhood from Venue', 'Neighborhood']), venue.neighborhood || '');
+    }
+    if (!updates.has(c.explicit) && lookups.venue.queer.has(venueId)) set(c.explicit, 'Yes');
+  }
+  if (artistsChanged || partyChanged) {
+    const indicators = qdpArchiveIndicatorValues_(row[c.artists - 1], lookups, row[c.party - 1]);
+    if (!indicators.unknown) { set(c.queerIndicator, indicators.queer); set(c.transIndicator, indicators.trans); }
+  }
+  if ((updates.has(c.title) || artistsChanged || partyChanged) && typeof buildEventPublicTitle_ === 'function') {
+    const publicTitle = column(['Title_Public (auto w/ emojis)', 'Title Public (auto w/ emojis)', 'Title_Public']);
+    if (!updates.has(publicTitle)) set(publicTitle, buildEventPublicTitle_(row[c.title - 1], qdpArchiveIds_(row[c.artists - 1]), lookups.core, row[c.party - 1]));
+  }
+  if (updates.has(c.description) && !updates.has(c.explicit) && typeof contentImpliesExplicitQueer_ === 'function' &&
+      contentImpliesExplicitQueer_(row[c.title - 1], row[c.description - 1])) set(c.explicit, 'Yes');
+  const start = fields.find(field => field.label === 'Start date'), end = fields.find(field => field.label === 'End date');
+  if (start && end && (changed.has(start.key) || changed.has(end.key))) {
+    const from = updates.has(start.column) ? row[start.column - 1] : start.value;
+    const to = updates.has(end.column) ? row[end.column - 1] : end.value;
+    if (from && to && to < from) throw new Error('The end date cannot precede the start date.');
+  }
+  if (updates.size) {
+    if (target.layout.name === CONFIG.SHEET_EVENTS) set(column(['LastEditedAt', 'Last Edited At']), new Date().toISOString());
+    const latest = qdpArchiveAdminEventTarget_(body);
+    if (latest.revision !== target.revision) throw new Error('This event changed while saving. Nothing was written; your edits have been kept.');
+    qdpArchiveAdminMarkDirty_();
+    qdpArchiveWriteCells_(target.ss, [...updates].map(([column, value]) => ({sheet: target.sheet, row: latest.number, column, value})));
+  }
+  return { event: qdpArchiveAdminEventRecord_(qdpArchiveAdminEventTarget_(body)), needsPublish: !!updates.size };
 }
 
 function qdpArchiveAdminDecide_(body) {
@@ -1365,6 +1520,8 @@ function qdpArchiveAdminRejects_(body) {
 function qdpAdminArchive_(body) {
   const action = String(body.action || '').trim().toLowerCase();
   if (action === 'admin.archive.bootstrap') return qdpArchiveAdminPage_(body);
+  if (action === 'admin.archive.event.read') return qdpArchiveAdminReadEvent_(body);
+  if (action === 'admin.archive.event.save') return qdpArchiveWithLock_(() => qdpArchiveAdminSaveEvent_(body));
   if (action === 'admin.archive.rejects') return qdpArchiveAdminRejects_(body);
   if (action === 'admin.archive.step') {
     qdpArchiveAdminWorker();

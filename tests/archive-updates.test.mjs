@@ -25,6 +25,8 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
     getValues() { return Array.from({ length: this.height }, (_, i) => Array.from({ length: this.width }, (_, j) =>
       this.sheet.rows[this.row - 1 + i]?.[this.col - 1 + j] ?? '')); }
     getValue() { return this.getValues()[0][0]; }
+    getFormulas() { return Array.from({length: this.height}, (_, i) => Array.from({length: this.width}, (_, j) =>
+      this.sheet.formulas?.[this.row - 1 + i]?.[this.col - 1 + j] || '')); }
     setValues(values) {
       assert.equal(values.length, this.height);
       values.forEach((row, i) => {
@@ -190,13 +192,85 @@ test('rejection-only batches stay saved without publishing or applying unchecked
   assert.deepEqual(h.publishes, []);
 });
 
-test('event edit links target the current exact archive row after records move', () => {
+test('event edit links open Admin using stable EventID and source tab after records move', () => {
   const h = setup({events: [event('ONE', 'New Artist'), event('TWO', 'No match')]});
   h.call('scan');
   const sheet = h.sheets.get('Events_Archive');
   [sheet.rows[1], sheet.rows[2]] = [sheet.rows[2], sheet.rows[1]];
   assert.equal(h.call('bootstrap').events[0].editUrl,
-    `https://docs.google.com/spreadsheets/d/qdp-index/edit#gid=${sheet.getSheetId()}&range=3:3`);
+    '/admin/event.html?eventId=ONE&sheet=Events_Archive');
+});
+
+test('review results include the full original description without truncating or stripping line breaks', () => {
+  const description = 'New Artist\n\n' + 'Full recorded event copy. '.repeat(90) + '\nLast line of the event.';
+  const h = setup({events: [event('ONE', description)]});
+  assert.equal(h.call('scan').events[0].description, description);
+});
+
+test('Admin event editor saves a historical description to its original source without touching Events', () => {
+  const h = setup({active: [event('ONE', 'Current event stays separate')]});
+  const source = {eventId: 'ONE', sheet: 'Events_Archive'};
+  const loaded = h.call('event.read', source);
+  assert.equal(loaded.event.fields.find(field => field.key === 'Description').value, 'Featuring New Artist and The Crew');
+  const saved = h.call('event.save', {...source, expectedRevision: loaded.event.revision, fields: {Description: 'Updated\n\nFull description'}});
+  assert.equal(saved.event.fields.find(field => field.key === 'Description').value, 'Updated\n\nFull description');
+  assert.notEqual(saved.event.revision, loaded.event.revision);
+  assert.equal(h.sheets.get('Events').rows[1][eventHeaders.indexOf('Description')], 'Current event stays separate');
+  assert.equal(h.sheets.get('Events_Archive').rows[1][eventHeaders.indexOf('LastEditedAt')], '');
+  assert.equal(saved.needsPublish, true);
+  assert.equal(h.batchRequests.length, 1);
+});
+
+test('event editor follows row movement and rejects stale, missing, or duplicated records before writing', () => {
+  for (const mode of ['moved', 'changed', 'missing', 'duplicate']) {
+    const h = setup({events: [event('ONE', 'Original description'), event('TWO', 'Other event')]});
+    const source = {eventId: 'ONE', sheet: 'Events_Archive'};
+    const loaded = h.call('event.read', source), sheet = h.sheets.get(source.sheet);
+    if (mode === 'moved') [sheet.rows[1], sheet.rows[2]] = [sheet.rows[2], sheet.rows[1]];
+    if (mode === 'changed') sheet.rows[1][eventHeaders.indexOf('Description')] = 'External edit';
+    if (mode === 'missing') sheet.rows.splice(1, 1);
+    if (mode === 'duplicate') sheet.rows.push(sheet.rows[1].slice());
+    const save = () => h.call('event.save', {...source, expectedRevision: loaded.event.revision, fields: {Description: 'My edit'}});
+    if (mode === 'moved') {
+      save(); assert.equal(sheet.rows[2][eventHeaders.indexOf('Description')], 'My edit');
+      assert.equal(sheet.rows[1][eventHeaders.indexOf('Description')], 'Other event');
+    } else { assert.throws(save, /changed|no longer|duplicated/); assert.equal(h.batchRequests.length, 0); }
+  }
+});
+
+test('event editor protects formulas and system fields and preserves unrelated archive data', () => {
+  const h = setup();
+  const source = {eventId: 'ONE', sheet: 'Events_Archive'}, sheet = h.sheets.get(source.sheet);
+  sheet.formulas = []; sheet.formulas[1] = []; sheet.formulas[1][eventHeaders.indexOf('Title_Public (auto w/ emojis)')] = '=A2';
+  const loaded = h.call('event.read', source);
+  assert.equal(loaded.event.fields.find(f => f.key === 'Title_Public (auto w/ emojis)').readOnly, true);
+  for (const fields of [{EventID: 'OTHER'}, {'Title_Public (auto w/ emojis)': 'Overwrite formula'}, {CalendarEventId: 'other-calendar-id'}]) {
+    assert.throws(() => h.call('event.save', {...source, expectedRevision: loaded.event.revision, fields}), /cannot be edited/);
+  }
+  assert.equal(h.batchRequests.length, 0);
+  h.call('event.save', {...source, expectedRevision: loaded.event.revision, fields: {'ArtistIDs (comma-separated)': 'NEW'}});
+  assert.equal(sheet.formulas[1][eventHeaders.indexOf('Title_Public (auto w/ emojis)')], '=A2');
+  assert.equal(sheet.rows[1][eventHeaders.indexOf('QueerArtistIndicator')], 'Yes');
+  assert.equal(sheet.rows[1][eventHeaders.indexOf('TransArtistIndicator')], 'Yes');
+  assert.equal(sheet.rows[1][eventHeaders.indexOf('Description')], 'Featuring New Artist and The Crew');
+});
+
+test('event editor rejects new unknown IDs, non-event tabs, and invalid links before writing', () => {
+  const h = setup(), source = {eventId: 'ONE', sheet: 'Events_Archive'};
+  const loaded = h.call('event.read', source);
+  for (const fields of [{'ArtistIDs (comma-separated)': 'MISSING'}, {Flyer_URL: 'javascript:alert(1)'}]) {
+    assert.throws(() => h.call('event.save', {...source, expectedRevision: loaded.event.revision, fields}), /Unknown|HTTP or HTTPS/);
+  }
+  assert.throws(() => h.call('event.read', {sheet: 'Artists', eventId: 'NEW'}), /recorded event/);
+  assert.equal(h.batchRequests.length, 0);
+});
+
+test('editing active Events marks the record for Calendar sync and never writes Calendar directly', () => {
+  const h = setup({active: [event('ACTIVE', 'Original')]});
+  const source = {eventId: 'ACTIVE', sheet: 'Events'}, loaded = h.call('event.read', source);
+  h.call('event.save', {...source, expectedRevision: loaded.event.revision, fields: {Description: 'Updated'}});
+  assert.ok(Date.parse(h.sheets.get('Events').rows[1][eventHeaders.indexOf('LastEditedAt')]));
+  assert.deepEqual(h.publishes, []);
 });
 
 test('a stale checked revision prevents the entire save before any decisions are written', () => {

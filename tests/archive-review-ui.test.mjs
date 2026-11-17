@@ -24,7 +24,7 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
   const requests = [], timers = new Map(), windowListeners = {};
   let timerId = 0;
   const events = pages.map((proposals, i) => ({eventId: 'EVENT-' + i, title: 'Night ' + i, sheet: 'Archive 2025',
-    date: '2025-04-01', editUrl: `https://docs.google.com/spreadsheets/d/INDEX/edit#gid=12&range=${i+2}:${i+2}`, proposals}));
+    date: '2025-04-01', description: 'Full event description\n\n' + 'A complete event detail. '.repeat(40) + '\nFinal detail.', proposals}));
   const payload = data => {
     const offset = Math.max(0, Math.min(events.length - 1, data.offset || 0));
     const summary = {pending: 0, approved: 0, applied: 0, rejected: 0, blocked: 0};
@@ -132,11 +132,13 @@ test('unchecked and cleared revisions never get sent, and check-page skips ambig
   assert.equal(h.requests.length, 1);
 });
 
-test('edit-event links open exact source rows separately, and leaving guards unsaved choices', async () => {
+test('results display the full description and open the Admin event editor separately without losing choices', async () => {
   const h = setup(); await h.settle();
   const link = h.find('archiveEvents', child => child.className === 'archive-edit-event')[0];
-  assert.equal(link.href, 'https://docs.google.com/spreadsheets/d/INDEX/edit#gid=12&range=2:2');
+  assert.equal(link.href, '/admin/event.html?eventId=EVENT-0&sheet=Archive%202025');
   assert.equal(link.target, '_blank');
+  const description = h.find('archiveEvents', child => child.className === 'archive-event-description')[0];
+  assert.equal(description.children[1].textContent, 'Full event description\n\n' + 'A complete event detail. '.repeat(40) + '\nFinal detail.');
   await h.change(h.candidates()[0], true);
   const event = {preventDefault() { this.prevented = true; }};
   h.windowListeners.beforeunload(event);

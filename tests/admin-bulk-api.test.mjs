@@ -75,7 +75,7 @@ test('profile saves require Admin access', async () => {
 
 test('archive review actions retain the existing authentication, same-origin and secret proxy boundary', async () => {
   const h = setup({upstream: {ok: 'yes', summary: {pending: 1}}});
-  for (const suffix of ['bootstrap', 'scan', 'step', 'decide', 'save', 'apply', 'publish', 'retry', 'rejects', 'restore']) {
+  for (const suffix of ['bootstrap', 'scan', 'step', 'decide', 'save', 'event.read', 'event.save', 'apply', 'publish', 'retry', 'rejects', 'restore']) {
     const body = {action: 'admin.archive.' + suffix, changes: [{key: 'fixture', revision: 'old'}]};
     const response = await h.call(body);
     assert.equal(response.status, 200);

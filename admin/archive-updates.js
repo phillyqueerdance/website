@@ -158,18 +158,15 @@
       const title = node("h3"), link = node("a", "", event.title);
       link.href = "/?event=" + encodeURIComponent(event.eventId); link.target = "_blank"; link.rel = "noopener";
       title.append(link); body.append(title, node("p", "event-id", `${event.eventId} · ${event.sheet}`));
-      if (event.editUrl) {
-        try {
-          const url = new URL(event.editUrl);
-          if (url.protocol === 'https:' && url.hostname === 'docs.google.com' && url.pathname.startsWith('/spreadsheets/')) {
-            const edit = node('a', 'archive-edit-event', 'Edit event');
-            edit.href = url.href; edit.target = '_blank'; edit.rel = 'noopener';
-            edit.title = 'Edit this event in its source spreadsheet row';
-            body.append(edit);
-          }
-        } catch {}
-      }
+      const edit = node('a', 'archive-edit-event', 'Edit event');
+      edit.href = '/admin/event.html?eventId=' + encodeURIComponent(event.eventId) + '&sheet=' + encodeURIComponent(event.sheet);
+      edit.target = '_blank'; edit.rel = 'noopener'; edit.title = 'Edit this event in QDP Admin';
+      body.append(edit);
       if (event.sourceIssue) body.append(node("p", "archive-result", event.sourceIssue));
+      const description = node('section', 'archive-event-description');
+      description.append(node('h4', '', 'Event description'), node('p', '', event.description ||
+        (event.sourceIssue ? 'Description unavailable: correct the source record and refresh.' : 'No description recorded.')));
+      body.append(description);
       for (const proposal of event.proposals) renderProposal(proposal, event, body);
       card.append(flyer, body); fragment.append(card);
     }
@@ -277,5 +274,6 @@
   window.addEventListener('beforeunload', event => {
     if (drafts.size) { event.preventDefault(); event.returnValue = ''; }
   });
+  window.addEventListener('focus', () => { if (state && !busy) perform('bootstrap'); });
   perform("bootstrap", { references: true });
 })();

@@ -1,0 +1,10 @@
+.profile-panel h2 { margin: 0; overflow-wrap: anywhere; }
+.event-long textarea { min-height: 220px; line-height: 1.5; }
+.event-multiple { grid-column: 1 / -1; }
+.event-options { max-height: 220px; overflow-y: auto; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.event-option { display: flex; align-items: center; gap: 9px; padding: 6px 2px; font-size: .9rem; }
+.event-option[hidden] { display: none; }
+.event-option input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--pink); }
+.event-option span { overflow-wrap: anywhere; }
+.event-id { overflow-wrap: anywhere; }
+nav[aria-label="Admin tools"] { display: flex; flex-wrap: wrap; gap: 10px; }

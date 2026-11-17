@@ -24,6 +24,9 @@
 .archive-event h3 { margin: 4px 0 8px; font-size: 1.12rem; overflow-wrap: anywhere; }
 .archive-event h3 a { color: var(--text); }
 .archive-edit-event { display: inline-block; margin-top: 6px; color: var(--yellow); text-decoration: underline; font-size: .86rem; }
+.archive-event-description { margin: 16px 0; }
+.archive-event-description h4 { margin: 0 0 8px; font-size: .86rem; }
+.archive-event-description p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.55; }
 .archive-event-date { margin: 0; font-size: .85rem; color: var(--orange); }
 .archive-proposal { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 16px; min-width: 0; }
 .archive-proposal-header { display: flex; justify-content: space-between; align-items: start; gap: 12px; }

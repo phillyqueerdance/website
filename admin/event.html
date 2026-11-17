@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#111114">
+  <title>Edit Event | QDP Admin</title>
+  <link rel="icon" type="image/png" href="/admin/favicon.png">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
+  <link rel="stylesheet" href="/admin/profile-editor.css?v=20261117-profiles">
+  <link rel="stylesheet" href="/admin/event-editor.css?v=20261117-1">
+  <script src="/admin/profile-editor.js?v=20261117-integrity" defer></script>
+  <script src="/admin/event-editor.js?v=20261117-1" defer></script>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-brand">
+      <img class="brand-mark" src="/admin/favicon.png" alt="" width="48" height="48">
+      <div><p class="eyebrow">Queer Dance Philly</p><h1>Edit Event</h1></div>
+    </div>
+    <button id="eventReload" class="icon-button" type="button" aria-label="Reload event">↻</button>
+  </header>
+  <main class="admin-shell">
+    <nav aria-label="Admin tools"><a class="admin-page-link" href="/admin/archive-updates">Archive Updates</a>
+      <a class="admin-page-link" href="/admin/">Admin home</a></nav>
+    <section class="profile-panel" aria-labelledby="eventHeading">
+      <h2 id="eventHeading">Loading event…</h2>
+      <p id="eventIdentity" class="event-id"></p>
+      <p id="eventStatus" class="profile-status" role="status" aria-live="polite"></p>
+      <form id="eventForm" hidden novalidate>
+        <fieldset id="eventFields" class="profile-fields" aria-label="Event fields" disabled></fieldset>
+        <div class="profile-actions">
+          <button id="eventSave" class="save-button" type="submit" disabled>Save event</button>
+          <p class="field-help">Save here, then publish saved changes from Archive Updates.</p>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
