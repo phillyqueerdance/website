@@ -1,4 +1,10 @@
 (() => {
+  const neighborhoods = Object.freeze([
+    "Southwest", "South", "Center City", "West", "Lower North", "Upper North", "Kensington",
+    "Roxborough/Manayunk", "Germantown/Chestnut Hill", "Olney/Oak Lane", "Near Northeast",
+    "Far Northeast", "Fishtown", "Gayborhood", "Old City-Queen Village", "Northern Liberties",
+    "Rittenhouse", "Fairmount", "Online"
+  ]);
   function message(node, text, error = false) {
     node.textContent = text;
     node.toggleAttribute("data-error", error);
@@ -43,14 +49,17 @@
 
       const label = document.createElement("label");
       const title = document.createElement("span");
-      const tag = field.type === "flag" ? "select" : field.type === "long" ? "textarea" : "input";
+      const isNeighborhood = field.key === "Neighborhood";
+      const tag = field.type === "flag" || isNeighborhood ? "select" : field.type === "long" ? "textarea" : "input";
       const input = document.createElement(tag);
       label.className = "field";
       if (tag === "textarea") label.classList.add("profile-long");
       title.textContent = field.label;
       if (tag === "select") {
-        for (const value of new Set(["", "Yes", "No", field.value])) {
-          input.add(new Option(value || "Unspecified", value));
+        for (const value of new Set(["", ...(isNeighborhood ? neighborhoods : ["Yes", "No"]), field.value])) {
+          const option = new Option(value || "Unspecified", value);
+          if (isNeighborhood && value && !neighborhoods.includes(value)) option.disabled = true;
+          input.add(option);
         }
       } else {
         input.maxLength = field.maxLength;
@@ -79,7 +88,7 @@
     return "/admin/" + paths[kind] + "?id=" + encodeURIComponent(id);
   }
 
-  window.QDPAdminProfiles = { request, renderFields, editUrl, message };
+  window.QDPAdminProfiles = { request, renderFields, editUrl, message, neighborhoods };
   const panel = document.querySelector("[data-profile-kind]");
   if (!panel) return;
   const kind = panel.dataset.profileKind;

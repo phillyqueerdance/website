@@ -6,6 +6,16 @@ import vm from "node:vm";
 const metadata = readFileSync(new URL("../event-metadata.js", import.meta.url), "utf8");
 const calendar = readFileSync(new URL("../live-calendar.js", import.meta.url), "utf8");
 const admin = readFileSync(new URL("../admin/admin.js", import.meta.url), "utf8");
+class Element {
+  children = [];
+  dataset = {};
+  value = "";
+  attributes = {};
+  append(...children) { this.children.push(...children); }
+  replaceChildren(...children) { this.children = children; }
+  setAttribute(key, value) { this.attributes[key] = value; }
+}
+const elements = new Map();
 const context = vm.createContext({
   URL,
   Option: class {
@@ -15,8 +25,12 @@ const context = vm.createContext({
     }
   },
   document: {
-    getElementById: () => null,
+    getElementById: id => {
+      if (!elements.has(id)) elements.set(id, new Element());
+      return elements.get(id);
+    },
     querySelectorAll: () => [],
+    createElement: () => new Element(),
     createDocumentFragment() {
       return { children: [], append(option) { this.children.push(option); } };
     }
@@ -35,6 +49,7 @@ const event = (eventId, fields = {}) => ({
   publishToWeb: true,
   description: "Event description",
   venueId: "VENUE-001",
+  artistIds: [],
   ...fields
 });
 const ids = (views, view) => Array.from(views.get(view), row => row.eventId);
@@ -143,12 +158,52 @@ test("Admin uses its current scripts from either dashboard URL", () => {
   const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css)(?:\?[^"]*)?)"/g)]
     .map(match => match[1]);
   for (const base of ["https://queerdancephilly.com/admin", "https://queerdancephilly.com/admin/"]) {
-    assert.ok(assets.includes("/admin/admin.js?v=20261117-remove-standard"));
+    assert.ok(assets.includes("/admin/admin.js?v=20261117-admin-locations"));
     for (const asset of assets) {
       assert.ok(asset.startsWith("/"));
       assert.equal(new URL(asset, base).pathname, asset.split("?")[0]);
     }
   }
+});
+
+test("coverage dates stay in Sunday-first columns across week and month boundaries", () => {
+  const coverage = new Map([
+    ["2026-11-28", []],
+    ["2026-11-29", []],
+    ["2026-11-30", []],
+    ["2026-12-01", []]
+  ]);
+  context.renderCalendarCoverage(coverage, new Map());
+  const rows = elements.get("coverageBody").children[0].children;
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].children[0].children.length, 0);
+  assert.equal(rows[0].children[6].children[0].children[0].dateTime, "2026-11-28");
+  assert.equal(rows[1].children[0].children[0].children[0].dateTime, "2026-11-29");
+  assert.equal(rows[1].children[2].children[0].children[0].dateTime, "2026-12-01");
+  const html = readFileSync(new URL("../admin/index.html", import.meta.url), "utf8");
+  const table = html.slice(html.indexOf('<table class="coverage-table"'), html.indexOf('<tbody id="coverageBody"'));
+  assert.deepEqual([...table.matchAll(/<th scope="col">(\w+)<\/th>/g)].map(match => match[1]),
+    ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+});
+
+test("recently-updated sort uses Calendar update times and puts unknown dates last", () => {
+  const events = [
+    event("UNKNOWN", { start: "2026-11-17T20:00:00-05:00", calendarUpdatedAt: "" }),
+    event("OLDER", { calendarUpdatedAt: "2026-11-15T20:00:00Z", lastEditedAt: "2026-11-17T22:00:00Z" }),
+    event("NEWER", { start: "2026-12-01T21:00:00-05:00", calendarUpdatedAt: "2026-11-17T10:00:00-05:00" }),
+    event("INVALID", { calendarUpdatedAt: "not-a-date" })
+  ];
+  elements.get("sortSelect").value = "updated";
+  assert.deepEqual([...events].sort(context.compareVisibleEvents).map(event => event.eventId),
+    ["NEWER", "OLDER", "UNKNOWN", "INVALID"]);
+  context.testEvents = events;
+  vm.runInContext("state.events = testEvents; state.drafts.clear();", context);
+  elements.get("filterSelect").value = "all";
+  assert.deepEqual(Array.from(context.visibleEvents(), event => event.eventId),
+    ["NEWER", "OLDER", "UNKNOWN", "INVALID"]);
+  assert.equal(events[0].eventId, "UNKNOWN");
+  elements.get("sortSelect").value = "start";
+  assert.equal([...events].sort(context.compareVisibleEvents).at(-1).eventId, "NEWER");
 });
 
 test("event rows link to QDP listings when the saved event is published", () => {

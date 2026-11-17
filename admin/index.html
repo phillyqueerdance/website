@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="/admin/favicon.png">
   <link rel="apple-touch-icon" href="/admin/favicon.png">
   <link rel="stylesheet" href="/poster-theme.css?v=20260926-01">
-  <link rel="stylesheet" href="/admin/admin.css?v=20261117-all-venues">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
   <link rel="stylesheet" href="/admin/post-generator.css?v=20261020-queer-filter-1">
 </head>
 
@@ -97,13 +97,13 @@
           <table class="coverage-table" aria-labelledby="coverageHeading" aria-describedby="coverageHelp">
             <thead>
               <tr>
+                <th scope="col">Sun</th>
                 <th scope="col">Mon</th>
                 <th scope="col">Tue</th>
                 <th scope="col">Wed</th>
                 <th scope="col">Thu</th>
                 <th scope="col">Fri</th>
                 <th scope="col">Sat</th>
-                <th scope="col">Sun</th>
               </tr>
             </thead>
             <tbody id="coverageBody"></tbody>
@@ -150,7 +150,7 @@
       </div>
 
       <p class="sync-note">
-        Saved public title, description, Artist ID, Venue ID, and
+        Saved public title, description, location, Artist ID, Venue ID, and
         ExplicitQueer edits stay in the Sheet until you push. Website
         visibility does not require a push. A pull can create “Needs push”
         items when QDP's derived Calendar fields differ.
@@ -275,6 +275,13 @@
             </optgroup>
           </select>
         </label>
+        <label class="filter-field sort-field">
+          <span class="sr-only">Sort events</span>
+          <select id="sortSelect">
+            <option value="start">Event date · soonest first</option>
+            <option value="updated">Recently updated in Google Calendar</option>
+          </select>
+        </label>
       </div>
 
       <div class="save-all-bar">
@@ -366,6 +373,24 @@
             </small>
           </label>
 
+          <div class="location-fields" hidden>
+            <label class="field">
+              <span>Location</span>
+              <input class="location-input" type="text" maxlength="3000">
+            </label>
+            <label class="field">
+              <span>Address</span>
+              <input class="address-input" type="text" maxlength="1000">
+            </label>
+            <label class="field">
+              <span>Neighborhood</span>
+              <select class="neighborhood-input">
+                <option value="">Unspecified</option>
+              </select>
+              <small class="field-help location-help">Editable while no Venue ID is selected.</small>
+            </label>
+          </div>
+
           <label class="field party-field" hidden>
             <span>Party ID</span>
             <select class="party-input"></select>
@@ -426,9 +451,9 @@
 
   <script src="/event-metadata.js?v=20261112-vals-melt-strip-1"></script>
   <script src="/live-calendar.js?v=20261019-calendar-cutoff-1"></script>
-  <script src="/admin/profile-editor.js?v=20261117-integrity"></script>
-  <script src="/admin/integrity.js?v=20261117-integrity"></script>
-  <script src="/admin/admin.js?v=20261117-remove-standard"></script>
+  <script src="/admin/profile-editor.js?v=20261117-neighborhoods"></script>
+  <script src="/admin/integrity.js?v=20261117-admin-locations"></script>
+  <script src="/admin/admin.js?v=20261117-admin-locations"></script>
   <script src="/admin/post-generator.js?v=20261112-vals-melt-strip-1"></script>
 </body>
 </html>

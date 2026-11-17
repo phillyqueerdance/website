@@ -22,6 +22,7 @@ function setup(){
   renderEvents(){},renderStatus(){},updateGlobalControls(){},updateStatusFromEvents(){},updateCardState(){},compareEvents:(a,b)=>a.eventId.localeCompare(b.eventId),
   showToast(message){messages.push(message);},setBusy(value){state.busy=value;},
   window:{confirm:()=>true},adminRequest:async(action,body)=>{requests.push({action,body});throw Error('Not configured');}});
+ vm.runInContext(client.match(/^const EVENT_LOCATION_FIELDS = .+;$/m)[0],context);
  for(const name of ['baseDraft','draftFor','sameIds','draftIsDirty','draftMatchesEvent','eventSavePayload','saveAllChanges','saveChangedEvents','applySavedEvents','applySavedEvent','applyDashboard','trackSyncJob','pollSyncJob'])vm.runInContext(fn(name),context);
  for(const event of events)state.drafts.set(event.eventId,{...context.baseDraft(event),description:`Edit ${event.eventId}`});
  return {context,state,events,requests,messages,timers};
@@ -71,4 +72,33 @@ test('an event removed during sync retains its unsaved draft for review',()=>{
 test('background status polls request only status and retain edits',async()=>{
  const h=setup();h.state.syncJob={id:'J',kind:'pull',state:'queued'};h.context.adminRequest=async(action)=>{h.requests.push(action);return {job:{id:'J',kind:'pull',state:'running'}};};
  await h.context.pollSyncJob();assert.deepEqual(h.requests,['admin.status']);assert.equal(h.state.drafts.size,3);assert.equal(h.state.syncJob.state,'running');assert.equal(h.state.busy,false);
+});
+
+test('location-only drafts are included in Save all and clear only after confirmation',async()=>{
+ const h=setup();h.state.drafts.clear();h.state.capabilities.eventLocations=true;
+ const event=h.events[0];Object.assign(event,{venueId:'',location:'Original location',address:'',neighborhood:''});
+ h.state.drafts.set(event.eventId,{...h.context.baseDraft(event),location:'New location',address:'123 Main St',neighborhood:'Center City'});
+ h.context.adminRequest=async(action,body)=>{h.requests.push({action,body});return {events:body.changes.map(change=>({...event,...change,revision:'location-saved'}))};};
+ await h.context.saveAllChanges();
+ assert.equal(h.requests.length,1);assert.equal(h.requests[0].body.changes.length,1);
+ assert.equal(h.requests[0].body.changes[0].location,'New location');
+ assert.equal(h.requests[0].body.changes[0].address,'123 Main St');
+ assert.equal(h.requests[0].body.changes[0].neighborhood,'Center City');
+ assert.equal(h.state.drafts.size,0);assert.equal(h.state.events[0].location,'New location');
+});
+
+test('linked venues and older deployments never receive manual location fields',()=>{
+ const h=setup();h.state.capabilities.eventLocations=true;
+ assert.equal(Object.hasOwn(h.context.eventSavePayload(h.events[0]),'location'),false);
+ h.events[0].venueId='';h.state.drafts.set('E0',h.context.baseDraft(h.events[0]));h.state.capabilities.eventLocations=false;
+ assert.equal(Object.hasOwn(h.context.eventSavePayload(h.events[0]),'location'),false);
+});
+
+test('refresh cannot rebase a location draft over an external location change',()=>{
+ const h=setup();h.state.drafts.clear();h.state.artists=[];h.state.venues=[];
+ Object.assign(h.events[0],{venueId:'',location:'Old place'});
+ h.state.drafts.set('E0',{...h.context.baseDraft(h.events[0]),location:'My edit'});
+ const fresh=h.events.map(event=>({...event,revision:'refreshed'}));fresh[0].location='Someone else’s edit';
+ h.context.applyDashboard({events:fresh,status:{},capabilities:{eventLocations:true}},{preserveDrafts:true});
+ assert.equal(h.state.drafts.get('E0').expectedRevision,'r0');assert.equal(h.state.drafts.get('E0').location,'My edit');
 });

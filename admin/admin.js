@@ -1,5 +1,6 @@
 const ADMIN_API_URL = "/admin/api";
 const COVERAGE_DAYS = 28;
+const EVENT_LOCATION_FIELDS = ["location", "address", "neighborhood"];
 const DUPLICATE_START_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 const phillyDateFormatter = new Intl.DateTimeFormat("en-CA", {
@@ -40,6 +41,7 @@ const elements = {
   pendingSummary: document.getElementById("pendingSummary"),
   searchInput: document.getElementById("searchInput"),
   filterSelect: document.getElementById("filterSelect"),
+  sortSelect: document.getElementById("sortSelect"),
   loadingState: document.getElementById("loadingState"),
   eventList: document.getElementById("eventList"),
   emptyState: document.getElementById("emptyState"),
@@ -242,6 +244,17 @@ function compareEvents(left, right) {
     left.publicTitle.localeCompare(right.publicTitle);
 }
 
+function compareVisibleEvents(left, right) {
+  if (elements.sortSelect.value === "updated") {
+    const leftTime = Date.parse(left.calendarUpdatedAt);
+    const rightTime = Date.parse(right.calendarUpdatedAt);
+    const safeLeft = Number.isFinite(leftTime) ? leftTime : -Infinity;
+    const safeRight = Number.isFinite(rightTime) ? rightTime : -Infinity;
+    return safeRight - safeLeft || compareEvents(left, right);
+  }
+  return compareEvents(left, right);
+}
+
 function hasWebsiteListing(event) {
   return Boolean(
     event.publishToWeb &&
@@ -435,6 +448,9 @@ function baseDraft(event) {
     publishToWeb: event.publishToWeb,
     artistIds: [...event.artistIds],
     venueId: event.venueId,
+    location: event.location || "",
+    address: event.address || "",
+    neighborhood: event.neighborhood || "",
     partyId: event.partyId,
     flyerSource: event.flyerSource,
     explicitQueer: event.explicitQueer,
@@ -456,6 +472,7 @@ function draftIsDirty(
     draft.description !== event.description ||
     draft.publishToWeb !== event.publishToWeb ||
     draft.venueId !== event.venueId ||
+    (!draft.venueId && EVENT_LOCATION_FIELDS.some(field => draft[field] !== (event[field] || ""))) ||
     draft.partyId !== event.partyId ||
     draft.flyerSource !== event.flyerSource ||
     (event.explicitQueerValue === "" && draft.explicitQueerTouched) ||
@@ -481,6 +498,7 @@ function draftMatchesEvent(draft, event) {
     normalizedDescription === event.description &&
     draft.publishToWeb === event.publishToWeb &&
     draft.venueId === event.venueId &&
+    (draft.venueId || EVENT_LOCATION_FIELDS.every(field => draft[field]?.trim() === (event[field] || ""))) &&
     draft.partyId === event.partyId &&
     draft.flyerSource?.trim() === event.flyerSource &&
     (event.explicitQueerValue !== "" || !draft.explicitQueerTouched) &&
@@ -497,6 +515,7 @@ function calendarFieldsAreDirty(
     draft.publicTitle !== event.publicTitle ||
     draft.description !== event.description ||
     draft.venueId !== event.venueId ||
+    (!draft.venueId && EVENT_LOCATION_FIELDS.some(field => draft[field] !== (event[field] || ""))) ||
     draft.partyId !== event.partyId ||
     draft.explicitQueer !== event.explicitQueer ||
     !sameIds(draft.artistIds, event.artistIds)
@@ -629,8 +648,9 @@ function visibleEvents() {
         venue ? venue.name : event.venueName,
         draft.venueId,
         artistText,
-        event.location,
-        event.address
+        draft.location,
+        draft.address,
+        draft.neighborhood
       ]
         .join(" ")
         .toLowerCase()
@@ -653,7 +673,7 @@ function visibleEvents() {
     }
 
     return true;
-  });
+  }).sort(compareVisibleEvents);
 }
 
 function artistSummary(artistIds) {
@@ -686,7 +706,7 @@ function eventPlace(event, draft) {
     return draft.venueId;
   }
 
-  return event.location || "No venue listed";
+  return draft.location || draft.address || "No venue listed";
 }
 
 function externalEventUrl(event) {
@@ -734,6 +754,16 @@ function updateCardState(
 
   card.querySelector(".event-place").textContent =
     eventPlace(event, draft);
+
+  card.querySelector(".location-fields").hidden = Boolean(draft.venueId);
+  for (const field of EVENT_LOCATION_FIELDS) {
+    const input = card.querySelector(`.${field}-input`);
+    if (field === "neighborhood") input.disabled = state.busy || !state.capabilities.eventLocations;
+    else input.readOnly = !state.capabilities.eventLocations;
+  }
+  card.querySelector(".location-help").textContent = state.capabilities.eventLocations
+    ? "Editable while no Venue ID is selected."
+    : "Update Core.gs and redeploy to edit event locations.";
 
   card.querySelector(".artist-summary").textContent =
     artistSummary(draft.artistIds);
@@ -898,6 +928,16 @@ function renderEvent(event, venueOptions) {
 
   const venueInput =
     card.querySelector(".venue-input");
+  const locationInputs = new Map(EVENT_LOCATION_FIELDS.map(field => [field, card.querySelector(`.${field}-input`)]));
+  const neighborhoodInput = locationInputs.get("neighborhood");
+  const neighborhoods = window.QDPAdminProfiles.neighborhoods;
+  for (const neighborhood of neighborhoods) neighborhoodInput.add(new Option(neighborhood, neighborhood));
+  if (draft.neighborhood && !neighborhoods.includes(draft.neighborhood)) {
+    const existing = new Option(draft.neighborhood, draft.neighborhood);
+    existing.disabled = true;
+    neighborhoodInput.add(existing);
+  }
+  for (const [field, input] of locationInputs) input.value = draft[field];
   const partyInput = card.querySelector(".party-input");
   const flyerInput = card.querySelector(".flyer-source-input");
   if (typeof event.partyId === "string") {
@@ -1010,6 +1050,7 @@ function renderEvent(event, venueOptions) {
         publishToWeb: publishInput.checked,
         artistIds: checkedArtistIds(),
         venueId: venueInput.value,
+        ...Object.fromEntries([...locationInputs].map(([field, input]) => [field, input.value])),
         partyId: event.partyId === undefined ? undefined : partyInput.value,
         flyerSource: event.flyerSource === undefined ? undefined : flyerInput.value,
         explicitQueer: explicitInput.checked,
@@ -1022,6 +1063,7 @@ function renderEvent(event, venueOptions) {
   }
 
   publicTitleInput.addEventListener("input", storeDraft);
+  for (const [field, input] of locationInputs) input.addEventListener(field === "neighborhood" ? "change" : "input", storeDraft);
   partyInput.addEventListener("change", storeDraft);
   flyerInput.addEventListener("input", storeDraft);
   descriptionInput.addEventListener(
@@ -1179,7 +1221,7 @@ function renderEvents() {
 function renderCalendarCoverage(coverage, views) {
   const dates = [...coverage.keys()];
   const firstDate = new Date(`${dates[0]}T00:00:00Z`);
-  const weekdayOffset = (firstDate.getUTCDay() + 6) % 7;
+  const weekdayOffset = firstDate.getUTCDay();
   const rows = document.createDocumentFragment();
 
   for (let index = -weekdayOffset; index < dates.length; index += 7) {
@@ -1506,6 +1548,8 @@ elements.filterSelect.addEventListener(
   renderEvents
 );
 
+elements.sortSelect.addEventListener("change", renderEvents);
+
 window.addEventListener(
   "beforeunload",
   event => {
@@ -1530,6 +1574,8 @@ function eventSavePayload(event) {
   return { eventId: event.eventId, expectedRevision: draft.expectedRevision || event.revision,
     publicTitle: draft.publicTitle, description: draft.description, publishToWeb: draft.publishToWeb,
     artistIds: [...draft.artistIds], venueId: draft.venueId, partyId: draft.partyId, flyerSource: draft.flyerSource,
+    ...(!draft.venueId && state.capabilities.eventLocations
+      ? Object.fromEntries(EVENT_LOCATION_FIELDS.map(field => [field, draft[field]])) : {}),
     explicitQueer: draft.explicitQueer, explicitQueerTouched: draft.explicitQueerTouched };
 }
 

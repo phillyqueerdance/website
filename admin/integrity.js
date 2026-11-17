@@ -43,9 +43,7 @@
     ["missing-flyer", "Missing flyers"],
     ["missing-description", "Missing descriptions"],
     ["unrecognized-artists", "Unrecognized artists"],
-    ["possible-duplicate", "Potential duplicates"],
-    ["unclassified-relevance", "Unclassified queer relevance"],
-    ["missing-party", "Missing party associations"]
+    ["possible-duplicate", "Potential duplicates"]
   ]);
   addChecks("entityIntegrity", [
     ["missing-photo", "Missing profile photos"],
@@ -83,8 +81,6 @@
     for (const event of events) {
       const unknown = (event.artistIds || []).filter(id => !artists.has(id));
       if (unknown.length) eventIssue("unrecognized-artists", event, unknown.join(", "));
-      if (event.relevanceClassified === false) eventIssue("unclassified-relevance", event);
-      if (event.partyId === "") eventIssue("missing-party", event);
     }
     const byName = new Map();
     const duplicates = new Set();

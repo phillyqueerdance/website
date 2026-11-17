@@ -558,9 +558,23 @@ select:focus-visible {
 
 .event-tools {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 9px;
   margin: 17px 0 14px;
+}
+
+.event-tools .search-field {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 760px) {
+  .event-tools {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .event-tools .search-field {
+    grid-column: auto;
+  }
 }
 
 .search-field input,
@@ -583,6 +597,10 @@ select:focus-visible {
 
 .filter-field select {
   max-width: 190px;
+}
+
+.sort-field select {
+  max-width: 260px;
 }
 
 .state-message {
