@@ -17,7 +17,7 @@ function setup({
    fetch: async (url, options) => {
      if (options.method === 'HEAD') return head(url, options);
      requests.push({url, body: JSON.parse(options.body)});
-     return {ok: true, json: async () => upstream};
+     return {ok: true, json: async () => typeof upstream === 'function' ? upstream(JSON.parse(options.body)) : upstream};
    }
  });
  vm.runInContext(source,ctx);ctx.verifyAccess=authorize;
@@ -71,6 +71,48 @@ test('profile saves require Admin access', async () => {
   });
   assert.equal(response.status, 403);
   assert.equal(requests.length, 0);
+});
+
+test('event venue choices include every Index venue while retaining venue metadata', async () => {
+  const {call, requests} = setup({
+    upstream: body => {
+      if (body.action === 'admin.profiles.list') {
+        assert.equal(body.kind, 'venue');
+        return {ok: 'yes', profiles: [
+          {id: 'VENUE-001', name: 'Example Venue'},
+          {id: 'SECLOC-001', name: 'Secret Location'},
+          {id: 'TOBEAN-001', name: 'To Be Announced'}
+        ]};
+      }
+      return {
+        ok: 'yes', referencesVersion: 'cached',
+        references: {
+          artists: [{id: 'ARTIST-001'}], parties: [{id: 'PARTY-001'}],
+          venues: [{id: 'VENUE-001', name: 'Example Venue', address: '123 Main St', queer: true}]
+        }
+      };
+    }
+  });
+  const response = await call({action: 'admin.bootstrap'});
+  assert.equal(response.status, 200);
+  const {references, referencesVersion} = await response.json();
+  assert.deepEqual(references.venues, [
+    {id: 'VENUE-001', name: 'Example Venue', address: '123 Main St', queer: true},
+    {id: 'SECLOC-001', name: 'Secret Location'},
+    {id: 'TOBEAN-001', name: 'To Be Announced'}
+  ]);
+  assert.deepEqual(references.artists, [{id: 'ARTIST-001'}]);
+  assert.deepEqual(references.parties, [{id: 'PARTY-001'}]);
+  assert.equal(referencesVersion, 'cached');
+  assert.deepEqual(requests.map(({body}) => body.action), ['admin.bootstrap', 'admin.profiles.list']);
+});
+
+test('unchanged references retain the current full venue list without another catalog read', async () => {
+  const {call, requests} = setup({upstream: {ok: 'yes', referencesVersion: 'cached'}});
+  const response = await call({action: 'admin.bootstrap', referencesVersion: 'cached'});
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).referencesVersion, 'cached');
+  assert.equal(requests.length, 1);
 });
 
 test('external link checks distinguish a confirmed missing page from blocked requests', async () => {

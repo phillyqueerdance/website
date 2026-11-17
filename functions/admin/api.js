@@ -394,6 +394,24 @@ async function checkProfileLink(value) {
   }
 }
 
+async function addIndexVenueChoices(env, payload) {
+  if (!payload.references) return;
+  const catalog = await requestAppsScriptAdmin(env, {
+    action: "admin.profiles.list",
+    kind: "venue"
+  });
+  if (catalog.ok !== "yes" || !Array.isArray(catalog.profiles)) {
+    throw new Error(catalog.error || "The full venue list could not be loaded.");
+  }
+  const references = new Map((payload.references.venues || []).map(venue => [venue.id, venue]));
+  for (const venue of catalog.profiles) {
+    if (!venue.id) continue;
+    references.set(venue.id, { ...references.get(venue.id), id: venue.id, name: venue.name || venue.id });
+  }
+  payload.references.venues = [...references.values()]
+    .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+}
+
 export async function onRequestPost(
   context
 ) {
@@ -471,6 +489,10 @@ export async function onRequestPost(
 
     if ((action === "admin.artist.read" || action === "admin.artist.save") && upstreamPayload.artist) {
       await addArtistPhotoCrops(context, cropStore(context.env), { artists: [upstreamPayload.artist] });
+    }
+
+    if (action === "admin.bootstrap") {
+      await addIndexVenueChoices(context.env, upstreamPayload);
     }
 
     return jsonResponse(upstreamPayload);

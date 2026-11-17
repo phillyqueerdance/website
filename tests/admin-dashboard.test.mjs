@@ -132,7 +132,30 @@ test("coverage includes empty dates and counts saved website events by their loc
 test("venue choices include Index entries without a public profile", () => {
   const options = context.createVenueOptions([
     { id: "VENUE-001", name: "Test venue", publicOK: true },
-    { id: "SECLOC-001", name: "Secret Location", publicOK: false }
+    { id: "SECLOC-001", name: "Secret Location", publicOK: false },
+    { id: "TOBEAN-001", name: "To Be Announced", publicOK: false }
   ]);
-  assert.deepEqual(options.children.map(option => option.value), ["", "VENUE-001", "SECLOC-001"]);
+  assert.deepEqual(options.children.map(option => option.value), ["", "VENUE-001", "SECLOC-001", "TOBEAN-001"]);
+});
+
+test("Admin uses its current scripts from either dashboard URL", () => {
+  const html = readFileSync(new URL("../admin/index.html", import.meta.url), "utf8");
+  const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css)(?:\?[^"]*)?)"/g)]
+    .map(match => match[1]);
+  for (const base of ["https://queerdancephilly.com/admin", "https://queerdancephilly.com/admin/"]) {
+    assert.ok(assets.includes("/admin/admin.js?v=20261117-venue-links"));
+    for (const asset of assets) {
+      assert.ok(asset.startsWith("/"));
+      assert.equal(new URL(asset, base).pathname, asset.split("?")[0]);
+    }
+  }
+});
+
+test("event rows link to QDP listings when the saved event is published", () => {
+  const html = readFileSync(new URL("../admin/index.html", import.meta.url), "utf8");
+  assert.match(html, /class="event-view-link" target="_blank" rel="noopener noreferrer" hidden>View event/);
+  assert.equal(context.hasWebsiteListing(event("PUBLISHED")), true);
+  assert.equal(context.hasWebsiteListing(event("HIDDEN", {publishToWeb: false})), false);
+  assert.equal(context.hasWebsiteListing(event("DELETED", {publicTitle: "(DELETED ENTRY)"})), false);
+  assert.equal(context.window.QDPEventMetadata.url("EVENT-001"), "https://queerdancephilly.com/?event=EVENT-001");
 });

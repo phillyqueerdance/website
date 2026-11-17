@@ -366,8 +366,18 @@ select:focus-visible {
 
 .database-integrity .dashboard-note:empty,
 .event-card .field[hidden],
+#eventList .event-view-link[hidden],
 #createdProfile[hidden] {
   display: none;
+}
+
+.event-view-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-right: auto;
+  color: var(--yellow);
+  font-weight: 700;
 }
 
 .calendar-coverage {

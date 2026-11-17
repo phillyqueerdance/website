@@ -694,6 +694,9 @@ function updateCardState(
   event
 ) {
   const draft = draftFor(event);
+  const viewLink = card.querySelector(".event-view-link");
+  viewLink.hidden = !hasWebsiteListing(event);
+  if (!viewLink.hidden) viewLink.href = window.QDPEventMetadata.url(event.eventId);
   card.querySelector(".classify-standard").hidden =
     event.relevanceClassified !== false || draft.explicitQueerTouched || draft.explicitQueer;
   const dirty = draftIsDirty(event, draft);
