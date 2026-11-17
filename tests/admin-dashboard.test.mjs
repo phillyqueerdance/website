@@ -143,7 +143,7 @@ test("Admin uses its current scripts from either dashboard URL", () => {
   const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css)(?:\?[^"]*)?)"/g)]
     .map(match => match[1]);
   for (const base of ["https://queerdancephilly.com/admin", "https://queerdancephilly.com/admin/"]) {
-    assert.ok(assets.includes("/admin/admin.js?v=20261117-venue-links"));
+    assert.ok(assets.includes("/admin/admin.js?v=20261117-all-venues"));
     for (const asset of assets) {
       assert.ok(asset.startsWith("/"));
       assert.equal(new URL(asset, base).pathname, asset.split("?")[0]);
@@ -158,4 +158,22 @@ test("event rows link to QDP listings when the saved event is published", () => 
   assert.equal(context.hasWebsiteListing(event("HIDDEN", {publishToWeb: false})), false);
   assert.equal(context.hasWebsiteListing(event("DELETED", {publicTitle: "(DELETED ENTRY)"})), false);
   assert.equal(context.window.QDPEventMetadata.url("EVENT-001"), "https://queerdancephilly.com/?event=EVENT-001");
+});
+
+test("external event links prefer the saved URL and accept source posts in descriptions", () => {
+  assert.equal(context.externalEventUrl({
+    eventUrl: "https://example.com/event",
+    description: "https://www.instagram.com/p/SOURCE/"
+  }), "https://example.com/event");
+  assert.equal(context.externalEventUrl({
+    description: '<a href="https://www.instagram.com/p/SOURCE/">Source</a>'
+  }), "https://www.instagram.com/p/SOURCE/");
+  assert.equal(context.externalEventUrl({
+    description: "Tickets https://ra.co/events/1234567."
+  }), "https://ra.co/events/1234567");
+  assert.equal(context.externalEventUrl({eventUrl: "javascript:alert(1)"}), "");
+  assert.equal(context.externalEventUrl({
+    description: "https://drive.google.com/file/d/PHOTO/view https://www.instagram.com/dj_example/"
+  }), "");
+  assert.equal(context.externalEventUrl({eventUrl: "https://queerdancephilly.com/?event=EVENT-001"}), "");
 });

@@ -689,6 +689,26 @@ function eventPlace(event, draft) {
   return event.location || "No venue listed";
 }
 
+function externalEventUrl(event) {
+  const { safeUrl } = window.QDPEventMetadata;
+  for (const value of [event.eventUrl, event.externalUrl, event.sourceUrl]) {
+    const url = safeUrl(value);
+    if (url && new URL(url).hostname.replace(/^www\./, "") !== "queerdancephilly.com") return url;
+  }
+  const links = String(event.description || "").match(/https?:\/\/[^\s<>"']+/gi) || [];
+  for (const value of links) {
+    const url = safeUrl(value.replace(/[.,;!?)]+$/, "").replace(/&amp;/g, "&"));
+    if (!url) continue;
+    const { hostname, pathname } = new URL(url);
+    if ((/^(?:www\.)?instagram\.com$/i.test(hostname) && /^\/(?:p|reel|reels|tv)\//i.test(pathname)) ||
+        (/^(?:www\.)?ra\.co$/i.test(hostname) && /^\/events\//i.test(pathname)) ||
+        (/^(?:www\.)?partiful\.com$/i.test(hostname) && /^\/e\//i.test(pathname)) ||
+        (/^(?:www\.)?eventbrite\.[a-z.]+$/i.test(hostname) && /^\/e\//i.test(pathname)) ||
+        (/^(?:www\.)?dice\.fm$/i.test(hostname) && /^\/event\//i.test(pathname))) return url;
+  }
+  return "";
+}
+
 function updateCardState(
   card,
   event
@@ -697,6 +717,11 @@ function updateCardState(
   const viewLink = card.querySelector(".event-view-link");
   viewLink.hidden = !hasWebsiteListing(event);
   if (!viewLink.hidden) viewLink.href = window.QDPEventMetadata.url(event.eventId);
+  const externalLink = card.querySelector(".event-external-link");
+  const externalUrl = externalEventUrl(event);
+  externalLink.hidden = !externalUrl;
+  if (externalUrl) externalLink.href = externalUrl;
+  else externalLink.removeAttribute("href");
   card.querySelector(".classify-standard").hidden =
     event.relevanceClassified !== false || draft.explicitQueerTouched || draft.explicitQueer;
   const dirty = draftIsDirty(event, draft);

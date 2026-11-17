@@ -367,17 +367,22 @@ select:focus-visible {
 .database-integrity .dashboard-note:empty,
 .event-card .field[hidden],
 #eventList .event-view-link[hidden],
+#eventList .event-external-link[hidden],
 #createdProfile[hidden] {
   display: none;
 }
 
-.event-view-link {
+.event-view-link,
+.event-external-link {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  margin-right: auto;
   color: var(--yellow);
   font-weight: 700;
+}
+
+.event-view-link {
+  margin-right: auto;
 }
 
 .calendar-coverage {
@@ -967,6 +972,7 @@ select:focus-visible {
 
 .event-card-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 9px;
   margin-top: 13px;

@@ -131,9 +131,13 @@
   async function loadProfiles() {
     try {
       const { profiles } = await admin("admin.profiles.list");
+      if (kind === "venue" && !["SECLOC-001", "TOBEAN-001"].every(id => profiles.some(profile => profile.id === id))) {
+        message(loadStatus, "Deploy Core.gs 7.4.14 to include SECLOC-001 and TOBEAN-001.", true);
+      } else {
+        message(loadStatus, profiles.length ? "" : "No profiles found in the Index.");
+      }
       for (const profile of profiles) picker.add(new Option(optionLabel(profile), profile.id));
       picker.disabled = profiles.length === 0;
-      message(loadStatus, profiles.length ? "" : "No profiles found in the Index.");
       const requested = new URLSearchParams(window.location.search).get("id");
       if (profiles.some(profile => profile.id === requested)) {
         picker.value = requested;
