@@ -1,5 +1,5 @@
 /**
- * Queer Dance Philly — Archive Updates v7.4.17
+ * Queer Dance Philly — Archive Updates v7.4.18
  * ArchiveReview.gs: Archive ID review, Admin Archive Updates, saved rejects,
  * approvals, resumable jobs, and artist-indicator recalculation.
  * Replace this file and Core.gs with the supplied Archive Updates versions.
@@ -1075,6 +1075,12 @@ function qdpArchiveAdminDate_(value) {
   return isNaN(+parsed) ? '' : Utilities.formatDate(parsed, 'America/New_York', 'yyyy-MM-dd');
 }
 
+function qdpArchiveAdminProfiles_(kind) {
+  // Artists use their own Admin API; the Index profile loader only supports
+  // venues, parties, and collectives.
+  return kind === 'artist' ? qdpAdminListArtists_() : qdpAdminListIndexProfiles_(kind);
+}
+
 function qdpArchiveAdminOptions_(body) {
   const options = { admin: true, includeActive: body.includeActive !== false,
     from: String(body.from || '').trim(), to: String(body.to || '').trim(),
@@ -1091,7 +1097,7 @@ function qdpArchiveAdminOptions_(body) {
     }
   }
   if (options.from && options.to && options.from > options.to) throw new Error('The end date must follow the start date.');
-  if (options.profileId && !qdpAdminListIndexProfiles_(options.kind).some(p => p.id === options.profileId)) {
+  if (options.profileId && !qdpArchiveAdminProfiles_(options.kind).some(p => p.id === options.profileId)) {
     throw new Error('That profile is no longer in the Index. Refresh the page.');
   }
   return options;
@@ -1173,7 +1179,7 @@ function qdpArchiveAdminReady_() {
 function qdpArchiveAdminReferences_() {
   const out = {};
   ['artist', 'venue', 'party', 'collective'].forEach(kind => {
-    out[kind] = qdpAdminListIndexProfiles_(kind).map(p => ({ id: p.id, name: p.name }));
+    out[kind] = qdpArchiveAdminProfiles_(kind).map(p => ({ id: p.id, name: p.name }));
   });
   return out;
 }

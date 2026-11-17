@@ -99,7 +99,11 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
     SpreadsheetApp: { newDataValidation: () => ({ requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } }), flush() {} },
     ScriptApp: { getProjectTriggers: () => triggers.slice(), deleteTrigger: trigger => triggers.splice(triggers.indexOf(trigger), 1),
       newTrigger: handler => ({ timeBased() { return this; }, everyMinutes() { return this; }, create() { const trigger = { getHandlerFunction: () => handler }; triggers.push(trigger); return trigger; } }) },
-    qdpAdminListIndexProfiles_: references, buildLookupMaps_: core,
+    qdpAdminListArtists_: () => references('artist'),
+    qdpAdminListIndexProfiles_: kind => {
+      if (kind === 'artist') throw new Error('Choose Venues, Parties, or Collectives.');
+      return references(kind);
+    }, buildLookupMaps_: core,
     normalizeKey_: normalize, fixMojibake_: text => text,
     qdpAliasMatches_: (alias, text) => alias.exactOnly ? new RegExp('(?:^| )' + alias.key + '(?=$| )').test(text) : text.includes(alias.key),
     qdpArchiveIds_: text => [...new Set(String(text || '').split(',').map(x => x.trim()).filter(Boolean))],
@@ -114,7 +118,6 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
   if (process.env.QDP_CORE_SOURCE) {
     vm.runInContext(readFileSync(process.env.QDP_CORE_SOURCE, 'utf8'), c);
     c.ss_ = () => ss;
-    c.qdpAdminListIndexProfiles_ = references;
   }
   const call = (action, data = {}) => c.qdpAdminArchive_({ action: 'admin.archive.' + action, ...data });
   const plain = value => JSON.parse(JSON.stringify(value));
@@ -124,6 +127,26 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
   const finish = () => { for (let i = 0; i < 30; i++) { const page = call('bootstrap'); if (!c.qdpArchiveAdminActive_(page.job)) return page; c.qdpArchiveAdminWorker(); } throw new Error('Job did not finish'); };
   return { c, ss, sheets, props, triggers, publishes, call, plain, proposals, approve, finish, rows };
 }
+
+test('initial page load gets artists from the artist loader and includes every profile type', () => {
+  const h = setup();
+  assert.throws(() => h.c.qdpAdminListIndexProfiles_('artist'), /Choose Venues, Parties, or Collectives/);
+  const page = h.call('bootstrap', { references: true });
+  assert.deepEqual(Object.keys(page.references), ['artist', 'venue', 'party', 'collective']);
+  assert.ok(page.references.artist.some(p => p.id === 'NEW' && p.name === 'New Artist'));
+  for (const [kind, id] of [['venue', 'ROOM'], ['party', 'NIGHT'], ['collective', 'CREW']]) {
+    assert.ok(page.references[kind].some(p => p.id === id));
+  }
+  assert.equal(page.scanInProgress, false);
+  assert.equal(page.job, null);
+});
+
+test('a focused artist scan validates the artist using the dedicated artist loader', () => {
+  const h = setup();
+  assert.throws(() => h.call('scan', {kind: 'artist', profileId: 'MISSING'}), /no longer in the Index/);
+  const page = h.call('scan', {kind: 'artist', profileId: 'NEW'});
+  assert.ok(h.proposals(page).some(p => p.kind === 'artist' && p.proposedIds.includes('NEW')));
+});
 
 test('a newly added artist is proposed on old records without replacing existing assignments', () => {
   const h = setup({ events: [event('ONE', 'The Night featuring New Artist and The Crew at The Room', {
