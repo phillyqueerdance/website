@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
   <link rel="stylesheet" href="../poster-theme.css?v=20260926-01">
-  <link rel="stylesheet" href="admin.css?v=20261117-event-rows">
+  <link rel="stylesheet" href="admin.css?v=20261117-dashboard">
   <link rel="stylesheet" href="post-generator.css?v=20261020-queer-filter-1">
 </head>
 
@@ -47,11 +47,46 @@
   </header>
 
   <main class="admin-shell">
-    <nav aria-label="Admin tools">
-      <a class="admin-page-link" href="/admin/artist-crops">Artists</a>
-      <a class="admin-page-link" href="/admin/apify-import">Apify Import</a>
-    </nav>
-    <section class="sync-panel" aria-labelledby="syncHeading">
+    <section class="dashboard-panel" aria-labelledby="dashboardHeading">
+      <div class="section-heading">
+        <h2 id="dashboardHeading">Dashboard</h2>
+        <span id="statusUpdated" class="status-updated"></span>
+      </div>
+
+      <nav class="dashboard-links" aria-label="Quick actions">
+        <a class="admin-page-link" href="#events">Events</a>
+        <a class="admin-page-link" href="#calendar-sync">Calendar sync</a>
+        <a class="admin-page-link" href="#generate-post">Generate Post</a>
+        <a class="admin-page-link" href="/admin/artist-crops">Artists</a>
+        <a class="admin-page-link" href="/admin/apify-import">Apify Import</a>
+        <a class="admin-page-link" href="/">Public calendar</a>
+      </nav>
+
+      <p id="dashboardState" class="dashboard-note" role="status">Loading overview…</p>
+      <div id="dashboardContent" class="dashboard-content" hidden>
+        <section aria-labelledby="attentionHeading">
+          <h3 id="attentionHeading">Needs attention</h3>
+          <ul class="dashboard-list">
+            <li><button class="dashboard-row review-row" type="button" data-event-view="needs-push">Needs push <strong></strong></button></li>
+            <li><button class="dashboard-row review-row" type="button" data-event-view="hidden-upcoming">Hidden upcoming <strong></strong></button></li>
+            <li><button class="dashboard-row review-row" type="button" data-event-view="missing-flyer" aria-describedby="flyerCoverage">Missing flyers <strong></strong></button></li>
+            <li><button class="dashboard-row review-row" type="button" data-event-view="missing-venue">Missing Venue IDs <strong></strong></button></li>
+            <li><button class="dashboard-row review-row" type="button" data-event-view="missing-description">Missing descriptions <strong></strong></button></li>
+            <li><button class="dashboard-row review-row" type="button" data-event-view="possible-duplicate" title="Upcoming listings with the same title and start time">Possible duplicates <strong></strong></button></li>
+          </ul>
+          <p id="flyerCoverage" class="dashboard-note" hidden></p>
+        </section>
+
+        <section aria-labelledby="upcomingHeading">
+          <h3 id="upcomingHeading">Next 7 days</h3>
+          <ul id="weekList" class="dashboard-list"></ul>
+          <p id="weekEmpty" class="dashboard-note" hidden>No events scheduled in the next 7 days.</p>
+          <button id="viewWeek" class="dashboard-more" type="button" data-event-view="next-seven-days" hidden></button>
+        </section>
+      </div>
+    </section>
+
+    <section id="calendar-sync" class="sync-panel" aria-labelledby="syncHeading" tabindex="-1">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Calendar sync</p>
@@ -86,9 +121,57 @@
         items when QDP's derived Calendar fields differ.
       </p>
       <p id="syncProgress" class="sync-progress" role="status" aria-live="polite" hidden></p>
+
+      <details id="syncStatus" class="sync-status">
+        <summary>Calendar and website status <span id="syncStatusIssue" hidden>· Sync failed</span></summary>
+        <dl class="status-grid">
+          <div>
+            <dt>Last pull</dt>
+            <dd id="lastPull">—</dd>
+          </div>
+
+          <div>
+            <dt>Last push</dt>
+            <dd id="lastPush">—</dd>
+          </div>
+
+          <div>
+            <dt>Needs push in window</dt>
+            <dd id="pendingCount">—</dd>
+          </div>
+
+          <div>
+            <dt>Outside sync window</dt>
+            <dd id="outsidePendingCount">—</dd>
+          </div>
+
+          <div>
+            <dt>Showing on website</dt>
+            <dd id="websiteCount">—</dd>
+          </div>
+
+          <div>
+            <dt>Upcoming in Sheet</dt>
+            <dd id="upcomingCount">—</dd>
+          </div>
+
+          <div>
+            <dt>Hidden upcoming</dt>
+            <dd id="hiddenCount">—</dd>
+          </div>
+
+          <div>
+            <dt>Active Sheet rows</dt>
+            <dd id="activeCount">—</dd>
+          </div>
+        </dl>
+
+        <p id="syncWindow" class="status-footnote"></p>
+        <p id="cacheNote" class="status-footnote"></p>
+      </details>
     </section>
 
-    <section class="post-panel" aria-labelledby="postHeading">
+    <section id="generate-post" class="post-panel" aria-labelledby="postHeading" tabindex="-1">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Share the calendar</p>
@@ -117,7 +200,7 @@
       <div id="postGallery" class="post-gallery"></div>
     </section>
 
-    <section class="events-panel" aria-labelledby="eventsHeading">
+    <section id="events" class="events-panel" aria-labelledby="eventsHeading" tabindex="-1">
       <div class="section-heading event-heading">
         <div>
           <p class="eyebrow">Database</p>
@@ -142,10 +225,18 @@
           <span class="sr-only">Filter events</span>
           <select id="filterSelect">
             <option value="upcoming">Upcoming</option>
-            <option value="needs-push">Needs push</option>
+            <option value="next-seven-days">Next 7 days</option>
             <option value="published">Showing on website</option>
             <option value="hidden">Hidden from website</option>
             <option value="all">All active rows</option>
+            <optgroup label="Needs attention">
+              <option value="needs-push">Needs push</option>
+              <option value="hidden-upcoming">Hidden upcoming</option>
+              <option value="missing-flyer">Missing flyers</option>
+              <option value="missing-venue">Missing Venue IDs</option>
+              <option value="missing-description">Missing descriptions</option>
+              <option value="possible-duplicate">Possible duplicates</option>
+            </optgroup>
           </select>
         </label>
       </div>
@@ -171,65 +262,10 @@
       </div>
     </section>
 
-    <section class="status-panel" aria-labelledby="statusHeading">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">System</p>
-          <h2 id="statusHeading">Status</h2>
-        </div>
-
-        <span id="statusUpdated" class="status-updated"></span>
-      </div>
-
-      <dl class="status-grid">
-        <div>
-          <dt>Last pull</dt>
-          <dd id="lastPull">—</dd>
-        </div>
-
-        <div>
-          <dt>Last push</dt>
-          <dd id="lastPush">—</dd>
-        </div>
-
-        <div>
-          <dt>Needs push in window</dt>
-          <dd id="pendingCount">—</dd>
-        </div>
-
-        <div>
-          <dt>Outside sync window</dt>
-          <dd id="outsidePendingCount">—</dd>
-        </div>
-
-        <div>
-          <dt>Showing on website</dt>
-          <dd id="websiteCount">—</dd>
-        </div>
-
-        <div>
-          <dt>Upcoming in Sheet</dt>
-          <dd id="upcomingCount">—</dd>
-        </div>
-
-        <div>
-          <dt>Hidden upcoming</dt>
-          <dd id="hiddenCount">—</dd>
-        </div>
-
-        <div>
-          <dt>Active Sheet rows</dt>
-          <dd id="activeCount">—</dd>
-        </div>
-      </dl>
-
-      <p id="syncWindow" class="status-footnote"></p>
-      <p id="cacheNote" class="status-footnote"></p>
-    </section>
   </main>
 
   <template id="eventTemplate">
-    <article class="event-card">
+    <article class="event-card" tabindex="-1">
       <figure class="event-flyer">
         <a class="event-flyer-link" target="_blank" rel="noopener noreferrer" hidden>
           <img alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
@@ -341,7 +377,7 @@
   </noscript>
 
   <script src="../event-metadata.js?v=20261112-vals-melt-strip-1"></script>
-  <script src="admin.js?v=20261117-event-rows"></script>
+  <script src="admin.js?v=20261117-dashboard"></script>
   <script src="post-generator.js?v=20261112-vals-melt-strip-1"></script>
 </body>
 </html>

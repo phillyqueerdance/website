@@ -1,9 +1,26 @@
 const ADMIN_API_URL = "/admin/api";
+const WEEK_PREVIEW_LIMIT = 5;
+
+const phillyDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
 
 const elements = {
   refreshButton: document.getElementById("refreshButton"),
+  dashboardState: document.getElementById("dashboardState"),
+  dashboardContent: document.getElementById("dashboardContent"),
+  reviewButtons: document.querySelectorAll(".review-row"),
+  flyerCoverage: document.getElementById("flyerCoverage"),
+  weekList: document.getElementById("weekList"),
+  weekEmpty: document.getElementById("weekEmpty"),
+  viewWeek: document.getElementById("viewWeek"),
+  eventsPanel: document.getElementById("events"),
   pullButton: document.getElementById("pullButton"),
   pushButton: document.getElementById("pushButton"),
+  syncStatusIssue: document.getElementById("syncStatusIssue"),
   saveAllButton: document.getElementById("saveAllButton"),
   unsavedSummary: document.getElementById("unsavedSummary"),
   saveAllHelp: document.getElementById("saveAllHelp"),
@@ -39,6 +56,7 @@ const state = {
   venueById: new Map(),
   drafts: new Map(),
   cards: new Map(),
+  dashboardViews: new Map(),
   feedFlyers: new Map(),
   flyerRequest: 0,
   busy: false,
@@ -59,31 +77,75 @@ function phillyDateKey(value) {
     return "";
   }
 
-  return new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "America/New_York",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }
-  ).format(date);
+  const parts = Object.fromEntries(
+    phillyDateFormatter.formatToParts(date).map(({ type, value }) => [type, value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function isUpcoming(event) {
+function isUpcoming(event, todayKey = phillyDateKey(new Date())) {
   const eventKey =
     phillyDateKey(
       event.end || event.start
     );
-
-  const todayKey =
-    phillyDateKey(new Date());
 
   return Boolean(
     eventKey &&
     todayKey &&
     eventKey >= todayKey
   );
+}
+
+function dashboardEventViews(events, feedFlyers, now = new Date()) {
+  const active = events.filter(event => !event.removedFromSheet);
+  const today = phillyDateKey(now);
+  const upcoming = active.filter(event => isUpcoming(event, today));
+  const weekEnd = new Date(`${today}T00:00:00Z`);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+  const weekEndKey = weekEnd.toISOString().slice(0, 10);
+  const week = upcoming.filter(event => {
+    const start = Date.parse(event.start);
+    const end = Date.parse(event.end);
+    return Math.max(start, Number.isFinite(end) ? end : start) >= now &&
+      phillyDateKey(start) < weekEndKey;
+  });
+
+  const firstByTitleAndStart = new Map();
+  const duplicateIds = new Set();
+  const missingFlyers = [];
+  let unknownFlyers = 0;
+  for (const event of upcoming) {
+    if (!Object.hasOwn(event, "flyerUrl") && !feedFlyers.has(event.eventId)) {
+      unknownFlyers++;
+    } else if (!eventFlyerUrl(event, feedFlyers)) {
+      missingFlyers.push(event);
+    }
+
+    const title = window.QDPEventMetadata.cleanTitle({ title: event.publicTitle })
+      .replace(/\s+/g, " ").toLowerCase();
+    const start = Date.parse(event.start);
+    if (!title || !Number.isFinite(start)) continue;
+    const key = `${start}\n${title}`;
+    if (firstByTitleAndStart.has(key)) {
+      duplicateIds.add(firstByTitleAndStart.get(key));
+      duplicateIds.add(event.eventId);
+    } else {
+      firstByTitleAndStart.set(key, event.eventId);
+    }
+  }
+
+  return {
+    views: new Map([
+      ["next-seven-days", week],
+      ["needs-push", active.filter(event => event.needsPush)],
+      ["hidden-upcoming", upcoming.filter(event => !event.publishToWeb)],
+      ["missing-flyer", missingFlyers],
+      ["missing-venue", upcoming.filter(event => !event.venueId?.trim())],
+      ["missing-description", upcoming.filter(event => !event.description?.trim())],
+      ["possible-duplicate", upcoming.filter(event => duplicateIds.has(event.eventId))]
+    ]),
+    unknownFlyers
+  };
 }
 
 function compareEvents(left, right) {
@@ -379,7 +441,7 @@ function setBusy(busy) {
     });
 
   document
-    .querySelectorAll("details")
+    .querySelectorAll(".artist-picker")
     .forEach(details => {
       details.classList.toggle("is-disabled", busy);
       if (busy) {
@@ -454,8 +516,9 @@ function visibleEvents() {
       .toLowerCase();
 
   const filter = elements.filterSelect.value;
+  const events = state.dashboardViews.get(filter) || state.events;
 
-  return state.events.filter(event => {
+  return events.filter(event => {
     const draft = draftFor(event);
     const venue = state.venueById.get(draft.venueId);
     const artistText = draft.artistIds
@@ -486,10 +549,6 @@ function visibleEvents() {
 
     if (filter === "upcoming") {
       return isUpcoming(event);
-    }
-
-    if (filter === "needs-push") {
-      return event.needsPush;
     }
 
     if (filter === "published") {
@@ -628,12 +687,17 @@ function artistDisplayName(artist) {
     .join(" ");
 }
 
+function eventFlyerUrl(event, feedFlyers) {
+  return window.QDPEventMetadata.image({
+    flyerUrl: event.flyerUrl ?? feedFlyers.get(event.eventId)
+  });
+}
+
 function renderEventFlyer(card, event) {
   const link = card.querySelector(".event-flyer-link");
   const image = link.querySelector("img");
   const status = card.querySelector(".event-flyer-status");
-  const source = event.flyerUrl ?? state.feedFlyers.get(event.eventId);
-  const url = window.QDPEventMetadata.image({ flyerUrl: source });
+  const url = eventFlyerUrl(event, state.feedFlyers);
   link.hidden = !url;
   status.hidden = Boolean(url);
   status.textContent = "No flyer";
@@ -667,6 +731,8 @@ async function refreshFeedFlyers() {
     for (const { card, event } of state.cards.values()) {
       if (!Object.hasOwn(event, "flyerUrl")) renderEventFlyer(card, event);
     }
+    renderDashboard();
+    if (elements.filterSelect.value === "missing-flyer") renderEvents();
   } catch {
     // The dashboard remains editable if the public feed is unavailable.
   }
@@ -984,6 +1050,51 @@ function renderEvents() {
     `${events.length} of ${state.events.length}`;
 }
 
+function renderDashboard() {
+  const { views, unknownFlyers } = dashboardEventViews(state.events, state.feedFlyers);
+  state.dashboardViews = views;
+  for (const button of elements.reviewButtons) {
+    const count = views.get(button.dataset.eventView).length;
+    button.querySelector("strong").textContent = count;
+    button.classList.toggle("has-items", count > 0);
+  }
+
+  elements.flyerCoverage.hidden = unknownFlyers === 0;
+  elements.flyerCoverage.textContent = unknownFlyers
+    ? `Flyer data unavailable for ${unknownFlyers} upcoming ${unknownFlyers === 1 ? "event" : "events"}.`
+    : "";
+
+  const week = views.get("next-seven-days");
+  const preview = week.slice(0, WEEK_PREVIEW_LIMIT).map(event => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dashboard-row week-row";
+    button.dataset.eventView = "next-seven-days";
+    button.dataset.eventId = event.eventId;
+    button.disabled = state.busy;
+
+    const title = document.createElement("strong");
+    title.textContent = event.publicTitle || event.title || event.eventId;
+    const details = document.createElement("span");
+    const venue = state.venueById.get(event.venueId)?.name || event.venueName || event.location;
+    details.textContent = [
+      formatEventDate(event),
+      venue,
+      event.publishToWeb ? "" : "Hidden from website"
+    ].filter(Boolean).join(" · ");
+    button.append(title, details);
+    item.append(button);
+    return item;
+  });
+  elements.weekList.replaceChildren(...preview);
+  elements.weekEmpty.hidden = week.length > 0;
+  elements.viewWeek.hidden = week.length <= WEEK_PREVIEW_LIMIT;
+  elements.viewWeek.textContent = `View all ${week.length} events`;
+  elements.dashboardState.hidden = true;
+  elements.dashboardContent.hidden = false;
+}
+
 function renderOperation(
   element,
   operation,
@@ -1001,9 +1112,17 @@ function renderOperation(
 }
 
 function renderStatus() {
+  renderDashboard();
   if (!state.status) {
+    elements.statusUpdated.textContent = "";
+    elements.syncStatusIssue.hidden = true;
     return;
   }
+
+  elements.syncStatusIssue.hidden = ![
+    state.status.lastPull,
+    state.status.lastPush
+  ].some(operation => operation?.status === "error");
 
   renderOperation(
     elements.lastPull,
@@ -1069,8 +1188,10 @@ function updateStatusFromEvents() {
     return;
   }
 
-  const upcoming = state.events.filter(isUpcoming);
-  const pending = state.events.filter(event => event.needsPush);
+  const active = state.events.filter(event => !event.removedFromSheet);
+  const today = phillyDateKey(new Date());
+  const upcoming = active.filter(event => isUpcoming(event, today));
+  const pending = active.filter(event => event.needsPush);
   const pendingInWindow = pending.filter(
     event => event.inSyncWindow
   );
@@ -1082,10 +1203,10 @@ function updateStatusFromEvents() {
     pendingPushTotalCount: pending.length,
     pendingOutsideWindowCount:
       pending.length - pendingInWindow.length,
-    activeSheetEventCount: state.events.length,
+    activeSheetEventCount: active.length,
     upcomingSheetEventCount: upcoming.length,
     websiteEventCount:
-      state.events.filter(appearsOnWebsite).length,
+      active.filter(appearsOnWebsite).length,
     hiddenUpcomingCount:
       upcoming.filter(event => !event.publishToWeb).length
   };
@@ -1119,7 +1240,7 @@ function applyDashboard(result, { preserveDrafts = false } = {}) {
   });
   state.events.sort(compareEvents);
   state.status = result.status || null;
-  renderEvents(); renderStatus(); updateGlobalControls();
+  renderStatus(); renderEvents(); updateGlobalControls();
   if (result.syncJob && ['queued', 'running'].includes(result.syncJob.state)) trackSyncJob(result.syncJob);
 }
 
@@ -1132,6 +1253,9 @@ async function refreshDashboard({ discardDrafts = false, preserveDrafts = false,
     applyDashboard(result, { preserveDrafts });
     void refreshFeedFlyers();
   } catch (error) {
+    if (!state.dashboardViews.size) {
+      elements.dashboardState.textContent = "Overview unavailable. Use Refresh to retry.";
+    }
     if (!quiet) { elements.loadingState.hidden = false; elements.loadingState.textContent = error.message; }
     showToast(error.message, true);
   } finally {
@@ -1151,7 +1275,11 @@ async function runSync(kind) {
   try {
     const result = await adminRequest(`admin.${kind}`);
     if (result.job) trackSyncJob(result.job);
-    else { applyDashboard(result); showToast(`${kind === 'pull' ? 'Pull' : 'Push'} complete.`); }
+    else {
+      applyDashboard(result);
+      void refreshFeedFlyers();
+      showToast(`${kind === 'pull' ? 'Pull' : 'Push'} complete.`);
+    }
   } catch (error) { showToast(error.message, true); }
   finally { setBusy(false); }
 }
@@ -1170,6 +1298,20 @@ elements.pushButton.addEventListener(
   "click",
   () => runSync("push")
 );
+
+elements.dashboardContent.addEventListener("click", event => {
+  const button = event.target.closest("button[data-event-view]");
+  if (!button) return;
+
+  elements.searchInput.value = "";
+  elements.filterSelect.value = button.dataset.eventView;
+  renderEvents();
+
+  const card = state.cards.get(button.dataset.eventId)?.card;
+  const target = card?.parentElement === elements.eventList ? card : elements.eventsPanel;
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({ block: "start" });
+});
 
 elements.searchInput.addEventListener(
   "input",
@@ -1265,7 +1407,7 @@ function applySavedEvents(result, expectedIds) {
   const expected = new Set(expectedIds);
   state.events = state.events.map(event => expected.has(event.eventId) ? byId.get(event.eventId) : event).sort(compareEvents);
   expectedIds.forEach(id => state.drafts.delete(id));
-  updateStatusFromEvents(); renderEvents(); renderStatus(); updateGlobalControls();
+  updateStatusFromEvents(); renderStatus(); renderEvents(); updateGlobalControls();
 }
 
 
