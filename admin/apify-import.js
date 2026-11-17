@@ -246,14 +246,15 @@ async function loadWorkbook() {
     elements.candidates.replaceChildren(...candidates.map(candidateCard));
     setStatus(elements["save-status"], "");
     setStatus(elements["workbook-status"], file.name + " loaded.");
-    showView();
   } catch (error) {
     setStatus(elements["workbook-status"], error.message || "The workbook could not be opened.", true);
+    return;
   } finally {
     elements.workbook.value = "";
     state.busy = false;
     updateControls();
   }
+  showView();
 }
 
 async function saveSelected() {
