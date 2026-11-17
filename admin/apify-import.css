@@ -324,3 +324,72 @@
 .apify-page [hidden] {
   display: none;
 }
+
+.apify-correction-editor {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.apify-correction-fields {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.apify-correction-fields legend {
+  padding: 0;
+  font-weight: 760;
+}
+
+.apify-correction-choice {
+  align-self: start;
+  display: grid;
+  gap: 7px;
+  padding: 11px 13px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-raised);
+}
+
+.apify-correction-label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.apify-correction-label {
+  font-size: .9rem;
+  font-weight: 730;
+}
+
+.apify-correction-label input {
+  accent-color: var(--yellow);
+}
+
+.apify-correction-choice > :is(textarea, input) {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+  color: var(--text);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+}
+
+@media (min-width: 700px) {
+  .apify-correction-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .apify-correction-fields > p,
+  .apify-correction-choice:has(textarea) {
+    grid-column: 1 / -1;
+  }
+}

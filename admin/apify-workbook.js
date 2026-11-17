@@ -24,7 +24,8 @@ export const REVIEW_FIELDS = [
 
 const CORRECTION_FIELDS = [
   "Date", "Current title", "Correction", "Venue", "Instagram source",
-  "Apply to existing event only", "Suggested Description", "RawFlyerURL", "Public listing"
+  "Apply to existing event only", "Suggested Description", "RawFlyerURL", "Public listing",
+  "Suggested StartDate", "Suggested StartTime", "Suggested EndDate", "Suggested EndTime"
 ];
 
 function zipDirectory(bytes) {
@@ -229,10 +230,19 @@ function candidates(rows, workbookKey, date1904) {
     });
 }
 
-function corrections(rows, date1904) {
+function corrections(rows, workbookKey, date1904) {
   return readTable(rows, CORRECTION_FIELDS, ["Current title", "Correction"], "Corrections")
     .filter(row => row.values["Current title"])
-    .map(({ values }) => ({ ...values, Date: formattedDate(values.Date, date1904) }));
+    .map(({ rowNumber, values }) => {
+      values.intakeKey = workbookKey + ":" + rowNumber;
+      for (const name of ["Date", "Suggested StartDate", "Suggested EndDate"]) {
+        values[name] = formattedDate(values[name], date1904);
+      }
+      for (const name of ["Suggested StartTime", "Suggested EndTime"]) {
+        values[name] = formattedTime(values[name]);
+      }
+      return values;
+    });
 }
 
 export async function readScrapeWorkbook(file) {
@@ -268,6 +278,6 @@ export async function readScrapeWorkbook(file) {
   const workbookKey = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
   return {
     candidates: candidates(newRows ?? [], workbookKey, date1904),
-    corrections: corrections(correctionRows ?? [], date1904)
+    corrections: corrections(correctionRows ?? [], workbookKey, date1904)
   };
 }

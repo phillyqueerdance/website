@@ -1,4 +1,5 @@
-import { readScrapeWorkbook, REVIEW_FIELDS } from "./apify-workbook.js?v=20261116-02";
+import { readScrapeWorkbook, REVIEW_FIELDS } from "./apify-workbook.js?v=20261116-corrections-2";
+import { suggestedCorrectionTimes } from "./apify-correction-times.js?v=20261116-corrections-1";
 
 const elements = Object.fromEntries([
   "workbook", "workbook-status", "events-tab", "corrections-tab", "event-count",
@@ -12,7 +13,9 @@ const state = {
   controls: [],
   busy: false,
   listings: null,
-  listingStatus: ""
+  listingStatus: "",
+  correctionEdits: new Map(),
+  correctionBusy: false
 };
 
 const dateLabel = new Intl.DateTimeFormat("en-US", {
@@ -203,8 +206,8 @@ function selectedCandidates() {
 function updateControls() {
   const selected = selectedCandidates();
   const withoutFlyer = selected.filter(candidate => !candidate.fields.RawFlyerURL.trim()).length;
-  elements.workbook.disabled = state.busy;
-  elements["save-apify"].disabled = state.busy || !selected.length;
+  elements.workbook.disabled = state.busy || state.correctionBusy;
+  elements["save-apify"].disabled = state.busy || state.correctionBusy || !selected.length;
   elements["save-count"].textContent = selected.length + (selected.length === 1 ? " event" : " events")
     + " selected" + (withoutFlyer ? " · " + withoutFlyer + " without a flyer" : "");
   for (const { candidate, article, decisions, buttons, editor, saved } of state.controls) {
@@ -226,13 +229,14 @@ function setStatus(node, text, error = false) {
 
 async function loadWorkbook() {
   const file = elements.workbook.files[0];
-  if (!file || state.busy) return;
+  if (!file || state.busy || state.correctionBusy) return;
   state.busy = true;
   updateControls();
   setStatus(elements["workbook-status"], "Reading " + file.name + "…");
   try {
     state.review = await readScrapeWorkbook(file);
     state.controls = [];
+    state.correctionEdits.clear();
     const { candidates, corrections } = state.review;
     elements["event-count"].textContent = candidates.length;
     elements["correction-count"].textContent = corrections.length;
@@ -242,19 +246,20 @@ async function loadWorkbook() {
     elements.candidates.replaceChildren(...candidates.map(candidateCard));
     setStatus(elements["save-status"], "");
     setStatus(elements["workbook-status"], file.name + " loaded.");
-    showView();
   } catch (error) {
     setStatus(elements["workbook-status"], error.message || "The workbook could not be opened.", true);
+    return;
   } finally {
     elements.workbook.value = "";
     state.busy = false;
     updateControls();
   }
+  showView();
 }
 
 async function saveSelected() {
   const selected = selectedCandidates();
-  if (!selected.length || state.busy) return;
+  if (!selected.length || state.busy || state.correctionBusy) return;
   state.busy = true;
   updateControls();
   setStatus(elements["save-status"], "Saving to Apify Import…");
@@ -324,7 +329,8 @@ function correctionCard(correction) {
   const compare = element("div", "apify-compare");
   const current = element("section", "apify-comparison apify-current");
   current.append(element("h3", "", "Current QDP listing"));
-  const live = state.listings?.get(publicEventId(correction["Public listing"]));
+  const eventId = publicEventId(correction["Public listing"]);
+  const live = state.listings?.get(eventId);
   if (live) {
     if (live.title && live.title !== workbookTitle) current.append(element("strong", "", live.title));
     const timing = listingTiming(live);
@@ -358,7 +364,142 @@ function correctionCard(correction) {
   if (correction["Apply to existing event only"]) {
     article.append(element("p", "apify-correction-note", correction["Apply to existing event only"]));
   }
+  if (eventId) article.append(correctionEditor(correction, eventId, live));
+  else article.append(element("p", "apify-muted", "A QDP listing link with an EventID is required to save this correction."));
   return article;
+}
+
+const CORRECTION_OPTIONS = [
+  ["description", "Description"],
+  ["start", "Start date and time"],
+  ["end", "End date and time"],
+  ["flyer", "Flyer"]
+];
+
+const philadelphiaDateTime = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit",
+  minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZone: "America/New_York"
+});
+
+function correctionDateTime(value) {
+  const date = new Date(value || "");
+  if (!Number.isFinite(+date)) return "";
+  const parts = Object.fromEntries(philadelphiaDateTime.formatToParts(date).map(part => [part.type, part.value]));
+  return [parts.year, parts.month, parts.day].join("-") + "T" +
+    [parts.hour, parts.minute, parts.second].join(":");
+}
+
+function correctionEditor(correction, eventId, live) {
+  let edit = state.correctionEdits.get(correction);
+  if (!edit) {
+    edit = { chosen: new Set(), draft: {}, message: "", error: false };
+    state.correctionEdits.set(correction, edit);
+  }
+
+  const current = { start: correctionDateTime(live?.start), end: correctionDateTime(live?.end) };
+  const suggested = suggestedCorrectionTimes(correction, current);
+  const draft = {
+    description: correction["Suggested Description"] || live?.description || "",
+    start: suggested.start || current.start,
+    end: suggested.end || current.end,
+    flyer: httpsUrl(correction.RawFlyerURL),
+    ...edit.draft
+  };
+
+  const section = element("section", "apify-correction-editor");
+  const fields = element("fieldset", "apify-correction-fields");
+  fields.disabled = state.busy || state.correctionBusy;
+  fields.append(element("legend", "", "Choose correction fields to save"));
+  fields.append(element("p", "apify-muted", "Times use Philadelphia time."));
+
+  const status = element("p", "apify-status");
+  status.setAttribute("role", "status");
+  setStatus(status, edit.message, edit.error);
+
+  const save = element("button", "save-all-button", "Save correction to Apify Import");
+  save.type = "button";
+  save.addEventListener("click", () => void saveCorrection(correction, eventId, edit, draft));
+  function updateSave() {
+    save.disabled = fields.disabled || !edit.chosen.size;
+  }
+
+  for (const [field, label] of CORRECTION_OPTIONS) {
+    if (field === "flyer" && !draft.flyer) continue;
+    const row = element("div", "apify-correction-choice");
+    const header = element("label", "apify-correction-label");
+    const toggle = element("input");
+    toggle.type = "checkbox";
+    toggle.checked = edit.chosen.has(field);
+    toggle.addEventListener("change", () => {
+      if (toggle.checked) edit.chosen.add(field);
+      else edit.chosen.delete(field);
+      updateSave();
+    });
+    header.append(toggle, element("span", "", label));
+    row.append(header);
+
+    if (field === "flyer") {
+      row.append(openLink("Open replacement flyer", draft.flyer));
+    } else {
+      const editor = element(field === "description" ? "textarea" : "input");
+      if (field === "description") editor.rows = 3;
+      else { editor.type = "datetime-local"; editor.step = 1; }
+      editor.value = draft[field];
+      editor.setAttribute("aria-label", "Proposed " + label.toLowerCase());
+      editor.addEventListener("input", () => {
+        draft[field] = editor.value;
+        edit.draft[field] = editor.value;
+      });
+      row.append(editor);
+    }
+    fields.append(row);
+  }
+
+  updateSave();
+  section.append(fields, save, status);
+  return section;
+}
+
+async function saveCorrection(correction, eventId, edit, draft) {
+  if (state.busy || state.correctionBusy || !edit.chosen.size) return;
+  state.correctionBusy = true;
+  edit.error = false;
+  edit.message = "Saving to Apify Import…";
+  updateControls();
+  renderCorrections();
+  try {
+    const response = await fetch("/admin/api", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "admin.apifycorrection.stage",
+        key: correction.intakeKey,
+        eventId,
+        title: correction["Current title"],
+        listingUrl: httpsUrl(correction["Public listing"]),
+        sourceUrl: httpsUrl(correction["Instagram source"]),
+        changes: Object.fromEntries([...edit.chosen].map(field => [field, draft[field]]))
+      })
+    });
+    const result = await response.json().catch(() => null);
+    if (result?.error === "Unknown admin action.") {
+      throw new Error("Saving corrections needs the updated Apps Script web app.");
+    }
+    if (!response.ok || result?.ok !== "yes" || typeof result.alreadySaved !== "boolean") {
+      throw new Error(result?.error || "The correction could not be confirmed. You can retry this selection.");
+    }
+    edit.chosen.clear();
+    edit.message = result.alreadySaved
+      ? "This selection is already in Apify Import."
+      : "Selected correction fields saved to Apify Import.";
+  } catch (error) {
+    edit.message = error.message || "The correction could not be confirmed. You can retry this selection.";
+    edit.error = true;
+  } finally {
+    state.correctionBusy = false;
+    updateControls();
+    renderCorrections();
+  }
 }
 
 function renderCorrections() {
