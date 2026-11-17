@@ -8,9 +8,9 @@
   <title>Archive Updates | QDP Admin</title>
   <link rel="icon" type="image/png" href="/admin/favicon.png">
   <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
-  <link rel="stylesheet" href="/admin/archive-updates.css?v=20261117-1">
+  <link rel="stylesheet" href="/admin/archive-updates.css?v=20261117-batch">
   <script src="/admin/profile-editor.js?v=20261117-integrity" defer></script>
-  <script src="/admin/archive-updates.js?v=20261117-1" defer></script>
+  <script src="/admin/archive-updates.js?v=20261117-batch" defer></script>
 </head>
 <body>
   <header class="admin-header">
@@ -57,10 +57,12 @@
         <label class="field"><span>Search review</span><input id="archiveQuery" type="search" placeholder="Event, profile, or ID"></label>
       </div>
       <div class="archive-bulk archive-actions">
-        <label class="archive-check"><input id="archiveSelectPage" type="checkbox"> Select this page</label>
-        <button id="archiveApproveSelected" class="quiet-button" type="button" disabled>Approve selected</button>
-        <button id="archiveRejectSelected" class="quiet-button" type="button" disabled>Reject selected</button>
+        <label class="archive-check"><input id="archiveSelectPage" type="checkbox"> Check this page</label>
+        <button id="archiveSave" class="save-button" type="button" disabled>Save all changes</button>
+        <button id="archiveClear" class="quiet-button" type="button" disabled>Clear unsaved choices</button>
       </div>
+      <p id="archiveDraftCount" class="dashboard-note" role="status">Check the revisions you approve. Unchecked suggestions stay pending.</p>
+      <p class="field-help">Selections carry across result pages and filters. Nothing is written until you save. Save before leaving this page. Where several venues or parties are proposed, choose one.</p>
       <p id="archiveEmpty" class="dashboard-note" hidden></p>
       <div id="archiveEvents" class="archive-events" aria-busy="false"></div>
       <div class="archive-pagination"><button id="archivePrevious" class="quiet-button" type="button" disabled>Previous</button>
@@ -68,9 +70,9 @@
     </section>
 
     <section class="dashboard-panel archive-publish" aria-labelledby="publishHeading">
-      <div><h2 id="publishHeading">Publish approved changes</h2>
-        <p id="archivePublishNote" class="dashboard-note">Approve suggestions above, then apply them to the source records and publish the website.</p></div>
-      <div class="archive-actions"><button id="archiveApply" class="save-button" type="button" disabled>Apply &amp; publish approved</button>
+      <div><h2 id="publishHeading">Save changes</h2>
+        <p id="archivePublishNote" class="dashboard-note">Save checked revisions and rejections together, then publish approved changes to the website.</p></div>
+      <div class="archive-actions"><button id="archiveApply" class="save-button" type="button" disabled>Save all changes</button>
         <button id="archivePublish" class="quiet-button" type="button" disabled>Publish saved changes</button></div>
     </section>
 

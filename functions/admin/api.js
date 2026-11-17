@@ -25,6 +25,7 @@ const ALLOWED_ACTIONS = new Set([
   "admin.archive.scan",
   "admin.archive.step",
   "admin.archive.decide",
+  "admin.archive.save",
   "admin.archive.apply",
   "admin.archive.publish",
   "admin.archive.retry",

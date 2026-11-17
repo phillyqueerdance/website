@@ -15,6 +15,8 @@ const event = (id, description, fields = {}) => Object.fromEntries(eventHeaders.
 })[h] || '']));
 
 function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], active = [], extra = {} } = {}) {
+  let nextSheetId = 1;
+  const batchRequests = [];
   class Range {
     constructor(sheet, row, col, height = 1, width = 1) {
       Object.assign(this, { sheet, row, col, height, width });
@@ -37,8 +39,9 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
   }
   for (const method of ['setBackground', 'setFontColor', 'setFontWeight', 'setNote', 'setNumberFormat', 'setDataValidation']) Range.prototype[method] = function() { return this; };
   class Sheet {
-    constructor(name, rows = []) { this.name = name; this.rows = rows.map(row => row.slice()); }
+    constructor(name, rows = []) { this.name = name; this.id = nextSheetId++; this.rows = rows.map(row => row.slice()); }
     getName() { return this.name; }
+    getSheetId() { return this.id; }
     getLastRow() { return this.rows.length; }
     getLastColumn() { return Math.max(0, ...this.rows.map(row => row.length)); }
     getRange(...args) { return new Range(this, ...args); }
@@ -63,7 +66,7 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
     Events_Archive: rows(events), Events: rows(active), ...extra
   };
   const sheets = new Map(Object.entries(tables).map(([name, data]) => [name, new Sheet(name, data)]));
-  const ss = { getSheetByName: name => sheets.get(name), getSheets: () => [...sheets.values()],
+  const ss = { getId: () => 'qdp-index', getSheetByName: name => sheets.get(name), getSheets: () => [...sheets.values()],
     insertSheet: name => { const sheet = new Sheet(name); sheets.set(name, sheet); return sheet; }, toast() {} };
   const props = new Map(), triggers = [], publishes = [];
   const normalize = text => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}@]+/gu, ' ').trim();
@@ -97,6 +100,20 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
       base64EncodeWebSafe: bytes => Buffer.from(bytes).toString('base64url'),
       formatDate: (date, zone, format) => format === 'yyyy-MM-dd' ? new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(date) : date.toISOString() },
     SpreadsheetApp: { newDataValidation: () => ({ requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } }), flush() {} },
+    Sheets: { Spreadsheets: { batchUpdate(body, spreadsheetId) {
+      assert.equal(spreadsheetId, 'qdp-index');
+      const prepared = body.requests.map(request => {
+        const update = request.updateCells;
+        const sheet = [...sheets.values()].find(sheet => sheet.getSheetId() === update.start.sheetId);
+        assert.ok(sheet);
+        assert.equal(update.rows.length, 1);
+        assert.equal(update.rows[0].values.length, 1);
+        return { sheet, row: update.start.rowIndex, column: update.start.columnIndex,
+          value: update.rows[0].values[0].userEnteredValue.stringValue };
+      });
+      batchRequests.push(body.requests);
+      for (const cell of prepared) cell.sheet.rows[cell.row][cell.column] = cell.value;
+    } } },
     ScriptApp: { getProjectTriggers: () => triggers.slice(), deleteTrigger: trigger => triggers.splice(triggers.indexOf(trigger), 1),
       newTrigger: handler => ({ timeBased() { return this; }, everyMinutes() { return this; }, create() { const trigger = { getHandlerFunction: () => handler }; triggers.push(trigger); return trigger; } }) },
     qdpAdminListArtists_: () => references('artist'),
@@ -125,8 +142,114 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
   const approve = page => call('decide', { changes: proposals(page).filter(p => p.state === 'pending' && p.kind === 'artist')
     .map(p => ({ key: p.key, revision: p.revision, decision: 'Approve', proposedIds: p.proposedIds })) });
   const finish = () => { for (let i = 0; i < 30; i++) { const page = call('bootstrap'); if (!c.qdpArchiveAdminActive_(page.job)) return page; c.qdpArchiveAdminWorker(); } throw new Error('Job did not finish'); };
-  return { c, ss, sheets, props, triggers, publishes, call, plain, proposals, approve, finish, rows };
+  return { c, ss, sheets, props, triggers, publishes, batchRequests, call, plain, proposals, approve, finish, rows };
 }
+
+test('checked revisions and rejections save together; unchecked suggestions remain pending', () => {
+  const h = setup({events: [event('ONE', 'New Artist and The Crew'), event('TWO', 'New Artist')]});
+  const page = h.call('scan');
+  const artist = page.events[0].proposals.find(p => p.kind === 'artist');
+  const collective = page.events[0].proposals.find(p => p.kind === 'collective');
+  const saved = h.call('save', {changes: [
+    {key: artist.key, revision: artist.revision, decision: 'Approve', proposedIds: artist.proposedIds},
+    {key: collective.key, revision: collective.revision, decision: 'Reject'}
+  ]});
+  assert.equal(saved.saved, 2);
+  assert.equal(saved.savedKeys.length, 2);
+  assert.equal(saved.job.phase, 'applying');
+  const done = h.finish();
+  assert.deepEqual(h.plain(done.summary), {pending: 1, approved: 0, applied: 1, rejected: 1, blocked: 0});
+  assert.equal(h.sheets.get('Events_Archive').rows[2][eventHeaders.indexOf('ArtistIDs (comma-separated)')], '');
+  assert.equal(h.call('rejects').rejectedTotal, 1);
+  assert.deepEqual(h.publishes, ['live', 'archive']);
+});
+
+test('all decisions and all archive cell updates use batch requests rather than a write per change', () => {
+  const h = setup({events: Array.from({length: 125}, (_, i) => event('E-' + i, 'New Artist'))});
+  const page = h.call('scan');
+  const changes = h.sheets.get('Archive_ID_Review').rows.slice(1).map(row => ({
+    key: h.c.qdpArchiveAdminKey_(row), revision: h.c.qdpArchiveAdminRevision_(row), decision: 'Approve', proposedIds: ['NEW']
+  }));
+  h.call('save', {changes});
+  assert.equal(h.batchRequests.length, 1);
+  assert.equal(h.batchRequests[0].length, 250);
+  h.c.qdpArchiveAdminWorker();
+  assert.equal(h.batchRequests.length, 2);
+  assert.equal(h.batchRequests[1].length, 500); // ID, result, and two indicator cells for each event.
+  assert.equal(h.finish().summary.applied, 125);
+});
+
+test('rejection-only batches stay saved without publishing or applying unchecked suggestions', () => {
+  const h = setup();
+  const artist = h.proposals(h.call('scan')).find(p => p.kind === 'artist');
+  const result = h.call('save', {changes: [{key: artist.key, revision: artist.revision, decision: 'Reject'}]});
+  assert.equal(result.summary.rejected, 1);
+  assert.equal(result.summary.pending, 1);
+  assert.equal(result.job.phase, 'ready');
+  assert.equal(h.triggers.length, 0);
+  assert.deepEqual(h.publishes, []);
+});
+
+test('event edit links target the current exact archive row after records move', () => {
+  const h = setup({events: [event('ONE', 'New Artist'), event('TWO', 'No match')]});
+  h.call('scan');
+  const sheet = h.sheets.get('Events_Archive');
+  [sheet.rows[1], sheet.rows[2]] = [sheet.rows[2], sheet.rows[1]];
+  assert.equal(h.call('bootstrap').events[0].editUrl,
+    `https://docs.google.com/spreadsheets/d/qdp-index/edit#gid=${sheet.getSheetId()}&range=3:3`);
+});
+
+test('a stale checked revision prevents the entire save before any decisions are written', () => {
+  const h = setup();
+  const page = h.call('scan');
+  const before = JSON.stringify(h.sheets.get('Archive_ID_Review').rows);
+  const changes = h.proposals(page).map((p, i) => ({key: p.key, revision: i ? 'stale' : p.revision,
+    decision: 'Approve', proposedIds: p.proposedIds}));
+  assert.throws(() => h.call('save', {changes}), /review changed/);
+  assert.equal(JSON.stringify(h.sheets.get('Archive_ID_Review').rows), before);
+  assert.equal(h.batchRequests.length, 0);
+  assert.equal(h.triggers.length, 0);
+});
+
+test('new batch saves require Sheets service before writing; the older menu still works', () => {
+  const h = setup();
+  const page = h.call('scan');
+  const artist = h.proposals(page).find(p => p.kind === 'artist');
+  h.c.Sheets = undefined;
+  assert.throws(() => h.call('save', {changes: [{key: artist.key, revision: artist.revision,
+    decision: 'Approve', proposedIds: artist.proposedIds}]}), /Enable Google Sheets API/);
+  h.approve(page);
+  assert.equal(h.c.qdpApplyApprovedArchiveIds().applied, 1);
+});
+
+test('a failed archive batch writes no partial event edits and resumes safely', () => {
+  const h = setup({events: [event('ONE', 'New Artist'), event('TWO', 'New Artist')]});
+  const page = h.call('scan');
+  h.call('save', {changes: h.proposals(page).map(p => ({key: p.key, revision: p.revision,
+    decision: 'Approve', proposedIds: p.proposedIds}))});
+  const batchUpdate = h.c.Sheets.Spreadsheets.batchUpdate;
+  h.c.Sheets.Spreadsheets.batchUpdate = () => { throw new Error('Temporary Sheets outage'); };
+  assert.equal(h.finish().job.phase, 'failed');
+  assert.ok(h.sheets.get('Events_Archive').rows.slice(1).every(row => row[eventHeaders.indexOf('ArtistIDs (comma-separated)')] === ''));
+  assert.deepEqual(h.publishes, []);
+  h.c.Sheets.Spreadsheets.batchUpdate = batchUpdate;
+  h.call('retry');
+  assert.equal(h.finish().summary.applied, 2);
+  assert.deepEqual(h.publishes, ['live', 'archive']);
+});
+
+test('queer classification can depend on a venue approved in the same atomic batch', () => {
+  const h = setup({events: [event('ONE', 'The Room')]});
+  h.sheets.get('Venues').rows[1][6] = 'Yes';
+  const page = h.call('scan');
+  assert.ok(h.proposals(page).some(p => p.kind === 'classification'));
+  h.call('save', {changes: h.proposals(page).map(p => ({key: p.key, revision: p.revision,
+    decision: 'Approve', proposedIds: p.proposedIds}))});
+  assert.equal(h.finish().summary.applied, 2);
+  const row = h.sheets.get('Events_Archive').rows[1];
+  assert.equal(row[eventHeaders.indexOf('VenueID')], 'ROOM');
+  assert.equal(row[eventHeaders.indexOf('ExplicitQueer (Yes/No)')], 'Yes');
+});
 
 test('initial page load gets artists from the artist loader and includes every profile type', () => {
   const h = setup();

@@ -23,6 +23,7 @@
 .archive-no-flyer { display: grid; place-items: center; min-height: 135px; padding: 12px; border: 1px dashed var(--border); color: var(--muted); text-align: center; font-size: .8rem; }
 .archive-event h3 { margin: 4px 0 8px; font-size: 1.12rem; overflow-wrap: anywhere; }
 .archive-event h3 a { color: var(--text); }
+.archive-edit-event { display: inline-block; margin-top: 6px; color: var(--yellow); text-decoration: underline; font-size: .86rem; }
 .archive-event-date { margin: 0; font-size: .85rem; color: var(--orange); }
 .archive-proposal { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 16px; min-width: 0; }
 .archive-proposal-header { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
@@ -31,6 +32,7 @@
 .archive-result[data-state="applied"] { color: var(--green); }
 .archive-result[data-state="rejected"] { color: var(--muted); }
 .archive-result[data-state="blocked"] { color: var(--red); }
+.archive-result[data-state="draft"] { color: var(--orange); }
 .archive-current { margin: 10px 0; font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
 .archive-candidates { display: flex; flex-wrap: wrap; gap: 8px; border: 0; margin: 8px 0 12px; padding: 0; }
 .archive-candidate { display: flex; align-items: center; gap: 8px; background: rgb(183 23 197 / .13); border: 1px solid rgb(183 23 197 / .4); border-radius: 8px; padding: 8px 10px; max-width: 100%; font-size: .86rem; overflow-wrap: anywhere; }

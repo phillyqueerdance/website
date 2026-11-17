@@ -1,8 +1,9 @@
 /**
- * Queer Dance Philly — Archive Updates v7.4.18
+ * Queer Dance Philly — Archive Updates v7.4.19
  * ArchiveReview.gs: Archive ID review, Admin Archive Updates, saved rejects,
  * approvals, resumable jobs, and artist-indicator recalculation.
- * Replace this file and Core.gs with the supplied Archive Updates versions.
+ * Replace only ArchiveReview.gs for this batch-review update. Keep the
+ * existing Archive Updates Core.gs and PublicData.gs installations.
  * Use the supplied PublicData.gs to publish every Archive YYYY tab.
  * Keep Imports.gs, scraper.gs, the manifest, services, properties, deployment
  * URL, spreadsheet data, and existing refresh triggers.
@@ -155,7 +156,7 @@ function qdpWriteRejectedArchiveIds() {
   return qdpArchiveWithLock_(() => qdpArchiveWriteRejects_());
 }
 
-function qdpArchiveWriteRejects_() {
+function qdpArchiveWriteRejects_(batchLimit) {
     const cfg = QDP_ARCHIVE_REVIEW_;
     const ss = qdpArchiveSpreadsheet_();
     const queue = ss.getSheetByName(cfg.sheet);
@@ -169,7 +170,7 @@ function qdpArchiveWriteRejects_() {
     // A stale scan can still save rejects: this action writes no archive cells.
     const rejected = qdpArchiveUnsavedRejects_(review, saved.keys);
     const batch = rejected.filter(item => item.values.length)
-      .slice(0, cfg.rejectRowsPerRun);
+      .slice(0, Math.max(cfg.rejectRowsPerRun, Number(batchLimit) || 0));
     const now = new Date();
     const output = [];
     const invalid = rejected.filter(item => !item.values.length).length;
@@ -191,19 +192,21 @@ function qdpArchiveWriteRejects_() {
       SpreadsheetApp.flush();
     }
     // Include previously saved rows so retries repair status after a partial run.
+    const cells = [];
     review.forEach((r, i) => {
       if (r[0] !== 'Reject') return;
       const values = qdpArchiveRejectedValues_(r);
       if (values.length && values.every(value => saved.keys.has(
         qdpArchiveRejectKey_(r[4], r[6], value))) && r[1] !== 'Rejected (saved)') {
-        queue.getRange(i + 2, 2).setValue('Rejected (saved)');
+        cells.push({ sheet: queue, row: i + 2, column: 2, value: 'Rejected (saved)' });
       }
     });
     rejected.filter(item => !item.values.length).forEach(item => {
       if (item.r[1] !== 'Invalid reject: no new value') {
-        queue.getRange(item.queueRow, 2).setValue('Invalid reject: no new value');
+        cells.push({ sheet: queue, row: item.queueRow, column: 2, value: 'Invalid reject: no new value' });
       }
     });
+    qdpArchiveWriteCells_(ss, cells);
     const remaining = qdpArchiveUnsavedRejects_(review, saved.keys)
       .filter(item => item.values.length).length;
     ss.toast('Saved ' + output.length + ' rejected matches. ' + remaining +
@@ -554,23 +557,30 @@ function qdpArchiveIndicatorValues_(rawArtistIds, lookups, partyId) {
 
 
 
-function qdpArchiveRefreshIndicators_(target, lookups) {
+function qdpArchiveRefreshIndicators_(target, lookups, cells) {
   const c = target.layout.columns;
   const sheet = target.layout.sheet;
-  const ids = sheet.getRange(target.number, c.artists).getValue();
-  const partyId = sheet.getRange(target.number, c.party).getValue();
+  const row = target.row || sheet.getRange(target.number, 1, 1, target.layout.width).getValues()[0];
+  const ids = row[c.artists - 1];
+  const partyId = row[c.party - 1];
   const expected = qdpArchiveIndicatorValues_(ids, lookups, partyId);
   if (expected.unknown) return { changed: 0, unknown: expected.unknown };
+  function write(column, value, highlight = false) {
+    if (cells) cells.push({ sheet, row: target.number, column, value, highlight });
+    else {
+      const cell = sheet.getRange(target.number, column);
+      cell.setValue(value);
+      if (highlight) cell.setBackground('#fff2b3');
+    }
+  }
   let changed = 0;
   [
     [c.queerIndicator, expected.queer],
     [c.transIndicator, expected.trans]
   ].forEach(([column, value]) => {
     if (!column) return;
-    const cell = sheet.getRange(target.number, column);
-    if (String(cell.getValue() || '').trim() === value) return;
-    cell.setValue(value);
-    cell.setBackground('#fff2b3');
+    if (String(row[column - 1] || '').trim() === value) return;
+    write(column, value, true);
     changed++;
   });
   // Active events still participate in Calendar sync; mark their changes just
@@ -578,14 +588,42 @@ function qdpArchiveRefreshIndicators_(target, lookups) {
   if (target.layout.name === CONFIG.SHEET_EVENTS) {
     const headers = target.layout.headers;
     const edited = headers.findIndex(h => ['LastEditedAt', 'Last Edited At'].includes(h));
-    if (edited >= 0) sheet.getRange(target.number, edited + 1).setValue(new Date().toISOString());
+    if (edited >= 0) write(edited + 1, new Date().toISOString());
     const titleColumn = headers.findIndex(h => ['Title_Public (auto w/ emojis)', 'Title Public (auto w/ emojis)'].includes(h));
     if (titleColumn >= 0 && typeof buildEventPublicTitle_ === 'function') {
-      sheet.getRange(target.number, titleColumn + 1).setValue(buildEventPublicTitle_(
-        sheet.getRange(target.number, c.title).getValue(), qdpArchiveIds_(ids), lookups.core, partyId));
+      write(titleColumn + 1, buildEventPublicTitle_(
+        row[c.title - 1], qdpArchiveIds_(ids), lookups.core, partyId));
     }
   }
   return { changed, unknown: [] };
+}
+
+// Write only the changed cells. The Sheets service sends the whole set in one
+// atomic request, preserving formulas and all unrelated event fields.
+function qdpArchiveWriteCells_(ss, cells) {
+  if (!cells.length) return;
+  if (typeof Sheets !== 'undefined') {
+    const requests = cells.map(cell => {
+      const value = { userEnteredValue: { stringValue: String(cell.value) } };
+      if (cell.highlight) value.userEnteredFormat = {
+        backgroundColor: { red: 1, green: 242 / 255, blue: 179 / 255 }
+      };
+      return { updateCells: {
+        start: { sheetId: cell.sheet.getSheetId(), rowIndex: cell.row - 1, columnIndex: cell.column - 1 },
+        rows: [{ values: [value] }],
+        fields: 'userEnteredValue' + (cell.highlight ? ',userEnteredFormat.backgroundColor' : '')
+      } };
+    });
+    Sheets.Spreadsheets.batchUpdate({ requests, includeSpreadsheetInResponse: false }, ss.getId());
+  } else {
+    // Preserve the older spreadsheet-menu workflow when the advanced service
+    // has not been enabled. The Admin batch-save action requires that service.
+    cells.forEach(cell => {
+      const range = cell.sheet.getRange(cell.row, cell.column);
+      range.setValue(cell.value);
+      if (cell.highlight) range.setBackground('#fff2b3');
+    });
+  }
 }
 
 
@@ -951,7 +989,7 @@ function qdpArchiveApplyApprovals_() {
         const id = String(row[l.columns.eventId - 1] || '').trim();
         if (!id) return;
         if (!byId[name].has(id)) byId[name].set(id, []);
-        byId[name].get(id).push({ row, number: l.firstDataRow + i });
+        byId[name].get(id).push({ row, original: row.slice(), number: l.firstDataRow + i });
       });
     });
     const lookups = qdpArchiveLookups_(ss);
@@ -967,6 +1005,7 @@ function qdpArchiveApplyApprovals_() {
     };
     let applied = 0;
     const touched = new Map();
+    const cells = [];
     batch.forEach(item => {
       const r = item.r;
       const l = layouts[String(r[2])];
@@ -1009,15 +1048,13 @@ function qdpArchiveApplyApprovals_() {
               if (String(cell.getValue() || '').trim() !== current) {
                 result = 'Stale: IDs changed';
               } else {
-                qdpArchiveAdminMarkDirty_();
-                cell.setValue(next);
-                cell.setBackground('#fff2b3');
+                cells.push({ sheet: l.sheet, row: target.number, column: col, value: next, highlight: true });
                 target.row[col - 1] = next;
                 applied++;
                 result = 'Applied';
                 const targetKey = l.name + '\u001e' + target.number;
                 if (!touched.has(targetKey)) {
-                  touched.set(targetKey, { layout: l, number: target.number,
+                  touched.set(targetKey, { layout: l, number: target.number, row: target.row, original: target.original,
                     reviewRows: [] });
                 }
                 touched.get(targetKey).reviewRows.push(item.queueRow);
@@ -1026,19 +1063,25 @@ function qdpArchiveApplyApprovals_() {
           }
         }
       }
-      queue.getRange(item.queueRow, 2).setValue(result);
+      cells.push({ sheet: queue, row: item.queueRow, column: 2, value: result });
     });
     let indicatorCells = 0;
     let unresolvedEvents = 0;
     touched.forEach(target => {
-      const result = qdpArchiveRefreshIndicators_(target, lookups);
+      const current = target.layout.sheet.getRange(target.number, 1, 1, target.layout.width).getValues()[0];
+      if (JSON.stringify(current) !== JSON.stringify(target.original)) {
+        throw new Error('An event changed while saving. Retry to recheck the records. No changes from this batch were written.');
+      }
+      const result = qdpArchiveRefreshIndicators_(target, lookups, cells);
       indicatorCells += result.changed;
       if (result.unknown.length) {
         unresolvedEvents++;
-        target.reviewRows.forEach(row => queue.getRange(row, 2)
-          .setValue('Applied; indicators need ID cleanup'));
+        target.reviewRows.forEach(row => cells.push({ sheet: queue, row, column: 2,
+          value: 'Applied; indicators need ID cleanup' }));
       }
     });
+    if (applied) qdpArchiveAdminMarkDirty_();
+    qdpArchiveWriteCells_(ss, cells);
     const remaining = approved.length - batch.length;
     ss.toast('Applied ' + applied + ' changes. ' + remaining +
       ' approved rows remain. Refreshed ' + indicatorCells +
@@ -1218,9 +1261,14 @@ function qdpArchiveAdminPage_(body) {
     const headers = rows[0] || [];
     const column = names => headers.findIndex(h => names.includes(String(h).trim()));
     const idColumn = column(['EventID', 'Event ID']);
-    const matches = rows.slice(1).filter(row => String(row[idColumn] || '').trim() === event.eventId);
+    const sheet = ss.getSheetByName(event.sheet);
+    if (sheet) event.editUrl = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(ss.getId()) +
+      '/edit#gid=' + sheet.getSheetId();
+    const matches = rows.slice(1).map((row, i) => ({ row, number: i + 2 }))
+      .filter(item => String(item.row[idColumn] || '').trim() === event.eventId);
     if (matches.length !== 1) { event.sourceIssue = 'Event missing or duplicated; scan again after correcting the source.'; return; }
-    const row = matches[0];
+    const { row, number } = matches[0];
+    event.editUrl += '&range=' + number + ':' + number;
     event.date = qdpArchiveAdminDate_(row[column(['StartDate', 'Start Date'])]);
     const flyer = row[column(['FlyerURL', 'Flyer URL', 'Flyer_URL'])] ||
       row[column(['RawFlyerURL', 'Raw Flyer URL'])] ||
@@ -1240,8 +1288,8 @@ function qdpArchiveAdminPage_(body) {
 
 function qdpArchiveAdminDecide_(body) {
   qdpArchiveAdminReady_();
-  if (!Array.isArray(body.changes) || !body.changes.length || body.changes.length > 100) {
-    throw new Error('Review between one and 100 suggestions at a time.');
+  if (!Array.isArray(body.changes) || !body.changes.length || body.changes.length > 5000) {
+    throw new Error('Save between one and 5,000 suggestions at a time.');
   }
   const ss = qdpArchiveSpreadsheet_(), queue = qdpArchiveAdminQueue_(ss);
   const indexed = new Map();
@@ -1280,16 +1328,16 @@ function qdpArchiveAdminDecide_(body) {
     validated.push({ ...target, decision: change.decision,
       proposed: change.decision === 'Approve' ? proposed.join(', ') : target.row[8] });
   });
-  validated.forEach(item => {
-    queue.sheet.getRange(item.number, 1).setValue(item.decision);
-    queue.sheet.getRange(item.number, 9).setValue(item.proposed);
-  });
-  // Save each rejection immediately so navigation or a new scan cannot lose it.
+  qdpArchiveWriteCells_(ss, validated.flatMap(item => [
+    { sheet: queue.sheet, row: item.number, column: 1, value: item.decision },
+    { sheet: queue.sheet, row: item.number, column: 9, value: item.proposed }
+  ]));
+  // Persist rejected matches together as part of the explicit batch save.
   while (true) {
-    const result = qdpArchiveWriteRejects_();
+    const result = qdpArchiveWriteRejects_(validated.length);
     if (!result.remaining) break;
   }
-  return { saved: validated.length };
+  return { saved: validated.length, savedKeys: validated.map(item => qdpArchiveAdminKey_(item.row)) };
 }
 
 function qdpArchiveAdminBegin_(phase) {
@@ -1342,6 +1390,30 @@ function qdpAdminArchive_(body) {
       return scanned;
     }
     if (action === 'admin.archive.decide') return qdpArchiveAdminDecide_(body);
+    if (action === 'admin.archive.save') {
+      qdpArchiveAdminReady_();
+      if (typeof Sheets === 'undefined') throw new Error('Enable Google Sheets API in Apps Script Services before saving changes together.');
+      const changes = body.changes || [];
+      if (!Array.isArray(changes) || changes.length > 5000) throw new Error('Save up to 5,000 suggestions at a time.');
+      const applying = changes.some(change => change.decision === 'Approve') ||
+        qdpArchiveAdminQueue_(ss).rows.some(row => qdpArchiveAdminRowState_(row) === 'approved' &&
+          !changes.some(change => change.key === qdpArchiveAdminKey_(row) && change.decision !== 'Approve'));
+      if (!changes.length && !applying) throw new Error('Check at least one proposed change before saving.');
+      if (applying && (typeof qdpLivePublish !== 'function' || typeof qdpArchivePublish !== 'function')) {
+        throw new Error('Install PublicData.gs before publishing archive updates.');
+      }
+      // Ensure background work can be scheduled before writing decisions.
+      if (applying) qdpArchiveAdminEnsureTrigger_();
+      let saved;
+      try {
+        saved = changes.length ? qdpArchiveAdminDecide_(body) : { saved: 0, savedKeys: [] };
+      } catch (error) {
+        if (applying) qdpArchiveAdminStopTriggers_();
+        throw error;
+      }
+      if (applying) qdpArchiveAdminBegin_('applying');
+      return saved;
+    }
     if (action === 'admin.archive.apply') {
       if (!qdpArchiveAdminQueue_(ss).rows.some(row => qdpArchiveAdminRowState_(row) === 'approved')) {
         throw new Error('Approve at least one suggestion first.');

@@ -2,13 +2,14 @@
   const api = window.QDPAdminProfiles;
   const ids = ["archiveRefresh", "archiveScanForm", "archiveScanFields", "archiveKind", "archiveProfile", "archiveFrom", "archiveTo",
     "archiveIncludeActive", "archiveStatus", "archiveProgress", "archiveLastScan", "archiveRetry", "archiveCounts", "archiveView",
-    "archiveQuery", "archiveSelectPage", "archiveApproveSelected", "archiveRejectSelected", "archiveEmpty", "archiveEvents",
+    "archiveQuery", "archiveSelectPage", "archiveSave", "archiveClear", "archiveDraftCount", "archiveEmpty", "archiveEvents",
     "archivePrevious", "archiveNext", "archivePage", "archiveApply", "archivePublish", "archivePublishNote", "archiveRejectDetails",
     "archiveRejectStatus", "archiveRejectList", "archiveRejectPrevious", "archiveRejectNext"];
   const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   const labels = { artist: "Artists", venue: "Venue", party: "Party", collective: "Collectives", classification: "Explicitly queer event" };
   let state = null, references = {}, busy = false, offset = 0, rejectOffset = 0, timer, searchTimer;
   let controls = new Map();
+  const drafts = new Map();
 
   function node(tag, className, text) {
     const item = document.createElement(tag);
@@ -31,44 +32,65 @@
     el.archiveScanFields.disabled = busy || active() || !state;
     el.archiveRetry.hidden = state?.job?.phase !== "failed";
     el.archiveRetry.disabled = busy;
-    el.archiveApply.disabled = lock || !state?.summary.approved;
-    el.archivePublish.disabled = lock || !state?.needsPublish;
-    const available = [...controls.values()].filter(c => c.reviewable || c.rejectable);
-    const selected = available.filter(c => c.select.checked);
+    const canSave = drafts.size || state?.summary.approved;
+    el.archiveSave.disabled = el.archiveApply.disabled = lock || !canSave;
+    el.archiveSave.textContent = el.archiveApply.textContent = 'Save all changes' + (drafts.size ? ` (${drafts.size})` : '');
+    el.archiveClear.disabled = lock || !drafts.size;
+    el.archivePublish.disabled = lock || !state?.needsPublish || !!drafts.size;
+    el.archiveDraftCount.textContent = drafts.size ? `${drafts.size} unsaved revision${drafts.size === 1 ? '' : 's'} across all result pages.` :
+      'Check the revisions you approve. Unchecked suggestions stay pending.';
+    const available = [...controls.values()].filter(c => c.reviewable && c.choices.length && (!c.single || c.choices.length === 1));
+    const selected = available.filter(c => c.choices.every(choice => choice.checked));
     el.archiveSelectPage.disabled = lock || !available.length;
     el.archiveSelectPage.checked = !!available.length && selected.length === available.length;
-    el.archiveSelectPage.indeterminate = !!selected.length && selected.length < available.length;
-    el.archiveApproveSelected.disabled = lock || !selected.length || selected.some(c => !c.reviewable);
-    el.archiveRejectSelected.disabled = lock || !selected.length;
+    el.archiveSelectPage.indeterminate = available.some(c => c.choices.some(choice => choice.checked)) && selected.length < available.length;
     el.archivePrevious.disabled = busy || !state || offset <= 0;
     el.archiveNext.disabled = busy || !state || offset + state.pageSize >= state.totalEvents;
     for (const c of controls.values()) {
-      c.select.disabled = lock || !(c.reviewable || c.rejectable);
       c.fields.disabled = lock || !c.reviewable;
-      c.approve.disabled = lock || !c.reviewable;
       c.reject.disabled = lock || !c.rejectable;
-      c.reset.disabled = lock;
+      c.reset.disabled = lock || (!c.reviewable && !drafts.has(c.proposal.key));
     }
   }
   function selectedIds(control) {
     return [...control.proposal.currentIds, ...control.choices.filter(c => c.checked).map(c => c.value)];
   }
-  async function decide(items, decision) {
-    const changes = items.map(c => ({ key: c.proposal.key, revision: c.proposal.revision,
-      decision, ...(decision === "Approve" ? { proposedIds: selectedIds(c) } : {}) }));
-    if (changes.length > 100) { status("Select up to 100 suggestions at a time.", true); return; }
-    if (decision === "Approve" && items.some(c => !c.choices.some(choice => choice.checked))) {
-      status("Choose at least one addition in every selected suggestion. Ambiguous venues and parties need one choice.", true); return;
+  function showDraft(control) {
+    const { proposal, choices, badge, reject } = control;
+    const draft = drafts.get(proposal.key);
+    const ids = draft ? (draft.decision === 'Approve' ? draft.proposedIds : []) :
+      (proposal.state === 'approved' ? proposal.proposedIds : []);
+    for (const choice of choices) choice.checked = ids.includes(choice.value);
+    badge.textContent = draft ? (draft.decision === 'Approve' ? 'Checked · not saved' :
+      draft.decision === 'Reject' ? 'Rejected · not saved' : 'Pending · not saved') :
+      (proposal.state === 'approved' ? 'Approved · awaiting apply' : proposal.result);
+    badge.dataset.state = draft ? 'draft' : proposal.state;
+    reject.textContent = draft?.decision === 'Reject' ? 'Undo rejection' : 'Reject suggestion';
+  }
+  function stage(control, decision) {
+    const proposal = control.proposal;
+    if (decision === 'Approve' && !control.choices.some(choice => choice.checked)) {
+      decision = proposal.state === 'approved' ? 'Pending' : '';
     }
-    await perform("decide", { changes }, decision === "Reject" ? "Rejections saved. These matches will be skipped in future scans." : "Decisions saved. Apply & publish when ready.");
+    if (decision) drafts.set(proposal.key, { key: proposal.key, revision: proposal.revision, decision,
+      ...(decision === 'Approve' ? { proposedIds: selectedIds(control) } : {}) });
+    else drafts.delete(proposal.key);
+    showDraft(control); updateButtons();
+  }
+  async function saveAll() {
+    if (locked()) return;
+    const changes = [...drafts.values()];
+    if (!changes.length && !state?.summary.approved) return;
+    if (changes.length > 5000) { status('Save up to 5,000 revisions at a time.', true); return; }
+    if (new TextEncoder().encode(JSON.stringify({ changes })).length > 2 * 1024 * 1024) {
+      status('These revisions are too large for one batch. Clear some selections and save a smaller group.', true); return;
+    }
+    await perform('save', { changes });
   }
   function renderProposal(proposal, event, parent) {
     const card = node("section", "archive-proposal");
     const heading = node("div", "archive-proposal-header");
-    const selectLabel = node("label", "archive-check");
-    const select = node("input"); select.type = "checkbox";
-    select.setAttribute("aria-label", `Select ${labels[proposal.kind]} suggestion for ${event.title}`);
-    selectLabel.append(select, node("strong", "", labels[proposal.kind]));
+    const selectLabel = node("strong", "", labels[proposal.kind]);
     const badge = node("span", "archive-result", proposal.state === "approved" ? "Approved · awaiting apply" : proposal.result);
     badge.dataset.state = proposal.state;
     heading.append(selectLabel, badge); card.append(heading);
@@ -78,32 +100,36 @@
     const single = ["venue", "party", "classification"].includes(proposal.kind);
     const choices = added.map(id => {
       const label = node("label", "archive-candidate");
-      const input = node("input"); input.type = single ? "radio" : "checkbox";
+      const input = node("input"); input.type = "checkbox";
       input.name = "candidate-" + proposal.key; input.value = id;
-      input.checked = !single || added.length === 1;
+      input.checked = false;
       const name = node("span", "", profileName(proposal.kind, id)); name.title = id;
       label.append(input, name); fields.append(label); return input;
     });
     card.append(fields);
     const actions = node("div", "archive-actions");
-    const approve = node("button", "quiet-button", single ? "Approve" : "Approve checked additions"); approve.type = "button";
     const reject = node("button", "quiet-button", "Reject suggestion"); reject.type = "button";
-    const reset = node("button", "quiet-button", "Return to pending"); reset.type = "button";
+    const reset = node("button", "quiet-button", "Clear choices"); reset.type = "button";
     const reviewable = ["pending", "approved"].includes(proposal.state) && !event.sourceIssue;
     const rejectable = !["applied", "rejected"].includes(proposal.state);
-    const control = { proposal, select, fields, choices, approve, reject, reset, reviewable, rejectable };
+    const control = { proposal, fields, choices, reject, reset, badge, single, reviewable, rejectable };
     controls.set(proposal.key, control);
-    if (proposal.state === "approved") actions.append(reset);
-    else if (reviewable) actions.append(approve);
+    if (reviewable) actions.append(reset);
     if (rejectable) actions.append(reject);
     card.append(actions);
     const details = node("details", "archive-evidence"); details.append(node("summary", "", "Show matching evidence"),
       node("p", "", proposal.matched), node("p", "", proposal.evidence));
     card.append(details); parent.append(card);
-    select.addEventListener("change", updateButtons);
-    approve.addEventListener("click", () => decide([control], "Approve"));
-    reject.addEventListener("click", () => decide([control], "Reject"));
-    reset.addEventListener("click", () => decide([control], "Pending"));
+    showDraft(control);
+    for (const choice of choices) choice.addEventListener('change', () => {
+      if (single && choice.checked) for (const other of choices) if (other !== choice) other.checked = false;
+      stage(control, 'Approve');
+    });
+    reject.addEventListener('click', () => stage(control, drafts.get(proposal.key)?.decision === 'Reject' ? '' : 'Reject'));
+    reset.addEventListener('click', () => {
+      for (const choice of choices) choice.checked = false;
+      stage(control, 'Approve');
+    });
   }
   function dateLabel(value) {
     if (!value) return "Date unavailable";
@@ -132,6 +158,17 @@
       const title = node("h3"), link = node("a", "", event.title);
       link.href = "/?event=" + encodeURIComponent(event.eventId); link.target = "_blank"; link.rel = "noopener";
       title.append(link); body.append(title, node("p", "event-id", `${event.eventId} · ${event.sheet}`));
+      if (event.editUrl) {
+        try {
+          const url = new URL(event.editUrl);
+          if (url.protocol === 'https:' && url.hostname === 'docs.google.com' && url.pathname.startsWith('/spreadsheets/')) {
+            const edit = node('a', 'archive-edit-event', 'Edit event');
+            edit.href = url.href; edit.target = '_blank'; edit.rel = 'noopener';
+            edit.title = 'Edit this event in its source spreadsheet row';
+            body.append(edit);
+          }
+        } catch {}
+      }
       if (event.sourceIssue) body.append(node("p", "archive-result", event.sourceIssue));
       for (const proposal of event.proposals) renderProposal(proposal, event, body);
       card.append(flyer, body); fragment.append(card);
@@ -151,8 +188,8 @@
       "publishing-archive": "Publishing the archive and profile histories…", ready: "Scan complete. Review the proposed additions below.",
       complete: "Website data published. Any suggestions that need attention remain in the review. Caches can take about a minute to refresh." };
     status(job?.phase === "failed" ? job.error : messages[job?.phase] || "Ready to scan recorded events.", job?.phase === "failed");
-    el.archivePublishNote.textContent = payload.needsPublish ? "Saved archive changes are awaiting publication. You can publish them without applying more suggestions." :
-      "Apply approved suggestions and publish the website. Unreviewed suggestions stay pending.";
+    el.archivePublishNote.textContent = payload.needsPublish ? "Saved archive changes are awaiting publication." :
+      "Save all changes submits your checked revisions and rejections together, then applies approved revisions and publishes the website.";
     if (payload.lastPublishedAt) el.archivePublishNote.textContent += " Last published " + new Date(payload.lastPublishedAt).toLocaleString() + ".";
     updateButtons(); scheduleStep();
   }
@@ -165,12 +202,23 @@
     busy = true; updateButtons(); el.archiveEvents.setAttribute("aria-busy", "true");
     try {
       const result = await api.request("admin.archive." + action, { ...params(), ...data });
+      if (action === 'save') {
+        if (!Array.isArray(result.savedKeys) || data.changes.some(change => !result.savedKeys.includes(change.key))) {
+          throw new Error('The save was not confirmed. Your selections have been kept; refresh to check the saved review.');
+        }
+        for (const key of result.savedKeys) drafts.delete(key);
+      }
+      if (action === 'scan') drafts.clear();
       render(result);
+      if (action === 'save' && !active()) status(`${result.saved} revisions saved together.`);
       if (success) status(success);
     } catch (error) {
       let text = error.message;
       if (/Deploy the updated Core.gs|Unknown admin action/i.test(text)) {
-        text = "Install the updated Core.gs and ArchiveReview.gs, then update the existing Apps Script deployment to use Archive Updates.";
+        text = action === 'save' ? 'Install ArchiveReview.gs v7.4.19 and update the existing Apps Script deployment to save revisions together. Your selections have been kept.' :
+          "Install the updated Core.gs and ArchiveReview.gs, then update the existing Apps Script deployment to use Archive Updates.";
+      } else if (/Unknown archive action/i.test(text)) {
+        text = 'Install ArchiveReview.gs v7.4.19 and update the existing Apps Script deployment to save revisions together. Your selections have been kept.';
       }
       status(text, true); clearTimeout(timer);
     } finally { busy = false; el.archiveEvents.setAttribute("aria-busy", "false"); updateButtons(); }
@@ -185,7 +233,7 @@
   el.archiveScanForm.addEventListener("submit", event => {
     event.preventDefault();
     const replaces = state && (state.summary.pending + state.summary.approved + state.summary.blocked > 0);
-    if (replaces && !window.confirm("Replace the current review with a new scan? Saved rejected matches and applied event changes will be kept.")) return;
+    if ((replaces || drafts.size) && !window.confirm("Replace the current review with a new scan? Unsaved selections will be cleared. Saved rejected matches and applied event changes will be kept.")) return;
     offset = 0;
     perform("scan", { includeActive: el.archiveIncludeActive.checked, from: el.archiveFrom.value, to: el.archiveTo.value,
       kind: el.archiveKind.value, profileId: el.archiveProfile.value, replaceReview: !!replaces });
@@ -194,11 +242,16 @@
   el.archiveRetry.addEventListener("click", () => perform("retry"));
   el.archiveView.addEventListener("change", () => { offset = 0; perform("bootstrap"); });
   el.archiveQuery.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { offset = 0; perform("bootstrap"); }, 300); });
-  el.archiveSelectPage.addEventListener("change", () => { for (const c of controls.values()) if (c.reviewable || c.rejectable) c.select.checked = el.archiveSelectPage.checked; updateButtons(); });
-  const selected = () => [...controls.values()].filter(c => c.select.checked && (c.reviewable || c.rejectable));
-  el.archiveApproveSelected.addEventListener("click", () => decide(selected(), "Approve"));
-  el.archiveRejectSelected.addEventListener("click", () => decide(selected(), "Reject"));
-  el.archiveApply.addEventListener("click", () => perform("apply"));
+  el.archiveSelectPage.addEventListener('change', () => {
+    const checked = el.archiveSelectPage.checked;
+    for (const c of controls.values()) if (c.reviewable && (!c.single || c.choices.length === 1)) {
+      for (const choice of c.choices) choice.checked = checked;
+      stage(c, 'Approve');
+    }
+  });
+  el.archiveSave.addEventListener('click', saveAll);
+  el.archiveApply.addEventListener('click', saveAll);
+  el.archiveClear.addEventListener('click', () => { drafts.clear(); for (const c of controls.values()) showDraft(c); updateButtons(); });
   el.archivePublish.addEventListener("click", () => perform("publish"));
   el.archivePrevious.addEventListener("click", () => { offset -= state.pageSize; perform("bootstrap"); });
   el.archiveNext.addEventListener("click", () => { offset += state.pageSize; perform("bootstrap"); });
@@ -221,5 +274,8 @@
   el.archiveRejectDetails.addEventListener("toggle", () => { if (el.archiveRejectDetails.open) loadRejects(); });
   el.archiveRejectPrevious.addEventListener("click", () => { rejectOffset = Math.max(0, rejectOffset - 30); loadRejects(); });
   el.archiveRejectNext.addEventListener("click", () => { rejectOffset += 30; loadRejects(); });
+  window.addEventListener('beforeunload', event => {
+    if (drafts.size) { event.preventDefault(); event.returnValue = ''; }
+  });
   perform("bootstrap", { references: true });
 })();
