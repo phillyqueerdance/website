@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
   <link rel="stylesheet" href="../poster-theme.css?v=20260926-01">
-  <link rel="stylesheet" href="admin.css?v=20261117-dashboard">
+  <link rel="stylesheet" href="admin.css?v=20261117-coverage">
   <link rel="stylesheet" href="post-generator.css?v=20261020-queer-filter-1">
 </head>
 
@@ -72,7 +72,7 @@
             <li><button class="dashboard-row review-row" type="button" data-event-view="missing-flyer" aria-describedby="flyerCoverage">Missing flyers <strong></strong></button></li>
             <li><button class="dashboard-row review-row" type="button" data-event-view="missing-venue">Missing Venue IDs <strong></strong></button></li>
             <li><button class="dashboard-row review-row" type="button" data-event-view="missing-description">Missing descriptions <strong></strong></button></li>
-            <li><button class="dashboard-row review-row" type="button" data-event-view="possible-duplicate" title="Upcoming listings with the same title and start time">Possible duplicates <strong></strong></button></li>
+            <li><button class="dashboard-row review-row" type="button" data-event-view="possible-duplicate" title="Matching titles within 3 hours on the same night. A shared venue allows minor title differences.">Possible duplicates <strong></strong></button></li>
           </ul>
           <p id="flyerCoverage" class="dashboard-note" hidden></p>
         </section>
@@ -82,6 +82,36 @@
           <ul id="weekList" class="dashboard-list"></ul>
           <p id="weekEmpty" class="dashboard-note" hidden>No events scheduled in the next 7 days.</p>
           <button id="viewWeek" class="dashboard-more" type="button" data-event-view="next-seven-days" hidden></button>
+        </section>
+
+        <section class="calendar-coverage" aria-labelledby="coverageHeading">
+          <div class="section-heading coverage-heading">
+            <h3 id="coverageHeading">Calendar coverage</h3>
+            <p class="dashboard-note" id="coverageHelp">Published events · next 4 weeks</p>
+          </div>
+          <table class="coverage-table" aria-labelledby="coverageHeading" aria-describedby="coverageHelp">
+            <thead>
+              <tr>
+                <th scope="col">Mon</th>
+                <th scope="col">Tue</th>
+                <th scope="col">Wed</th>
+                <th scope="col">Thu</th>
+                <th scope="col">Fri</th>
+                <th scope="col">Sat</th>
+                <th scope="col">Sun</th>
+              </tr>
+            </thead>
+            <tbody id="coverageBody"></tbody>
+          </table>
+          <div class="coverage-key" aria-hidden="true">
+            <span>Fewer events</span>
+            <span class="coverage-swatch" data-level="0"></span>
+            <span class="coverage-swatch" data-level="1"></span>
+            <span class="coverage-swatch" data-level="2"></span>
+            <span class="coverage-swatch" data-level="3"></span>
+            <span class="coverage-swatch" data-level="4"></span>
+            <span>More events</span>
+          </div>
         </section>
       </div>
     </section>
@@ -229,6 +259,7 @@
             <option value="published">Showing on website</option>
             <option value="hidden">Hidden from website</option>
             <option value="all">All active rows</option>
+            <option id="coverageDateOption" value="" hidden>Website events by date</option>
             <optgroup label="Needs attention">
               <option value="needs-push">Needs push</option>
               <option value="hidden-upcoming">Hidden upcoming</option>
@@ -377,7 +408,8 @@
   </noscript>
 
   <script src="../event-metadata.js?v=20261112-vals-melt-strip-1"></script>
-  <script src="admin.js?v=20261117-dashboard"></script>
+  <script src="../live-calendar.js?v=20261019-calendar-cutoff-1"></script>
+  <script src="admin.js?v=20261117-coverage"></script>
   <script src="post-generator.js?v=20261112-vals-melt-strip-1"></script>
 </body>
 </html>

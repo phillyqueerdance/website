@@ -1,11 +1,24 @@
 const ADMIN_API_URL = "/admin/api";
 const WEEK_PREVIEW_LIMIT = 5;
+const COVERAGE_DAYS = 28;
+const DUPLICATE_START_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 const phillyDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York",
   year: "numeric",
   month: "2-digit",
   day: "2-digit"
+});
+const coverageDateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  month: "short",
+  day: "numeric"
+});
+const coverageLabelFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  weekday: "long",
+  month: "long",
+  day: "numeric"
 });
 
 const elements = {
@@ -17,6 +30,8 @@ const elements = {
   weekList: document.getElementById("weekList"),
   weekEmpty: document.getElementById("weekEmpty"),
   viewWeek: document.getElementById("viewWeek"),
+  coverageBody: document.getElementById("coverageBody"),
+  coverageDateOption: document.getElementById("coverageDateOption"),
   eventsPanel: document.getElementById("events"),
   pullButton: document.getElementById("pullButton"),
   pushButton: document.getElementById("pushButton"),
@@ -96,6 +111,94 @@ function isUpcoming(event, todayKey = phillyDateKey(new Date())) {
   );
 }
 
+function normalizeListingName(value) {
+  return value.normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function similarListingTitles(left, right) {
+  const [shorter, longer] = left.length <= right.length ? [left, right] : [right, left];
+  if (shorter.length < 4) return false;
+  if (` ${longer} `.includes(` ${shorter} `)) return true;
+  if (longer.length - shorter.length > 1) return false;
+
+  let mismatch = 0;
+  while (mismatch < shorter.length && shorter[mismatch] === longer[mismatch]) {
+    mismatch++;
+  }
+
+  if (shorter.length < longer.length) {
+    return shorter.slice(mismatch) === longer.slice(mismatch + 1);
+  }
+
+  return shorter.slice(mismatch + 1) === longer.slice(mismatch + 1) ||
+    (shorter[mismatch] === longer[mismatch + 1] &&
+      shorter[mismatch + 1] === longer[mismatch] &&
+      shorter.slice(mismatch + 2) === longer.slice(mismatch + 2));
+}
+
+function findPossibleDuplicates(events, today, now) {
+  const { cleanTitle, undisclosed } = window.QDPEventMetadata;
+  const { dayKey } = window.QDPLiveCalendar;
+  const currentNight = dayKey(now);
+  const byNight = new Map();
+  const duplicateIds = new Set();
+
+  for (const event of events) {
+    const publicTitle = cleanTitle({ title: event.publicTitle });
+    const title = normalizeListingName(publicTitle) || publicTitle.replace(/\s+/g, " ").toLowerCase();
+    const start = Date.parse(event.start);
+    if (!title || !Number.isFinite(start)) continue;
+
+    const night = dayKey(start);
+    if (night < currentNight && !isUpcoming(event, today)) continue;
+
+    const place = String(event.venueName || event.location || "");
+    const venueId = event.venueId?.trim().toUpperCase();
+    const venueName = undisclosed(place) ? "" : normalizeListingName(place);
+    const candidates = byNight.get(night) || [];
+
+    for (const other of candidates) {
+      if (Math.abs(start - other.start) > DUPLICATE_START_WINDOW_MS) continue;
+
+      const sameVenue = venueId && other.venueId
+        ? venueId === other.venueId
+        : venueName && venueName === other.venueName;
+      if (title === other.title || (sameVenue && similarListingTitles(title, other.title))) {
+        duplicateIds.add(event.eventId);
+        duplicateIds.add(other.eventId);
+      }
+    }
+
+    candidates.push({ eventId: event.eventId, start, title, venueId, venueName });
+    byNight.set(night, candidates);
+  }
+
+  return events.filter(event => duplicateIds.has(event.eventId));
+}
+
+function calendarCoverage(events, now) {
+  const calendar = window.QDPLiveCalendar;
+  const date = new Date(`${calendar.dayKey(now)}T00:00:00Z`);
+  const coverage = new Map();
+  for (let index = 0; index < COVERAGE_DAYS; index++) {
+    coverage.set(date.toISOString().slice(0, 10), []);
+    date.setUTCDate(date.getUTCDate() + 1);
+  }
+
+  for (const event of events) {
+    if (!hasWebsiteListing(event)) continue;
+    const listings = coverage.get(phillyDateKey(event.start));
+    if (listings && calendar.isVisible(event, now.getTime())) listings.push(event);
+  }
+  return coverage;
+}
+
 function dashboardEventViews(events, feedFlyers, now = new Date()) {
   const active = events.filter(event => !event.removedFromSheet);
   const today = phillyDateKey(now);
@@ -110,8 +213,6 @@ function dashboardEventViews(events, feedFlyers, now = new Date()) {
       phillyDateKey(start) < weekEndKey;
   });
 
-  const firstByTitleAndStart = new Map();
-  const duplicateIds = new Set();
   const missingFlyers = [];
   let unknownFlyers = 0;
   for (const event of upcoming) {
@@ -119,18 +220,6 @@ function dashboardEventViews(events, feedFlyers, now = new Date()) {
       unknownFlyers++;
     } else if (!eventFlyerUrl(event, feedFlyers)) {
       missingFlyers.push(event);
-    }
-
-    const title = window.QDPEventMetadata.cleanTitle({ title: event.publicTitle })
-      .replace(/\s+/g, " ").toLowerCase();
-    const start = Date.parse(event.start);
-    if (!title || !Number.isFinite(start)) continue;
-    const key = `${start}\n${title}`;
-    if (firstByTitleAndStart.has(key)) {
-      duplicateIds.add(firstByTitleAndStart.get(key));
-      duplicateIds.add(event.eventId);
-    } else {
-      firstByTitleAndStart.set(key, event.eventId);
     }
   }
 
@@ -142,8 +231,9 @@ function dashboardEventViews(events, feedFlyers, now = new Date()) {
       ["missing-flyer", missingFlyers],
       ["missing-venue", upcoming.filter(event => !event.venueId?.trim())],
       ["missing-description", upcoming.filter(event => !event.description?.trim())],
-      ["possible-duplicate", upcoming.filter(event => duplicateIds.has(event.eventId))]
+      ["possible-duplicate", findPossibleDuplicates(active, today, now)]
     ]),
+    coverage: calendarCoverage(active, now),
     unknownFlyers
   };
 }
@@ -162,14 +252,17 @@ function compareEvents(left, right) {
     left.publicTitle.localeCompare(right.publicTitle);
 }
 
-function appearsOnWebsite(event) {
+function hasWebsiteListing(event) {
   return Boolean(
     event.publishToWeb &&
     event.publicTitle &&
     event.start &&
-    !/^\(DELETED ENTRY\)/i.test(event.publicTitle) &&
-    isUpcoming(event)
+    !/^\(DELETED ENTRY\)/i.test(event.publicTitle)
   );
+}
+
+function appearsOnWebsite(event) {
+  return hasWebsiteListing(event) && isUpcoming(event);
 }
 
 function formatEventDate(event) {
@@ -738,7 +831,16 @@ async function refreshFeedFlyers() {
   }
 }
 
-function renderEvent(event) {
+function createVenueOptions(venues) {
+  const options = document.createDocumentFragment();
+  options.append(new Option("No linked venue", ""));
+  for (const venue of venues) {
+    options.append(new Option(`${venue.name} · ${venue.id}`, venue.id));
+  }
+  return options;
+}
+
+function renderEvent(event, venueOptions) {
   const card =
     elements.eventTemplate.content
       .firstElementChild
@@ -781,39 +883,15 @@ function renderEvent(event) {
   let explicitQueerTouched =
     Boolean(draft.explicitQueerTouched);
 
-  let venuesLoaded = false;
   let artistsLoaded = false;
 
-  function addVenueOption(id) {
-    const venue = state.venueById.get(id);
-    const option = document.createElement("option");
-    option.value = id;
-    option.textContent = !id
-      ? "No linked venue"
-      : venue
-        ? `${venue.name} · ${id}`
-        : `Unknown VenueID · ${id}`;
-    venueInput.append(option);
-  }
-
-  addVenueOption("");
-  if (draft.venueId) addVenueOption(draft.venueId);
-
-  function loadVenueOptions() {
-    if (venuesLoaded) return;
-    const selected = venueInput.value;
-    venueInput.replaceChildren();
-    addVenueOption("");
-    if (selected && !state.venueById.has(selected)) {
-      addVenueOption(selected);
+  // Native pickers can open before focus handlers have added their options.
+  venueInput.append(venueOptions.cloneNode(true));
+  for (const id of new Set([event.venueId, draft.venueId])) {
+    if (id && !state.venueById.has(id)) {
+      venueInput.append(new Option(`Unknown VenueID · ${id}`, id));
     }
-    state.venues.forEach(venue => addVenueOption(venue.id));
-    venueInput.value = selected;
-    venuesLoaded = true;
   }
-
-  venueInput.addEventListener("focus", loadVenueOptions);
-  venueInput.addEventListener("pointerdown", loadVenueOptions);
 
   const artistEmpty = document.createElement("p");
   artistEmpty.className = "artist-empty";
@@ -1010,10 +1088,12 @@ function renderEvents() {
     if (!currentIds.has(id)) state.cards.delete(id);
   });
 
+  let venueOptions;
   const cards = events.map(event => {
     let entry = state.cards.get(event.eventId);
     if (!entry || entry.event !== event) {
-      entry = { event, card: renderEvent(event) };
+      venueOptions ??= createVenueOptions(state.venues);
+      entry = { event, card: renderEvent(event, venueOptions) };
       state.cards.set(event.eventId, entry);
     }
     if (entry.card.parentElement !== elements.eventList) {
@@ -1050,9 +1130,58 @@ function renderEvents() {
     `${events.length} of ${state.events.length}`;
 }
 
+function renderCalendarCoverage(coverage, views) {
+  const dates = [...coverage.keys()];
+  const firstDate = new Date(`${dates[0]}T00:00:00Z`);
+  const weekdayOffset = (firstDate.getUTCDay() + 6) % 7;
+  const rows = document.createDocumentFragment();
+
+  for (let index = -weekdayOffset; index < dates.length; index += 7) {
+    const row = document.createElement("tr");
+    for (let column = 0; column < 7; column++) {
+      const cell = document.createElement("td");
+      row.append(cell);
+
+      const day = dates[index + column];
+      if (!day) continue;
+      const date = new Date(`${day}T00:00:00Z`);
+      const listings = coverage.get(day);
+      const filter = `coverage:${day}`;
+      views.set(filter, listings);
+
+      const button = document.createElement("button");
+      button.className = "coverage-day";
+      button.type = "button";
+      button.disabled = state.busy;
+      button.dataset.eventView = filter;
+      button.dataset.coverageDate = coverageLabelFormatter.format(date);
+      button.dataset.level = Math.min(listings.length, 4);
+      button.setAttribute("aria-label",
+        `${button.dataset.coverageDate}, ${listings.length} published ${listings.length === 1 ? "event" : "events"}`);
+      const label = document.createElement("time");
+      label.dateTime = day;
+      label.textContent = coverageDateFormatter.format(date);
+      const count = document.createElement("strong");
+      count.textContent = listings.length;
+      button.append(label, count);
+      cell.append(button);
+    }
+    rows.append(row);
+  }
+
+  elements.coverageBody.replaceChildren(rows);
+  const selectedDate = elements.coverageDateOption.value;
+  if (selectedDate && !views.has(selectedDate)) {
+    if (elements.filterSelect.value === selectedDate) elements.filterSelect.value = "upcoming";
+    elements.coverageDateOption.value = "";
+    elements.coverageDateOption.hidden = true;
+  }
+}
+
 function renderDashboard() {
-  const { views, unknownFlyers } = dashboardEventViews(state.events, state.feedFlyers);
+  const { views, coverage, unknownFlyers } = dashboardEventViews(state.events, state.feedFlyers);
   state.dashboardViews = views;
+  renderCalendarCoverage(coverage, views);
   for (const button of elements.reviewButtons) {
     const count = views.get(button.dataset.eventView).length;
     button.querySelector("strong").textContent = count;
@@ -1304,6 +1433,11 @@ elements.dashboardContent.addEventListener("click", event => {
   if (!button) return;
 
   elements.searchInput.value = "";
+  if (button.dataset.coverageDate) {
+    elements.coverageDateOption.value = button.dataset.eventView;
+    elements.coverageDateOption.textContent = `Website events · ${button.dataset.coverageDate}`;
+    elements.coverageDateOption.hidden = false;
+  }
   elements.filterSelect.value = button.dataset.eventView;
   renderEvents();
 
