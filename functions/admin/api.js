@@ -13,6 +13,9 @@ const ALLOWED_ACTIONS = new Set([
   "admin.artists.list",
   "admin.artist.read",
   "admin.artist.save",
+  "admin.profiles.list",
+  "admin.profile.read",
+  "admin.profile.save",
   "admin.pull",
   "admin.push"
 ]);
