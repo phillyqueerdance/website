@@ -1,5 +1,52 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Admin Archive Updates
+
+The Admin dashboard links to `/admin/archive-updates`. It scans events already
+recorded in `Events_Archive`, every `Archive YYYY` tab, and optionally the active
+`Events` tab. Date ranges and artist, venue, party, or collective filters can
+focus a scan on one profile or type. It does not import external historical
+events or perform an Instagram scrape.
+
+Install the supplied full **Core.gs v7.4.17**, **ArchiveReview.gs v7.4.17**, and
+**PublicData.gs with dynamic archive tab discovery** in the existing Apps Script
+project. Save and update the existing Web app deployment to a new version,
+keeping its URL and access settings. Preserve every other script, including
+`scraper.gs`, `Imports.gs`, `ApifyAdminImport.gs`, the manifest, existing Script
+Properties, and refresh triggers. `archive-feed.gs` remains a reference publisher
+and must not be installed alongside PublicData.gs. The full Core.gs and
+PublicData.gs replacements are supplied separately because they are maintained
+with the user's existing Apps Script source.
+
+Scan, review each event's proposed additions and evidence, then choose
+**Apply & publish approved**. Approvals are saved before any source ID changes.
+Rejections are written immediately to the existing `Archive_ID_Rejects` ledger;
+the page can restore individual rejected matches for consideration on a later
+scan. Starting a new scan replaces the current review only after an explicit
+choice, while applied changes and saved rejects remain intact.
+
+Archive matching shares Core's alias rules, normalization, and artist name
+exclusions. It preserves existing single venue/party assignments and existing
+list IDs. Profile affiliations do not supply event lineups or event venues.
+Changes to source records or lookup data block stale approvals. Active event
+changes receive the ordinary edit timestamp for Calendar sync; archived events
+remain in their source archive sheets. Publication keeps the existing public
+profile approvals, event visibility, cancellation, and identity consent gates.
+
+Review decisions use `Archive_ID_Review`. Durable scan and job progress live in
+Script Properties under `QDP_ARCHIVE_ID_REVIEW_SCAN_V1` and
+`QDP_ARCHIVE_ADMIN_*`. While the page is open it advances batches immediately.
+One temporary `qdpArchiveAdminWorker` minute trigger continues an active job
+after the page closes, and removes itself when the job completes or fails.
+Failed operations display their error and can be retried; applied changes keep
+a publication marker until both the live feed and archive are published.
+
+Validation: `node --test tests/archive-updates.test.mjs
+tests/admin-bulk-api.test.mjs tests/archive.test.mjs`. For an integration pass
+with the full maintained Core.gs, set `QDP_CORE_SOURCE` to its local path before
+running the archive update tests. Browser layout and interaction checks use
+isolated example records rather than changing the live archive.
+
 ## Event photos
 
 Add an optional `PhotoURLs` column anywhere in the Events tab. Put the image

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#111114">
+  <title>Archive Updates | QDP Admin</title>
+  <link rel="icon" type="image/png" href="/admin/favicon.png">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
+  <link rel="stylesheet" href="/admin/archive-updates.css?v=20261117-1">
+  <script src="/admin/profile-editor.js?v=20261117-integrity" defer></script>
+  <script src="/admin/archive-updates.js?v=20261117-1" defer></script>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-brand">
+      <img class="brand-mark" src="/admin/favicon.png" alt="" width="48" height="48">
+      <div><p class="eyebrow">Queer Dance Philly</p><h1>Archive Updates</h1></div>
+    </div>
+    <button id="archiveRefresh" class="icon-button" type="button" aria-label="Refresh archive review">↻</button>
+  </header>
+  <main class="admin-shell archive-shell">
+    <nav aria-label="Admin tools"><a class="admin-page-link" href="/admin/">Back to Admin</a></nav>
+    <p class="archive-intro">Connect newly added profiles to events already recorded in QDP.</p>
+
+    <section class="dashboard-panel" aria-labelledby="scanHeading">
+      <div class="section-heading"><h2 id="scanHeading">Scan recorded events</h2></div>
+      <form id="archiveScanForm">
+        <fieldset id="archiveScanFields" class="archive-scan-fields" disabled>
+          <label class="field"><span>Profile type</span><select id="archiveKind">
+            <option value="">All profile types</option><option value="artist">Artists</option>
+            <option value="venue">Venues</option><option value="party">Parties</option><option value="collective">Collectives</option>
+          </select></label>
+          <label class="field"><span>Profile</span><select id="archiveProfile" disabled><option value="">All profiles</option></select></label>
+          <label class="field"><span>From date <small>(optional)</small></span><input id="archiveFrom" type="date"></label>
+          <label class="field"><span>Through date <small>(optional)</small></span><input id="archiveTo" type="date"></label>
+          <label class="archive-check archive-scan-wide"><input id="archiveIncludeActive" type="checkbox" checked> Include the Events tab as well as archived records</label>
+          <div class="archive-scan-wide archive-actions"><button id="archiveScan" class="save-button" type="submit">Start new scan</button>
+            <span class="field-help">Existing associations are preserved. New matches go into review.</span></div>
+        </fieldset>
+      </form>
+      <p id="archiveStatus" class="archive-status" role="status" aria-live="polite">Loading archive review…</p>
+      <progress id="archiveProgress" class="archive-progress" max="1" value="0" hidden aria-label="Events scanned"></progress>
+      <p id="archiveLastScan" class="field-help"></p>
+      <button id="archiveRetry" class="quiet-button" type="button" hidden>Retry operation</button>
+    </section>
+
+    <section class="dashboard-panel" aria-labelledby="reviewHeading">
+      <div class="section-heading"><h2 id="reviewHeading">Review associations</h2></div>
+      <div id="archiveCounts" class="archive-counts" aria-label="Review totals"></div>
+      <div class="archive-review-tools">
+        <label class="field"><span>Show</span><select id="archiveView">
+          <option value="">All suggestions</option><option value="pending">Pending</option><option value="approved">Approved</option>
+          <option value="blocked">Needs attention</option><option value="applied">Applied</option><option value="rejected">Rejected</option>
+        </select></label>
+        <label class="field"><span>Search review</span><input id="archiveQuery" type="search" placeholder="Event, profile, or ID"></label>
+      </div>
+      <div class="archive-bulk archive-actions">
+        <label class="archive-check"><input id="archiveSelectPage" type="checkbox"> Select this page</label>
+        <button id="archiveApproveSelected" class="quiet-button" type="button" disabled>Approve selected</button>
+        <button id="archiveRejectSelected" class="quiet-button" type="button" disabled>Reject selected</button>
+      </div>
+      <p id="archiveEmpty" class="dashboard-note" hidden></p>
+      <div id="archiveEvents" class="archive-events" aria-busy="false"></div>
+      <div class="archive-pagination"><button id="archivePrevious" class="quiet-button" type="button" disabled>Previous</button>
+        <span id="archivePage" class="field-help"></span><button id="archiveNext" class="quiet-button" type="button" disabled>Next</button></div>
+    </section>
+
+    <section class="dashboard-panel archive-publish" aria-labelledby="publishHeading">
+      <div><h2 id="publishHeading">Publish approved changes</h2>
+        <p id="archivePublishNote" class="dashboard-note">Approve suggestions above, then apply them to the source records and publish the website.</p></div>
+      <div class="archive-actions"><button id="archiveApply" class="save-button" type="button" disabled>Apply &amp; publish approved</button>
+        <button id="archivePublish" class="quiet-button" type="button" disabled>Publish saved changes</button></div>
+    </section>
+
+    <details id="archiveRejectDetails" class="dashboard-panel archive-rejects">
+      <summary>Saved rejected matches</summary>
+      <p class="field-help">Rejected matches stay excluded from future scans. Restore a match to consider it again on your next scan.</p>
+      <p id="archiveRejectStatus" class="dashboard-note" role="status"></p>
+      <div id="archiveRejectList"></div>
+      <div class="archive-actions"><button id="archiveRejectPrevious" class="quiet-button" type="button" disabled>Previous</button>
+        <button id="archiveRejectNext" class="quiet-button" type="button" disabled>Next</button></div>
+    </details>
+  </main>
+</body>
+</html>

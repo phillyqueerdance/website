@@ -8,6 +8,17 @@
 
 const QDP_ARCHIVE_TABS_ = ['Archive 2024', 'Archive 2025', 'Events_Archive'];
 
+function qdpArchiveSourceTabNames_(ss) {
+  // The fallback only supports older standalone test adapters without getSheets.
+  if (typeof ss.getSheets !== 'function') return QDP_ARCHIVE_TABS_.slice();
+  const names = ss.getSheets().map(sheet => sheet.getName())
+    .filter(name => name === 'Events_Archive' || /^Archive \d{4}$/.test(name));
+  if (!names.includes('Events_Archive')) throw new Error('Events_Archive is missing.');
+  return names.sort((a, b) => a === 'Events_Archive' ? 1
+    : b === 'Events_Archive' ? -1 : a.localeCompare(b));
+}
+
+
 function qdpArchiveIndex_(headers) {
   const index = {};
   headers.forEach((header, column) => {
@@ -226,7 +237,7 @@ function qdpArchiveEventSets_(ss, artists, venues, parties, collectives, include
   const archivedById = new Map();
   const allById = new Map();
   const excludedIds = new Set();
-  (includeActive ? [...QDP_ARCHIVE_TABS_, CONFIG.SHEET_EVENTS] : QDP_ARCHIVE_TABS_).forEach(name => {
+  (includeActive ? [...qdpArchiveSourceTabNames_(ss), CONFIG.SHEET_EVENTS] : qdpArchiveSourceTabNames_(ss)).forEach(name => {
     const data = qdpArchiveSheet_(ss, name);
     if (!data) return;
     // A missing publication header excludes this entire sheet, even if rows
@@ -342,7 +353,7 @@ function qdpArchiveShard_(id, count) {
 }
 
 function qdpArchivePublishSource_(ss) {
-  for (const name of QDP_ARCHIVE_TABS_) {
+  for (const name of qdpArchiveSourceTabNames_(ss)) {
     const sheet = ss.getSheetByName(name);
     const headers = sheet && sheet.getLastColumn() > 0
       ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] : [];
