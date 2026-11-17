@@ -1,4 +1,4 @@
-import { verifyAccess } from "./api.js";
+import { requestAppsScriptAdmin, verifyAccess } from "./api.js";
 import { onRequestGet as archiveData } from "../api/archive.js";
 import { cropStore, saveArtistPhotoCrop } from "../artist-photo-crops.js";
 import { archiveCacheKey } from "../kv-cache.js";
@@ -35,7 +35,7 @@ export async function onRequestPost(context) {
   } catch {
     return json({ error: "Invalid crop request." }, 400);
   }
-  const { id, src, crop: value } = body || {};
+  const { id, src, crop: value, source } = body || {};
   const crop = meta.photoCrop(value);
   if (!meta.validId(id) || typeof src !== "string" || !src || (value !== null && !crop)) {
     return json({ error: "Choose an artist and a valid crop." }, 400);
@@ -46,12 +46,19 @@ export async function onRequestPost(context) {
   }
 
   try {
-    const response = await archiveData({ ...context, request: archiveCacheKey(request.url, "artists") });
-    if (!response.ok) return json({ error: "Could not verify the artist photo. Try again." }, 503);
-    const { artists } = await response.json();
-    const artist = artists.find(item => item.id === id);
+    let artist;
+    if (source === "index") {
+      const result = await requestAppsScriptAdmin(env, { action: "admin.artist.read", artistId: id });
+      if (result.ok !== "yes") return json({ error: result.error || "Could not verify the Index photo." }, 409);
+      artist = result.artist?.id === id ? result.artist : null;
+    } else {
+      const response = await archiveData({ ...context, request: archiveCacheKey(request.url, "artists") });
+      if (!response.ok) return json({ error: "Could not verify the artist photo. Try again." }, 503);
+      const { artists } = await response.json();
+      artist = artists.find(item => item.id === id);
+    }
     if (!artist || meta.profileImage("artist", artist)?.src !== src) {
-      return json({ error: "This artist’s published photo has changed. Reload the editor and try again." }, 409);
+      return json({ error: "This artist’s photo has changed. Reload the editor and try again." }, 409);
     }
     await saveArtistPhotoCrop(context, kv, id, src, crop);
     return json({ crop });

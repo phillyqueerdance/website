@@ -1,26 +1,123 @@
 (() => {
   const meta = window.QDPProfileMetadata;
-  const artist = document.getElementById("cropArtist");
-  const workspace = document.getElementById("cropWorkspace");
-  const stage = document.getElementById("cropStage");
-  const controls = document.getElementById("cropControls");
-  const zoom = document.getElementById("cropZoom");
-  const x = document.getElementById("cropX");
-  const y = document.getElementById("cropY");
-  const save = document.getElementById("cropSave");
-  const reset = document.getElementById("cropReset");
-  const status = document.getElementById("cropStatus");
-  const photos = new Map();
-  const defaultCrop = aspect => ({ x: .5, y: .5, zoom: 1, aspect });
+  const byId = id => document.getElementById(id);
+  const artist = byId("cropArtist");
+  const artistStatus = byId("artistStatus");
+  const editor = byId("artistEditor");
+  const profile = byId("artistProfile");
+  const fields = byId("artistFields");
+  const profileSave = byId("artistSave");
+  const profileStatus = byId("profileStatus");
+  const workspace = byId("cropWorkspace");
+  const stage = byId("cropStage");
+  const controls = byId("cropControls");
+  const zoom = byId("cropZoom");
+  const x = byId("cropX");
+  const y = byId("cropY");
+  const save = byId("cropSave");
+  const reset = byId("cropReset");
+  const cropStatus = byId("cropStatus");
+  const catalog = new Map();
+  const inputs = new Map();
   const clamp = value => Math.max(0, Math.min(1, value));
-  let crop, aspect, drag;
-  let selection = 0;
+  const defaultCrop = aspect => ({ x: .5, y: .5, zoom: 1, aspect });
+  const needsDeployment = "Deploy the updated Core.gs to edit artist profiles here.";
+  let indexMode = true;
+  let current;
+  let selected = "";
+  let crop, savedCrop, photoSrc, drag;
+  let profileVersion = 0;
+  let photoVersion = 0;
   let saving = false;
   zoom.max = meta.maxPhotoZoom;
 
-  function message(text, error = false) {
-    status.textContent = text;
-    status.toggleAttribute("data-error", error);
+  function message(node, text, error = false) {
+    node.textContent = text;
+    node.toggleAttribute("data-error", error);
+  }
+
+  async function request(path, body) {
+    const response = await fetch(path, body ? {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body)
+    } : { headers: { Accept: "application/json" } });
+    if (response.redirected || response.status === 401 || response.status === 403) {
+      throw new Error("Sign in to QDP Admin to edit artists.");
+    }
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result) throw new Error(result?.error || "Could not reach the artist editor. Try again.");
+    return result;
+  }
+
+  async function admin(action, details = {}) {
+    const result = await request("/admin/api", { action, ...details });
+    if (result.ok !== "yes") throw new Error(result.error || "The Index did not confirm this request.");
+    return result;
+  }
+
+  function changedFields() {
+    return Object.fromEntries(Array.from(inputs, ([key, { input, original }]) =>
+      [key, input.value, original])
+      .filter(([, value, original]) => value !== original)
+      .map(([key, value]) => [key, value]));
+  }
+
+  function syncButtons() {
+    profileSave.disabled = saving || !Object.keys(changedFields()).length;
+  }
+
+  function setSaving(value) {
+    saving = artist.disabled = fields.disabled = controls.disabled = value;
+    syncButtons();
+  }
+
+  function populateProfile(record) {
+    const groups = new Map();
+    inputs.clear();
+    fields.replaceChildren();
+    byId("artistId").textContent = "ArtistID " + record.id;
+    for (const field of record.fields) {
+      if (!groups.has(field.group)) {
+        const section = document.createElement("fieldset");
+        const legend = document.createElement("legend");
+        const grid = document.createElement("div");
+        section.className = "artist-group";
+        grid.className = "artist-group-fields";
+        legend.textContent = field.group;
+        section.append(legend, grid);
+        fields.append(section);
+        groups.set(field.group, grid);
+      }
+      const label = document.createElement("label");
+      const title = document.createElement("span");
+      const input = document.createElement(field.type === "long" ? "textarea" : field.type === "flag" ? "select" : "input");
+      label.className = "field";
+      title.textContent = field.label;
+      label.append(title, input);
+      if (field.type === "flag") {
+        const choices = new Set(["", "Yes", "No", field.value]);
+        for (const value of choices) input.add(new Option(value || "Unspecified", value));
+      } else {
+        input.maxLength = field.maxLength;
+        if (field.type === "long") input.rows = 5;
+        if (["url", "drive", "instagram"].includes(field.type)) input.inputMode = "url";
+        if (field.type === "ids") input.placeholder = "Comma-separated IDs";
+      }
+      input.value = field.value;
+      input.disabled = field.readOnly;
+      if (field.readOnly) {
+        const hint = document.createElement("small");
+        hint.className = "field-help";
+        hint.textContent = "Set by a Sheet formula";
+        label.append(hint);
+      } else {
+        inputs.set(field.key, { input, original: input.value });
+      }
+      groups.get(field.group).append(label);
+    }
+    profile.hidden = false;
+    syncButtons();
   }
 
   function paint() {
@@ -31,44 +128,118 @@
     y.value = crop.y;
     x.disabled = frame.width <= 1;
     y.disabled = frame.height <= 1;
-    reset.disabled = !photos.get(artist.value).crop;
+    reset.disabled = !savedCrop;
   }
 
-  async function loadPhoto() {
-    const version = ++selection;
-    const item = photos.get(artist.value);
-    crop = drag = null;
+  async function loadPhoto(record) {
+    const version = ++photoVersion;
+    crop = savedCrop = drag = null;
     workspace.hidden = true;
     stage.querySelector("img")?.remove();
-    if (!item) return message("");
-    message("Loading photo…");
+    photoSrc = meta.profileImage("artist", record)?.src || "";
+    if (!photoSrc) {
+      message(cropStatus, indexMode ? "Save a photo link in the profile to crop it here." : "This artist has no photo.");
+      return;
+    }
+    message(cropStatus, "Loading photo…");
     try {
       const image = new Image();
       image.alt = "";
       image.draggable = false;
-      image.src = item.src;
+      image.referrerPolicy = "no-referrer";
+      image.src = photoSrc;
       await image.decode();
-      if (version !== selection) return;
-      aspect = image.naturalWidth / image.naturalHeight;
-      crop = meta.photoCrop(item.crop || defaultCrop(aspect));
-      if (!crop) return message("This photo’s dimensions cannot be cropped here.", true);
+      if (version !== photoVersion) return;
+      const aspect = image.naturalWidth / image.naturalHeight;
+      savedCrop = meta.photoCrop(record.imageCrop);
+      crop = meta.photoCrop({ ...(savedCrop || defaultCrop(aspect)), aspect });
+      if (!crop) throw new Error("This photo’s dimensions cannot be cropped here.");
       stage.prepend(image);
       paint();
       workspace.hidden = false;
-      message(item.crop ? "Manual crop saved." : "Centered crop is active. Save to use your framing.");
-    } catch {
-      if (version === selection) message("Could not load this artist’s photo.", true);
+      message(cropStatus, savedCrop ? "Manual crop saved." : "Centered crop is active.");
+    } catch (error) {
+      if (version === photoVersion) {
+        message(cropStatus, error.message || "Could not load this artist’s photo.", true);
+      }
     }
   }
 
-  artist.addEventListener("change", loadPhoto);
+  function hasEdits() {
+    if (Object.keys(changedFields()).length) return true;
+    const original = savedCrop || (crop && defaultCrop(crop.aspect));
+    return crop && ["x", "y", "zoom"].some(key => crop[key] !== original[key]);
+  }
+
+  async function loadArtist() {
+    if (current && hasEdits() && !window.confirm("Discard your unsaved artist changes?")) {
+      artist.value = selected;
+      return;
+    }
+    const version = ++profileVersion;
+    ++photoVersion;
+    selected = artist.value;
+    current = crop = null;
+    inputs.clear();
+    editor.hidden = profile.hidden = workspace.hidden = true;
+    message(profileStatus, "");
+    message(cropStatus, "");
+    if (!selected) {
+      message(artistStatus, indexMode ? "" : needsDeployment);
+      return;
+    }
+    message(artistStatus, "Loading artist…");
+    try {
+      const option = catalog.get(selected);
+      const record = indexMode ? (await admin("admin.artist.read", { artistId: selected })).artist : option;
+      if (version !== profileVersion) return;
+      if (record?.id !== selected || (indexMode && !Array.isArray(record.fields))) {
+        throw new Error("The Index did not return this profile.");
+      }
+      current = record;
+      editor.hidden = false;
+      if (indexMode) populateProfile(record);
+      message(artistStatus, indexMode ? "" : needsDeployment);
+      void loadPhoto(record);
+    } catch (error) {
+      if (version === profileVersion) message(artistStatus, error.message, true);
+    }
+  }
+
+  profile.addEventListener("input", syncButtons);
+  profile.addEventListener("submit", async event => {
+    event.preventDefault();
+    const updates = changedFields();
+    if (!current || !indexMode || saving || !Object.keys(updates).length) return;
+    setSaving(true);
+    message(profileStatus, "Saving profile…");
+    try {
+      const { artist: record } = await admin("admin.artist.save", {
+        artistId: current.id, expectedRevision: current.revision, fields: updates
+      });
+      if (record?.id !== selected || !Array.isArray(record.fields)) {
+        throw new Error("The Index did not confirm this profile save. Reload to check.");
+      }
+      current = record;
+      artist.selectedOptions[0].textContent = record.name;
+      populateProfile(record);
+      if ((meta.profileImage("artist", record)?.src || "") !== photoSrc) void loadPhoto(record);
+      message(profileStatus, "Saved to Artists. Publish archive changes to update the website now.");
+    } catch (error) {
+      message(profileStatus, error.message, true);
+    } finally {
+      setSaving(false);
+    }
+  });
+
+  artist.addEventListener("change", loadArtist);
   controls.addEventListener("input", event => {
     if (!crop || saving) return;
     const input = event.target;
     const key = input === zoom ? "zoom" : input === x ? "x" : "y";
     crop[key] = input.valueAsNumber;
     paint();
-    message("Unsaved crop.");
+    message(cropStatus, "Unsaved crop.");
   });
 
   stage.addEventListener("pointerdown", event => {
@@ -86,7 +257,7 @@
     if (roomX > 0) crop.x = clamp(drag.x - (event.clientX - drag.startX) / roomX);
     if (roomY > 0) crop.y = clamp(drag.y - (event.clientY - drag.startY) / roomY);
     paint();
-    if (status.textContent !== "Unsaved crop.") message("Unsaved crop.");
+    message(cropStatus, "Unsaved crop.");
   });
   stage.addEventListener("lostpointercapture", event => {
     if (drag?.id === event.pointerId) drag = null;
@@ -94,33 +265,24 @@
 
   async function saveCrop(value) {
     if (!crop || saving) return;
-    const id = artist.value;
-    const item = photos.get(id);
-    saving = true;
+    const aspect = crop.aspect;
     drag = null;
-    artist.disabled = controls.disabled = true;
-    message(value ? "Saving crop…" : "Restoring centered crop…");
+    setSaving(true);
+    message(cropStatus, value ? "Saving crop…" : "Restoring centered crop…");
     try {
-      const response = await fetch("/admin/artist-photo-crop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ id, src: item.src, crop: value })
+      const result = await request("/admin/artist-photo-crop", {
+        id: selected, src: photoSrc, crop: value, source: indexMode ? "index" : "archive"
       });
-      if (response.redirected || response.status === 401 || response.status === 403) {
-        throw new Error("Sign in to QDP Admin to save a crop.");
-      }
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Could not save the crop.");
-      item.crop = meta.photoCrop(result.crop);
-      crop = item.crop ? { ...item.crop } : defaultCrop(aspect);
+      savedCrop = meta.photoCrop(result.crop);
+      crop = savedCrop ? { ...savedCrop } : defaultCrop(aspect);
       paint();
-      message(item.crop
+      message(cropStatus, savedCrop
         ? "Crop saved. Public photos may take a few minutes to update."
         : "Centered crop restored. Public photos may take a few minutes to update.");
     } catch (error) {
-      message(error instanceof SyntaxError ? "Could not save the crop. Reload and try again." : error.message, true);
+      message(cropStatus, error.message, true);
     } finally {
-      artist.disabled = controls.disabled = saving = false;
+      setSaving(false);
     }
   }
 
@@ -129,22 +291,26 @@
 
   async function loadArtists() {
     try {
-      const response = await fetch("/api/archive?resource=artists");
-      if (!response.ok) throw new Error();
-      const { artists } = await response.json();
-      artists.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true }));
-      for (const profile of artists) {
-        const photo = meta.profileImage("artist", profile);
-        if (!photo || !meta.validId(profile.id)) continue;
-        photos.set(profile.id, { src: photo.src, crop: meta.photoCrop(profile.imageCrop) });
-        artist.add(new Option(profile.name, profile.id));
+      let artists;
+      try {
+        ({ artists } = await admin("admin.artists.list"));
+      } catch (error) {
+        if (error.message !== "Unknown admin action.") throw error;
+        ({ artists } = await request("/api/archive?resource=artists"));
+        indexMode = false;
       }
-      artist.disabled = photos.size === 0;
-      message(photos.size ? "" : "No published artist photos yet.");
-    } catch {
-      message("Could not load artists. Reload the page to try again.", true);
+      artists.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true }));
+      for (const record of artists) {
+        if (!meta.validId(record.id)) continue;
+        catalog.set(record.id, record);
+        artist.add(new Option(record.name, record.id));
+      }
+      artist.disabled = !catalog.size;
+      message(artistStatus, indexMode ? (catalog.size ? "" : "No artists in the Index.") : needsDeployment);
+    } catch (error) {
+      message(artistStatus, error.message || "Could not load artists. Reload and try again.", true);
     }
   }
 
-  loadArtists();
+  void loadArtists();
 })();

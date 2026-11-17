@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
   <link rel="stylesheet" href="../poster-theme.css?v=20260926-01">
-  <link rel="stylesheet" href="admin.css?v=20261112-artist-crops-1">
+  <link rel="stylesheet" href="admin.css?v=20261117-event-rows">
   <link rel="stylesheet" href="post-generator.css?v=20261020-queer-filter-1">
 </head>
 
@@ -48,7 +48,7 @@
 
   <main class="admin-shell">
     <nav aria-label="Admin tools">
-      <a class="admin-page-link" href="/admin/artist-crops">Artist photo crops</a>
+      <a class="admin-page-link" href="/admin/artist-crops">Artists</a>
       <a class="admin-page-link" href="/admin/apify-import">Apify Import</a>
     </nav>
     <section class="sync-panel" aria-labelledby="syncHeading">
@@ -230,93 +230,101 @@
 
   <template id="eventTemplate">
     <article class="event-card">
-      <div class="event-card-header">
-        <div>
-          <p class="event-date"></p>
-          <p class="event-place"></p>
+      <figure class="event-flyer">
+        <a class="event-flyer-link" target="_blank" rel="noopener noreferrer" hidden>
+          <img alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+        </a>
+        <figcaption class="event-flyer-status">No flyer</figcaption>
+      </figure>
+      <div class="event-card-main">
+        <div class="event-card-header">
+          <div>
+            <p class="event-date"></p>
+            <p class="event-place"></p>
+          </div>
+
+          <span class="sync-badge"></span>
         </div>
 
-        <span class="sync-badge"></span>
-      </div>
+        <div class="switch-grid">
+          <label class="switch-control publish-control">
+            <input class="publish-input" type="checkbox">
+            <span class="toggle" aria-hidden="true"></span>
+            <span>
+              <strong>Show on website</strong>
+              <small class="publish-detail"></small>
+            </span>
+          </label>
 
-      <div class="switch-grid">
-        <label class="switch-control publish-control">
-          <input class="publish-input" type="checkbox">
-          <span class="toggle" aria-hidden="true"></span>
-          <span>
-            <strong>Show on website</strong>
-            <small class="publish-detail"></small>
-          </span>
-        </label>
+          <label class="switch-control explicit-control">
+            <input class="explicit-input" type="checkbox">
+            <span class="toggle" aria-hidden="true"></span>
+            <span>
+              <strong>ExplicitQueer</strong>
+              <small class="explicit-detail"></small>
+            </span>
+          </label>
+        </div>
 
-        <label class="switch-control explicit-control">
-          <input class="explicit-input" type="checkbox">
-          <span class="toggle" aria-hidden="true"></span>
-          <span>
-            <strong>ExplicitQueer</strong>
-            <small class="explicit-detail"></small>
-          </span>
-        </label>
-      </div>
-
-      <label class="field">
-        <span>Public title · sent to Calendar</span>
-        <input class="public-title-input" type="text" maxlength="500">
-        <small class="field-help">
-          Edit the identity emojis here exactly as you want them pushed.
-        </small>
-      </label>
-
-      <label class="field">
-        <span>Description</span>
-        <textarea class="description-input" rows="5" maxlength="20000"></textarea>
-      </label>
-
-      <div class="linked-fields">
-        <label class="field venue-field">
-          <span>Venue ID</span>
-          <select class="venue-input"></select>
+        <label class="field">
+          <span>Public title · sent to Calendar</span>
+          <input class="public-title-input" type="text" maxlength="500">
           <small class="field-help">
-            Uses the Sheet's venue autofill rules for address, neighborhood,
-            and queer venues.
+            Edit the identity emojis here exactly as you want them pushed.
           </small>
         </label>
 
-        <div class="field artist-field">
-          <span class="field-label">Artist IDs</span>
-          <details class="artist-picker">
-            <summary>
-              <span class="artist-summary">Select artists</span>
-              <span class="dropdown-arrow" aria-hidden="true">⌄</span>
-            </summary>
+        <label class="field">
+          <span>Description</span>
+          <textarea class="description-input" rows="5" maxlength="20000"></textarea>
+        </label>
 
-            <div class="artist-picker-panel">
-              <label class="artist-search-field">
-                <span class="sr-only">Search Artist IDs</span>
-                <input
-                  class="artist-search-input"
-                  type="search"
-                  placeholder="Search artists or IDs"
-                  autocomplete="off"
-                >
-              </label>
+        <div class="linked-fields">
+          <label class="field venue-field">
+            <span>Venue ID</span>
+            <select class="venue-input"></select>
+            <small class="field-help">
+              Uses the Sheet's venue autofill rules for address, neighborhood,
+              and queer venues.
+            </small>
+          </label>
 
-              <div class="artist-options" role="group" aria-label="Artist IDs"></div>
-            </div>
-          </details>
-          <small class="field-help">
-            Updates ArtistIDs and identity indicators. Public-title emojis stay
-            exactly as entered above.
-          </small>
+          <div class="field artist-field">
+            <span class="field-label">Artist IDs</span>
+            <details class="artist-picker">
+              <summary>
+                <span class="artist-summary">Select artists</span>
+                <span class="dropdown-arrow" aria-hidden="true">⌄</span>
+              </summary>
+
+              <div class="artist-picker-panel">
+                <label class="artist-search-field">
+                  <span class="sr-only">Search Artist IDs</span>
+                  <input
+                    class="artist-search-input"
+                    type="search"
+                    placeholder="Search artists or IDs"
+                    autocomplete="off"
+                  >
+                </label>
+
+                <div class="artist-options" role="group" aria-label="Artist IDs"></div>
+              </div>
+            </details>
+            <small class="field-help">
+              Updates ArtistIDs and identity indicators. Public-title emojis stay
+              exactly as entered above.
+            </small>
+          </div>
         </div>
-      </div>
 
-      <div class="event-card-actions">
-        <button class="reset-button" type="button" disabled>Reset</button>
-        <button class="save-button" type="button" disabled>Save to Sheet</button>
-      </div>
+        <div class="event-card-actions">
+          <button class="reset-button" type="button" disabled>Reset</button>
+          <button class="save-button" type="button" disabled>Save to Sheet</button>
+        </div>
 
-      <p class="event-id"></p>
+        <p class="event-id"></p>
+      </div>
     </article>
   </template>
 
@@ -332,8 +340,8 @@
     <p class="noscript">QDP Admin requires JavaScript.</p>
   </noscript>
 
-  <script src="admin.js?v=20261015-bulk-1"></script>
   <script src="../event-metadata.js?v=20261112-vals-melt-strip-1"></script>
+  <script src="admin.js?v=20261117-event-rows"></script>
   <script src="post-generator.js?v=20261112-vals-melt-strip-1"></script>
 </body>
 </html>

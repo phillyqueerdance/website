@@ -330,16 +330,56 @@ select:focus-visible {
 
 .event-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
 .event-card {
   position: relative;
+  display: grid;
+  align-items: start;
+  gap: 16px;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--panel-raised);
   transition: background 160ms ease, border-color 160ms ease;
+}
+
+.event-card-main {
+  min-width: 0;
+}
+
+.event-flyer {
+  width: min(100%, 15rem);
+  margin: 0;
+}
+
+.event-flyer-link {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+}
+
+.event-flyer-link[hidden] {
+  display: none;
+}
+
+.event-flyer img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: contain;
+}
+
+.event-flyer-status {
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: .82rem;
 }
 
 .event-card.is-explicit-queer {
@@ -786,9 +826,9 @@ select:focus-visible {
     padding: 25px 20px 20px;
   }
 
-  .event-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+  .event-card {
+    grid-template-columns: clamp(9rem, 22vw, 15rem) minmax(0, 1fr);
+    gap: 20px;
   }
 
   .status-grid {

@@ -39,6 +39,8 @@ const state = {
   venueById: new Map(),
   drafts: new Map(),
   cards: new Map(),
+  feedFlyers: new Map(),
+  flyerRequest: 0,
   busy: false,
   refreshing: false,
   capabilities: {},
@@ -626,6 +628,50 @@ function artistDisplayName(artist) {
     .join(" ");
 }
 
+function renderEventFlyer(card, event) {
+  const link = card.querySelector(".event-flyer-link");
+  const image = link.querySelector("img");
+  const status = card.querySelector(".event-flyer-status");
+  const source = event.flyerUrl ?? state.feedFlyers.get(event.eventId);
+  const url = window.QDPEventMetadata.image({ flyerUrl: source });
+  link.hidden = !url;
+  status.hidden = Boolean(url);
+  status.textContent = "No flyer";
+  if (!url) return;
+
+  link.href = url;
+  link.setAttribute("aria-label", "Open flyer for " + (event.publicTitle || event.title || event.eventId));
+  let triedProxy = false;
+  image.onerror = () => {
+    if (!triedProxy && url.startsWith("https:")) {
+      triedProxy = true;
+      image.src = "/admin/flyer?url=" + encodeURIComponent(url);
+      return;
+    }
+    link.hidden = true;
+    status.hidden = false;
+    status.textContent = "Flyer unavailable";
+  };
+  image.src = url.replace(/^(https:\/\/lh3\.googleusercontent\.com\/d\/[\w-]+)=w\d+$/, "$1=w640");
+}
+
+async function refreshFeedFlyers() {
+  const request = ++state.flyerRequest;
+  if (!state.events.some(event => !Object.hasOwn(event, "flyerUrl"))) return;
+  try {
+    const response = await fetch("/admin/post-data");
+    if (!response.ok) return;
+    const { events } = await response.json();
+    if (request !== state.flyerRequest || !Array.isArray(events)) return;
+    state.feedFlyers = new Map(events.map(event => [event.eventId, event.flyerUrl]));
+    for (const { card, event } of state.cards.values()) {
+      if (!Object.hasOwn(event, "flyerUrl")) renderEventFlyer(card, event);
+    }
+  } catch {
+    // The dashboard remains editable if the public feed is unavailable.
+  }
+}
+
 function renderEvent(event) {
   const card =
     elements.eventTemplate.content
@@ -635,6 +681,7 @@ function renderEvent(event) {
   const draft = draftFor(event);
 
   card.dataset.eventId = event.eventId;
+  renderEventFlyer(card, event);
   card.querySelector(".event-date").textContent =
     formatEventDate(event);
 
@@ -1083,6 +1130,7 @@ async function refreshDashboard({ discardDrafts = false, preserveDrafts = false,
   try {
     const result = await adminRequest('admin.bootstrap', { referencesVersion: state.referencesVersion });
     applyDashboard(result, { preserveDrafts });
+    void refreshFeedFlyers();
   } catch (error) {
     if (!quiet) { elements.loadingState.hidden = false; elements.loadingState.textContent = error.message; }
     showToast(error.message, true);

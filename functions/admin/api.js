@@ -1,3 +1,5 @@
+import { addArtistPhotoCrops, cropStore } from "../artist-photo-crops.js";
+
 const DEFAULT_APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec";
 
@@ -8,6 +10,9 @@ const ALLOWED_ACTIONS = new Set([
   "admin.savebatch",
   "admin.apifyimport",
   "admin.apifycorrection.stage",
+  "admin.artists.list",
+  "admin.artist.read",
+  "admin.artist.save",
   "admin.pull",
   "admin.push"
 ]);
@@ -325,6 +330,23 @@ function appsScriptUrl(env) {
   ).trim();
 }
 
+export async function requestAppsScriptAdmin(env, body) {
+  const sharedSecret = String(env.QDP_ADMIN_SHARED_SECRET || "").trim();
+  if (!sharedSecret) throw new Error("QDP_ADMIN_SHARED_SECRET is not configured.");
+
+  const response = await fetch(appsScriptUrl(env), {
+    method: "POST",
+    redirect: "follow",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, adminToken: sharedSecret })
+  });
+  if (response.status === 404) {
+    throw new Error("The Apps Script deployment URL returned 404. Verify QDP_APPS_SCRIPT_URL and redeploy the existing Apps Script Web app as a new version.");
+  }
+  if (!response.ok) throw new Error(`Apps Script returned ${response.status}.`);
+  return response.json();
+}
+
 export async function onRequestPost(
   context
 ) {
@@ -346,18 +368,6 @@ export async function onRequestPost(
     }
 
     await verifyAccess(context);
-
-    const sharedSecret =
-      String(
-        context.env.QDP_ADMIN_SHARED_SECRET ||
-        ""
-      ).trim();
-
-    if (!sharedSecret) {
-      throw new Error(
-        "QDP_ADMIN_SHARED_SECRET is not configured."
-      );
-    }
 
     const contentLength = Number(
       context.request.headers.get(
@@ -393,39 +403,7 @@ export async function onRequestPost(
       );
     }
 
-    const upstreamResponse =
-      await fetch(
-        appsScriptUrl(context.env),
-        {
-          method: "POST",
-          redirect: "follow",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            ...body,
-            action,
-            adminToken: sharedSecret
-          })
-        }
-      );
-
-    if (!upstreamResponse.ok) {
-      if (upstreamResponse.status === 404) {
-        throw new Error(
-          "The Apps Script deployment URL returned 404. Verify QDP_APPS_SCRIPT_URL and redeploy the existing Apps Script Web app as a new version."
-        );
-      }
-
-      throw new Error(
-        `Apps Script returned ${upstreamResponse.status}.`
-      );
-    }
-
-    const upstreamPayload =
-      await upstreamResponse.json();
-
+    const upstreamPayload = await requestAppsScriptAdmin(context.env, { ...body, action });
     if (upstreamPayload.ok !== "yes") {
       return jsonResponse(
         {
@@ -435,6 +413,10 @@ export async function onRequestPost(
         },
         400
       );
+    }
+
+    if ((action === "admin.artist.read" || action === "admin.artist.save") && upstreamPayload.artist) {
+      await addArtistPhotoCrops(context, cropStore(context.env), { artists: [upstreamPayload.artist] });
     }
 
     return jsonResponse(upstreamPayload);
