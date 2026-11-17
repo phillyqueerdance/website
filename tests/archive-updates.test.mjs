@@ -459,18 +459,72 @@ test('a failed archive publish retains the dirty marker and retries without appl
   assert.deepEqual(h.publishes, ['live', 'archive']);
 });
 
-test('large scans resume from durable progress and share one temporary trigger', () => {
+test('large scans can restart immediately from row one and share one temporary trigger', () => {
   const h = setup({ events: Array.from({ length: 560 }, (_, i) => event('E-' + i, 'New Artist')) });
   const first = h.call('scan');
   assert.equal(first.scan.scanned, 250);
   assert.equal(first.scanInProgress, true);
   assert.equal(h.triggers.length, 1);
-  assert.throws(() => h.call('scan'), /Wait for the current/);
+  const restarted = h.call('scan');
+  assert.notEqual(restarted.job.run, first.job.run);
+  assert.equal(restarted.scan.scanned, 250);
+  assert.equal(h.sheets.get('Archive_ID_Review').rows.length, 251);
+  assert.equal(h.triggers.length, 1);
   const done = h.finish();
   assert.equal(done.scan.scanned, 560);
   assert.equal(done.scanInProgress, false);
   assert.equal(done.totalEvents, 560);
   assert.equal(h.triggers.length, 0);
+});
+
+test('a fresh scan discards unsaved approvals and valid or invalid rejects while keeping the saved rejection ledger', () => {
+  const h = setup({events: [event('ONE', 'New Artist and The Crew'), event('TWO', 'New Artist'), event('THREE', 'New Artist')]});
+  const first = h.call('scan');
+  const saved = first.events[0].proposals.find(p => p.kind === 'artist');
+  h.call('decide', {changes: [{key: saved.key, revision: saved.revision, decision: 'Reject'}]});
+  const queue = h.sheets.get('Archive_ID_Review');
+  const row = (id, kind) => queue.rows.slice(1).find(r => r[4] === id && h.c.qdpArchiveAdminKind_(r[6]) === kind);
+  row('ONE', 'collective')[0] = 'Approve';
+  row('TWO', 'artist')[0] = 'Reject';
+  const invalid = row('THREE', 'artist'); invalid[0] = 'Reject'; invalid[1] = 'Invalid reject: no new value'; invalid[8] = '';
+  const ledger = JSON.stringify(h.sheets.get('Archive_ID_Rejects').rows);
+  const events = JSON.stringify(h.sheets.get('Events_Archive').rows);
+  const fresh = h.call('scan');
+  assert.notEqual(fresh.scan.run, first.scan.run);
+  assert.deepEqual(h.plain(fresh.summary), {pending: 3, approved: 0, applied: 0, rejected: 0, blocked: 0});
+  assert.equal(fresh.events.find(e => e.eventId === 'ONE').proposals.some(p => p.kind === 'artist'), false);
+  assert.equal(fresh.events.find(e => e.eventId === 'ONE').proposals.some(p => p.kind === 'collective'), true);
+  assert.ok(queue.rows.slice(1).every(row => row[0] === 'Pending'));
+  assert.equal(JSON.stringify(h.sheets.get('Archive_ID_Rejects').rows), ledger);
+  assert.equal(JSON.stringify(h.sheets.get('Events_Archive').rows), events);
+});
+
+test('a fresh scan interrupts remaining approvals and keeps already applied source changes and publication state', () => {
+  const h = setup({events: Array.from({length: 210}, (_, i) => event('E-' + i, 'New Artist'))});
+  h.call('scan');
+  for (const row of h.sheets.get('Archive_ID_Review').rows.slice(1)) row[0] = 'Approve';
+  h.call('apply'); h.c.qdpArchiveAdminWorker();
+  const fresh = h.call('scan');
+  assert.equal(fresh.job.phase, 'ready');
+  assert.equal(fresh.summary.pending, 10);
+  assert.equal(fresh.summary.approved, 0);
+  assert.equal(fresh.needsPublish, true);
+  const rows = h.sheets.get('Events_Archive').rows.slice(1);
+  assert.ok(rows.slice(0, 200).every(row => row[eventHeaders.indexOf('ArtistIDs (comma-separated)')] === 'NEW'));
+  assert.ok(rows.slice(200).every(row => row[eventHeaders.indexOf('ArtistIDs (comma-separated)')] === ''));
+  assert.deepEqual(h.publishes, []);
+});
+
+test('an old publisher finishing with an error cannot overwrite or stop a fresh scan', () => {
+  const h = setup(); h.approve(h.call('scan')); h.call('apply'); h.c.qdpArchiveAdminWorker();
+  let fresh;
+  h.c.qdpLivePublish = () => { fresh = h.call('scan'); throw new Error('Late failure from the old publisher'); };
+  h.c.qdpArchiveAdminWorker();
+  const current = h.call('bootstrap');
+  assert.equal(current.job.run, fresh.job.run);
+  assert.equal(current.job.phase, 'ready');
+  assert.equal(current.needsPublish, true);
+  assert.equal(current.job.error, undefined);
 });
 
 test('an Index edit invalidates uncommitted decisions and writes no archive cells', () => {

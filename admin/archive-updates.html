@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
   <link rel="stylesheet" href="/admin/archive-updates.css?v=20261117-editor">
   <script src="/admin/profile-editor.js?v=20261117-integrity" defer></script>
-  <script src="/admin/archive-updates.js?v=20261117-editor" defer></script>
+  <script src="/admin/archive-updates.js?v=20261117-fresh-scan" defer></script>
 </head>
 <body>
   <header class="admin-header">
@@ -37,7 +37,7 @@
           <label class="field"><span>Through date <small>(optional)</small></span><input id="archiveTo" type="date"></label>
           <label class="archive-check archive-scan-wide"><input id="archiveIncludeActive" type="checkbox" checked> Include the Events tab as well as archived records</label>
           <div class="archive-scan-wide archive-actions"><button id="archiveScan" class="save-button" type="submit">Start new scan</button>
-            <span class="field-help">Existing associations are preserved. New matches go into review.</span></div>
+            <span class="field-help">Each scan replaces the current review and unsaved decisions. Saved rejected matches stay excluded.</span></div>
         </fieldset>
       </form>
       <p id="archiveStatus" class="archive-status" role="status" aria-live="polite">Loading archive review…</p>

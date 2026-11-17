@@ -9,7 +9,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const proposal = (key, kind = 'artist', added = ['NEW']) => ({key, revision: 'r-' + key, kind,
   currentIds: [], proposedIds: added, state: 'pending', result: 'Ready', matched: 'Recorded lineup', evidence: 'Name in event copy'});
 
-function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = false} = {}) {
+function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = false, jobPhase = 'ready'} = {}) {
   class Element {
     constructor(tag = 'div') { this.tag = tag; this.children = []; this.listeners = {}; this.value = ''; this.attributes = {}; this.dataset = {}; this.checked = false; this.disabled = false; this.textContent = ''; }
     append(...children) { for (const child of children) this.children.push(...(child.tag === 'fragment' ? child.children : [child])); }
@@ -30,7 +30,7 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
     const summary = {pending: 0, approved: 0, applied: 0, rejected: 0, blocked: 0};
     for (const event of events) for (const p of event.proposals) summary[p.state]++;
     return {ok: 'yes', events: [events[offset]], totalEvents: events.length, pageSize: 1, offset, summary,
-      scan: {scanned: events.length, total: events.length, proposed: 4}, scanInProgress: false, job: {phase: 'ready'},
+      scan: {scanned: events.length, total: events.length, proposed: 4}, scanInProgress: jobPhase === 'scanning', job: {phase: jobPhase},
       references: {artist: [{id: 'NEW', name: 'New Artist'}]}, needsPublish: false};
   };
   const context = vm.createContext({URL, Intl, Date, Map, Set, TextEncoder, Option: class extends Element {
@@ -143,4 +143,26 @@ test('results display the full description and open the Admin event editor separ
   const event = {preventDefault() { this.prevented = true; }};
   h.windowListeners.beforeunload(event);
   assert.equal(event.prevented, true);
+});
+
+test('Start new scan sends a fresh scan immediately, without confirmation or saving local decisions', async () => {
+  const h = setup({pages: [[proposal('A'), proposal('B')]]}); await h.settle();
+  h.context.window.confirm = () => { throw new Error('A new scan must not ask for confirmation'); };
+  await h.change(h.candidates()[0], true);
+  await h.buttons('Reject suggestion')[1].emit('click');
+  h.elements.get('archiveView').value = 'approved'; h.elements.get('archiveQuery').value = 'Old review search';
+  await h.elements.get('archiveScanForm').emit('submit'); await h.settle();
+  const scan = h.requests.find(r => r.action === 'admin.archive.scan');
+  assert.ok(scan);
+  assert.equal(scan.data.offset, 0); assert.equal(scan.data.view, ''); assert.equal(scan.data.query, '');
+  assert.equal(h.requests.some(r => ['admin.archive.save', 'admin.archive.decide'].includes(r.action)), false);
+  assert.ok(h.candidates().every(input => input.checked === false));
+  assert.match(h.elements.get('archiveDraftCount').textContent, /Check the revisions/);
+});
+
+test('Start new scan remains available while another scan is running', async () => {
+  const h = setup({jobPhase: 'scanning'}); await h.settle();
+  assert.equal(h.elements.get('archiveScanFields').disabled, false);
+  await h.elements.get('archiveScanForm').emit('submit'); await h.settle();
+  assert.equal(h.requests.filter(r => r.action === 'admin.archive.scan').length, 1);
 });

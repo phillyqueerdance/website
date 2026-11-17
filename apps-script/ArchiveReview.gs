@@ -1,8 +1,8 @@
 /**
- * Queer Dance Philly — Archive Updates v7.4.20
+ * Queer Dance Philly — Archive Updates v7.4.21
  * ArchiveReview.gs: Archive ID review, Admin Archive Updates, saved rejects,
  * approvals, resumable jobs, and artist-indicator recalculation.
- * Replace only ArchiveReview.gs for this event-editor update. Keep the
+ * Replace only ArchiveReview.gs for this fresh-scan update. Keep the
  * existing Archive Updates Core.gs and PublicData.gs installations.
  * Use the supplied PublicData.gs to publish every Archive YYYY tab.
  * Keep Imports.gs, scraper.gs, the manifest, services, properties, deployment
@@ -10,7 +10,8 @@
  * QDP > Archive Review: Start New Review, then Continue Review to finish.
  * Edit proposed values and Decision in Archive_ID_Review. Write Approvals
  * applies approved edits and recalculates indicators. Write Rejects saves
- * rejects separately. Save rejects before starting another review.
+ * rejects separately. Starting a new scan discards unsaved review decisions;
+ * the separate saved-rejection list is always retained.
  */
 
 const QDP_ARCHIVE_ADMIN_ = Object.freeze({
@@ -823,19 +824,9 @@ function qdpArchiveStartReview_(options) {
     const layouts = archiveNames.map(name =>
       qdpArchiveLayout_(ss.getSheetByName(name)));
     const lookups = qdpArchiveLookups_(ss);
-    const saved = qdpArchiveSavedRejects_(ss);
-    const prior = ss.getSheetByName(QDP_ARCHIVE_REVIEW_.sheet);
-    if (prior && prior.getLastRow() > 1) {
-      qdpArchiveReviewSheet_(ss, false);
-      const previousReview = prior.getRange(2, 1, prior.getLastRow() - 1,
-        QDP_ARCHIVE_REVIEW_.headers.length).getValues();
-      const unsaved = qdpArchiveUnsavedRejects_(previousReview, saved.keys);
-      if (unsaved.length) {
-        throw new Error('There are unsaved Reject decisions. Run Write Rejects before ' +
-          'starting a new review. Correct any Invalid reject rows or change their Decision. ' +
-          'The existing review was not cleared.');
-      }
-    }
+    // Validate the permanent rejection ledger without changing its contents.
+    // A fresh scan replaces the review, including unsaved/invalid decisions.
+    qdpArchiveSavedRejects_(ss);
     qdpArchiveReviewSheet_(ss, true);
     const state = {
       run: Utilities.getUuid(), startedAt: new Date().toISOString(),
@@ -1530,21 +1521,22 @@ function qdpAdminArchive_(body) {
   const result = qdpArchiveWithLock_(() => {
     const ss = qdpArchiveSpreadsheet_();
     if (action === 'admin.archive.scan') {
-      const job = qdpArchiveAdminRead_(QDP_ARCHIVE_ADMIN_.jobKey);
-      if (qdpArchiveAdminActive_(job)) throw new Error('Wait for the current archive operation to finish.');
       const options = qdpArchiveAdminOptions_(body);
-      const queue = qdpArchiveAdminQueue_(ss);
-      if (queue.rows.some(row => ['pending', 'approved', 'blocked'].includes(qdpArchiveAdminRowState_(row))) && body.replaceReview !== true) {
-        throw new Error('Starting a new scan replaces the current review. Save decisions or choose to replace it.');
+      // Claim a new job before replacing the review. Any older worker or
+      // publisher finishing later must not restore the superseded operation.
+      const job = { run: Utilities.getUuid(), phase: 'scanning', startedAt: new Date().toISOString() };
+      qdpArchiveAdminWrite_(QDP_ARCHIVE_ADMIN_.jobKey, job);
+      try {
+        qdpArchiveAdminEnsureTrigger_();
+        const scanned = qdpArchiveStartReview_(options);
+        job.phase = scanned.finished ? 'ready' : 'scanning';
+        qdpArchiveAdminWrite_(QDP_ARCHIVE_ADMIN_.jobKey, job);
+        if (scanned.finished) qdpArchiveAdminStopTriggers_();
+        return scanned;
+      } catch (error) {
+        qdpArchiveAdminFail_(job, error);
+        throw error;
       }
-      qdpArchiveAdminEnsureTrigger_();
-      const scanned = qdpArchiveStartReview_(options);
-      qdpArchiveAdminWrite_(QDP_ARCHIVE_ADMIN_.jobKey, {
-        run: Utilities.getUuid(), phase: scanned.finished ? 'ready' : 'scanning',
-        startedAt: new Date().toISOString()
-      });
-      if (scanned.finished) qdpArchiveAdminStopTriggers_();
-      return scanned;
     }
     if (action === 'admin.archive.decide') return qdpArchiveAdminDecide_(body);
     if (action === 'admin.archive.save') {
@@ -1663,6 +1655,8 @@ function qdpArchiveAdminWorker() {
 
 function qdpArchiveAdminFail_(job, error) {
   if (!job) return;
+  const current = qdpArchiveAdminRead_(QDP_ARCHIVE_ADMIN_.jobKey);
+  if (!current || current.run !== job.run) return;
   job.retryPhase = job.phase; job.phase = 'failed';
   job.error = String(error && error.message || error).slice(0, 1000);
   delete job.leaseUntil;

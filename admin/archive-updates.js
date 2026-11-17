@@ -29,7 +29,7 @@
   function updateButtons() {
     const lock = locked();
     el.archiveRefresh.disabled = busy;
-    el.archiveScanFields.disabled = busy || active() || !state;
+    el.archiveScanFields.disabled = busy || !state;
     el.archiveRetry.hidden = state?.job?.phase !== "failed";
     el.archiveRetry.disabled = busy;
     const canSave = drafts.size || state?.summary.approved;
@@ -229,11 +229,10 @@
   el.archiveKind.addEventListener("change", () => { el.archiveProfile.value = ""; populateProfiles(); });
   el.archiveScanForm.addEventListener("submit", event => {
     event.preventDefault();
-    const replaces = state && (state.summary.pending + state.summary.approved + state.summary.blocked > 0);
-    if ((replaces || drafts.size) && !window.confirm("Replace the current review with a new scan? Unsaved selections will be cleared. Saved rejected matches and applied event changes will be kept.")) return;
-    offset = 0;
+    clearTimeout(searchTimer);
+    offset = 0; el.archiveView.value = ''; el.archiveQuery.value = '';
     perform("scan", { includeActive: el.archiveIncludeActive.checked, from: el.archiveFrom.value, to: el.archiveTo.value,
-      kind: el.archiveKind.value, profileId: el.archiveProfile.value, replaceReview: !!replaces });
+      kind: el.archiveKind.value, profileId: el.archiveProfile.value });
   });
   el.archiveRefresh.addEventListener("click", () => perform("bootstrap", { references: true }));
   el.archiveRetry.addEventListener("click", () => perform("retry"));
