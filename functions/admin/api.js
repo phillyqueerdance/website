@@ -21,6 +21,15 @@ const ALLOWED_ACTIONS = new Set([
   "admin.integrity",
   "admin.integrity.dismiss",
   "admin.integrity.links",
+  "admin.archive.bootstrap",
+  "admin.archive.scan",
+  "admin.archive.step",
+  "admin.archive.decide",
+  "admin.archive.apply",
+  "admin.archive.publish",
+  "admin.archive.retry",
+  "admin.archive.rejects",
+  "admin.archive.restore",
   "admin.pull",
   "admin.push"
 ]);

@@ -73,6 +73,21 @@ test('profile saves require Admin access', async () => {
   assert.equal(requests.length, 0);
 });
 
+test('archive review actions retain the existing authentication, same-origin and secret proxy boundary', async () => {
+  const h = setup({upstream: {ok: 'yes', summary: {pending: 1}}});
+  for (const suffix of ['bootstrap', 'scan', 'step', 'decide', 'apply', 'publish', 'retry', 'rejects', 'restore']) {
+    const body = {action: 'admin.archive.' + suffix, changes: [{key: 'fixture', revision: 'old'}]};
+    const response = await h.call(body);
+    assert.equal(response.status, 200);
+    assert.deepEqual(h.requests.at(-1).body, {...body, adminToken: 'fixture-secret'});
+    assert.match(response.headers.get('Cache-Control'), /no-store/);
+    assert.equal(JSON.stringify(await response.json()).includes('fixture-secret'), false);
+  }
+  const denied = setup({authorize: async () => { throw new Error('Cloudflare Access token is required.'); }});
+  assert.equal((await denied.call({action: 'admin.archive.apply'})).status, 403);
+  assert.equal(denied.requests.length, 0);
+});
+
 test('event venue choices include every Index venue while retaining venue metadata', async () => {
   const {call, requests} = setup({
     upstream: body => {

@@ -130,6 +130,20 @@ test('publisher builds only approved data and one source scan supports all views
     Array.from(liveMonths.months, item => `${item.month}:${item.count}`));
 });
 
+test('new year archive tabs are discovered and published without a hard-coded year list', () => {
+  const fixture = structuredClone(sheets);
+  fixture['Archive 2027'] = [
+    ['EventID', 'Title_Public', 'Publish_To_Web', 'StartDate', 'StartTime', 'ArtistIDs', 'VenueID'],
+    ['NEW-YEAR', 'New year archive', 'Yes', '2027-01-01', '20:00:00', 'ALPHA', 'ROOM']
+  ];
+  const {ss, context} = appsScript(fixture);
+  ss.getSheets = () => Object.keys(fixture).map(name => ({getName: () => name}));
+  const snapshot = context.qdpArchivePublishSource_(ss);
+  assert.equal(snapshot.artistEntries.ALPHA.events.some(event => event.eventId === 'NEW-YEAR'), true);
+  assert.equal(snapshot.eventEntries['NEW-YEAR'].eventId, 'NEW-YEAR');
+  assert.deepEqual(Array.from(context.qdpArchiveSourceTabNames_(ss)), ['Archive 2024', 'Archive 2025', 'Archive 2027', 'Events_Archive']);
+});
+
 test('live artist feeds retain complete long biographies in directories and profiles', async () => {
   const longBio = ('An artist biography may contain many paragraphs.\n\n').repeat(150) + 'Last paragraph remains visible.';
   const fixture = structuredClone(sheets);
