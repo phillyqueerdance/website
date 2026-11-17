@@ -354,8 +354,7 @@ select:focus-visible {
   color: var(--muted);
 }
 
-.integrity-check button,
-.classify-standard {
+.integrity-check button {
   min-height: 40px;
   padding: 4px 9px;
   border: 1px solid var(--border);

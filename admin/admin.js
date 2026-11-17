@@ -722,8 +722,6 @@ function updateCardState(
   externalLink.hidden = !externalUrl;
   if (externalUrl) externalLink.href = externalUrl;
   else externalLink.removeAttribute("href");
-  card.querySelector(".classify-standard").hidden =
-    event.relevanceClassified !== false || draft.explicitQueerTouched || draft.explicitQueer;
   const dirty = draftIsDirty(event, draft);
   const calendarDirty =
     calendarFieldsAreDirty(event, draft);
@@ -1026,12 +1024,6 @@ function renderEvent(event, venueOptions) {
   publicTitleInput.addEventListener("input", storeDraft);
   partyInput.addEventListener("change", storeDraft);
   flyerInput.addEventListener("input", storeDraft);
-  card.querySelector(".classify-standard").addEventListener("click", () => {
-    explicitInput.checked = false;
-    explicitQueerTouched = true;
-    storeDraft();
-  });
-
   descriptionInput.addEventListener(
     "input",
     () => {
