@@ -8,7 +8,7 @@ recorded in `Events_Archive`, every `Archive YYYY` tab, and optionally the activ
 focus a scan on one profile or type. It does not import external historical
 events or perform an Instagram scrape.
 
-Install the supplied full **Core.gs v7.4.22**, **ArchiveReview.gs v7.4.23**, and
+Install the supplied full **Core.gs v7.4.22**, **ArchiveReview.gs v7.4.24**, and
 **PublicData.gs v7.4.22** in the existing Apps Script
 project. Save and update the existing Web app deployment to a new version,
 keeping its URL and access settings. Preserve every other script, including

@@ -1,5 +1,5 @@
 /**
- * Queer Dance Philly — Archive Updates v7.4.23
+ * Queer Dance Philly — Archive Updates v7.4.24
  * ArchiveReview.gs: Archive ID review, Admin Archive Updates, saved rejects,
  * approvals, resumable jobs, and artist-indicator recalculation.
  * Replace ArchiveReview.gs for inline archive editing; keep Core.gs and PublicData.gs v7.4.22.
@@ -1376,7 +1376,7 @@ function qdpArchiveAdminSource_(ss, name) {
 function qdpArchiveAdminCachedTarget_(ss, name, id) {
   const source = qdpArchiveAdminSource_(ss, name), matches = source.byId.get(id) || [];
   if (matches.length !== 1) throw new Error(matches.length ? 'This event is duplicated in its source tab. Correct the duplicate before editing.' : 'This event is no longer in its source tab. Refresh Archive Updates.');
-  source.formulas ||= source.range.getFormulas();
+  if (!source.formulas) source.formulas = source.range.getFormulas();
   const target = {ss, sheet: source.sheet, layout: source.layout, row: matches[0].row.slice(), number: matches[0].number,
     eventId: id, formulas: source.formulas[matches[0].number - 1].slice()};
   target.revision = qdpArchiveAdminEventRevision_(target);
