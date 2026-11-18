@@ -866,7 +866,7 @@
           bytes = 0;
         }
         for (const [index, entry] of drafts.entries()) {
-          const {key, expectedRevision, description} = entry || {};
+          const {key, expectedRevision, description, replaceDraft} = entry || {};
           const item = items.get(key);
           const label = item?.fields['Title (internal)'] || (typeof key === 'string' && key) || 'Draft ' + (index + 1);
           if (typeof key !== 'string' || !key.trim() || typeof expectedRevision !== 'string' || !expectedRevision.trim()) {
@@ -882,19 +882,39 @@
             continue;
           }
           seen.add(key);
+          let revision = expectedRevision;
+          if (replaceDraft !== undefined) {
+            if (typeof replaceDraft?.targetSheet !== 'string' || !replaceDraft.targetSheet.trim() ||
+                typeof replaceDraft.targetEventId !== 'string' || !replaceDraft.targetEventId.trim() ||
+                typeof replaceDraft.previousDescription !== 'string') {
+              reportIssue(label, 'The replacement draft is missing its archive match or previous text.');
+              continue;
+            }
+            if (!item || !hasDescriptionRequest(item) || item.targetSheet !== replaceDraft.targetSheet ||
+                item.targetEventId !== replaceDraft.targetEventId) {
+              reportIssue(label, 'The confirmed description request or its archive match changed. Review it before importing.');
+              continue;
+            }
+            if (item.draftDescription && item.draftDescription !== replaceDraft.previousDescription &&
+                item.draftDescription !== description) {
+              reportIssue(label, 'A different draft is already saved for this event. Review its text before replacing it.');
+              continue;
+            }
+            revision = item.revision;
+          }
           if (item && descriptionReady(item) && item.draftDescription === description) {
             alreadyReady++;
             continue;
           }
 
           const local = state.drafts.get(key);
-          if (local?.dirty && (!item || local.stale || local.revision !== expectedRevision ||
+          if (local?.dirty && (!item || local.stale || local.revision !== revision ||
               local.state !== 'confirmed' || local.target?.sheet !== item.targetSheet ||
               local.target?.eventId !== item.targetEventId || local.values.Description !== (item.draftDescription || ''))) {
             reportIssue(label, 'This draft conflicts with edits queued for the same event. Resolve those edits before importing it.');
             continue;
           }
-          const draft = {key, expectedRevision, description};
+          const draft = {key, expectedRevision: revision, description};
           const size = encoder.encode(JSON.stringify(draft)).length;
           if (size > 1.9 * MB) {
             reportIssue(label, 'This draft is too large to import.');
