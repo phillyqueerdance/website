@@ -158,7 +158,7 @@ test("Admin uses its current scripts from either dashboard URL", () => {
   const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css)(?:\?[^"]*)?)"/g)]
     .map(match => match[1]);
   for (const base of ["https://queerdancephilly.com/admin", "https://queerdancephilly.com/admin/"]) {
-    assert.ok(assets.includes("/admin/admin.js?v=20261117-admin-locations"));
+    assert.ok(assets.includes("/admin/admin.js?v=20261117-load-speed"));
     for (const asset of assets) {
       assert.ok(asset.startsWith("/"));
       assert.equal(new URL(asset, base).pathname, asset.split("?")[0]);

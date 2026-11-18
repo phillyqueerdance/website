@@ -503,7 +503,7 @@ export async function onRequestPost(
       await addArtistPhotoCrops(context, cropStore(context.env), { artists: [upstreamPayload.artist] });
     }
 
-    if (action === "admin.bootstrap") {
+    if (action === "admin.bootstrap" && !upstreamPayload.capabilities?.fullVenueReferences) {
       await addIndexVenueChoices(context.env, upstreamPayload);
     }
 

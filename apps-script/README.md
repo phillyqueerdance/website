@@ -8,8 +8,8 @@ recorded in `Events_Archive`, every `Archive YYYY` tab, and optionally the activ
 focus a scan on one profile or type. It does not import external historical
 events or perform an Instagram scrape.
 
-Install the supplied full **Core.gs v7.4.17**, **ArchiveReview.gs v7.4.17**, and
-**PublicData.gs with dynamic archive tab discovery** in the existing Apps Script
+Install the supplied full **Core.gs v7.4.22**, **ArchiveReview.gs v7.4.22**, and
+**PublicData.gs v7.4.22** in the existing Apps Script
 project. Save and update the existing Web app deployment to a new version,
 keeping its URL and access settings. Preserve every other script, including
 `scraper.gs`, `Imports.gs`, `ApifyAdminImport.gs`, the manifest, existing Script
@@ -18,12 +18,21 @@ and must not be installed alongside PublicData.gs. The full Core.gs and
 PublicData.gs replacements are supplied separately because they are maintained
 with the user's existing Apps Script source.
 
-Scan, review each event's proposed additions and evidence, then choose
-**Apply & publish approved**. Approvals are saved before any source ID changes.
-Rejections are written immediately to the existing `Archive_ID_Rejects` ledger;
-the page can restore individual rejected matches for consideration on a later
-scan. Starting a new scan replaces the current review only after an explicit
-choice, while applied changes and saved rejects remain intact.
+Scan and check the revisions to approve; suggestions begin unchecked. Choices
+and rejections stay local across result pages until **Save all changes**. That
+action commits decisions and permanent rejects in one Sheets request, then
+applies approved revisions in batches. The rejection ledger and the review
+status are written atomically without depending on a potentially cached reread.
+The page can restore saved rejected matches for a later scan. **Start new scan**
+always replaces the current review and unsaved choices while retaining saved
+rejects and already applied source edits.
+
+**Publish saved changes** is separate. Saved source edits set a publication
+hold respected by scheduled publishers and public fallback responses. Until
+explicit publication completes, the website uses its published snapshots;
+the live timer only keeps that existing snapshot fresh. The hold survives
+page closure, fresh scans, and publishing failures. Rejection-only saves do
+not need publication.
 
 Archive matching shares Core's alias rules, normalization, and artist name
 exclusions. It preserves existing single venue/party assignments and existing
@@ -41,10 +50,20 @@ after the page closes, and removes itself when the job completes or fails.
 Failed operations display their error and can be retried; applied changes keep
 a publication marker until both the live feed and archive are published.
 
+Scans process up to 1,000 records or 15 seconds of matching per batch, reuse
+lookup reads within each execution, and append without downloading the growing
+review. Progress responses omit result cards until a batch operation finishes.
+Result pagination hashes only the displayed proposals. Applying revisions reads
+only the affected source tabs and checks affected row spans together. Main
+Admin bootstraps use one Apps Script request with the updated Core, and refreshes
+retain unchanged event cards. Older Core deployments retain their venue-list
+compatibility request.
+
 Validation: `node --test tests/archive-updates.test.mjs
 tests/admin-bulk-api.test.mjs tests/archive.test.mjs`. For an integration pass
-with the full maintained Core.gs, set `QDP_CORE_SOURCE` to its local path before
-running the archive update tests. Browser layout and interaction checks use
+with the full maintained replacements, set `QDP_CORE_SOURCE` and
+`QDP_PUBLIC_DATA_SOURCE` to their local paths and include
+`tests/saved-publication.test.mjs`. Browser layout and interaction checks use
 isolated example records rather than changing the live archive.
 
 ## Event photos

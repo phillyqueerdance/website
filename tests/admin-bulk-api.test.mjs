@@ -130,6 +130,17 @@ test('unchanged references retain the current full venue list without another ca
   assert.equal(requests.length, 1);
 });
 
+test('current Core bootstrap includes complete venue references without a second Apps Script request', async () => {
+  const upstream = {ok: 'yes', capabilities: {fullVenueReferences: true}, references: {venues: [
+    {id: 'SECLOC-001', name: 'Location not disclosed'}, {id: 'TOBEAN-001', name: 'Location TBA'}
+  ]}};
+  const {call, requests} = setup({upstream});
+  const response = await call({action: 'admin.bootstrap'});
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), upstream);
+  assert.equal(requests.length, 1);
+});
+
 test('external link checks distinguish a confirmed missing page from blocked requests', async () => {
   const calls = [];
   const {call, requests} = setup({

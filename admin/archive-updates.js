@@ -8,7 +8,7 @@
   const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   const labels = { artist: "Artists", venue: "Venue", party: "Party", collective: "Collectives", classification: "Explicitly queer event" };
   let state = null, references = {}, busy = false, offset = 0, rejectOffset = 0, timer, searchTimer;
-  let controls = new Map();
+  let controls = new Map(), namesByKind = {}, restoreButtons = [];
   const drafts = new Map();
 
   function node(tag, className, text) {
@@ -22,9 +22,10 @@
   }
   function locked() { return busy || active() || state?.scanInProgress; }
   function profileName(kind, id) {
-    return references[kind]?.find(p => p.id === id)?.name || (kind === "classification" && id === "Yes" ? "Explicitly queer" : id);
+    return namesByKind[kind]?.get(id) || (kind === "classification" && id === "Yes" ? "Explicitly queer" : id);
   }
-  function params() { return { offset, view: el.archiveView.value, query: el.archiveQuery.value }; }
+  function params() { return { offset, view: el.archiveView.value, query: el.archiveQuery.value,
+    includeRejects: el.archiveRejectDetails.open, rejectOffset }; }
   function status(text, error = false) { api.message(el.archiveStatus, text, error); }
   function updateButtons() {
     const lock = locked();
@@ -32,7 +33,7 @@
     el.archiveScanFields.disabled = busy || !state;
     el.archiveRetry.hidden = state?.job?.phase !== "failed";
     el.archiveRetry.disabled = busy;
-    const canSave = drafts.size || state?.summary.approved;
+    const canSave = drafts.size || state?.summary.approved || state?.unsavedRejectCount;
     el.archiveSave.disabled = el.archiveApply.disabled = lock || !canSave;
     el.archiveSave.textContent = el.archiveApply.textContent = 'Save all changes' + (drafts.size ? ` (${drafts.size})` : '');
     el.archiveClear.disabled = lock || !drafts.size;
@@ -51,6 +52,7 @@
       c.reject.disabled = lock || !c.rejectable;
       c.reset.disabled = lock || (!c.reviewable && !drafts.has(c.proposal.key));
     }
+    for (const button of restoreButtons) button.disabled = lock;
   }
   function selectedIds(control) {
     return [...control.proposal.currentIds, ...control.choices.filter(c => c.checked).map(c => c.value)];
@@ -80,7 +82,7 @@
   async function saveAll() {
     if (locked()) return;
     const changes = [...drafts.values()];
-    if (!changes.length && !state?.summary.approved) return;
+    if (!changes.length && !state?.summary.approved && !state?.unsavedRejectCount) return;
     if (changes.length > 5000) { status('Save up to 5,000 revisions at a time.', true); return; }
     if (new TextEncoder().encode(JSON.stringify({ changes })).length > 2 * 1024 * 1024) {
       status('These revisions are too large for one batch. Clear some selections and save a smaller group.', true); return;
@@ -137,8 +139,13 @@
       .format(new Date(value + "T12:00:00"));
   }
   function render(payload) {
+    if (payload.progressOnly) { state = { ...state, ...payload }; renderProgress(state); return; }
     state = payload; offset = payload.offset;
-    if (payload.references) { references = payload.references; populateProfiles(); }
+    if (payload.references) {
+      references = payload.references;
+      namesByKind = Object.fromEntries(Object.entries(references).map(([kind, profiles]) => [kind, new Map(profiles.map(p => [p.id, p.name]))]));
+      populateProfiles();
+    }
     el.archiveCounts.replaceChildren(...Object.entries(payload.summary).map(([key, value]) => {
       const label = key === "blocked" ? "Needs attention" : key.charAt(0).toUpperCase() + key.slice(1);
       const item = node("div", "archive-count"); item.append(node("strong", "", String(value)), document.createTextNode(label)); return item;
@@ -174,6 +181,10 @@
     el.archiveEmpty.hidden = !!payload.events.length;
     el.archiveEmpty.textContent = payload.scan ? "No suggestions match this view." : "Start a scan to find missing associations in recorded events.";
     el.archivePage.textContent = payload.totalEvents ? `${offset + 1}–${Math.min(offset + payload.pageSize, payload.totalEvents)} of ${payload.totalEvents} events` : "";
+    if (payload.rejects) renderRejects(payload);
+    renderProgress(payload);
+  }
+  function renderProgress(payload) {
     const scan = payload.scan;
     el.archiveProgress.hidden = !payload.scanInProgress;
     el.archiveProgress.max = Math.max(1, scan?.total || 1); el.archiveProgress.value = scan?.scanned || 0;
@@ -183,16 +194,17 @@
     const messages = { scanning: "Scanning recorded events… You can leave this page; progress is saved.",
       applying: "Applying approved associations to their source records…", "publishing-live": "Publishing current event changes…",
       "publishing-archive": "Publishing the archive and profile histories…", ready: "Scan complete. Review the proposed additions below.",
+      saved: "Changes saved to the sheet. Use Publish saved changes when you’re ready to update the website.",
       complete: "Website data published. Any suggestions that need attention remain in the review. Caches can take about a minute to refresh." };
     status(job?.phase === "failed" ? job.error : messages[job?.phase] || "Ready to scan recorded events.", job?.phase === "failed");
     el.archivePublishNote.textContent = payload.needsPublish ? "Saved archive changes are awaiting publication." :
-      "Save all changes submits your checked revisions and rejections together, then applies approved revisions and publishes the website.";
+      "Save all changes writes approved revisions and rejections to the sheet. Publish saved changes updates the website separately.";
     if (payload.lastPublishedAt) el.archivePublishNote.textContent += " Last published " + new Date(payload.lastPublishedAt).toLocaleString() + ".";
     updateButtons(); scheduleStep();
   }
   function scheduleStep() {
     clearTimeout(timer);
-    if (active()) timer = setTimeout(() => perform("step"), 1500);
+    if (active()) timer = setTimeout(() => perform("step", { progressOnly: true }), state?.job?.leaseUntil > Date.now() ? 1500 : 250);
   }
   async function perform(action, data = {}, success = "") {
     if (busy) { scheduleStep(); return; }
@@ -207,15 +219,15 @@
       }
       if (action === 'scan') drafts.clear();
       render(result);
-      if (action === 'save' && !active()) status(`${result.saved} revisions saved together.`);
+      if (action === 'save' && !active() && result.job?.phase !== 'failed') status(`${result.saved} decisions saved to the sheet. The website has not been published.`);
       if (success) status(success);
     } catch (error) {
       let text = error.message;
       if (/Deploy the updated Core.gs|Unknown admin action/i.test(text)) {
-        text = action === 'save' ? 'Install ArchiveReview.gs v7.4.19 and update the existing Apps Script deployment to save revisions together. Your selections have been kept.' :
+        text = action === 'save' ? 'Install ArchiveReview.gs v7.4.22 and update the existing Apps Script deployment to save revisions together. Your selections have been kept.' :
           "Install the updated Core.gs and ArchiveReview.gs, then update the existing Apps Script deployment to use Archive Updates.";
       } else if (/Unknown archive action/i.test(text)) {
-        text = 'Install ArchiveReview.gs v7.4.19 and update the existing Apps Script deployment to save revisions together. Your selections have been kept.';
+        text = 'Install ArchiveReview.gs v7.4.22 and update the existing Apps Script deployment to save revisions together. Your selections have been kept.';
       }
       status(text, true); clearTimeout(timer);
     } finally { busy = false; el.archiveEvents.setAttribute("aria-busy", "false"); updateButtons(); }
@@ -255,17 +267,23 @@
   async function loadRejects() {
     try {
       const data = await api.request("admin.archive.rejects", { rejectOffset });
+      renderRejects(data);
+    } catch (error) { el.archiveRejectStatus.textContent = error.message; }
+  }
+  function renderRejects(data) {
+      restoreButtons = [];
+      rejectOffset = data.rejectOffset || 0;
       el.archiveRejectStatus.textContent = `${data.rejectedTotal} saved rejected matches`;
       el.archiveRejectList.replaceChildren(...data.rejects.map(item => {
         const row = node("div", "archive-rejected"), text = node("div");
         text.append(node("strong", "", item.title), node("p", "", `${item.eventId} · ${item.field} · ${item.value}`));
         const button = node("button", "quiet-button", "Restore"); button.type = "button"; button.disabled = locked();
-        button.addEventListener("click", async () => { button.disabled = true; await perform("restore", { key: item.key }, "Match restored. It can appear on the next scan."); await loadRejects(); });
+        restoreButtons.push(button);
+        button.addEventListener("click", async () => { button.disabled = true; await perform("restore", { key: item.key }, "Match restored. It can appear on the next scan."); });
         row.append(text, button); return row;
       }));
       el.archiveRejectPrevious.disabled = rejectOffset === 0;
       el.archiveRejectNext.disabled = rejectOffset + 30 >= data.rejectedTotal;
-    } catch (error) { el.archiveRejectStatus.textContent = error.message; }
   }
   el.archiveRejectDetails.addEventListener("toggle", () => { if (el.archiveRejectDetails.open) loadRejects(); });
   el.archiveRejectPrevious.addEventListener("click", () => { rejectOffset = Math.max(0, rejectOffset - 30); loadRejects(); });

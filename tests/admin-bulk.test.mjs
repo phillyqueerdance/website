@@ -69,6 +69,22 @@ test('an event removed during sync retains its unsaved draft for review',()=>{
  const h=setup();h.context.applyDashboard({events:h.events.slice(1),status:{}},{preserveDrafts:true});
  assert.equal(h.state.drafts.get('E0').description,'Edit E0');assert.equal(h.state.events.find(e=>e.eventId==='E0').removedFromSheet,true);
 });
+
+test('refresh reuses unchanged event cards and invalidates cards with changed records or discarded drafts',()=>{
+ const h=setup();h.state.drafts.clear();
+ const original=h.events[0],card={event:original,card:{}};
+ h.state.cards.set('E0',card);
+ const refresh=()=>h.context.applyDashboard({events:h.events.map(e=>({...e})),capabilities:{bulkSave:true}});
+ refresh();assert.equal(h.state.events[0],original);assert.equal(h.state.cards.get('E0'),card);
+ h.state.drafts.set('E0',{...h.context.baseDraft(original),description:'Discarded edit'});
+ refresh();assert.equal(h.state.cards.has('E0'),false);
+});
+
+test('refresh invalidates cards when reference data changes',()=>{
+ const h=setup();h.state.drafts.clear();h.state.cards.set('E0',{event:h.events[0],card:{}});
+ h.context.applyDashboard({events:h.events.map(e=>({...e})),capabilities:{bulkSave:true},references:{artists:[{id:'NEW',name:'New Artist'}]}});
+ assert.equal(h.state.cards.size,0);
+});
 test('background status polls request only status and retain edits',async()=>{
  const h=setup();h.state.syncJob={id:'J',kind:'pull',state:'queued'};h.context.adminRequest=async(action)=>{h.requests.push(action);return {job:{id:'J',kind:'pull',state:'running'}};};
  await h.context.pollSyncJob();assert.deepEqual(h.requests,['admin.status']);assert.equal(h.state.drafts.size,3);assert.equal(h.state.syncJob.state,'running');assert.equal(h.state.busy,false);

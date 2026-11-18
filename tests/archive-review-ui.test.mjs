@@ -22,7 +22,8 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
   const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(match => [match[1], new Element()]));
   elements.get('archiveIncludeActive').checked = true;
   const requests = [], timers = new Map(), windowListeners = {};
-  let timerId = 0;
+  let timerId = 0, needsPublish = false;
+  const rejects = [];
   const events = pages.map((proposals, i) => ({eventId: 'EVENT-' + i, title: 'Night ' + i, sheet: 'Archive 2025',
     date: '2025-04-01', description: 'Full event description\n\n' + 'A complete event detail. '.repeat(40) + '\nFinal detail.', proposals}));
   const payload = data => {
@@ -31,7 +32,8 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
     for (const event of events) for (const p of event.proposals) summary[p.state]++;
     return {ok: 'yes', events: [events[offset]], totalEvents: events.length, pageSize: 1, offset, summary,
       scan: {scanned: events.length, total: events.length, proposed: 4}, scanInProgress: jobPhase === 'scanning', job: {phase: jobPhase},
-      references: {artist: [{id: 'NEW', name: 'New Artist'}]}, needsPublish: false};
+      references: {artist: [{id: 'NEW', name: 'New Artist'}]}, needsPublish,
+      ...(data.includeRejects ? {rejectedTotal: rejects.length, rejectOffset: 0, rejects} : {})};
   };
   const context = vm.createContext({URL, Intl, Date, Map, Set, TextEncoder, Option: class extends Element {
     constructor(text, value) { super('option'); this.textContent = text; this.value = value; }
@@ -47,12 +49,21 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
         if (failSave) throw new Error('Network response interrupted');
         if (incompleteSave) return payload(data);
         for (const change of data.changes) for (const event of events) for (const p of event.proposals) if (p.key === change.key) {
-          p.state = change.decision === 'Approve' ? 'approved' : change.decision === 'Reject' ? 'rejected' : 'pending';
+          p.state = change.decision === 'Approve' ? 'applied' : change.decision === 'Reject' ? 'rejected' : 'pending';
+          if (change.decision === 'Reject') rejects.push({key: p.key, title: event.title, eventId: event.eventId, field: 'ArtistIDs', value: 'NEW'});
+          if (change.decision === 'Approve') needsPublish = true;
           p.revision += '-saved';
           if (change.proposedIds) p.proposedIds = change.proposedIds;
         }
+        jobPhase = 'saved';
         return {...payload(data), saved: data.changes.length, savedKeys: data.changes.map(change => change.key)};
       }
+      if (action === 'admin.archive.rejects') return {rejectedTotal: rejects.length, rejectOffset: 0, rejects};
+      if (action === 'admin.archive.step' && data.progressOnly) {
+        const full = payload(data);
+        return {progressOnly: true, scan: {...full.scan, scanned: 2}, job: full.job, scanInProgress: true, needsPublish};
+      }
+      if (action === 'admin.archive.publish') { jobPhase = 'publishing-live'; return payload(data); }
       return payload(data);
     }
   }}});
@@ -63,7 +74,7 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
   const candidates = () => find('archiveEvents', child => child.className === 'archive-candidate').map(label => label.children[0]);
   const buttons = text => find('archiveEvents', child => child.tag === 'button' && child.textContent === text);
   const change = async (input, checked) => { input.checked = checked; await input.emit('change'); await settle(); };
-  return {elements, requests, context, settle, find, candidates, buttons, change, windowListeners};
+  return {elements, requests, context, settle, find, candidates, buttons, change, windowListeners, timers};
 }
 
 test('every proposed change starts unchecked, and checking or rejecting performs no write', async () => {
@@ -165,4 +176,36 @@ test('Start new scan remains available while another scan is running', async () 
   assert.equal(h.elements.get('archiveScanFields').disabled, false);
   await h.elements.get('archiveScanForm').emit('submit'); await h.settle();
   assert.equal(h.requests.filter(r => r.action === 'admin.archive.scan').length, 1);
+});
+
+test('saving an approval never publishes until Publish saved changes is pressed', async () => {
+  const h = setup(); await h.settle();
+  await h.change(h.candidates()[0], true);
+  await h.elements.get('archiveSave').emit('click'); await h.settle();
+  assert.equal(h.requests.some(r => r.action === 'admin.archive.publish'), false);
+  assert.equal(h.elements.get('archivePublish').disabled, false);
+  assert.match(h.elements.get('archivePublishNote').textContent, /awaiting publication/);
+  await h.elements.get('archivePublish').emit('click'); await h.settle();
+  assert.equal(h.requests.filter(r => r.action === 'admin.archive.publish').length, 1);
+});
+
+test('saving a rejection updates its open saved list in the same response', async () => {
+  const h = setup(); await h.settle();
+  h.elements.get('archiveRejectDetails').open = true;
+  await h.elements.get('archiveRejectDetails').emit('toggle'); await h.settle();
+  await h.buttons('Reject suggestion')[0].emit('click');
+  await h.elements.get('archiveSave').emit('click'); await h.settle();
+  assert.match(h.elements.get('archiveRejectStatus').textContent, /1 saved rejected/);
+  assert.equal(h.elements.get('archiveRejectList').children.length, 1);
+  assert.equal(h.find('archiveRejectList', child => child.tag === 'button')[0].disabled, false);
+  assert.equal(h.requests.filter(r => r.action === 'admin.archive.rejects').length, 1);
+});
+
+test('scan progress leaves event controls attached instead of rebuilding the whole results page', async () => {
+  const h = setup({jobPhase: 'scanning'}); await h.settle();
+  const candidate = h.candidates()[0];
+  await [...h.timers.values()][0](); await h.settle();
+  assert.equal(h.requests.at(-1).data.progressOnly, true);
+  assert.equal(h.candidates()[0], candidate);
+  assert.equal(h.elements.get('archiveProgress').value, 2);
 });

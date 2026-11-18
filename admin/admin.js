@@ -1409,10 +1409,16 @@ function applySavedEvent(result, expectedId) {
 
 function applyDashboard(result, { preserveDrafts = false } = {}) {
   const previous = new Map(state.events.map(event => [event.eventId, event]));
+  const dirtyIds = new Set(state.events.filter(event => draftIsDirty(event, draftFor(event))).map(event => event.eventId));
   const edited = preserveDrafts ? new Map(state.events.filter(event => draftIsDirty(event, draftFor(event)))
     .map(event => [event.eventId, draftFor(event)])) : new Map();
   state.drafts.clear();
-  state.cards.clear();
+  const sameReferences = !result.references || JSON.stringify(result.references) === JSON.stringify({
+    artists: state.artists || [], venues: state.venues || [], parties: state.parties || []
+  });
+  const sameCapabilities = JSON.stringify(result.capabilities || {}) === JSON.stringify(state.capabilities || {});
+  if (!sameReferences || !sameCapabilities) state.cards.clear();
+  else if (!preserveDrafts) dirtyIds.forEach(id => state.cards.delete(id));
   if (result.references) {
     state.artists = result.references.artists || [];
     state.venues = result.references.venues || [];
@@ -1422,7 +1428,12 @@ function applyDashboard(result, { preserveDrafts = false } = {}) {
   }
   state.referencesVersion = result.referencesVersion || state.referencesVersion;
   state.capabilities = result.capabilities || {};
-  state.events = Array.isArray(result.events) ? result.events : [];
+  state.events = Array.isArray(result.events) ? result.events.map(event => {
+    const before = previous.get(event.eventId);
+    return before && JSON.stringify(before) === JSON.stringify(event) ? before : event;
+  }) : [];
+  const currentIds = new Set(state.events.map(event => event.eventId));
+  for (const id of state.cards.keys()) if (!currentIds.has(id)) state.cards.delete(id);
   edited.forEach((draft, id) => {
     const current = state.events.find(event => event.eventId === id);
     const before = previous.get(id);
