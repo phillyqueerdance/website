@@ -12,9 +12,10 @@
 
   async function request(action, data = {}) {
     const label = action.startsWith("admin.backfill.") ? "Archive Backfill" : "QDP Admin";
+    const endpoint = action === "admin.backfill.savebatch" ? "/admin/api?backfill=save" : "/admin/api";
     let response;
     try {
-      response = await fetch("/admin/api", {
+      response = await fetch(endpoint, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },

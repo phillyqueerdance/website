@@ -2,13 +2,9 @@
 
 ## Admin Archive Backfill (2025 pilot)
 
-**Loading fix (v1.0.1):** Replace ArchiveBackfill.gs and update the existing
-web-app deployment; Core.gs v7.4.26 remains compatible. Opening an empty queue
-does not scan the archive or create tables. Match scans read the archive without
-initializing edit metadata or acquiring the event save lock. Imports create the
-backfill tables as needed and retry a temporarily blocked batch up to five times,
-keeping progress already saved. Other validation and stale-review errors stop
-the import immediately.
+**Batch review (v1.1.0).** Replace ArchiveBackfill.gs and update the existing
+web-app deployment. Core.gs v7.4.26 remains compatible. The review loads
+suggested records together, then filters and pages locally.
 
 The new `/admin/archive-backfill` page reviews externally collected historical
 Instagram evidence beside existing archive events. Install the separately supplied
@@ -17,11 +13,13 @@ and update its existing web-app deployment. Keep ArchiveReview.gs v7.4.25,
 PublicData.gs v7.4.22+, Imports.gs, the Apify flyer importer, properties,
 permissions, deployment URL and existing triggers. No setup rerun is required.
 
-Import `QDP_2025_Backfill_Review.json` on that page. Import progress is shown,
-source batches can safely be retried, and the original scraper records are saved
-in Drive. The Index retains source identities, media, review choices, coverage
-and update history in Backfill_Posts, Backfill_Review, Backfill_Runs and
-Backfill_History. Keep those tab headers in their created order.
+Import `QDP_2025_Backfill_Review.json` on that page. Source records upload in
+compressed batches of up to 500. **Resume import** continues an interrupted
+import from the last completed batch. Selecting the same original JSON again
+reuses records and reviews that are already saved. The Index retains source
+identities, media, choices, coverage and update history in Backfill_Posts,
+Backfill_Review, Backfill_Runs and Backfill_History. Original scraper records
+are saved in Drive.
 
 Two queues distinguish existing archive matches from possible additions. A lead
 without a match is not proof that the archive is missing an event. The first
@@ -33,11 +31,12 @@ link. Admin uses the current shared alias rules, including historical artist
 names. One source can support several dates, and several posts can support the
 same proposed event. The carousel retains the source slide order.
 
-Choose a match, save field choices, then use **Apply selected changes**. Every
-field starts unchecked. Blank proposals cannot erase existing values. Applying
-rechecks the review, Index and archive revisions and commits the selected changes,
-completion status and before/after history together. The standard shared save
-rules and publication hold apply. Publish separately in Archive Updates.
+Compare the source with the suggested archive event. **Approve match + flyer**
+queues that update in one click. Choose another match, check further fields,
+defer or reject a proposal as needed. **Save all changes** saves the queue across
+pages. Each batch rechecks the review, Index and archive revisions and commits
+valid edits with their before/after history. Rows that need attention stay queued
+with an explanation. Publish separately in Archive Updates.
 
 **Descriptions:** collection imports must leave Description blank. Confirming a
 match and selecting Update description creates a saved writing request. Download
@@ -45,12 +44,11 @@ selected requests and return them to ChatGPT for writing; import the resulting
 JSON drafts and review them beside the current copy before applying. Draft items
 use `key`, `expectedRevision` and `description`. No model API key is required.
 
-**Flyers:** Save this flyer reuses the existing image downloader and byte
-verification. If an Instagram URL expires, choose the corresponding original
-from the saved source ZIPs under Restore a downloaded source image. Restores
-check its collected hash, image signature and saved copy. Uploads use the same
-Admin authentication and support images up to 6 MB. Raw source files remain
-independent of the selected event flyer.
+**Flyers.** Selected images download together during the batch save. Under
+**Use downloaded source images**, choose an extracted source folder to preview
+and use the originals for matching filenames. You can also pick the original
+for an individual slide. The save verifies the collected hash for an original
+and verifies the stored copy. Individual images can be up to 6 MB.
 
 The preparation tools under `tools/backfill/` accept the source-directory path
 as their first argument. They preserve the intake's 43-column order. OCR is a

@@ -58,6 +58,7 @@ export function setup({ events = [event('ONE', 'Featuring New Artist and The Cre
     getDataRange() { return this.getRange(1, 1, Math.max(1, this.getLastRow()), Math.max(1, this.getLastColumn())); }
     getFilter() { return this.filter || null; }
     getMaxRows() { return 10000; }
+    getMaxColumns() { return 128; }
     clear() { this.rows = []; snapshots.delete(this.name); }
     deleteRows(row, count) { this.rows.splice(row - 1, count); }
     setFrozenRows() {} setColumnWidth() {} hideColumns() {} insertRowsAfter() {}
@@ -112,15 +113,14 @@ export function setup({ events = [event('ONE', 'Featuring New Artist and The Cre
     SpreadsheetApp: { newDataValidation: () => ({ requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } }), flush() {} },
     Sheets: { Spreadsheets: { batchUpdate(body, spreadsheetId) {
       assert.equal(spreadsheetId, 'qdp-index');
-      const prepared = body.requests.map(request => {
+      const prepared = body.requests.flatMap(request => {
         const update = request.updateCells || request.appendCells;
         const sheet = [...sheets.values()].find(sheet => sheet.getSheetId() === (update.start?.sheetId ?? update.sheetId));
         assert.ok(sheet);
         if (request.appendCells) return {sheet, append: update.rows.map(row => row.values.map(cell => cell.userEnteredValue.stringValue))};
-        assert.equal(update.rows.length, 1);
-        assert.equal(update.rows[0].values.length, 1);
-        return { sheet, row: update.start.rowIndex, column: update.start.columnIndex,
-          value: update.rows[0].values[0].userEnteredValue.stringValue };
+        return update.rows.flatMap((row, i) => row.values.map((cell, j) => ({sheet,
+          row: update.start.rowIndex + i, column: update.start.columnIndex + j,
+          value: cell.userEnteredValue.stringValue ?? cell.userEnteredValue.boolValue})));
       });
       batchRequests.push(body.requests);
       for (const cell of prepared) {

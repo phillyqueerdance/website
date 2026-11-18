@@ -21,7 +21,7 @@ function setup({
    }
  });
  vm.runInContext(source,ctx);ctx.verifyAccess=authorize;
- const call=(body,origin='https://qdp.example')=>ctx.onRequestPost({request:new Request('https://qdp.example/admin/api',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify(body)}),env:{QDP_ADMIN_SHARED_SECRET:'fixture-secret'}});
+ const call=(body,origin='https://qdp.example',query='')=>ctx.onRequestPost({request:new Request('https://qdp.example/admin/api'+query,{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify(body)}),env:{QDP_ADMIN_SHARED_SECRET:'fixture-secret'}});
  return {requests,call};
 }
 test('authenticated bulk action forwards the whole batch once and preserves its confirmation',async()=>{
@@ -89,10 +89,23 @@ test('archive review actions retain the existing authentication, same-origin and
 });
 test('historical backfill actions use the same authenticated private proxy',async()=>{
   const h=setup({upstream:{ok:'yes'}});
-  for(const suffix of ['bootstrap','ingest','save','media','apply','requests','draft']){
+  for(const suffix of ['bootstrap','find','ingest','save','savebatch','media','apply','requests','draft','draftbatch']){
     const response=await h.call({action:'admin.backfill.'+suffix});assert.equal(response.status,200);assert.equal(h.requests.at(-1).body.adminToken,'fixture-secret');
   }
   const denied=setup({authorize:async()=>{throw new Error('Cloudflare Access token is required.');}});assert.equal((await denied.call({action:'admin.backfill.ingest'})).status,403);assert.equal(denied.requests.length,0);
+});
+
+test('only an authenticated batch save can forward the larger original-image payload',async()=>{
+  const h=setup({upstream:{ok:'yes'}}),imageBase64='a'.repeat(2300000);
+  const body={action:'admin.backfill.savebatch',changes:[{flyer:{imageBase64}}]};
+  assert.equal((await h.call(body)).status,413);
+  assert.equal((await h.call({...body,action:'admin.savebatch'},undefined,'?backfill=save')).status,400);
+  assert.equal(h.requests.length,0);
+  assert.equal((await h.call(body,undefined,'?backfill=save')).status,200);
+  assert.equal(h.requests[0].body.changes[0].flyer.imageBase64.length,imageBase64.length);
+  const denied=setup({authorize:async()=>{throw new Error('Cloudflare Access token is required.');}});
+  assert.equal((await denied.call(body,undefined,'?backfill=save')).status,403);
+  assert.equal(denied.requests.length,0);
 });
 
 test('event venue choices include every Index venue while retaining venue metadata', async () => {

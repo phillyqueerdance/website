@@ -11,12 +11,15 @@ const ALLOWED_ACTIONS = new Set([
   "admin.apifyimport",
   "admin.apifycorrection.stage",
   "admin.backfill.bootstrap",
+  "admin.backfill.find",
   "admin.backfill.ingest",
   "admin.backfill.save",
+  "admin.backfill.savebatch",
   "admin.backfill.media",
   "admin.backfill.apply",
   "admin.backfill.requests",
   "admin.backfill.draft",
+  "admin.backfill.draftbatch",
   "admin.artists.list",
   "admin.artist.read",
   "admin.artist.save",
@@ -453,13 +456,17 @@ export async function onRequestPost(
 
     await verifyAccess(context);
 
+    // A verified original may be up to 6 MB before base64 encoding. Keep
+    // the larger body allowance reserved for the authenticated backfill save.
+    const backfillSave = requestUrl.searchParams.get("backfill") === "save";
+    const maxBytes = (backfillSave ? 10 : 2) * 1024 * 1024;
     const contentLength = Number(
       context.request.headers.get(
         "Content-Length"
       ) || 0
     );
 
-    if (contentLength > 2 * 1024 * 1024) {
+    if (contentLength > maxBytes) {
       return jsonResponse(
         { error: "The request is too large." },
         413
@@ -468,7 +475,8 @@ export async function onRequestPost(
 
     const body = await context.request.json();
 
-    if (new TextEncoder().encode(JSON.stringify(body)).length > 2 * 1024 * 1024) {
+    const bodyBytes = new TextEncoder().encode(JSON.stringify(body)).length;
+    if (bodyBytes > maxBytes) {
       return jsonResponse(
         { error: "The request is too large." },
         413
@@ -480,6 +488,9 @@ export async function onRequestPost(
         .trim()
         .toLowerCase();
 
+    if (backfillSave && action !== "admin.backfill.savebatch") {
+      return jsonResponse({ error: "Use Archive Backfill to save source images." }, 400);
+    }
     if (!ALLOWED_ACTIONS.has(action)) {
       return jsonResponse(
         { error: "Unknown admin action." },
