@@ -254,3 +254,39 @@ test('saving other checked fields keeps a selected description request open for 
   assert.equal(applied.results[0].state,'applied');
   assert.equal(h.sheets.get('Events_Archive').rows[1][eventHeaders.indexOf('Description')],'Reviewed event copy.');
 });
+
+test('an older archive without flyer or edit-state columns previews approval and creates the columns when saving',()=>{
+  const h=fixture();h.importOne();
+  const archive=h.sheets.get('Events_Archive');
+  for(const name of ['Flyer_URL','QDP_EditState']) {
+    const column=archive.rows[0].indexOf(name);assert.ok(column>=0);
+    archive.rows.forEach(row=>row.splice(column,1));
+  }
+  const before=h.plain(archive.rows),view=workspace(h),item=view.items[0],record=target(view);
+  assert.equal(record.fields.find(field=>field.key==='Flyer_URL').readOnly,false);
+  assert.deepEqual(h.plain(archive.rows),before);
+  h.call('media',{postKey:'ig:1234567890123',mediaId:'1234567890123'});
+  const saved=h.call('savebatch',{changes:[choice(item,record,{}, {
+    selectedFields:['Flyer_URL'],flyer:{postKey:'ig:1234567890123',mediaId:'1234567890123'}
+  })]});
+  assert.equal(saved.results[0].state,'applied');
+  const column=archive.rows[0].indexOf('Flyer_URL');assert.ok(column>=0);
+  assert.match(archive.rows[1][column],/verified-image/);
+  assert.equal(archive.rows[0].filter(header=>header==='Flyer_URL').length,1);
+  assert.ok(archive.rows[0].includes('QDP_EditState'));
+  assert.equal(archive.rows[1][archive.rows[0].indexOf('Description')],'Original copy');
+});
+
+test('flyer approval writes through a legacy FlyerURL column without adding a second flyer column',()=>{
+  const h=fixture();h.importOne();
+  const archive=h.sheets.get('Events_Archive'),column=archive.rows[0].indexOf('Flyer_URL');
+  archive.rows[0][column]='FlyerURL';
+  const view=workspace(h),record=target(view);
+  h.call('media',{postKey:'ig:1234567890123',mediaId:'1234567890123'});
+  const saved=h.call('savebatch',{changes:[choice(view.items[0],record,{}, {
+    selectedFields:['Flyer_URL'],flyer:{postKey:'ig:1234567890123',mediaId:'1234567890123'}
+  })]});
+  assert.equal(saved.results[0].state,'applied');
+  assert.match(archive.rows[1][column],/verified-image/);
+  assert.equal(archive.rows[0].includes('Flyer_URL'),false);
+});

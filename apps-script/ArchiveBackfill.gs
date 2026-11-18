@@ -1,5 +1,5 @@
 /**
- * QDP archive backfill v1.1.0. Requires Core v7.4.26, ArchiveReview v7.4.25,
+ * QDP archive backfill v1.1.1. Requires Core v7.4.26, ArchiveReview v7.4.25,
  * PublicData v7.4.22+, and the existing QDP_Apify_Import / scraper helpers.
  * Source collection never writes an event. Apply is an explicit Admin action.
  */
@@ -190,6 +190,11 @@ function qdpBackfillTarget_(catalog,sheet,eventId) {
   if(!target.layout.headers.includes('QDP_EditState')) {
     target.addEditState=true;
     target.layout={...target.layout,width:target.layout.width+1,headers:[...target.layout.headers,'QDP_EditState']};
+    target.row.push('');target.formulas.push('');
+  }
+  if(!target.layout.headers.some(header=>['Flyer_URL','Flyer URL','FlyerURL'].includes(header))) {
+    target.addFlyerColumn=true;
+    target.layout={...target.layout,width:target.layout.width+1,headers:[...target.layout.headers,'Flyer_URL']};
     target.row.push('');target.formulas.push('');
   }
   target.revision=qdpArchiveAdminEventRevision_(target);
@@ -530,6 +535,7 @@ function qdpBackfillRecheckTargets_(plans) {
   for(const span of spans.values()) {
     const {target}=span;
     if(target.addEditState)qdpEnsureEventEditState_(target.sheet);
+    if(target.addFlyerColumn)qdpBackfillEnsureFlyerColumn_(target.sheet);
     const header=target.sheet.getRange(1,1,1,target.sheet.getLastColumn()).getValues()[0].map(value=>String(value||'').trim());
     if(JSON.stringify(header)!==JSON.stringify(target.layout.headers))continue;
     const range=target.sheet.getRange(span.first,1,span.last-span.first+1,target.layout.width);
@@ -540,6 +546,14 @@ function qdpBackfillRecheckTargets_(plans) {
     if(!span.rows||qdpArchiveAdminEventRevision_({...target,row:span.rows[index],formulas:span.formulas[index]})!==target.revision)invalid.add(target);
   }
   return invalid;
+}
+
+function qdpBackfillEnsureFlyerColumn_(sheet) {
+  const headers=sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+  if(headers.some(header=>['Flyer_URL','Flyer URL','FlyerURL'].includes(String(header||'').trim())))return;
+  const column=sheet.getLastColumn()+1;
+  if(column>sheet.getMaxColumns())sheet.insertColumnsAfter(sheet.getMaxColumns(),column-sheet.getMaxColumns());
+  sheet.getRange(1,column).setValue('Flyer_URL');
 }
 
 function qdpBackfillSaveBatch_(changes,staged) {

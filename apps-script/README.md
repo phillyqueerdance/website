@@ -2,6 +2,11 @@
 
 ## Admin Archive Backfill (2025 pilot)
 
+**Flyer approval fix (v1.1.1).** Replace ArchiveBackfill.gs and update the existing
+web-app deployment. Older archive tabs receive a flyer column when an approved
+edit is saved. The review previews that field immediately and explains any
+remaining reason a flyer approval is unavailable.
+
 **Batch review (v1.1.0).** Replace ArchiveBackfill.gs and update the existing
 web-app deployment. Core.gs v7.4.26 remains compatible. The review loads
 suggested records together, then filters and pages locally.

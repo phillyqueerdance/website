@@ -8,7 +8,7 @@ const html = readFileSync(new URL('../admin/archive-backfill.html', import.meta.
 const busyMessage = 'Another QDP save or sync is running. Your changes have not been saved; try again when it finishes.';
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
-function setup({count = 1, failKey = '', ingestErrors = []} = {}) {
+function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, flyerReadOnly = false, omitFlyer = false} = {}) {
   class Element {
     constructor(tag) {
       Object.assign(this, {tag, children: [], listeners: {}, value: '', attributes: {}, checked: false,
@@ -35,7 +35,7 @@ function setup({count = 1, failKey = '', ingestErrors = []} = {}) {
     const target = {sheet, eventId, revision: 'event-r1', title: 'Current event ' + i, fields: [
       {key: 'Title (internal)', value: 'Current event ' + i},
       {key: 'Description', value: 'Existing description'},
-      {key: 'Flyer_URL', value: ''}
+      ...(!omitFlyer ? [{key: 'Flyer_URL', value: '', readOnly: flyerReadOnly}] : [])
     ]};
     records.targets[JSON.stringify([sheet, eventId])] = target;
     records.sources['ig:' + postId] = {key: 'ig:' + postId, account: 'example',
@@ -45,7 +45,7 @@ function setup({count = 1, failKey = '', ingestErrors = []} = {}) {
       fields: {'Title (internal)': 'Proposed event ' + i, Description: ''},
       state: 'pending', selectedFields: [], draftDescription: '', visual: {status: 'inspected'},
       evidence: {notes: 'Venue and date match'}, postKeys: ['ig:' + postId],
-      matches: [{sheet, eventId, title: target.title, date: '2025-03-01', reasons: ['Same date'], conflicts: []}]});
+      matches: unmatched ? [] : [{sheet, eventId, title: target.title, date: '2025-03-01', reasons: ['Same date'], conflicts: []}]});
   }
   const message = (node, text, error = false) => { node.textContent = text; node.toggleAttribute('data-error', error); };
   const context = vm.createContext({
@@ -178,4 +178,31 @@ test('a busy write retries the exact import batch and completes', async () => {
   assert.equal(batches.length, 2);
   assert.deepEqual(batches[0].body, batches[1].body);
   assert.equal(h.get('Resume').hidden, true);
+});
+
+test('an unmatched proposal explains why approval is unavailable and enables it after choosing a found event', async () => {
+  const h = setup({unmatched: true});
+  await settle();
+  const approve = h.buttons('Approve match + flyer')[0];
+  assert.equal(approve.disabled, true);
+  const hint = h.find(element => element.className === 'backfill-meta backfill-flyer-availability')[0];
+  assert.equal(hint.hidden, false);
+  assert.match(hint.textContent, /Choose an archive event/);
+  const search = h.find(element => element.tag === 'input' && element.placeholder === 'Search 2025 archive events')[0];
+  search.value = 'EV-1';
+  await h.buttons('Find archive event')[0].emit('click');
+  await h.find(element => element.className === 'backfill-match')[0].emit('click');
+  assert.equal(approve.disabled, false);assert.equal(hint.hidden, true);
+  await approve.emit('click');
+  assert.equal(h.get('Save').textContent, 'Save all changes (1)');
+  assert.deepEqual(h.requests.map(request => request.action), ['admin.backfill.bootstrap', 'admin.backfill.find']);
+});
+
+test('calculated flyer fields and older deployments show the reason for a disabled approval', async () => {
+  for (const [options, reason] of [[{flyerReadOnly: true}, /contains a formula/], [{omitFlyer: true}, /ArchiveBackfill.gs v1.1.1/]]) {
+    const h = setup(options);await settle();
+    assert.equal(h.buttons('Approve match + flyer')[0].disabled, true);
+    const hint = h.find(element => element.className === 'backfill-meta backfill-flyer-availability')[0];
+    assert.equal(hint.hidden, false);assert.match(hint.textContent, reason);
+  }
 });

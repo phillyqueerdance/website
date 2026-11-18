@@ -307,6 +307,10 @@
     next.setAttribute('aria-label', 'Next source image');
     const slideCount = node('span');
     const selectFlyer = button('Approve match + flyer', chooseFlyer, 'save-button');
+    const flyerAvailability = node('p', 'backfill-meta backfill-flyer-availability');
+    flyerAvailability.id = 'backfill-flyer-reason-' + item.key;
+    flyerAvailability.setAttribute('role', 'status');
+    selectFlyer.setAttribute('aria-describedby', flyerAvailability.id);
     sourceActions.append(previous, slideCount, next, selectFlyer);
     const caption = node('details');
     caption.append(node('summary', '', 'Caption and visual findings'));
@@ -320,7 +324,7 @@
     const fileHint = node('small', 'backfill-meta');
     let shownSource = '', currentFlyer = null, currentFlyerUrl = '';
     restore.append(node('span', '', 'Choose this slide’s downloaded original'), original, fileHint);
-    sourceBox.append(node('h4', '', 'Instagram evidence'), sourceMedia, sourceActions, sourceLink, caption, restore);
+    sourceBox.append(node('h4', '', 'Instagram evidence'), sourceMedia, sourceActions, flyerAvailability, sourceLink, caption, restore);
 
     function showStatus() {
       const label = draft.dirty ? 'Queued: ' + draft.state : item.state;
@@ -335,15 +339,24 @@
       if (assets.length) draft.slide = (draft.slide + step + assets.length) % assets.length;
       showSlide();
     }
-    function canChooseFlyer() {
-      return draft.target?.fields.some(field => field.key === 'Flyer_URL' && !field.readOnly) &&
-        item.state !== 'applied' && !draft.stale;
+    function flyerBlockedReason() {
+      if (item.state === 'applied') return 'This proposal has already been saved.';
+      if (draft.stale) return 'Use “Review current match” before approving this flyer.';
+      if (!draft.target) return 'Choose an archive event under “Choose another archive match” first.';
+      const field = draft.target.fields.find(field => field.key === 'Flyer_URL');
+      if (!field) return 'This archive needs the updated ArchiveBackfill.gs v1.1.1 to add its flyer field.';
+      if (field.readOnly) return 'The archive flyer cell contains a formula and cannot be replaced here.';
+      return '';
     }
     function showSlide() {
       sourceLink.replaceChildren();
       const asset = assets[draft.slide];
       previous.disabled = next.disabled = assets.length < 2;
-      selectFlyer.disabled = !asset || !canChooseFlyer();
+      const reason = !asset ? 'This source post has no image to approve.' : flyerBlockedReason();
+      selectFlyer.disabled = Boolean(reason);
+      selectFlyer.title = reason;
+      flyerAvailability.textContent = reason;
+      flyerAvailability.hidden = !reason;
       restore.hidden = !asset;
       if (!asset) {
         sourceMedia.replaceChildren(node('p', '', 'No source image was returned.'));
@@ -367,7 +380,7 @@
     }
     function chooseFlyer() {
       const asset = assets[draft.slide];
-      if (!asset || !canChooseFlyer()) return;
+      if (!asset || flyerBlockedReason()) return;
       draft.flyer = {postKey: asset.source.key, mediaId: asset.media.id};
       draft.selected.add('Flyer_URL');
       queue(item, draft, 'confirmed');
@@ -382,7 +395,7 @@
         api.message(rowMessage, 'Choose a source image no larger than 6 MB.', true);
       } else {
         state.chosenFiles.set(mediaKey(asset), file);
-        if (canChooseFlyer()) chooseFlyer();
+        if (!flyerBlockedReason()) chooseFlyer();
         else showSlide();
       }
       original.value = '';
