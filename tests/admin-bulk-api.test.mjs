@@ -87,6 +87,13 @@ test('archive review actions retain the existing authentication, same-origin and
   assert.equal((await denied.call({action: 'admin.archive.apply'})).status, 403);
   assert.equal(denied.requests.length, 0);
 });
+test('historical backfill actions use the same authenticated private proxy',async()=>{
+  const h=setup({upstream:{ok:'yes'}});
+  for(const suffix of ['bootstrap','ingest','save','media','apply','requests','draft']){
+    const response=await h.call({action:'admin.backfill.'+suffix});assert.equal(response.status,200);assert.equal(h.requests.at(-1).body.adminToken,'fixture-secret');
+  }
+  const denied=setup({authorize:async()=>{throw new Error('Cloudflare Access token is required.');}});assert.equal((await denied.call({action:'admin.backfill.ingest'})).status,403);assert.equal(denied.requests.length,0);
+});
 
 test('event venue choices include every Index venue while retaining venue metadata', async () => {
   const {call, requests} = setup({

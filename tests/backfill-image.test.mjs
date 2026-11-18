@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const source=readFileSync(new URL('../functions/admin/backfill-image.js',import.meta.url),'utf8').replace(/^import .*;\n/,'').replace(/^export /gm,'');
+function setup({deny=false}={}){const calls=[];const context=vm.createContext({URL,Response,String,Number,btoa,verifyAccess:async()=>{if(deny)throw new Error('Cloudflare Access token is required.');},requestAppsScriptAdmin:async(env,body)=>{calls.push(body);return {ok:'yes',url:'https://images.example/saved.jpg'};}});vm.runInContext(source,context);return {calls,post:(body,headers={})=>context.onRequestPost({request:new Request('https://qdp.example/admin/backfill-image?postKey=ig%3A12345&mediaId=12345',{method:'POST',body,headers}),env:{}})};}
+test('binary source restore retains the exact bytes and uses a fixed authenticated action',async()=>{const h=setup(),bytes=new Uint8Array([255,216,255,1,2,3]);const response=await h.post(bytes);assert.equal(response.status,200);assert.equal(h.calls[0].action,'admin.backfill.media');assert.equal(h.calls[0].postKey,'ig:12345');assert.equal(h.calls[0].imageBase64,Buffer.from(bytes).toString('base64'));});
+test('unauthorized and cross-origin image uploads never contact Apps Script',async()=>{const denied=setup({deny:true});assert.equal((await denied.post('x')).status,403);assert.equal(denied.calls.length,0);const h=setup();assert.equal((await h.post('x',{Origin:'https://other.example'})).status,403);assert.equal(h.calls.length,0);});
+test('source image restore rejects oversized and empty uploads',async()=>{const h=setup();assert.equal((await h.post('x',{'Content-Length':String(6*1024*1024+1)})).status,413);assert.equal((await h.post('')).status,400);assert.equal(h.calls.length,0);});

@@ -1,5 +1,60 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Admin Archive Backfill (2025 pilot)
+
+The new `/admin/archive-backfill` page reviews externally collected historical
+Instagram evidence beside existing archive events. Install the separately supplied
+**Core.gs v7.4.26**, add **ArchiveBackfill.gs** to the existing Apps Script project,
+and update its existing web-app deployment. Keep ArchiveReview.gs v7.4.25,
+PublicData.gs v7.4.22+, Imports.gs, the Apify flyer importer, properties,
+permissions, deployment URL and existing triggers. No setup rerun is required.
+
+Import `QDP_2025_Backfill_Review.json` on that page. Import progress is shown,
+source batches can safely be retried, and the original scraper records are saved
+in Drive. The Index retains source identities, media, review choices, coverage
+and update history in Backfill_Posts, Backfill_Review, Backfill_Runs and
+Backfill_History. Keep those tab headers in their created order.
+
+Two queues distinguish existing archive matches from possible additions. A lead
+without a match is not proof that the archive is missing an event. The first
+version retains addition leads for later review; it does not create historical
+events. Search checks proposal details and supporting account names/captions.
+
+Matches require a full event date and additional evidence, or an existing source
+link. Admin uses the current shared alias rules, including historical artist
+names. One source can support several dates, and several posts can support the
+same proposed event. The carousel retains the source slide order.
+
+Choose a match, save field choices, then use **Apply selected changes**. Every
+field starts unchecked. Blank proposals cannot erase existing values. Applying
+rechecks the review, Index and archive revisions and commits the selected changes,
+completion status and before/after history together. The standard shared save
+rules and publication hold apply. Publish separately in Archive Updates.
+
+**Descriptions:** collection imports must leave Description blank. Confirming a
+match and selecting Update description creates a saved writing request. Download
+selected requests and return them to ChatGPT for writing; import the resulting
+JSON drafts and review them beside the current copy before applying. Draft items
+use `key`, `expectedRevision` and `description`. No model API key is required.
+
+**Flyers:** Save this flyer reuses the existing image downloader and byte
+verification. If an Instagram URL expires, choose the corresponding original
+from the saved source ZIPs under Restore a downloaded source image. Restores
+check its collected hash, image signature and saved copy. Uploads use the same
+Admin authentication and support images up to 6 MB. Raw source files remain
+independent of the selected event flyer.
+
+The preparation tools under `tools/backfill/` accept the source-directory path
+as their first argument. They preserve the intake's 43-column order. OCR is a
+text extraction aid; source image inspection and user approval remain distinct.
+Do not describe OCR output as visually confirmed event facts. Unknown times
+remain empty historical proposals so they cannot replace recorded times with
+guesses. Use the current future-event intake for its usual assumed-time rules.
+
+Validation: run the archive, backfill, UI, upload and Admin proxy tests with
+`QDP_CORE_SOURCE` set to the supplied Core.gs path. Live Apps Script/Drive
+installation still requires verification in the user's existing deployment.
+
 ## Admin Archive Updates
 
 **Search and collective aliases (v7.4.25):** Replace **Core.gs** and

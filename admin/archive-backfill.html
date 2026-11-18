@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#111114">
+  <title>Archive Backfill | QDP Admin</title>
+  <link rel="icon" type="image/png" href="/admin/favicon.png">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
+  <link rel="stylesheet" href="/admin/archive-backfill.css?v=20261118-backfill-1">
+  <script src="/admin/profile-editor.js?v=20261117-integrity" defer></script>
+  <script src="/admin/archive-backfill.js?v=20261118-backfill-1" defer></script>
+</head>
+<body>
+  <header class="admin-header"><div class="admin-brand"><img class="brand-mark" src="/admin/favicon.png" alt="" width="48" height="48"><div><p class="eyebrow">Queer Dance Philly</p><h1>Archive Backfill</h1></div></div><button id="backfillRefresh" class="quiet-button" type="button">Refresh</button></header>
+  <main class="admin-shell backfill-shell">
+    <nav aria-label="Admin tools"><a class="admin-page-link" href="/admin/">Back to Admin</a> <a class="admin-page-link" href="/admin/archive-updates">Archive Updates</a></nav>
+    <p>Review Instagram evidence for 2025 events. Confirm a match, then choose the details to update.</p>
+    <section class="dashboard-panel">
+      <h2>Source collection</h2>
+      <label class="field"><span>Import a prepared backfill collection</span><input id="backfillImport" type="file" accept=".json,application/json"></label>
+      <p id="backfillStatus" class="dashboard-note" role="status" aria-live="polite">Loading backfill review…</p>
+      <progress id="backfillProgress" hidden max="1" value="0" aria-label="Source import progress"></progress>
+      <details><summary>Account coverage</summary><div id="backfillCoverage"></div></details>
+    </section>
+    <section class="dashboard-panel">
+      <div class="backfill-tools"><label class="field"><span>Search sources and proposals</span><input id="backfillQuery" type="search" placeholder="Event, account, caption, date or ID"></label><label class="field"><span>Review queue</span><select id="backfillQueue"><option value="matches">Existing archive matches</option><option value="unmatched">Possible archive additions</option><option value="">All proposals</option></select></label><label class="field"><span>Review status</span><select id="backfillState"><option value="">All</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="deferred">Deferred</option><option value="rejected">Rejected</option><option value="applied">Applied</option></select></label></div>
+      <p id="backfillCounts" class="dashboard-note"></p>
+      <div id="backfillItems" aria-busy="false"></div>
+      <div class="backfill-actions"><button id="backfillPrevious" class="quiet-button" type="button">Previous</button><span id="backfillPage"></span><button id="backfillNext" class="quiet-button" type="button">Next</button></div>
+    </section>
+    <section class="dashboard-panel">
+      <h2>Description requests</h2><p>Confirm a match and select “Update description” to request a draft. Review the draft here before saving it to the archive.</p>
+      <p id="backfillRequestsNote" class="dashboard-note"></p>
+      <div class="backfill-actions"><button id="backfillRequests" class="quiet-button" type="button">Download selected requests</button><label class="field"><span>Import prepared description drafts</span><input id="backfillDrafts" type="file" accept=".json,application/json"></label></div>
+    </section>
+    <section class="dashboard-panel"><h2>Publish saved changes</h2><p>Applying selected changes saves them to the archive sheet. Publish separately when you are ready for them to appear on QDP.</p><a class="admin-page-link" href="/admin/archive-updates">Open publication controls</a></section>
+  </main>
+</body>
+</html>
