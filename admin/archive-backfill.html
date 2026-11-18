@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
   <link rel="stylesheet" href="/admin/archive-backfill.css?v=20261118-backfill-bulk">
   <script src="/admin/profile-editor.js?v=20261118-backfill-bulk" defer></script>
-  <script src="/admin/archive-backfill.js?v=20261118-backfill-approval" defer></script>
+  <script src="/admin/archive-backfill.js?v=20261118-description-import" defer></script>
 </head>
 <body>
   <header class="admin-header"><div class="admin-brand"><img class="brand-mark" src="/admin/favicon.png" alt="" width="48" height="48"><div><p class="eyebrow">Queer Dance Philly</p><h1>Archive Backfill</h1></div></div><button id="backfillRefresh" class="quiet-button" type="button">Refresh</button></header>
@@ -31,8 +31,12 @@
       <span id="backfillSaveStatus" class="backfill-meta" role="status" aria-live="polite"></span>
       <a id="backfillPublish" class="admin-page-link" href="/admin/archive-updates" hidden>Publish saved changes</a>
     </div>
-    <section class="dashboard-panel">
-      <div class="backfill-tools"><label class="field"><span>Search sources and proposals</span><input id="backfillQuery" type="search" placeholder="Event, account, caption, date or ID"></label><label class="field"><span>Review queue</span><select id="backfillQueue"><option value="matches">Existing archive matches</option><option value="unmatched">Possible archive additions</option><option value="">All proposals</option></select></label><label class="field"><span>Review status</span><select id="backfillState"><option value="">All</option><option value="pending">Pending</option><option value="queued">Queued to save</option><option value="confirmed">Confirmed</option><option value="deferred">Deferred</option><option value="rejected">Rejected</option><option value="applied">Applied</option></select></label></div>
+    <section class="dashboard-panel" id="backfillReview">
+      <div class="backfill-tools">
+        <label class="field"><span>Search sources and proposals</span><input id="backfillQuery" type="search" placeholder="Event, account, caption, date or ID"></label>
+        <label class="field"><span>Review queue</span><select id="backfillQueue"><option value="matches">Existing archive matches</option><option value="unmatched">Possible archive additions</option><option value="">All proposals</option></select></label>
+        <label class="field"><span>Review status</span><select id="backfillState"><option value="">All</option><option value="pending">Pending</option><option value="queued">Queued to save</option><option value="confirmed">Confirmed</option><option value="drafts">Description drafts ready</option><option value="deferred">Deferred</option><option value="rejected">Rejected</option><option value="applied">Applied</option></select></label>
+      </div>
       <label class="backfill-choice"><input id="backfillMissing" type="checkbox"> Archive flyer missing</label>
       <p id="backfillCounts" class="dashboard-note"></p>
       <div id="backfillItems" aria-busy="false"></div>
@@ -41,7 +45,13 @@
     <section class="dashboard-panel">
       <h2>Description requests</h2><p>Check “Update description” and save your choices to request a draft. Review drafts before saving them to the archive.</p>
       <p id="backfillRequestsNote" class="dashboard-note"></p>
-      <div class="backfill-actions"><button id="backfillRequests" class="quiet-button" type="button">Download selected requests</button><label class="field"><span>Import prepared description drafts</span><input id="backfillDrafts" type="file" accept=".json,application/json"></label></div>
+      <div class="backfill-actions">
+        <button id="backfillRequests" class="quiet-button" type="button" disabled>Download selected requests</button>
+        <label class="field"><span>Import prepared description drafts</span><input id="backfillDrafts" type="file" accept=".json,application/json" aria-describedby="backfillDraftStatus" disabled></label>
+        <a id="backfillReviewDrafts" class="admin-page-link" href="#backfillReview" hidden>Review description drafts</a>
+      </div>
+      <p id="backfillDraftStatus" class="dashboard-note backfill-notice" role="status" aria-live="polite"></p>
+      <ul id="backfillDraftIssues" class="backfill-caption backfill-notice" data-error hidden></ul>
     </section>
   </main>
 </body>

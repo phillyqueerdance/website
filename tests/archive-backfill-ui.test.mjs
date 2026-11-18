@@ -8,7 +8,8 @@ const html = readFileSync(new URL('../admin/archive-backfill.html', import.meta.
 const busyMessage = 'Another QDP save or sync is running. Your changes have not been saved; try again when it finishes.';
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
-function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, flyerReadOnly = false, omitFlyer = false} = {}) {
+function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, flyerReadOnly = false,
+  omitFlyer = false, descriptionRequests = []} = {}) {
   class Element {
     constructor(tag) {
       Object.assign(this, {tag, children: [], listeners: {}, value: '', attributes: {}, checked: false,
@@ -31,7 +32,7 @@ function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, f
     runs: [], needsPublish: false};
   for (let i = 1; i <= count; i++) {
     const eventId = 'EV-' + i, postId = String(12340 + i);
-    const sheet = 'Archive 2025';
+    const sheet = 'Archive 2025', awaitingDescription = descriptionRequests.includes(i);
     const target = {sheet, eventId, revision: 'event-r1', title: 'Current event ' + i, fields: [
       {key: 'Title (internal)', value: 'Current event ' + i},
       {key: 'Description', value: 'Existing description'},
@@ -43,7 +44,9 @@ function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, f
       media: [{id: postId, order: 1, url: 'https://images.example/source.jpg', savedUrl: ''}]};
     records.items.push({key: 'candidate:' + i, revision: 'r1', runId: '2025', indexSignature: 'index-r1',
       fields: {'Title (internal)': 'Proposed event ' + i, Description: ''},
-      state: 'pending', selectedFields: [], draftDescription: '', visual: {status: 'inspected'},
+      state: awaitingDescription ? 'confirmed' : 'pending', selectedFields: awaitingDescription ? ['Description'] : [],
+      targetSheet: awaitingDescription ? sheet : '', targetEventId: awaitingDescription ? eventId : '',
+      draftDescription: '', visual: {status: 'inspected'},
       evidence: {notes: 'Venue and date match'}, postKeys: ['ig:' + postId],
       matches: unmatched ? [] : [{sheet, eventId, title: target.title, date: '2025-03-01', reasons: ['Same date'], conflicts: []}]});
   }
@@ -66,6 +69,16 @@ function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, f
           if (error) throw error;
           return {addedPosts: body.posts?.length || 0, addedCandidates: body.candidates?.length || 0};
         }
+        if (action === 'admin.backfill.draftbatch') {
+          return {results: body.drafts.map(({key, expectedRevision, description}) => {
+            const item = records.items.find(item => item.key === key);
+            if (!item || item.revision !== expectedRevision) return {key, error: 'This review changed. Reload it before saving.'};
+            assert.ok(item.selectedFields.includes('Description'), 'The draft has a saved request');
+            const result = {key, revision: 'with-draft', draftDescription: description};
+            Object.assign(item, result);
+            return result;
+          })};
+        }
         if (action === 'admin.backfill.savebatch') {
           const results = body.changes.map(change => {
             if (change.key === failKey) return {key: change.key, error: 'Source image unavailable. Choose its downloaded original.'};
@@ -83,7 +96,11 @@ function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, f
   vm.runInContext(source, context);
   const find = fn => all(get('Items')).filter(fn);
   const buttons = label => find(n => n.tag === 'button' && n.textContent === label);
-  return {get, requests, timers, find, buttons};
+  function importDescriptions(text) {
+    get('Drafts').files = [{text: async () => text}];
+    return get('Drafts').emit('change');
+  }
+  return {get, requests, timers, find, buttons, importDescriptions};
 }
 
 test('reviewing across pages queues match and flyer selections locally and saves them in one request', async () => {
@@ -205,4 +222,71 @@ test('calculated flyer fields and older deployments show the reason for a disabl
     const hint = h.find(element => element.className === 'backfill-meta backfill-flyer-availability')[0];
     assert.equal(hint.hidden, false);assert.match(hint.textContent, reason);
   }
+});
+
+test('the upload confirms success beside the picker and opens the draft with its approval unchecked', async () => {
+  const h = setup({count: 2, descriptionRequests: [1]});
+  await settle();
+  await h.buttons('Approve match + flyer')[1].emit('click');
+  h.get('State').value = 'pending';
+  await h.get('State').emit('change');
+  const json = JSON.stringify({drafts: [{key: 'candidate:1', expectedRevision: 'r1', description: 'Proposed new description.'}]});
+  await h.importDescriptions(json);
+  assert.match(h.get('DraftStatus').textContent, /1 imported/);
+  assert.equal(h.get('ReviewDrafts').hidden, false);
+  assert.equal(h.get('Save').textContent, 'Save all changes (1)');
+  assert.deepEqual(h.requests.map(request => request.action), ['admin.backfill.bootstrap', 'admin.backfill.draftbatch']);
+  await h.get('ReviewDrafts').emit('click');
+  assert.equal(h.get('State').value, 'drafts');
+  assert.equal(h.find(n => n.tag === 'article').length, 1);
+  assert.equal(h.find(n => n.className === 'backfill-fields')[0].open, true);
+  const description = h.find(n => n.tag === 'textarea')[0];
+  assert.equal(description.value, 'Proposed new description.');
+  assert.equal(description.readOnly, true);
+  await h.importDescriptions(json);
+  assert.match(h.get('DraftStatus').textContent, /1 already ready for review/);
+  assert.equal(h.requests.filter(request => request.action === 'admin.backfill.draftbatch').length, 1);
+});
+
+test('the upload explains a request export, malformed JSON, or stale draft by the picker', async () => {
+  const h = setup({descriptionRequests: [1]});
+  await settle();
+  await h.importDescriptions('{"requests":[]}');
+  assert.match(h.get('DraftStatus').textContent, /request export/);
+  await h.importDescriptions('incomplete json');
+  assert.match(h.get('DraftStatus').textContent, /could not be read as JSON/);
+  assert.equal(h.requests.length, 1);
+  await h.importDescriptions(JSON.stringify([
+    {key: 'candidate:1', expectedRevision: 'stale', description: 'Draft for an older revision.'},
+    {key: 'candidate:2', description: 'Missing revision.'}
+  ]));
+  assert.match(h.get('DraftStatus').textContent, /2 could not be imported/);
+  assert.equal(h.get('DraftIssues').hidden, false);
+  assert.match(h.get('DraftIssues').childNodes.map(row => row.textContent).join('\n'), /Proposed event 1 — The review changed since export/);
+  assert.match(h.get('DraftIssues').childNodes.map(row => row.textContent).join('\n'), /candidate:2 — Missing the request key or revision/);
+});
+
+test('importing a draft alongside a queued flyer retains the flyer and requires explicit description approval', async () => {
+  const h = setup({descriptionRequests: [1]});
+  await settle();
+  await h.buttons('Approve match + flyer')[0].emit('click');
+  await h.importDescriptions(JSON.stringify([{key: 'candidate:1', expectedRevision: 'r1', description: 'A draft to review.'}]));
+  assert.match(h.get('DraftStatus').textContent, /1 imported/);
+  assert.equal(h.find(n => n.tag === 'textarea')[0].readOnly, true);
+  await h.get('Save').emit('click');
+  const [change] = h.requests.at(-1).body.changes;
+  assert.equal(change.expectedRevision, 'with-draft');
+  assert.deepEqual(change.selectedFields, ['Flyer_URL']);
+});
+
+test('a draft import keeps a queued manual description on the same event', async () => {
+  const h = setup({descriptionRequests: [1]});
+  await settle();
+  const description = h.find(n => n.tag === 'textarea')[0];
+  description.value = 'My unsaved description.';
+  await description.emit('input');
+  await h.importDescriptions(JSON.stringify([{key: 'candidate:1', expectedRevision: 'r1', description: 'A conflicting draft.'}]));
+  assert.match(h.get('DraftIssues').childNodes[0].textContent, /conflicts with edits queued for the same event/);
+  assert.equal(h.find(n => n.tag === 'textarea')[0].value, 'My unsaved description.');
+  assert.equal(h.requests.length, 1);
 });

@@ -3,7 +3,8 @@
   const controls = Object.fromEntries([
     'Refresh', 'Import', 'Resume', 'Status', 'Progress', 'Originals', 'Coverage', 'Query',
     'Queue', 'State', 'Missing', 'Counts', 'Items', 'Previous', 'Next', 'Page',
-    'RequestsNote', 'Requests', 'Drafts', 'Save', 'SavedChoices', 'SaveStatus', 'Publish'
+    'RequestsNote', 'Requests', 'Drafts', 'DraftStatus', 'DraftIssues', 'ReviewDrafts',
+    'Save', 'SavedChoices', 'SaveStatus', 'Publish'
   ].map(name => [name, document.getElementById('backfill' + name)]));
 
   const MB = 1024 * 1024;
@@ -60,6 +61,9 @@
   const pendingDrafts = () => [...state.drafts.values()].filter(draft => draft.dirty);
   const notice = (message, error = false) => api.message(controls.Status, message, error);
   const saveNotice = (message, error = false) => api.message(controls.SaveStatus, message, error);
+  const draftNotice = (message, error = false) => api.message(controls.DraftStatus, message, error);
+  const hasDescriptionRequest = item => item.state === 'confirmed' && item.selectedFields.includes('Description');
+  const descriptionReady = item => hasDescriptionRequest(item) && Boolean(item.draftDescription);
 
   async function busy(work) {
     if (state.busy) return;
@@ -121,6 +125,7 @@
     controls.Save.textContent = count ? 'Save all changes (' + count + ')' : 'Save all changes';
     controls.Save.disabled = state.busy || !count;
     controls.Import.disabled = state.busy || !state.workspace;
+    controls.Drafts.disabled = state.busy || !state.workspace;
     controls.SavedChoices.hidden = !savedChoices().length;
     controls.SavedChoices.disabled = state.busy;
     controls.Publish.hidden = !state.workspace?.needsPublish;
@@ -241,7 +246,9 @@
       const draft = state.drafts.get(item.key);
       const matches = item.matches.length || item.targetEventId || (draft?.dirty && draft.target);
       if ((queue === 'matches' && !matches) || (queue === 'unmatched' && matches)) return false;
-      if (status === 'queued' ? !draft?.dirty : status && item.state !== status) return false;
+      if (status === 'drafts') {
+        if (!descriptionReady(item)) return false;
+      } else if (status === 'queued' ? !draft?.dirty : status && item.state !== status) return false;
       if (controls.Missing.checked) {
         const field = (draft?.target || targetFor(item))?.fields.find(field => field.key === 'Flyer_URL');
         if (!field || field.readOnly || field.value) return false;
@@ -266,11 +273,12 @@
       : '0 proposals';
     controls.Previous.disabled = state.offset === 0;
     controls.Next.disabled = state.offset + PAGE_SIZE >= visible.length;
-    const requests = state.workspace.items.filter(item =>
-      item.state === 'confirmed' && item.selectedFields.includes('Description') && !item.draftDescription
-    ).length;
-    controls.RequestsNote.textContent = requests + ' selected events waiting for a draft.';
+    const descriptions = state.workspace.items.filter(hasDescriptionRequest);
+    const ready = descriptions.filter(descriptionReady).length;
+    const requests = descriptions.length - ready;
+    controls.RequestsNote.textContent = requests + ' awaiting drafts · ' + ready + ' ready for review';
     controls.Requests.disabled = !requests;
+    controls.ReviewDrafts.hidden = !ready;
     renderToolbar();
   }
 
@@ -463,8 +471,11 @@
 
     function appendFields(box) {
       const details = node('details', 'backfill-fields');
+      details.open = controls.State.value === 'drafts' && descriptionReady(item);
       details.append(node('summary', '', 'Edit event details and description'));
-      for (const [key, label] of Object.entries(fieldLabels)) {
+      const fields = Object.entries(fieldLabels);
+      if (details.open) fields.sort(([a], [b]) => (b === 'Description') - (a === 'Description'));
+      for (const [key, label] of fields) {
         const field = draft.target.fields.find(field => field.key === key);
         if (!field || field.readOnly) continue;
         const row = node('div', 'backfill-change');
@@ -798,43 +809,107 @@
   async function importDrafts(file) {
     if (!file) return;
     await busy(async () => {
+      controls.DraftIssues.replaceChildren();
+      controls.DraftIssues.hidden = true;
+      draftNotice('Reading description drafts…');
+      let saved = 0, alreadyReady = 0, failed = 0;
+      function reportIssue(label, reason) {
+        failed++;
+        controls.DraftIssues.append(node('li', '', label + ' — ' + reason));
+        controls.DraftIssues.hidden = false;
+      }
       try {
-        if (pendingDrafts().length) throw new Error('Save your queued changes before importing description drafts.');
-        const json = JSON.parse(await file.text());
-        const drafts = Array.isArray(json) ? json : json.drafts;
-        if (!Array.isArray(drafts) || drafts.length > 500) throw new Error('Choose a prepared description file with up to 500 drafts.');
+        const source = await file.text();
+        let json;
+        try {
+          json = JSON.parse(source.replace(/^\uFEFF/, ''));
+        } catch {
+          throw new Error('This file could not be read as JSON. Choose the prepared description drafts file.');
+        }
+        const drafts = Array.isArray(json) ? json : json?.drafts;
+        if (!Array.isArray(drafts)) {
+          if (Array.isArray(json?.requests)) throw new Error('You chose the request export. Choose the JSON with the written drafts.');
+          throw new Error('Choose the prepared JSON file containing description drafts.');
+        }
+        if (!drafts.length || drafts.length > 500) throw new Error('Choose a description file with 1 to 500 drafts.');
+
         const items = new Map(state.workspace.items.map(item => [item.key, item]));
-        let saved = 0, failed = 0, batch = [], bytes = 0;
+        const labels = new Map(), seen = new Set();
+        let batch = [], bytes = 0;
         async function send() {
           if (!batch.length) return;
-          const data = await api.request('admin.backfill.draftbatch', {drafts: batch});
+          draftNotice('Importing ' + batch.length + ' drafts · ' + saved + ' saved so far…');
+          const data = await waitForWrite('admin.backfill.draftbatch', {drafts: batch},
+            () => draftNotice('Waiting for the current QDP save or sync…'));
           for (const result of data.results) {
-            const item = items.get(result.key);
             if (result.error) {
-              state.errors.set(result.key, result.error);
-              failed++;
+              const reason = result.error.startsWith('This review changed.')
+                ? 'The review changed since export. Refresh to check for a saved draft or download a fresh request.'
+                : result.error;
+              reportIssue(labels.get(result.key), reason);
+              continue;
+            }
+            const item = items.get(result.key);
+            if (item) Object.assign(item, result);
+            const local = state.drafts.get(result.key);
+            if (local?.dirty) {
+              local.revision = result.revision;
+              local.values.Description = result.draftDescription;
+              local.selected.delete('Description');
             } else {
-              if (item) Object.assign(item, result);
               state.drafts.delete(result.key);
               state.errors.delete(result.key);
-              saved++;
             }
+            saved++;
           }
           batch = [];
           bytes = 0;
         }
-        for (const {key, expectedRevision, description} of drafts) {
+        for (const [index, entry] of drafts.entries()) {
+          const {key, expectedRevision, description} = entry || {};
+          const item = items.get(key);
+          const label = item?.fields['Title (internal)'] || (typeof key === 'string' && key) || 'Draft ' + (index + 1);
+          if (typeof key !== 'string' || !key.trim() || typeof expectedRevision !== 'string' || !expectedRevision.trim()) {
+            reportIssue(label, 'Missing the request key or revision. Use the JSON prepared from the exported request.');
+            continue;
+          }
+          if (typeof description !== 'string' || !description.trim()) {
+            reportIssue(label, 'The draft has no description text.');
+            continue;
+          }
+          if (seen.has(key)) {
+            reportIssue(label, 'This file already contains a draft for this review.');
+            continue;
+          }
+          seen.add(key);
+          if (item && descriptionReady(item) && item.draftDescription === description) {
+            alreadyReady++;
+            continue;
+          }
+
+          const local = state.drafts.get(key);
+          if (local?.dirty && (!item || local.stale || local.revision !== expectedRevision ||
+              local.state !== 'confirmed' || local.target?.sheet !== item.targetSheet ||
+              local.target?.eventId !== item.targetEventId || local.values.Description !== (item.draftDescription || ''))) {
+            reportIssue(label, 'This draft conflicts with edits queued for the same event. Resolve those edits before importing it.');
+            continue;
+          }
           const draft = {key, expectedRevision, description};
           const size = encoder.encode(JSON.stringify(draft)).length;
-          if (size > 1.9 * MB) { failed++; continue; }
+          if (size > 1.9 * MB) {
+            reportIssue(label, 'This draft is too large to import.');
+            continue;
+          }
           if (batch.length >= 100 || bytes + size > 1.9 * MB) await send();
+          labels.set(key, label);
           batch.push(draft);
           bytes += size + 1;
         }
         await send();
-        saveNotice(saved + ' description drafts ready for review.' + (failed ? ' ' + failed + ' could not be saved.' : ''), Boolean(failed));
+        draftNotice(saved + ' imported.' + (alreadyReady ? ' ' + alreadyReady + ' already ready for review.' : '') +
+          (failed ? ' ' + failed + ' could not be imported. See details below.' : ''), Boolean(failed));
       } catch (error) {
-        saveNotice(error.message, true);
+        draftNotice((saved ? saved + ' drafts imported before the upload stopped. ' : '') + error.message, true);
       } finally {
         controls.Drafts.value = '';
       }
@@ -873,6 +948,13 @@
       saveNotice(data.requests.length + ' selected description requests downloaded.');
     } catch (error) { saveNotice(error.message, true); }
   }));
+  controls.ReviewDrafts.addEventListener('click', () => {
+    controls.Query.value = '';
+    controls.Queue.value = '';
+    controls.Missing.checked = false;
+    controls.State.value = 'drafts';
+    resetView();
+  });
   controls.Drafts.addEventListener('change', () => importDrafts(controls.Drafts.files[0]));
   window.addEventListener('beforeunload', event => {
     if (pendingDrafts().length || state.importJob) {
