@@ -34,7 +34,7 @@
     el.archiveRetry.hidden = state?.job?.phase !== "failed";
     el.archiveRetry.disabled = busy;
     const canSave = drafts.size || state?.summary.approved || state?.unsavedRejectCount;
-    el.archiveSave.disabled = el.archiveApply.disabled = lock || !canSave;
+    el.archiveSave.disabled = el.archiveApply.disabled = lock || !canSave || state?.separatePublish !== true;
     el.archiveSave.textContent = el.archiveApply.textContent = 'Save all changes' + (drafts.size ? ` (${drafts.size})` : '');
     el.archiveClear.disabled = lock || !drafts.size;
     el.archivePublish.disabled = lock || !state?.needsPublish || !!drafts.size;
@@ -81,6 +81,7 @@
   }
   async function saveAll() {
     if (locked()) return;
+    if (state?.separatePublish !== true) { status('Install the v7.4.22 script replacements and update the existing Apps Script deployment before saving. Your selections have been kept.', true); return; }
     const changes = [...drafts.values()];
     if (!changes.length && !state?.summary.approved && !state?.unsavedRejectCount) return;
     if (changes.length > 5000) { status('Save up to 5,000 revisions at a time.', true); return; }
@@ -197,6 +198,7 @@
       saved: "Changes saved to the sheet. Use Publish saved changes when you’re ready to update the website.",
       complete: "Website data published. Any suggestions that need attention remain in the review. Caches can take about a minute to refresh." };
     status(job?.phase === "failed" ? job.error : messages[job?.phase] || "Ready to scan recorded events.", job?.phase === "failed");
+    if (payload.separatePublish !== true) status('Install the v7.4.22 script replacements and update the existing Apps Script deployment to use separate saving and publishing.', true);
     el.archivePublishNote.textContent = payload.needsPublish ? "Saved archive changes are awaiting publication." :
       "Save all changes writes approved revisions and rejections to the sheet. Publish saved changes updates the website separately.";
     if (payload.lastPublishedAt) el.archivePublishNote.textContent += " Last published " + new Date(payload.lastPublishedAt).toLocaleString() + ".";

@@ -9,7 +9,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const proposal = (key, kind = 'artist', added = ['NEW']) => ({key, revision: 'r-' + key, kind,
   currentIds: [], proposedIds: added, state: 'pending', result: 'Ready', matched: 'Recorded lineup', evidence: 'Name in event copy'});
 
-function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = false, jobPhase = 'ready'} = {}) {
+function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = false, jobPhase = 'ready', separatePublish = true} = {}) {
   class Element {
     constructor(tag = 'div') { this.tag = tag; this.children = []; this.listeners = {}; this.value = ''; this.attributes = {}; this.dataset = {}; this.checked = false; this.disabled = false; this.textContent = ''; }
     append(...children) { for (const child of children) this.children.push(...(child.tag === 'fragment' ? child.children : [child])); }
@@ -32,7 +32,7 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
     for (const event of events) for (const p of event.proposals) summary[p.state]++;
     return {ok: 'yes', events: [events[offset]], totalEvents: events.length, pageSize: 1, offset, summary,
       scan: {scanned: events.length, total: events.length, proposed: 4}, scanInProgress: jobPhase === 'scanning', job: {phase: jobPhase},
-      references: {artist: [{id: 'NEW', name: 'New Artist'}]}, needsPublish,
+      references: {artist: [{id: 'NEW', name: 'New Artist'}]}, needsPublish, separatePublish,
       ...(data.includeRejects ? {rejectedTotal: rejects.length, rejectOffset: 0, rejects} : {})};
   };
   const context = vm.createContext({URL, Intl, Date, Map, Set, TextEncoder, Option: class extends Element {
@@ -187,6 +187,16 @@ test('saving an approval never publishes until Publish saved changes is pressed'
   assert.match(h.elements.get('archivePublishNote').textContent, /awaiting publication/);
   await h.elements.get('archivePublish').emit('click'); await h.settle();
   assert.equal(h.requests.filter(r => r.action === 'admin.archive.publish').length, 1);
+});
+
+test('an older deployment cannot receive a save that would automatically publish', async () => {
+  const h = setup({separatePublish: false}); await h.settle();
+  await h.change(h.candidates()[0], true);
+  assert.equal(h.elements.get('archiveSave').disabled, true);
+  await h.elements.get('archiveSave').emit('click'); await h.settle();
+  assert.equal(h.requests.some(r => r.action === 'admin.archive.save'), false);
+  assert.match(h.elements.get('archiveStatus').textContent, /v7.4.22/);
+  assert.equal(h.candidates()[0].checked, true);
 });
 
 test('saving a rejection updates its open saved list in the same response', async () => {

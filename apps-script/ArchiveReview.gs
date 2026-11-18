@@ -1342,7 +1342,7 @@ function qdpArchiveAdminPage_(body) {
     event.flyerUrl = typeof qdpArchiveLink_ === 'function' ? qdpArchiveLink_(flyer) : '';
   });
   const unsavedRejectCount = queue.rows.filter(row => row[0] === 'Reject' && row[1] !== 'Rejected (saved)' && qdpArchiveRejectedValues_(row).length).length;
-  const payload = { summary, ...progress, unsavedRejectCount,
+  const payload = { summary, ...progress, unsavedRejectCount, separatePublish: typeof qdpPublicPublishSaved_ === 'function',
     events, totalEvents: all.length, offset, pageSize: QDP_ARCHIVE_ADMIN_.pageSize };
   if (body.references) payload.references = qdpArchiveAdminReferences_();
   if (body.includeRejects) Object.assign(payload, qdpArchiveAdminRejects_(body));
@@ -1641,6 +1641,9 @@ function qdpAdminArchive_(body) {
     if (action === 'admin.archive.save') {
       qdpArchiveAdminReady_();
       if (typeof Sheets === 'undefined') throw new Error('Enable Google Sheets API in Apps Script Services before saving changes together.');
+      if (typeof qdpPublicPublishSaved_ !== 'function' && (typeof qdpLivePublish === 'function' || typeof qdpArchivePublish === 'function')) {
+        throw new Error('Install PublicData.gs v7.4.22 and update the existing Apps Script deployment before saving. The older scheduled publisher cannot hold saved changes. Nothing was saved.');
+      }
       const changes = Array.isArray(body.changes) ? body.changes.slice() : body.changes || [];
       if (!Array.isArray(changes) || changes.length > 5000) throw new Error('Save up to 5,000 suggestions at a time.');
       const queue = qdpArchiveAdminQueue_(ss), submitted = new Set(changes.map(change => change.key));

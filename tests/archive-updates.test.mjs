@@ -261,6 +261,15 @@ test('saving does not require publication helpers, and upgrading a queued legacy
   }
 });
 
+test('a partial upgrade with the older scheduled publishers cannot write decisions or event edits', () => {
+  const h = setup(), page = h.call('scan');
+  h.c.qdpPublicPublishSaved_ = undefined;
+  assert.equal(h.call('bootstrap').separatePublish, false);
+  assert.throws(() => h.call('save', {changes: h.proposals(page).map(p => ({key: p.key, revision: p.revision,
+    decision: 'Approve', proposedIds: p.proposedIds}))}), /PublicData.gs v7.4.22/);
+  assert.equal(h.batchRequests.length, 0);
+});
+
 test('large saves continue in batches but never queue publication', () => {
   const h = setup({events: Array.from({length: 210}, (_, i) => event('E-' + i, 'New Artist'))});
   h.call('scan');
