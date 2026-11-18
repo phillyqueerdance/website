@@ -1,5 +1,5 @@
 /**
- * QDP archive backfill v1. Requires Core v7.4.26, ArchiveReview v7.4.25,
+ * QDP archive backfill v1.0.1. Requires Core v7.4.26, ArchiveReview v7.4.25,
  * PublicData v7.4.22+, and the existing QDP_Apify_Import / scraper helpers.
  * Source collection never writes an event. Apply is an explicit Admin action.
  */
@@ -15,9 +15,10 @@ const QDP_BACKFILL_ = Object.freeze({
     'Description','Event_URL','Instagram_URL','RawFlyerURL','Flyer_URL']
 });
 
-function qdpBackfillTable_(kind) {
+function qdpBackfillTable_(kind,create=true) {
   const ss=ss_(), headers=QDP_BACKFILL_[kind], name=QDP_BACKFILL_.names[kind];
   let sheet=ss.getSheetByName(name);
+  if(!sheet&&!create)return {ss,sheet:null,headers,rows:[]};
   if(!sheet) {sheet=ss.insertSheet(name);sheet.getRange(1,1,1,headers.length).setValues([headers]);sheet.setFrozenRows(1);}
   const values=sheet.getDataRange().getValues();
   if(headers.some((h,i)=>values[0][i]!==h)) throw new Error(name+' headers changed. Restore the named backfill headers before continuing.');
@@ -119,13 +120,16 @@ function qdpBackfillIngest_(body) {
 function qdpBackfillCatalog_(ss) {
   const out=[];out.byDate=new Map();out.bySource=new Map();
   for(const name of qdpArchiveSheets_(ss,false)) {
-    const source=qdpArchiveAdminSource_(ss,name),c=source.layout.columns;
-    source.rows.slice(1).forEach((row,index)=>{
+    // Matching is read-only. The event editor's source loader initializes
+    // QDP_EditState and can need the shared save lock even during a page load.
+    const sheet=ss.getSheetByName(name),rows=sheet.getDataRange().getValues();
+    const layout=qdpArchiveLayout_(sheet,rows[0]),c=layout.columns;
+    rows.slice(1).forEach((row,index)=>{
       const date=qdpArchiveAdminDate_(row[c.start-1]);if(!date.startsWith('2025-'))return;
       const id=String(row[c.eventId-1]||'').trim();if(!id)return;
       const item={sheet:name,eventId:id,date,title:String(row[c.title-1]||''),venueId:String(row[c.venue-1]||''),
         artistIds:qdpArchiveIds_(row[c.artists-1]),partyId:String(row[c.party-1]||''),
-        text:row.map(v=>String(v==null?'':v)).join('\n'),row,index:index+2,layout:source.layout};
+        text:row.map(v=>String(v==null?'':v)).join('\n'),row,index:index+2,layout};
       out.push(item);if(!out.byDate.has(date))out.byDate.set(date,[]);out.byDate.get(date).push(item);
       for(const match of item.text.matchAll(/https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/g)) {
         if(!out.bySource.has(match[1]))out.bySource.set(match[1],[]);out.bySource.get(match[1]).push(item);
@@ -180,11 +184,11 @@ function qdpBackfillPublicReview_(row,sourceByKey,catalog,lookups) {
   return result;
 }
 function qdpBackfillPage_(body) {
-  const review=qdpBackfillTable_('review'),posts=qdpBackfillTable_('posts'),runs=qdpBackfillTable_('runs');
+  const review=qdpBackfillTable_('review',false),posts=qdpBackfillTable_('posts',false),runs=qdpBackfillTable_('runs',false);
   const sourceByKey=new Map(posts.rows.map(row=>[row[0],row]));
   const query=qdpArchiveAdminSearchNormalize_(String(body.query||'')),state=String(body.state||'');
   let rows=review.rows.filter(row=>(!state||row[5]===state)&&(!query||qdpArchiveAdminSearchNormalize_(row.slice(0,11).join('\n')+'\n'+qdpBackfillParse_(row[2],[]).map(k=>sourceByKey.get(k)||[]).join('\n')).includes(query)));
-  const catalog=qdpBackfillCatalog_(review.ss),lookups=qdpArchiveLookups_(review.ss);
+  const catalog=rows.length?qdpBackfillCatalog_(review.ss):null,lookups=rows.length?qdpArchiveLookups_(review.ss):null;
   const queue=String(body.queue||'');
   if(queue==='matches'||queue==='unmatched')rows=rows.filter(row=>{
     const matched=!!row[7]||qdpBackfillMatches_(qdpBackfillParse_(row[3],{}),qdpBackfillParse_(row[2],[]).map(k=>sourceByKey.get(k)).filter(Boolean),catalog,lookups).length>0;

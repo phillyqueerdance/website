@@ -11,21 +11,36 @@
   }
 
   async function request(action, data = {}) {
-    const response = await fetch("/admin/api", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ action, ...data })
-    });
-    const result = await response.json().catch(() => null);
+    const label = action.startsWith("admin.backfill.") ? "Archive Backfill" : "QDP Admin";
+    let response;
+    try {
+      response = await fetch("/admin/api", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ action, ...data })
+      });
+    } catch {
+      throw new Error(`${label} could not connect. Reload this page and retry.`);
+    }
     if (response.redirected || response.status === 401 || response.status === 403) {
-      throw new Error("Sign in to QDP Admin to manage profiles.");
+      throw new Error("Sign in to QDP Admin again, then reload this page.");
+    }
+    const result = await response.json().catch(() => null);
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      if ([504, 524].includes(response.status)) {
+        throw new Error(`${label} timed out (HTTP ${response.status}). Reload and retry; reimporting the same collection keeps saved progress.`);
+      }
+      throw new Error(`${label} returned an unreadable response (HTTP ${response.status}). Reload this page and retry.`);
     }
     if (!response.ok || result?.ok !== "yes") {
-      if (/^unknown admin action\.?$/i.test(result?.error || "")) {
+      if (/^unknown (?:admin|archive backfill) action\.?$/i.test(result?.error || "")) {
+        if (action.startsWith("admin.backfill.")) {
+          throw new Error("Update the existing Apps Script web-app deployment with Core.gs and ArchiveBackfill.gs to use Archive Backfill.");
+        }
         throw new Error("Deploy the updated Core.gs to use this feature.");
       }
-      throw new Error(result?.error || "Could not reach the Index. Try again.");
+      throw new Error(result?.error || `${label} returned an unexpected response (HTTP ${response.status}).`);
     }
     return result;
   }

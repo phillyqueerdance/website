@@ -2,6 +2,14 @@
 
 ## Admin Archive Backfill (2025 pilot)
 
+**Loading fix (v1.0.1):** Replace ArchiveBackfill.gs and update the existing
+web-app deployment; Core.gs v7.4.26 remains compatible. Opening an empty queue
+does not scan the archive or create tables. Match scans read the archive without
+initializing edit metadata or acquiring the event save lock. Imports create the
+backfill tables as needed and retry a temporarily blocked batch up to five times,
+keeping progress already saved. Other validation and stale-review errors stop
+the import immediately.
+
 The new `/admin/archive-backfill` page reviews externally collected historical
 Instagram evidence beside existing archive events. Install the separately supplied
 **Core.gs v7.4.26**, add **ArchiveBackfill.gs** to the existing Apps Script project,

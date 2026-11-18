@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const source=readFileSync(new URL('../admin/archive-backfill.js',import.meta.url),'utf8');
 const html=readFileSync(new URL('../admin/archive-backfill.html',import.meta.url),'utf8');
-function setup({failSave=false}={}){
+function setup({failSave=false,ingestErrors=[]}={}){
   class Element {
     constructor(tag='div'){this.tag=tag;this.children=[];this.listeners={};this.value='';this.attributes={};this.checked=false;this.disabled=false;this.textContent='';this.files=[];}
     append(...children){this.children.push(...children);}replaceChildren(...children){this.children=[];this.append(...children);}
@@ -12,8 +12,8 @@ function setup({failSave=false}={}){
     addEventListener(n,f){(this.listeners[n]||=[]).push(f);}async emit(n,event={}){for(const f of this.listeners[n]||[])await f({preventDefault(){},...event});}
     click(){}get childNodes(){return this.children;}
   }
-  const elements=new Map([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element()]));
-  const all=root=>root.children.flatMap(child=>[child,...all(child)]),requests=[];
+  const elements=new Map([...html.matchAll(/<([a-z][a-z0-9-]*)\b[^>]*\bid="([^"]+)"/g)].map(m=>[m[2],new Element(m[1])]));
+  const all=root=>root.children.flatMap(child=>[child,...all(child)]),requests=[],timers=[];
   const target={sheet:'Archive 2025',eventId:'ONE',revision:'event-r1',title:'Current event title',fields:[
     {key:'Title (internal)',label:'Title',value:'Current event title'},
     {key:'Description',label:'Description',value:'Existing description'},
@@ -22,7 +22,7 @@ function setup({failSave=false}={}){
   const item={key:'candidate:one',revision:'r1',runId:'2025',fields:{'Title (internal)':'Proposed event title',Description:''},state:'pending',selectedFields:[],draftDescription:'',visual:{status:'inspected'},evidence:{notes:'Same date, venue and lineup'},sources:[{key:'ig:12345',account:'example',url:'https://www.instagram.com/p/Example/',caption:'Original caption',media:[{id:'12345',order:1,url:'https://images.example/source.jpg',savedUrl:''}]}],matches:[{sheet:target.sheet,eventId:'ONE',title:'Current event title',date:'2025-03-01',reasons:['Same event date','Same venue'],conflicts:[]}]};
   const response=()=>({items:[structuredClone(item)],offset:0,pageSize:10,total:1,summary:{[item.state]:1},sourceCount:1,runs:[],descriptionRequests:0});
   const message=(n,t,e=false)=>{n.textContent=t;n.toggleAttribute('data-error',e);};
-  const context=vm.createContext({URL,Blob,Map,Set,JSON,Object,Array,String,Number,Math,structuredClone,clearTimeout(){},setTimeout:()=>1,
+  const context=vm.createContext({URL,Blob,Map,Set,JSON,Object,Array,String,Number,Math,structuredClone,clearTimeout(){},setTimeout:(fn,delay)=>{timers.push({fn,delay});return timers.length;},
     document:{getElementById:id=>{assert.ok(elements.has(id),'HTML control exists: '+id);return elements.get(id);},createElement:tag=>new Element(tag),querySelectorAll:()=>[...elements.values(),...all(elements.get('backfillItems'))].filter(n=>['button','input','textarea','select'].includes(n.tag))},
     window:{location:{origin:'https://qdp.example'},addEventListener(){},QDPAdminProfiles:{message,request:async(action,data={})=>{
       requests.push({action,data:JSON.parse(JSON.stringify(data))});
@@ -34,6 +34,7 @@ function setup({failSave=false}={}){
       }
       if(action==='admin.backfill.media')return {url:'https://images.example/verified.jpg'};
       if(action==='admin.backfill.apply'){item.state='applied';return {changedCells:1};}
+      if(action==='admin.backfill.ingest'){const error=ingestErrors.shift();if(error)throw error;return {};}
       return {};
     }}}
   });
@@ -43,7 +44,7 @@ function setup({failSave=false}={}){
   const button=text=>find(n=>n.tag==='button'&&n.textContent===text)[0];
   const match=()=>find(n=>n.tag==='button'&&n.className==='backfill-match')[0];
   const choices=()=>find(n=>n.tag==='input'&&n.type==='checkbox');
-  return {elements,requests,find,button,match,choices,settle};
+  return {elements,requests,timers,find,button,match,choices,settle};
 }
 test('initial visual review never writes and keeps field approvals unchecked',async()=>{
   const h=setup();await h.settle();assert.deepEqual(h.requests.map(r=>r.action),['admin.backfill.bootstrap']);
@@ -76,4 +77,34 @@ test('applying requires saved confirmation and sends only selected field values'
   await h.match().emit('click');const check=h.choices()[0];check.checked=true;await check.emit('change');await h.button('Confirm match / save choices').emit('click');
   await h.button('Apply selected changes').emit('click');const request=h.requests.find(r=>r.action==='admin.backfill.apply');assert.deepEqual(request.data.fields,{'Title (internal)':'Proposed event title'});assert.equal(request.data.expectedTargetRevision,'event-r1');
   assert.ok(!h.requests.some(r=>r.action.includes('publish')));
+});
+const busyMessage='Another QDP save or sync is running. Your changes have not been saved; try again when it finishes.';
+function collection(h,count=21){
+  const input=h.elements.get('backfillImport');
+  input.files=[{size:1000,text:async()=>JSON.stringify({schema:'qdp-backfill-v1',runId:'fixture',posts:Array.from({length:count},(_,i)=>({pk:String(123450+i)})),candidates:[]})}];
+  return input.emit('change');
+}
+test('a temporarily busy import retries only its blocked batch and keeps completed progress',async()=>{
+  const h=setup({ingestErrors:[null,new Error(busyMessage)]});await h.settle();
+  const importing=collection(h);await h.settle();
+  assert.equal(h.elements.get('backfillProgress').value,20);
+  assert.match(h.elements.get('backfillStatus').textContent,/Waiting for another QDP/);
+  assert.equal(h.elements.get('backfillImport').disabled,true);assert.equal(h.timers.length,1);
+  h.timers[0].fn();await importing;
+  const batches=h.requests.filter(r=>r.action==='admin.backfill.ingest');
+  assert.equal(batches.length,3);assert.equal(batches[0].data.posts.length,20);
+  assert.deepEqual(batches[1].data,batches[2].data);assert.equal(h.elements.get('backfillProgress').value,21);
+  assert.equal(h.elements.get('backfillImport').disabled,false);assert.match(h.elements.get('backfillStatus').textContent,/Collection saved/);
+});
+test('persistent contention stops after five delayed retries and leaves the import usable',async()=>{
+  const h=setup({ingestErrors:Array.from({length:6},()=>new Error(busyMessage))});await h.settle();
+  const importing=collection(h,1);
+  for(let i=0;i<5;i++){await h.settle();assert.equal(h.timers.length,i+1);h.timers[i].fn();}
+  await importing;assert.equal(h.requests.filter(r=>r.action==='admin.backfill.ingest').length,6);
+  assert.equal(h.elements.get('backfillStatus').textContent,busyMessage);assert.equal(h.elements.get('backfillImport').disabled,false);
+});
+test('import validation failures stop immediately without an automatic retry',async()=>{
+  const h=setup({ingestErrors:[new Error('This pilot accepts event dates in 2025.')]});await h.settle();await collection(h,1);
+  assert.equal(h.timers.length,0);assert.equal(h.requests.filter(r=>r.action==='admin.backfill.ingest').length,1);
+  assert.match(h.elements.get('backfillStatus').textContent,/event dates in 2025/);
 });

@@ -106,3 +106,21 @@ test('Index changes invalidate saved approvals before an archive write',()=>{
 test('review mutations require an explicit current revision',()=>{
   const h=fixture();h.importOne();const current=h.row();assert.throws(()=>h.call('save',{key:current.key,state:'deferred',selectedFields:[]}),/review changed/);assert.equal(h.row().state,'pending');
 });
+test('opening an empty collection does not scan the archive, read profiles or create tables',()=>{
+  const h=fixture();h.reads.length=0;
+  const before=h.plain([...h.sheets.keys()]),page=h.call('bootstrap',{queue:'matches'});
+  assert.equal(page.total,0);assert.equal(page.sourceCount,0);assert.equal(page.items.length,0);
+  assert.deepEqual(h.plain([...h.sheets.keys()]),before);assert.deepEqual(h.reads,[]);
+});
+test('match scans remain read-only while another execution holds the shared save lock',()=>{
+  const h=fixture();h.importOne();
+  const archive=h.sheets.get('Events_Archive'),column=archive.rows[0].indexOf('QDP_EditState');
+  archive.rows.forEach(row=>row.splice(column,1));
+  const before=h.plain(archive.rows),batches=h.batchRequests.length,lock=h.c.LockService.getScriptLock();
+  assert.equal(lock.tryLock(),true);
+  try{
+    const page=h.call('bootstrap',{queue:'matches'});
+    assert.equal(page.total,1);assert.equal(page.items[0].matches[0].eventId,'ONE');
+    assert.deepEqual(h.plain(archive.rows),before);assert.equal(h.batchRequests.length,batches);
+  }finally{lock.releaseLock();}
+});
