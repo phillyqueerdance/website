@@ -266,6 +266,49 @@ test('the upload explains a request export, malformed JSON, or stale draft by th
   assert.match(h.get('DraftIssues').childNodes.map(row => row.textContent).join('\n'), /candidate:2 — Missing the request key or revision/);
 });
 
+test('a replacement uses the saved review revision and leaves the description ready for approval', async () => {
+  const h = setup({descriptionRequests: [1]});
+  await settle();
+  const previousDescription = 'The party celebrated two years.';
+  const description = 'The party celebrates two years.';
+  await h.importDescriptions(JSON.stringify([{key: 'candidate:1', expectedRevision: 'r1', description: previousDescription}]));
+  const replacement = JSON.stringify({drafts: [{key: 'candidate:1', expectedRevision: 'r1', description,
+    replaceDraft: {targetSheet: 'Archive 2025', targetEventId: 'EV-1', previousDescription}}]});
+  await h.importDescriptions(replacement);
+  assert.match(h.get('DraftStatus').textContent, /1 imported/);
+  assert.equal(h.requests.at(-1).action, 'admin.backfill.draftbatch');
+  assert.equal(h.requests.at(-1).body.drafts[0].expectedRevision, 'with-draft');
+  await h.get('ReviewDrafts').emit('click');
+  const input = h.find(n => n.tag === 'textarea')[0];
+  assert.equal(input.value, description);
+  assert.equal(input.readOnly, true);
+  assert.equal(h.get('Save').disabled, true);
+  await h.importDescriptions(replacement);
+  assert.match(h.get('DraftStatus').textContent, /1 already ready for review/);
+  assert.equal(h.requests.length, 3);
+});
+
+test('a replacement preserves a different saved draft or archive match and can fill an empty request', async () => {
+  const h = setup({count: 3, descriptionRequests: [1, 2, 3]});
+  await settle();
+  const previousDescription = 'The party brought people together.';
+  await h.importDescriptions(JSON.stringify([
+    {key: 'candidate:1', expectedRevision: 'r1', description: 'An edited draft.'},
+    {key: 'candidate:2', expectedRevision: 'r1', description: previousDescription}
+  ]));
+  await h.importDescriptions(JSON.stringify([1, 2, 3].map((i) => ({key: 'candidate:' + i,
+    expectedRevision: 'older-revision', description: 'The party brings people together.',
+    replaceDraft: {targetSheet: 'Archive 2025', targetEventId: i === 2 ? 'EV-4' : 'EV-' + i, previousDescription}}))));
+  assert.match(h.get('DraftStatus').textContent, /1 imported.*2 could not be imported/);
+  const issues = h.get('DraftIssues').childNodes.map(row => row.textContent).join('\n');
+  assert.match(issues, /Proposed event 1 — A different draft is already saved/);
+  assert.match(issues, /Proposed event 2 — The confirmed description request or its archive match changed/);
+  const drafts = h.requests.at(-1).body.drafts;
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].key, 'candidate:3');
+  assert.equal(drafts[0].expectedRevision, 'r1');
+});
+
 test('importing a draft alongside a queued flyer retains the flyer and requires explicit description approval', async () => {
   const h = setup({descriptionRequests: [1]});
   await settle();
