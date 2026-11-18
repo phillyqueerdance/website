@@ -1,8 +1,8 @@
 /**
- * Queer Dance Philly — Archive Updates v7.4.22
+ * Queer Dance Philly — Archive Updates v7.4.23
  * ArchiveReview.gs: Archive ID review, Admin Archive Updates, saved rejects,
  * approvals, resumable jobs, and artist-indicator recalculation.
- * Replace ArchiveReview.gs, Core.gs, and PublicData.gs together for this update.
+ * Replace ArchiveReview.gs for inline archive editing; keep Core.gs and PublicData.gs v7.4.22.
  * Use the supplied PublicData.gs to publish every Archive YYYY tab.
  * Keep Imports.gs, scraper.gs, the manifest, services, properties, deployment
  * URL, spreadsheet data, and existing refresh triggers.
@@ -28,7 +28,7 @@ const QDP_ARCHIVE_ADMIN_ = Object.freeze({
 let QDP_ARCHIVE_REQUEST_ = null;
 function qdpArchiveRequest_(ss) {
   if (!QDP_ARCHIVE_REQUEST_ || (QDP_ARCHIVE_REQUEST_.ss !== ss && QDP_ARCHIVE_REQUEST_.spreadsheetId !== ss.getId())) {
-    QDP_ARCHIVE_REQUEST_ = { ss, spreadsheetId: ss.getId(), sheets: new Map(), queue: null, lookups: null, references: null, rejects: null };
+    QDP_ARCHIVE_REQUEST_ = { ss, spreadsheetId: ss.getId(), sheets: new Map(), queue: null, lookups: null, references: null, rejects: null, sources: new Map() };
   }
   return QDP_ARCHIVE_REQUEST_;
 }
@@ -272,12 +272,12 @@ function qdpArchiveSpreadsheet_() {
 
 
 
-function qdpArchiveLayout_(sheet) {
+function qdpArchiveLayout_(sheet, suppliedHeaders) {
   if (!sheet) throw new Error('An archive sheet is missing.');
   const name = sheet.getName();
   if (!sheet.getLastRow()) throw new Error(name + ' is empty.');
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn())
-    .getValues()[0].map(value => String(value || '').trim());
+  const headers = (suppliedHeaders || sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0])
+    .map(value => String(value || '').trim());
   const wanted = {
     status: 'Status', eventId: 'EventID', title: 'Title (internal)',
     start: 'StartDate', venue: 'VenueID',
@@ -655,6 +655,10 @@ function qdpArchiveWriteCells_(ss, cells, extraRequests = []) {
     if (cell.sheet.getSheetId() === cached.sheet.getSheetId() && cell.row >= 2 && cached.rows[cell.row - 2]) {
       cached.rows[cell.row - 2][cell.column - 1] = cell.value;
     }
+  }
+  for (const cell of cells) {
+    const source = qdpArchiveRequest_(ss).sources.get(cell.sheet.getName());
+    if (source?.rows[cell.row - 1]) source.rows[cell.row - 1][cell.column - 1] = cell.value;
   }
 }
 
@@ -1310,7 +1314,6 @@ function qdpArchiveAdminPage_(body) {
   const requestedOffset = Math.max(0, Math.floor(Number(body.offset) || 0));
   const offset = Math.min(requestedOffset, Math.max(0, Math.floor((all.length - 1) / QDP_ARCHIVE_ADMIN_.pageSize) * QDP_ARCHIVE_ADMIN_.pageSize));
   const events = all.slice(offset, offset + QDP_ARCHIVE_ADMIN_.pageSize);
-  const sources = new Map();
   events.forEach(event => {
     // Hash only the proposals on this page; totals and filtering need no
     // per-row cryptographic work across the rest of the review.
@@ -1318,22 +1321,15 @@ function qdpArchiveAdminPage_(body) {
       field: String(row[6]), kind: qdpArchiveAdminKind_(row[6]), currentIds: qdpArchiveIds_(row[7]),
       proposedIds: qdpArchiveIds_(row[8]), decision: String(row[0]), result: String(row[1]),
       matched: String(row[9]), evidence: String(row[10]), state: qdpArchiveAdminRowState_(row)}));
-    if (!sources.has(event.sheet)) {
-      const sheet = ss.getSheetByName(event.sheet);
-      const rows = sheet ? sheet.getDataRange().getValues() : [];
-      const headers = rows[0] || [], idColumn = headers.findIndex(h => ['EventID', 'Event ID'].includes(String(h).trim()));
-      const byId = new Map();
-      rows.slice(1).forEach(row => {const id = String(row[idColumn] || '').trim();
-        if (!byId.has(id)) byId.set(id, []); byId.get(id).push(row);
-      });
-      sources.set(event.sheet, {headers, byId});
-    }
-    const {headers, byId} = sources.get(event.sheet);
+    const source = qdpArchiveAdminSource_(ss, event.sheet);
+    const {headers, byId} = source;
     const column = names => headers.findIndex(h => names.includes(String(h).trim()));
-    event.editUrl = '/admin/event.html?eventId=' + encodeURIComponent(event.eventId) + '&sheet=' + encodeURIComponent(event.sheet);
     const matches = byId.get(event.eventId) || [];
     if (matches.length !== 1) { event.sourceIssue = 'Event missing or duplicated; scan again after correcting the source.'; return; }
-    const row = matches[0];
+    const target = qdpArchiveAdminCachedTarget_(ss, event.sheet, event.eventId);
+    event.record = qdpArchiveAdminEventRecord_(target);
+    event.title = event.record.title;
+    const row = target.row;
     event.description = String(row[column(['Description'])] == null ? '' : row[column(['Description'])]);
     event.date = qdpArchiveAdminDate_(row[column(['StartDate', 'Start Date'])]);
     const flyer = row[column(['FlyerURL', 'Flyer URL', 'Flyer_URL'])] ||
@@ -1343,7 +1339,7 @@ function qdpArchiveAdminPage_(body) {
   });
   const unsavedRejectCount = queue.rows.filter(row => row[0] === 'Reject' && row[1] !== 'Rejected (saved)' && qdpArchiveRejectedValues_(row).length).length;
   const payload = { summary, ...progress, unsavedRejectCount, separatePublish: typeof qdpPublicPublishSaved_ === 'function',
-    events, totalEvents: all.length, offset, pageSize: QDP_ARCHIVE_ADMIN_.pageSize };
+    inlineEventEdits: true, events, totalEvents: all.length, offset, pageSize: QDP_ARCHIVE_ADMIN_.pageSize };
   if (body.references) payload.references = qdpArchiveAdminReferences_();
   if (body.includeRejects) Object.assign(payload, qdpArchiveAdminRejects_(body));
   return payload;
@@ -1351,6 +1347,42 @@ function qdpArchiveAdminPage_(body) {
 
 /* The individual event editor resolves the source by sheet and EventID on
  * every read/save. Historical records stay in their original archive tab. */
+function qdpArchiveAdminEventKey_(sheet, id) { return JSON.stringify([String(sheet), String(id)]); }
+
+function qdpArchiveAdminEventRevision_(target) {
+  // Formula expressions are protected; volatile calculated values need not
+  // make an otherwise unchanged event appear to be an external edit.
+  const values = target.row.map((value, i) => target.formulas[i] ? null : value);
+  return qdpArchiveDigest_(JSON.stringify([target.layout.name, target.eventId, target.layout.headers, values, target.formulas]));
+}
+
+function qdpArchiveAdminSource_(ss, name) {
+  const reads = qdpArchiveRequest_(ss);
+  if (reads.sources.has(name)) return reads.sources.get(name);
+  const sheet = ss.getSheetByName(name);
+  if (!sheet) throw new Error('This event source is no longer available. Refresh Archive Updates.');
+  const range = sheet.getDataRange(), rows = range.getValues();
+  const layout = qdpArchiveLayout_(sheet, rows[0]), byId = new Map();
+  rows.slice(1).forEach((row, i) => {
+    const id = String(row[layout.columns.eventId - 1] || '').trim();
+    if (!byId.has(id)) byId.set(id, []);
+    byId.get(id).push({row, number: i + 2});
+  });
+  const source = {sheet, layout, rows, headers: layout.headers, byId, formulas: null, range};
+  reads.sources.set(name, source);
+  return source;
+}
+
+function qdpArchiveAdminCachedTarget_(ss, name, id) {
+  const source = qdpArchiveAdminSource_(ss, name), matches = source.byId.get(id) || [];
+  if (matches.length !== 1) throw new Error(matches.length ? 'This event is duplicated in its source tab. Correct the duplicate before editing.' : 'This event is no longer in its source tab. Refresh Archive Updates.');
+  source.formulas ||= source.range.getFormulas();
+  const target = {ss, sheet: source.sheet, layout: source.layout, row: matches[0].row.slice(), number: matches[0].number,
+    eventId: id, formulas: source.formulas[matches[0].number - 1].slice()};
+  target.revision = qdpArchiveAdminEventRevision_(target);
+  return target;
+}
+
 function qdpArchiveAdminEventTarget_(body) {
   const ss = qdpArchiveSpreadsheet_();
   const name = String(body.sheet || '').trim(), id = String(body.eventId || '').trim();
@@ -1365,7 +1397,7 @@ function qdpArchiveAdminEventTarget_(body) {
     'This event is no longer in its source tab. Refresh Archive Updates.');
   const target = { ss, sheet, layout, ...matches[0], eventId: id };
   target.formulas = sheet.getRange(target.number, 1, 1, layout.width).getFormulas()[0];
-  target.revision = qdpArchiveDigest_(JSON.stringify([name, id, layout.headers, target.row, target.formulas]));
+  target.revision = qdpArchiveAdminEventRevision_(target);
   return target;
 }
 
@@ -1427,12 +1459,12 @@ function qdpArchiveAdminReadEvent_(body) {
   return { event: qdpArchiveAdminEventRecord_(target), references: qdpArchiveAdminReferences_() };
 }
 
-function qdpArchiveAdminSaveEvent_(body) {
-  qdpArchiveAdminReady_();
-  if (typeof Sheets === 'undefined') throw new Error('Enable Google Sheets API under Apps Script Services before saving.');
+function qdpArchiveAdminCheckEventSave_() {
   const sync = typeof qdpAdminReadSyncJob_ === 'function' ? qdpAdminReadSyncJob_() : null;
   if (sync && ['queued', 'running'].includes(sync.state)) throw new Error('A Calendar sync is running. Keep your edits here and save when it finishes.');
-  const target = qdpArchiveAdminEventTarget_(body);
+}
+
+function qdpArchiveAdminPrepareEvent_(body, target) {
   if (body.expectedRevision !== target.revision) throw new Error('This event changed since you opened it. Your edits were not saved. Reload the event and review the changes.');
   if (!body.fields || typeof body.fields !== 'object' || Array.isArray(body.fields)) throw new Error('Choose event fields to save.');
   const fields = qdpArchiveAdminEventFields_(target), byKey = new Map(fields.map(field => [field.key, field]));
@@ -1496,19 +1528,107 @@ function qdpArchiveAdminSaveEvent_(body) {
     const to = updates.has(end.column) ? row[end.column - 1] : end.value;
     if (from && to && to < from) throw new Error('The end date cannot precede the start date.');
   }
-  if (updates.size) {
-    if (target.layout.name === CONFIG.SHEET_EVENTS) set(column(['LastEditedAt', 'Last Edited At']), new Date().toISOString());
+  if (updates.size && target.layout.name === CONFIG.SHEET_EVENTS) set(column(['LastEditedAt', 'Last Edited At']), new Date().toISOString());
+  return {target, row, updates};
+}
+
+function qdpArchiveAdminSaveEvent_(body) {
+  qdpArchiveAdminReady_();
+  if (typeof Sheets === 'undefined') throw new Error('Enable Google Sheets API under Apps Script Services before saving.');
+  qdpArchiveAdminCheckEventSave_();
+  const target = qdpArchiveAdminEventTarget_(body), plan = qdpArchiveAdminPrepareEvent_(body, target);
+  if (plan.updates.size) {
     const latest = qdpArchiveAdminEventTarget_(body);
     if (latest.revision !== target.revision) throw new Error('This event changed while saving. Nothing was written; your edits have been kept.');
     qdpArchiveAdminMarkDirty_();
-    qdpArchiveWriteCells_(target.ss, [...updates].map(([column, value]) => ({sheet: target.sheet, row: latest.number, column, value})));
+    qdpArchiveWriteCells_(target.ss, [...plan.updates].map(([column, value]) => ({sheet: target.sheet, row: latest.number, column, value})));
   }
-  return { event: qdpArchiveAdminEventRecord_(qdpArchiveAdminEventTarget_(body)), needsPublish: !!updates.size };
+  const saved = {...target, row: plan.row}; saved.revision = qdpArchiveAdminEventRevision_(saved);
+  return {event: qdpArchiveAdminEventRecord_(saved), needsPublish: !!plan.updates.size};
 }
 
-function qdpArchiveAdminDecide_(body) {
+function qdpArchiveAdminPrepareInline_(ss, edits, decisions, queue) {
+  const cells = [], plans = [], savedEventKeys = [], seen = new Set();
+  if (!edits.length) return {cells, plans, savedEventKeys, editedEvents: 0, inlineApplied: 0};
+  qdpArchiveAdminCheckEventSave_();
+  const allowed = new Set(qdpArchiveSheets_(ss, true)), lookups = qdpArchiveLookups_(ss);
+  const overrides = new Map(decisions.map(item => [item.number, item]));
+  let inlineApplied = 0;
+  for (const edit of edits) {
+    const name = String(edit.sheet || '').trim(), id = String(edit.eventId || '').trim();
+    const key = qdpArchiveAdminEventKey_(name, id);
+    if (!allowed.has(name) || !id || id.length > 200 || seen.has(key)) throw new Error('Choose each recorded event only once when saving. Nothing was saved.');
+    seen.add(key);
+    const target = qdpArchiveAdminCachedTarget_(ss, name, id);
+    const manual = qdpArchiveAdminPrepareEvent_(edit, target), merged = {...edit.fields}, approved = [];
+    queue.rows.forEach((row, i) => {
+      if (String(row[2]) !== name || String(row[4]) !== id) return;
+      const override = overrides.get(i + 2), decision = override?.decision || row[0];
+      if (decision !== 'Approve' || !['pending', 'approved'].includes(qdpArchiveAdminRowState_(row))) return;
+      const field = ({VenueID: ['venue', true], PartyID: ['party', true], 'ExplicitQueer (Yes/No)': ['explicit', true],
+        'ArtistIDs (comma-separated)': ['artists', false], 'HostCollectiveIDs (comma-separated)': ['collectives', false]})[row[6]];
+      if (!field || String(row[13]) !== lookups.signature || qdpArchiveSignature_(target.row, target.layout.columns) !== String(row[11])) {
+        throw new Error(id + ': an approved suggestion changed. Start a fresh scan or clear that approval before saving event edits. Nothing was saved.');
+      }
+      const [kind, single] = field, column = target.layout.columns[kind], fieldKey = target.layout.headers[column - 1];
+      const proposed = qdpArchiveIds_(override ? override.proposed : row[8]), old = qdpArchiveIds_(row[7]);
+      if (String(target.row[column - 1] || '').trim() !== String(row[7] || '').trim() || !proposed.length ||
+        (single && proposed.length !== 1) || (!single && old.some(value => !proposed.includes(value))) ||
+        (kind === 'explicit' ? proposed[0] !== 'Yes' : proposed.some(value => !lookups[kind].ids.has(value)))) {
+        throw new Error(id + ': an approved association is stale or invalid. Clear that approval before saving event edits. Nothing was saved.');
+      }
+      if (single) {
+        if (manual.updates.has(column) && String(manual.row[column - 1] || '').trim() !== proposed[0]) {
+          throw new Error(id + ': the edited ' + row[6] + ' conflicts with a checked revision. Choose one value before saving. Nothing was saved.');
+        }
+        merged[fieldKey] = proposed[0];
+      } else {
+        merged[fieldKey] = [...new Set([...qdpArchiveIds_(manual.row[column - 1]), ...proposed.filter(value => !old.includes(value))])].join(', ');
+      }
+      approved.push({row, number: i + 2, kind});
+    });
+    const plan = qdpArchiveAdminPrepareEvent_({...edit, fields: merged}, target);
+    if (approved.some(item => item.kind === 'explicit') && !qdpArchiveExplicitBasis_(plan.row, target.layout.columns, lookups, [], [])) {
+      throw new Error(id + ': the edited event no longer supports the checked queer classification. Clear that revision or edit the classification directly. Nothing was saved.');
+    }
+    plans.push(plan); savedEventKeys.push(key);
+    for (const [column, value] of plan.updates) cells.push({sheet: target.sheet, row: target.number, column, value});
+    const applied = new Set(approved.map(item => item.number));
+    inlineApplied += approved.length;
+    for (const item of approved) cells.push({sheet: queue.sheet, row: item.number, column: 2, value: 'Applied'});
+    if (plan.updates.size) queue.rows.forEach((row, i) => {
+      const override = overrides.get(i + 2);
+      if (String(row[2]) === name && String(row[4]) === id && plan.updates.has(target.layout.columns.title)) {
+        cells.push({sheet: queue.sheet, row: i + 2, column: 6, value: plan.row[target.layout.columns.title - 1]});
+      }
+      if (String(row[2]) === name && String(row[4]) === id && !applied.has(i + 2) &&
+          (override?.decision || row[0]) !== 'Reject' && !['applied', 'rejected'].includes(qdpArchiveAdminRowState_(row))) {
+        cells.push({sheet: queue.sheet, row: i + 2, column: 2, value: 'Event edited; scan again'});
+      }
+    });
+  }
+  // Recheck all affected rows together before the single decision/event commit.
+  const spans = new Map();
+  for (const {target, updates} of plans) if (updates.size) {
+    const span = spans.get(target.layout.name) || {sheet: target.sheet, width: target.layout.width, first: target.number, last: target.number};
+    span.first = Math.min(span.first, target.number); span.last = Math.max(span.last, target.number); spans.set(target.layout.name, span);
+  }
+  for (const span of spans.values()) {
+    const range = span.sheet.getRange(span.first, 1, span.last - span.first + 1, span.width);
+    span.rows = range.getValues(); span.formulas = range.getFormulas();
+  }
+  for (const {target, updates} of plans) if (updates.size) {
+    const span = spans.get(target.layout.name), index = target.number - span.first;
+    if (qdpArchiveAdminEventRevision_({...target, row: span.rows[index], formulas: span.formulas[index]}) !== target.revision) {
+      throw new Error(target.eventId + ': this event changed while saving. Nothing was written; keep your edits and refresh.');
+    }
+  }
+  return {cells, plans, savedEventKeys, editedEvents: plans.filter(plan => plan.updates.size).length, inlineApplied};
+}
+
+function qdpArchiveAdminDecide_(body, eventEdits = []) {
   qdpArchiveAdminReady_();
-  if (!Array.isArray(body.changes) || !body.changes.length || body.changes.length > 5000) {
+  if (!Array.isArray(body.changes) || (!body.changes.length && !eventEdits.length) || body.changes.length > 5000) {
     throw new Error('Save between one and 5,000 suggestions at a time.');
   }
   const ss = qdpArchiveSpreadsheet_(), queue = qdpArchiveAdminQueue_(ss);
@@ -1565,6 +1685,9 @@ function qdpArchiveAdminDecide_(body) {
     { sheet: queue.sheet, row: item.number, column: 9, value: item.proposed }
   ]);
   for (const item of rejected) cells.push({sheet: queue.sheet, row: item.number, column: 2, value: 'Rejected (saved)'});
+  const inline = qdpArchiveAdminPrepareInline_(ss, eventEdits, validated, queue);
+  cells.push(...inline.cells);
+  if (inline.editedEvents) qdpArchiveAdminMarkDirty_();
   if (typeof Sheets !== 'undefined') {
     // One atomic commit includes both review decisions and the rejection
     // ledger. Never reread SpreadsheetApp after an API write to infer success.
@@ -1581,7 +1704,8 @@ function qdpArchiveAdminDecide_(body) {
     output.forEach(row => saved.rows.push(row));
     saved.keys = keys;
   }
-  return { saved: validated.length, savedKeys: validated.map(item => qdpArchiveAdminKey_(item.row)) };
+  return { saved: validated.length, savedKeys: validated.map(item => qdpArchiveAdminKey_(item.row)),
+    savedEventKeys: inline.savedEventKeys, editedEvents: inline.editedEvents, inlineApplied: inline.inlineApplied };
 }
 
 function qdpArchiveAdminBegin_(phase) {
@@ -1646,6 +1770,10 @@ function qdpAdminArchive_(body) {
       }
       const changes = Array.isArray(body.changes) ? body.changes.slice() : body.changes || [];
       if (!Array.isArray(changes) || changes.length > 5000) throw new Error('Save up to 5,000 suggestions at a time.');
+      const eventEdits = body.eventEdits == null ? [] : body.eventEdits;
+      if (!Array.isArray(eventEdits) || eventEdits.length > 200 || eventEdits.some(edit => !edit || typeof edit !== 'object' || Array.isArray(edit))) {
+        throw new Error('Save up to 200 edited events at a time.');
+      }
       const queue = qdpArchiveAdminQueue_(ss), submitted = new Set(changes.map(change => change.key));
       // Repair valid Reject decisions left by older saves that did not finish
       // writing their permanent rejection record.
@@ -1658,12 +1786,12 @@ function qdpAdminArchive_(body) {
       const cancelled = new Set(changes.filter(change => change.decision !== 'Approve').map(change => change.key));
       const applying = changes.some(change => change.decision === 'Approve') ||
         queue.rows.some(row => qdpArchiveAdminRowState_(row) === 'approved' && !cancelled.has(qdpArchiveAdminKey_(row)));
-      if (!changes.length && !applying) throw new Error('Check at least one proposed change before saving.');
+      if (!changes.length && !applying && !eventEdits.length) throw new Error('Edit an event or check at least one proposed change before saving.');
       // Ensure background work can be scheduled before writing decisions.
       if (applying) qdpArchiveAdminEnsureTrigger_();
       let saved;
       try {
-        saved = changes.length ? qdpArchiveAdminDecide_({...body, changes}) : { saved: 0, savedKeys: [] };
+        saved = changes.length || eventEdits.length ? qdpArchiveAdminDecide_({...body, changes}, eventEdits) : { saved: 0, savedKeys: [], savedEventKeys: [] };
       } catch (error) {
         if (applying) qdpArchiveAdminStopTriggers_();
         throw error;
@@ -1674,7 +1802,7 @@ function qdpAdminArchive_(body) {
           // Apply the first batch now, reusing the reads from the decision
           // save. Larger selections continue without publishing anything.
           const result = qdpArchiveApplyApprovals_();
-          job.applied = result.applied;
+          job.applied = (saved.inlineApplied || 0) + result.applied;
           if (!result.remaining) { job.phase = 'saved'; job.finishedAt = new Date().toISOString(); qdpArchiveAdminStopTriggers_(); }
           qdpArchiveAdminWrite_(QDP_ARCHIVE_ADMIN_.jobKey, job);
         } catch (error) { qdpArchiveAdminFail_(job, error); }

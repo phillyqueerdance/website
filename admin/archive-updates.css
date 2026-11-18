@@ -23,7 +23,22 @@
 .archive-no-flyer { display: grid; place-items: center; min-height: 135px; padding: 12px; border: 1px dashed var(--border); color: var(--muted); text-align: center; font-size: .8rem; }
 .archive-event h3 { margin: 4px 0 8px; font-size: 1.12rem; overflow-wrap: anywhere; }
 .archive-event h3 a { color: var(--text); }
-.archive-edit-event { display: inline-block; margin-top: 6px; color: var(--yellow); text-decoration: underline; font-size: .86rem; }
+.archive-inline-editor { min-width: 0; margin: 18px 0; padding: 14px; border: 1px solid var(--border); border-radius: 10px; }
+.archive-inline-editor > legend { padding: 0 6px; font-size: .88rem; font-weight: 700; }
+.archive-inline-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.archive-inline-core { grid-template-columns: minmax(0, 1fr); }
+.archive-inline-field { min-width: 0; }
+.archive-inline-wide { grid-column: 1 / -1; }
+.archive-inline-field textarea { min-height: 170px; line-height: 1.5; resize: vertical; }
+.archive-inline-more { margin-top: 14px; }
+.archive-inline-more > summary, .archive-id-picker summary { color: var(--yellow); cursor: pointer; font-size: .86rem; overflow-wrap: anywhere; }
+.archive-inline-more > .archive-inline-grid { margin-top: 16px; }
+.archive-id-picker { min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.archive-id-picker input[type="search"] { width: 100%; margin-top: 10px; }
+.archive-id-options { max-height: 230px; overflow-y: auto; margin-top: 8px; }
+.archive-id-option { display: flex; align-items: center; gap: 8px; padding: 7px 2px; font-size: .86rem; overflow-wrap: anywhere; }
+.archive-id-option input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--pink); }
+.archive-original-description { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 .archive-event-description { margin: 16px 0; }
 .archive-event-description h4 { margin: 0 0 8px; font-size: .86rem; }
 .archive-event-description p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.55; }
@@ -57,6 +72,8 @@
   .archive-flyer { width: 66px; }
   .archive-no-flyer { min-height: 88px; padding: 6px; font-size: .7rem; }
   .archive-proposal { margin-left: -78px; }
+  .archive-inline-editor { margin-left: -78px; }
+  .archive-inline-grid { grid-template-columns: minmax(0, 1fr); }
   .archive-count { flex: 1 0 85px; padding: 8px 10px; }
   .archive-proposal-header { align-items: center; }
   .archive-scan-fields .field { min-width: 0; }

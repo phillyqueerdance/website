@@ -8,9 +8,9 @@
   <title>Archive Updates | QDP Admin</title>
   <link rel="icon" type="image/png" href="/admin/favicon.png">
   <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
-  <link rel="stylesheet" href="/admin/archive-updates.css?v=20261117-editor">
+  <link rel="stylesheet" href="/admin/archive-updates.css?v=20261117-inline-events">
   <script src="/admin/profile-editor.js?v=20261117-integrity" defer></script>
-  <script src="/admin/archive-updates.js?v=20261117-batch-save-speed" defer></script>
+  <script src="/admin/archive-updates.js?v=20261117-inline-events" defer></script>
 </head>
 <body>
   <header class="admin-header">
@@ -59,10 +59,10 @@
       <div class="archive-bulk archive-actions">
         <label class="archive-check"><input id="archiveSelectPage" type="checkbox"> Check this page</label>
         <button id="archiveSave" class="save-button" type="button" disabled>Save all changes</button>
-        <button id="archiveClear" class="quiet-button" type="button" disabled>Clear unsaved choices</button>
+        <button id="archiveClear" class="quiet-button" type="button" disabled>Clear unsaved changes</button>
       </div>
       <p id="archiveDraftCount" class="dashboard-note" role="status">Check the revisions you approve. Unchecked suggestions stay pending.</p>
-      <p class="field-help">Selections carry across result pages and filters. Nothing is written until you save. Save before leaving this page. Where several venues or parties are proposed, choose one.</p>
+      <p class="field-help">Edit events here or check proposed revisions. All edits carry across result pages and filters until you save. Checked additions are combined with event edits. Where several venues or parties are proposed, choose one.</p>
       <p id="archiveEmpty" class="dashboard-note" hidden></p>
       <div id="archiveEvents" class="archive-events" aria-busy="false"></div>
       <div class="archive-pagination"><button id="archivePrevious" class="quiet-button" type="button" disabled>Previous</button>
@@ -71,7 +71,7 @@
 
     <section class="dashboard-panel archive-publish" aria-labelledby="publishHeading">
       <div><h2 id="publishHeading">Save changes</h2>
-        <p id="archivePublishNote" class="dashboard-note">Save approved revisions and rejections to the sheet. Use Publish saved changes separately to update the website.</p></div>
+        <p id="archivePublishNote" class="dashboard-note">Save event edits, approved revisions, and rejections to the sheet. Use Publish saved changes separately to update the website.</p></div>
       <div class="archive-actions"><button id="archiveApply" class="save-button" type="button" disabled>Save all changes</button>
         <button id="archivePublish" class="quiet-button" type="button" disabled>Publish saved changes</button></div>
     </section>

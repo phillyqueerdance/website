@@ -298,22 +298,129 @@ test('scan progress avoids rereading the growing review or rebuilding results, a
   h.finish();
   const before = h.digestCount, page = h.call('bootstrap');
   assert.equal(page.totalEvents, 2360);
-  assert.equal(h.digestCount - before, page.events.flatMap(e => e.proposals).length * 2);
+  assert.equal(h.digestCount - before, page.events.flatMap(e => e.proposals).length * 2 + page.events.length);
 });
 
-test('event edit links open Admin using stable EventID and source tab after records move', () => {
+test('inline event records use stable EventID and source tab after records move', () => {
   const h = setup({events: [event('ONE', 'New Artist'), event('TWO', 'No match')]});
   h.call('scan');
   const sheet = h.sheets.get('Events_Archive');
   [sheet.rows[1], sheet.rows[2]] = [sheet.rows[2], sheet.rows[1]];
-  assert.equal(h.call('bootstrap').events[0].editUrl,
-    '/admin/event.html?eventId=ONE&sheet=Events_Archive');
+  const result = h.call('bootstrap').events[0].record;
+  assert.equal(result.eventId, 'ONE'); assert.equal(result.sheet, 'Events_Archive');
+  assert.equal(result.fields.find(field => field.label === 'Description').value, 'New Artist');
 });
 
 test('review results include the full original description without truncating or stripping line breaks', () => {
   const description = 'New Artist\n\n' + 'Full recorded event copy. '.repeat(90) + '\nLast line of the event.';
   const h = setup({events: [event('ONE', description)]});
   assert.equal(h.call('scan').events[0].description, description);
+});
+
+test('one atomic save combines description edits, missed IDs, checked additions, and permanent rejections', () => {
+  const h = setup({staleReads: true}), page = h.call('scan'), record = page.events[0].record;
+  const result = h.call('save', {changes: h.proposals(page).map(p => ({key: p.key, revision: p.revision,
+    decision: p.kind === 'artist' ? 'Approve' : 'Reject', proposedIds: p.proposedIds})),
+    eventEdits: [{sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision,
+      fields: {Description: 'Cleaned description\n\nComplete final line.', 'ArtistIDs (comma-separated)': 'OLD', PartyID: 'NIGHT'}}]});
+  assert.equal(h.batchRequests.length, 1);
+  const row = h.sheets.get('Events_Archive').rows[1];
+  assert.equal(row[eventHeaders.indexOf('Description')], 'Cleaned description\n\nComplete final line.');
+  assert.equal(row[eventHeaders.indexOf('ArtistIDs (comma-separated)')], 'OLD, NEW');
+  assert.equal(row[eventHeaders.indexOf('PartyID')], 'NIGHT');
+  assert.equal(row[eventHeaders.indexOf('QueerArtistIndicator')], 'Yes');
+  assert.equal(result.summary.applied, 1); assert.equal(result.summary.rejected, 1);
+  assert.equal(result.editedEvents, 1); assert.equal(result.savedEventKeys.length, 1);
+  assert.equal(result.events[0].record.fields.find(field => field.label === 'Description').value, 'Cleaned description\n\nComplete final line.');
+  assert.equal(result.job.phase, 'saved'); assert.equal(result.needsPublish, true);
+  assert.equal(h.call('rejects').rejectedTotal, 1); assert.deepEqual(h.publishes, []);
+});
+
+test('event edits alone save across multiple source tabs, including missed associations and old ID removal', () => {
+  const h = setup({events: [event('ONE', 'New Artist', {'ArtistIDs (comma-separated)': 'UNRESOLVED'})],
+    active: [event('TWO', 'New Artist')]});
+  const page = h.call('scan', {includeActive: true});
+  const edits = page.events.map(({record}) => ({sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision,
+    fields: {Description: 'Cleaned ' + record.eventId, 'ArtistIDs (comma-separated)': 'OLD'}}));
+  const saved = h.call('save', {changes: [], eventEdits: edits});
+  assert.equal(h.batchRequests.length, 1); assert.equal(saved.editedEvents, 2);
+  assert.equal(saved.summary.blocked, 2); assert.equal(saved.summary.applied, 0);
+  assert.ok(saved.events.every(event => event.record.fields.find(field => field.label === 'Description').value.startsWith('Cleaned')));
+  assert.ok(h.sheets.get('Events').rows[1][eventHeaders.indexOf('LastEditedAt')]);
+  assert.equal(h.sheets.get('Events_Archive').rows[1][eventHeaders.indexOf('ArtistIDs (comma-separated)')], 'OLD');
+  assert.deepEqual(h.publishes, []);
+});
+
+test('one stale edited event blocks the whole mixed batch before writing any event or reject decision', () => {
+  const h = setup({events: [event('ONE', 'New Artist'), event('TWO', 'New Artist')]}), page = h.call('scan');
+  const edits = page.events.map(({record}) => ({sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision,
+    fields: {Description: 'My edit'}}));
+  h.sheets.get('Events_Archive').rows[2][eventHeaders.indexOf('Description')] = 'Someone else changed this';
+  const first = h.proposals(page)[0];
+  assert.throws(() => h.call('save', {changes: [{key: first.key, revision: first.revision, decision: 'Reject'}], eventEdits: edits}), /changed since/);
+  assert.equal(h.batchRequests.length, 0); assert.equal(h.call('rejects').rejectedTotal, 0);
+  assert.equal(h.sheets.get('Events_Archive').rows[1][eventHeaders.indexOf('Description')], 'New Artist');
+});
+
+test('a manual venue conflicting with a checked venue revision is rejected without writes', () => {
+  const h = setup({events: [event('ONE', 'The Room')]}), page = h.call('scan'), record = page.events[0].record;
+  const venue = h.proposals(page).find(p => p.kind === 'venue');
+  assert.throws(() => h.call('save', {changes: [{key: venue.key, revision: venue.revision, decision: 'Approve', proposedIds: ['ROOM']}],
+    eventEdits: [{sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision, fields: {VenueID: 'OTHER'}}]}), /conflicts with a checked revision/);
+  assert.equal(h.batchRequests.length, 0);
+});
+
+test('inline saves protect formula and identity columns and reject newly invented IDs', () => {
+  for (const fields of [{EventID: 'CHANGED'}, {'Title_Public (auto w/ emojis)': 'Override'}, {'ArtistIDs (comma-separated)': 'MADE-UP'}]) {
+    const h = setup(), sheet = h.sheets.get('Events_Archive');
+    sheet.formulas = [[], []]; sheet.formulas[1][eventHeaders.indexOf('Title_Public (auto w/ emojis)')] = '=A1';
+    const record = h.call('scan').events[0].record;
+    assert.throws(() => h.call('save', {changes: [], eventEdits: [{sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision, fields}]}), /cannot be edited|Unknown artists/);
+    assert.equal(h.batchRequests.length, 0);
+  }
+});
+
+test('calculated value changes do not conflict with inline edits, while formula expression changes do', () => {
+  for (const expressionChanged of [false, true]) {
+    const h = setup(), sheet = h.sheets.get('Events_Archive'), column = eventHeaders.indexOf('Title_Public (auto w/ emojis)');
+    sheet.formulas = [[], []]; sheet.formulas[1][column] = '=A1';
+    const record = h.call('scan').events[0].record;
+    sheet.rows[1][column] = 'Recalculated title';
+    if (expressionChanged) sheet.formulas[1][column] = '=B1';
+    const save = () => h.call('save', {changes: [], eventEdits: [{sheet: record.sheet, eventId: record.eventId,
+      expectedRevision: record.revision, fields: {Description: 'Cleaned'}}]});
+    if (expressionChanged) { assert.throws(save, /changed since/); assert.equal(h.batchRequests.length, 0); }
+    else { assert.equal(save().editedEvents, 1); assert.equal(sheet.rows[1][column], 'Recalculated title'); }
+  }
+});
+
+test('a renamed inline event updates its result header and remaining suggestions require a new scan', () => {
+  const h = setup(), record = h.call('scan').events[0].record;
+  const result = h.call('save', {changes: [], eventEdits: [{sheet: record.sheet, eventId: record.eventId,
+    expectedRevision: record.revision, fields: {'Title (internal)': 'Clean title'}}]});
+  assert.equal(result.events[0].title, 'Clean title');
+  assert.ok(result.events[0].proposals.every(p => p.result === 'Event edited; scan again'));
+  const fresh = h.call('scan'); assert.equal(fresh.summary.blocked, 0);
+});
+
+test('an edited description can save alongside checked venue and dependent queer classification', () => {
+  const h = setup({events: [event('ONE', 'The Room')]}); h.sheets.get('Venues').rows[1][6] = 'Yes';
+  const page = h.call('scan'), record = page.events[0].record;
+  const result = h.call('save', {changes: h.proposals(page).map(p => ({key: p.key, revision: p.revision, decision: 'Approve', proposedIds: p.proposedIds})),
+    eventEdits: [{sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision, fields: {Description: 'Clean event details'}}]});
+  assert.equal(result.summary.applied, 2); assert.equal(h.batchRequests.length, 1);
+  assert.equal(h.sheets.get('Events_Archive').rows[1][eventHeaders.indexOf('ExplicitQueer (Yes/No)')], 'Yes');
+});
+
+test('bulk inline editing reads the source once and rechecks one span rather than fetching each event separately', () => {
+  const h = setup({events: Array.from({length: 40}, (_, i) => event('E-' + i, 'New Artist'))});
+  const first = h.call('scan'), second = h.call('bootstrap', {offset: 20});
+  const edits = [...first.events, ...second.events].map(({record}) => ({sheet: record.sheet, eventId: record.eventId,
+    expectedRevision: record.revision, fields: {Description: 'Clean ' + record.eventId}}));
+  h.reads.length = 0;
+  const result = h.call('save', {changes: [], eventEdits: edits});
+  assert.equal(result.editedEvents, 40); assert.equal(h.batchRequests.length, 1);
+  assert.equal(h.reads.filter(read => read.sheet === 'Events_Archive').length, 2);
 });
 
 test('Admin event editor saves a historical description to its original source without touching Events', () => {

@@ -9,7 +9,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const proposal = (key, kind = 'artist', added = ['NEW']) => ({key, revision: 'r-' + key, kind,
   currentIds: [], proposedIds: added, state: 'pending', result: 'Ready', matched: 'Recorded lineup', evidence: 'Name in event copy'});
 
-function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = false, jobPhase = 'ready', separatePublish = true} = {}) {
+function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = false, incompleteEvents = false, jobPhase = 'ready', separatePublish = true} = {}) {
   class Element {
     constructor(tag = 'div') { this.tag = tag; this.children = []; this.listeners = {}; this.value = ''; this.attributes = {}; this.dataset = {}; this.checked = false; this.disabled = false; this.textContent = ''; }
     append(...children) { for (const child of children) this.children.push(...(child.tag === 'fragment' ? child.children : [child])); }
@@ -26,13 +26,22 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
   const rejects = [];
   const events = pages.map((proposals, i) => ({eventId: 'EVENT-' + i, title: 'Night ' + i, sheet: 'Archive 2025',
     date: '2025-04-01', description: 'Full event description\n\n' + 'A complete event detail. '.repeat(40) + '\nFinal detail.', proposals}));
+  for (const event of events) event.record = {eventId: event.eventId, sheet: event.sheet, title: event.title, revision: 'event-r-' + event.eventId,
+    fields: [
+      ['Title', 'Title', 'text', event.title], ['Description', 'Description', 'long', event.description],
+      ['ArtistIDs', 'Artists', 'artist', ''], ['HostCollectiveIDs', 'Collectives', 'collective', ''],
+      ['VenueID', 'Venue', 'venue', ''], ['PartyID', 'Party', 'party', ''], ['Location', 'Location', 'text', 'Existing location'],
+      ['StartDate', 'Start date', 'date', '2025-04-01'], ['PublicTitle', 'Public title', 'text', 'Calculated title']
+    ].map(([key, label, type, value]) => ({key, label, type, value, maxLength: 50000,
+      readOnly: key === 'PublicTitle', manualLocation: key === 'Location'}))};
   const payload = data => {
     const offset = Math.max(0, Math.min(events.length - 1, data.offset || 0));
     const summary = {pending: 0, approved: 0, applied: 0, rejected: 0, blocked: 0};
     for (const event of events) for (const p of event.proposals) summary[p.state]++;
     return {ok: 'yes', events: [events[offset]], totalEvents: events.length, pageSize: 1, offset, summary,
       scan: {scanned: events.length, total: events.length, proposed: 4}, scanInProgress: jobPhase === 'scanning', job: {phase: jobPhase},
-      references: {artist: [{id: 'NEW', name: 'New Artist'}]}, needsPublish, separatePublish,
+      references: {artist: [{id: 'NEW', name: 'New Artist'}, {id: 'MISSED', name: 'Missed Artist'}], collective: [],
+        venue: [{id: 'ROOM', name: 'The Room'}], party: []}, needsPublish, separatePublish, inlineEventEdits: true,
       ...(data.includeRejects ? {rejectedTotal: rejects.length, rejectOffset: 0, rejects} : {})};
   };
   const context = vm.createContext({URL, Intl, Date, Map, Set, TextEncoder, Option: class extends Element {
@@ -56,7 +65,13 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
           if (change.proposedIds) p.proposedIds = change.proposedIds;
         }
         jobPhase = 'saved';
-        return {...payload(data), saved: data.changes.length, savedKeys: data.changes.map(change => change.key)};
+      for (const edit of data.eventEdits || []) {
+        const event = events.find(event => event.eventId === edit.eventId && event.sheet === edit.sheet);
+        for (const field of event.record.fields) if (edit.fields[field.key] !== undefined) field.value = edit.fields[field.key];
+        event.record.revision += '-saved'; needsPublish = true;
+      }
+      return {...payload(data), saved: data.changes.length, savedKeys: data.changes.map(change => change.key),
+        ...(!incompleteEvents ? {savedEventKeys: data.eventEdits.map(edit => JSON.stringify([edit.sheet, edit.eventId]))} : {}), editedEvents: data.eventEdits.length};
       }
       if (action === 'admin.archive.rejects') return {rejectedTotal: rejects.length, rejectOffset: 0, rejects};
       if (action === 'admin.archive.step' && data.progressOnly) {
@@ -74,7 +89,10 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
   const candidates = () => find('archiveEvents', child => child.className === 'archive-candidate').map(label => label.children[0]);
   const buttons = text => find('archiveEvents', child => child.tag === 'button' && child.textContent === text);
   const change = async (input, checked) => { input.checked = checked; await input.emit('change'); await settle(); };
-  return {elements, requests, context, settle, find, candidates, buttons, change, windowListeners, timers};
+  const field = (label, event = 'EVENT-0') => find('archiveEvents', child => child.attributes?.['aria-label'] === label + ' · ' + event)[0];
+  const fill = async (label, value, event) => { const input = field(label, event); input.value = value; await input.emit('input'); await settle(); };
+  const openDetails = async () => { const more = find('archiveEvents', child => child.className === 'archive-inline-more')[0]; more.open = true; await more.emit('toggle'); await settle(); };
+  return {elements, requests, context, settle, find, candidates, buttons, change, windowListeners, timers, field, fill, openDetails};
 }
 
 test('every proposed change starts unchecked, and checking or rejecting performs no write', async () => {
@@ -143,13 +161,10 @@ test('unchecked and cleared revisions never get sent, and check-page skips ambig
   assert.equal(h.requests.length, 1);
 });
 
-test('results display the full description and open the Admin event editor separately without losing choices', async () => {
+test('results show the complete description in an inline editor with no separate edit-page link', async () => {
   const h = setup(); await h.settle();
-  const link = h.find('archiveEvents', child => child.className === 'archive-edit-event')[0];
-  assert.equal(link.href, '/admin/event.html?eventId=EVENT-0&sheet=Archive%202025');
-  assert.equal(link.target, '_blank');
-  const description = h.find('archiveEvents', child => child.className === 'archive-event-description')[0];
-  assert.equal(description.children[1].textContent, 'Full event description\n\n' + 'A complete event detail. '.repeat(40) + '\nFinal detail.');
+  assert.equal(h.find('archiveEvents', child => child.className === 'archive-edit-event').length, 0);
+  assert.equal(h.field('Description').value, 'Full event description\n\n' + 'A complete event detail. '.repeat(40) + '\nFinal detail.');
   await h.change(h.candidates()[0], true);
   const event = {preventDefault() { this.prevented = true; }};
   h.windowListeners.beforeunload(event);
@@ -218,4 +233,61 @@ test('scan progress leaves event controls attached instead of rebuilding the who
   assert.equal(h.requests.at(-1).data.progressOnly, true);
   assert.equal(h.candidates()[0], candidate);
   assert.equal(h.elements.get('archiveProgress').value, 2);
+});
+
+test('description edits survive pagination and refresh and join checked revisions in one save', async () => {
+  const h = setup({pages: [[proposal('A')], [proposal('B')]]}); await h.settle();
+  await h.fill('Description', 'Cleaned event zero\n\nFinal detail.');
+  await h.change(h.candidates()[0], true);
+  await h.elements.get('archiveNext').emit('click'); await h.settle();
+  await h.fill('Description', 'Cleaned event one', 'EVENT-1');
+  await h.elements.get('archivePrevious').emit('click'); await h.settle();
+  await h.elements.get('archiveRefresh').emit('click'); await h.settle();
+  assert.equal(h.field('Description').value, 'Cleaned event zero\n\nFinal detail.');
+  await h.elements.get('archiveSave').emit('click'); await h.settle();
+  const request = h.requests.find(request => request.action === 'admin.archive.save');
+  assert.equal(request.data.eventEdits.length, 2); assert.equal(request.data.changes.length, 1);
+  assert.equal(request.data.eventEdits[0].expectedRevision, 'event-r-EVENT-0');
+  assert.equal(h.requests.filter(request => request.action === 'admin.archive.save').length, 1);
+  assert.match(h.elements.get('archiveDraftCount').textContent, /Check the revisions/);
+  assert.equal(h.requests.some(request => request.action === 'admin.archive.publish'), false);
+});
+
+test('missed artist associations can be selected directly without checking a scan proposal', async () => {
+  const h = setup(); await h.settle(); await h.openDetails();
+  const picker = h.field('Artists').children[0]; picker.open = true; await picker.emit('toggle');
+  const label = h.find('archiveEvents', child => child.className === 'archive-id-option' && child.children[1].textContent.includes('MISSED'))[0];
+  await h.change(label.children[0], true);
+  await h.elements.get('archiveSave').emit('click'); await h.settle();
+  const request = h.requests.find(request => request.action === 'admin.archive.save');
+  assert.equal(request.data.changes.length, 0); assert.equal(request.data.eventEdits[0].fields.ArtistIDs, 'MISSED');
+});
+
+test('failed or incomplete event saves retain both direct edits and checked revisions', async () => {
+  for (const options of [{failSave: true}, {incompleteEvents: true}]) {
+    const h = setup(options); await h.settle(); await h.fill('Description', 'Keep this edit');
+    await h.change(h.candidates()[0], true);
+    await h.elements.get('archiveSave').emit('click'); await h.settle();
+    assert.equal(h.field('Description').value, 'Keep this edit'); assert.equal(h.candidates()[0].checked, true);
+    assert.match(h.elements.get('archiveDraftCount').textContent, /2 unsaved/);
+  }
+});
+
+test('formula fields and linked locations stay protected, and clearing all restores original field values', async () => {
+  const h = setup(); await h.settle(); await h.openDetails();
+  assert.equal(h.field('Public title').disabled, true);
+  await h.fill('Venue', 'ROOM'); assert.equal(h.field('Location').disabled, true);
+  await h.fill('Description', 'Discard this');
+  await h.elements.get('archiveClear').emit('click'); await h.settle();
+  assert.equal(h.field('Venue').value, ''); assert.equal(h.field('Location').disabled, false);
+  assert.ok(h.field('Description').value.startsWith('Full event description'));
+  assert.equal(h.elements.get('archiveSave').disabled, true);
+});
+
+test('starting a new scan discards inline drafts without saving them', async () => {
+  const h = setup(); await h.settle(); await h.fill('Description', 'Unsaved cleanup');
+  const event = {preventDefault() { this.prevented = true; }}; h.windowListeners.beforeunload(event); assert.equal(event.prevented, true);
+  await h.elements.get('archiveScanForm').emit('submit'); await h.settle();
+  assert.ok(h.field('Description').value.startsWith('Full event description'));
+  assert.equal(h.requests.some(request => request.action === 'admin.archive.save'), false);
 });

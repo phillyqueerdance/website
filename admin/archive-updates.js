@@ -8,8 +8,11 @@
   const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   const labels = { artist: "Artists", venue: "Venue", party: "Party", collective: "Collectives", classification: "Explicitly queer event" };
   let state = null, references = {}, busy = false, offset = 0, rejectOffset = 0, timer, searchTimer;
-  let controls = new Map(), namesByKind = {}, restoreButtons = [];
-  const drafts = new Map();
+  let controls = new Map(), eventControls = new Map(), namesByKind = {}, restoreButtons = [];
+  const drafts = new Map(), eventDrafts = new Map(), expandedEditors = new Set();
+  const eventKey = event => JSON.stringify([event.sheet, event.eventId]);
+  const idList = value => [...new Set(String(value || '').split(',').map(id => id.trim()).filter(Boolean))];
+  const dirtyCount = () => drafts.size + eventDrafts.size;
 
   function node(tag, className, text) {
     const item = document.createElement(tag);
@@ -33,13 +36,13 @@
     el.archiveScanFields.disabled = busy || !state;
     el.archiveRetry.hidden = state?.job?.phase !== "failed";
     el.archiveRetry.disabled = busy;
-    const canSave = drafts.size || state?.summary.approved || state?.unsavedRejectCount;
+    const count = dirtyCount(), canSave = count || state?.summary.approved || state?.unsavedRejectCount;
     el.archiveSave.disabled = el.archiveApply.disabled = lock || !canSave || state?.separatePublish !== true;
-    el.archiveSave.textContent = el.archiveApply.textContent = 'Save all changes' + (drafts.size ? ` (${drafts.size})` : '');
-    el.archiveClear.disabled = lock || !drafts.size;
-    el.archivePublish.disabled = lock || !state?.needsPublish || !!drafts.size;
-    el.archiveDraftCount.textContent = drafts.size ? `${drafts.size} unsaved revision${drafts.size === 1 ? '' : 's'} across all result pages.` :
-      'Check the revisions you approve. Unchecked suggestions stay pending.';
+    el.archiveSave.textContent = el.archiveApply.textContent = 'Save all changes' + (count ? ` (${count})` : '');
+    el.archiveClear.disabled = lock || !count;
+    el.archivePublish.disabled = lock || !state?.needsPublish || !!count;
+    el.archiveDraftCount.textContent = count ? `${count} unsaved change${count === 1 ? '' : 's'} across all result pages.` :
+      'Check the revisions you approve, or edit events directly. Unchecked suggestions stay pending.';
     const available = [...controls.values()].filter(c => c.reviewable && c.choices.length && (!c.single || c.choices.length === 1));
     const selected = available.filter(c => c.choices.every(choice => choice.checked));
     el.archiveSelectPage.disabled = lock || !available.length;
@@ -53,6 +56,128 @@
       c.reset.disabled = lock || (!c.reviewable && !drafts.has(c.proposal.key));
     }
     for (const button of restoreButtons) button.disabled = lock;
+    for (const control of eventControls.values()) control.setLocked(lock);
+  }
+  function renderEventEditor(event, parent) {
+    if (!event.record) {
+      parent.append(node('p', 'archive-result', event.sourceIssue || 'Install ArchiveReview.gs v7.4.23 and update the existing deployment to edit events here.'));
+      if (event.description) parent.append(node('p', 'archive-original-description', event.description));
+      return;
+    }
+    const record = event.record, key = eventKey(record), entries = new Map(), fitDescriptions = [];
+    const editor = node('fieldset', 'archive-inline-editor');
+    editor.append(node('legend', '', 'Edit event'));
+    const core = node('div', 'archive-inline-grid archive-inline-core'), more = node('details', 'archive-inline-more');
+    more.append(node('summary', '', 'Edit IDs and other event details'));
+    editor.append(core, more); parent.append(editor);
+    let moreLoaded = false;
+    function valueFor(field) { return eventDrafts.get(key)?.fields[field.key] ?? field.value; }
+    function locationState() {
+      const venue = record.fields.find(field => field.type === 'venue');
+      const linked = !!(venue && (entries.get(venue.key)?.read() ?? valueFor(venue)));
+      for (const entry of entries.values()) {
+        entry.disabled = !!entry.field.manualLocation && linked;
+        entry.input.disabled = entry.field.readOnly || entry.disabled;
+      }
+    }
+    function changed() {
+      locationState();
+      const previous = eventDrafts.get(key), fields = {...previous?.fields};
+      for (const [name, entry] of entries) {
+        if (entry.field.readOnly || entry.disabled || entry.read() === entry.field.value) delete fields[name];
+        else fields[name] = entry.read();
+      }
+      if (Object.keys(fields).length) eventDrafts.set(key, {sheet: record.sheet, eventId: record.eventId,
+        expectedRevision: previous?.expectedRevision || record.revision, fields});
+      else eventDrafts.delete(key);
+      updateButtons();
+    }
+    function addField(field, container) {
+      const multiple = ['artist', 'collective'].includes(field.type);
+      const label = node(multiple ? 'div' : 'label', 'field archive-inline-field' + (field.type === 'long' || multiple ? ' archive-inline-wide' : ''));
+      label.append(node('span', '', field.label));
+      let input, read, reset;
+      if (multiple) {
+        const original = idList(field.value), selected = new Set(idList(valueFor(field)));
+        input = node('fieldset', 'archive-id-picker');
+        const picker = node('details'), summary = node('summary'), search = node('input'), list = node('div', 'archive-id-options');
+        search.type = 'search'; search.placeholder = 'Find ' + field.label.toLowerCase();
+        search.setAttribute('aria-label', 'Find ' + field.label.toLowerCase() + ' · ' + record.eventId);
+        input.append(picker); picker.append(summary, search, list);
+        const options = references[field.type] || [], byId = namesByKind[field.type] || new Map();
+        function summarize() { summary.textContent = selected.size ? [...selected].map(id => byId.get(id) || id).join(', ') : 'Choose ' + field.label.toLowerCase(); }
+        function choices() {
+          if (!picker.open) return;
+          const query = search.value.trim().toLowerCase();
+          const matches = options.filter(option => (option.name + ' ' + option.id).toLowerCase().includes(query));
+          const shown = [...new Set([...selected].filter(id => !query || ((byId.get(id) || '') + ' ' + id).toLowerCase().includes(query)).concat(matches.slice(0, 40).map(option => option.id)))];
+          list.replaceChildren(...shown.map(id => {
+            const row = node('label', 'archive-id-option'), checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = selected.has(id);
+            row.append(checkbox, node('span', '', (byId.get(id) || id) + ' · ' + id));
+            checkbox.addEventListener('change', () => { if (checkbox.checked) selected.add(id); else selected.delete(id); summarize(); changed(); });
+            return row;
+          }));
+          if (matches.length > 40) list.append(node('small', 'field-help', 'Type to narrow the remaining matches.'));
+          if (!shown.length) list.append(node('p', 'field-help', 'No matching profiles.'));
+        }
+        picker.addEventListener('toggle', choices); search.addEventListener('input', choices); summarize();
+        read = () => selected.size === original.length && original.every(id => selected.has(id)) ? field.value : [...selected].join(', ');
+        reset = () => { selected.clear(); for (const id of original) selected.add(id); summarize(); choices(); };
+      } else {
+        const catalog = ['venue', 'party'].includes(field.type) ? references[field.type] || [] : null;
+        const options = catalog || (field.type === 'flag' ? [{id: 'Yes', name: 'Yes'}, {id: 'No', name: 'No'}] :
+          field.type === 'neighborhood' ? api.neighborhoods.map(name => ({id: name, name})) : null);
+        input = node(options ? 'select' : field.type === 'long' ? 'textarea' : 'input');
+        if (options) {
+          const current = valueFor(field); let loaded = false;
+          input.add(new Option('Unspecified', ''));
+          if (current) input.add(new Option(profileName(field.type, current), current));
+          if (field.value && field.value !== current) input.add(new Option(profileName(field.type, field.value), field.value));
+          function populate() {
+            if (loaded) return; loaded = true;
+            const selected = input.value;
+            for (const option of options) if (option.id !== current && option.id !== field.value) input.add(new Option(option.name, option.id));
+            input.value = selected;
+          }
+          if (catalog) input.addEventListener('focus', populate); else populate();
+        } else {
+          input.maxLength = field.maxLength;
+          if (field.type === 'long') input.rows = field.label === 'Description' ? 10 : 5;
+          else if (field.type === 'date') input.type = /^\d{4}-\d{2}-\d{2}$/.test(field.value) || !field.value ? 'date' : 'text';
+          else if (field.type === 'time') { input.type = /^\d{2}:\d{2}(?::\d{2})?$/.test(field.value) || !field.value ? 'time' : 'text'; input.step = '1'; }
+          else if (field.type === 'url') input.type = 'url';
+        }
+        input.value = valueFor(field); read = () => input.value; reset = () => { input.value = field.value; };
+        input.addEventListener('input', changed); input.addEventListener('change', changed);
+        if (field.label === 'Description') {
+          const fit = () => { if (input.style && input.scrollHeight) { input.style.height = 'auto'; input.style.height = Math.max(170, input.scrollHeight + 2) + 'px'; } };
+          fitDescriptions.push(fit); input.addEventListener('input', fit);
+        }
+      }
+      input.setAttribute('aria-label', field.label + ' · ' + record.eventId);
+      label.append(input);
+      if (field.readOnly) label.append(node('small', 'field-help', 'Calculated automatically.'));
+      if (field.manualLocation) label.append(node('small', 'field-help', 'Clear the venue to enter a manual location.'));
+      entries.set(field.key, {field, input, read, reset}); container.append(label);
+    }
+    const primary = field => ['Title', 'Description'].includes(field.label);
+    for (const field of record.fields.filter(primary)) addField(field, core);
+    function loadMore() {
+      if (more.open) {
+        expandedEditors.add(key);
+        if (!moreLoaded) {
+          moreLoaded = true; const grid = node('div', 'archive-inline-grid');
+          for (const field of record.fields.filter(field => !primary(field))) addField(field, grid);
+          more.append(grid); locationState();
+        }
+      } else expandedEditors.delete(key);
+    }
+    more.addEventListener('toggle', loadMore);
+    if (expandedEditors.has(key)) { more.open = true; loadMore(); }
+    locationState();
+    eventControls.set(key, {setLocked: lock => { editor.disabled = lock; }, fit: () => { for (const fit of fitDescriptions) fit(); }, reset: () => {
+      for (const entry of entries.values()) entry.reset(); locationState(); for (const fit of fitDescriptions) fit();
+    }});
   }
   function selectedIds(control) {
     return [...control.proposal.currentIds, ...control.choices.filter(c => c.checked).map(c => c.value)];
@@ -83,12 +208,15 @@
     if (locked()) return;
     if (state?.separatePublish !== true) { status('Install the v7.4.22 script replacements and update the existing Apps Script deployment before saving. Your selections have been kept.', true); return; }
     const changes = [...drafts.values()];
-    if (!changes.length && !state?.summary.approved && !state?.unsavedRejectCount) return;
+    const eventEdits = [...eventDrafts.values()];
+    if (eventEdits.length && state?.inlineEventEdits !== true) { status('Install ArchiveReview.gs v7.4.23 and update the existing deployment before saving event edits. Your edits have been kept.', true); return; }
+    if (!changes.length && !eventEdits.length && !state?.summary.approved && !state?.unsavedRejectCount) return;
     if (changes.length > 5000) { status('Save up to 5,000 revisions at a time.', true); return; }
-    if (new TextEncoder().encode(JSON.stringify({ changes })).length > 2 * 1024 * 1024) {
+    if (eventEdits.length > 200) { status('Save up to 200 edited events at a time.', true); return; }
+    if (new TextEncoder().encode(JSON.stringify({ changes, eventEdits })).length > 2 * 1024 * 1024) {
       status('These revisions are too large for one batch. Clear some selections and save a smaller group.', true); return;
     }
-    await perform('save', { changes });
+    await perform('save', { changes, eventEdits });
   }
   function renderProposal(proposal, event, parent) {
     const card = node("section", "archive-proposal");
@@ -151,7 +279,7 @@
       const label = key === "blocked" ? "Needs attention" : key.charAt(0).toUpperCase() + key.slice(1);
       const item = node("div", "archive-count"); item.append(node("strong", "", String(value)), document.createTextNode(label)); return item;
     }));
-    const fragment = document.createDocumentFragment(); controls = new Map();
+    const fragment = document.createDocumentFragment(); controls = new Map(); eventControls = new Map();
     for (const event of payload.events) {
       const card = node("article", "archive-event"), flyer = node("div", "archive-flyer");
       let flyerUrl;
@@ -166,19 +294,13 @@
       const title = node("h3"), link = node("a", "", event.title);
       link.href = "/?event=" + encodeURIComponent(event.eventId); link.target = "_blank"; link.rel = "noopener";
       title.append(link); body.append(title, node("p", "event-id", `${event.eventId} · ${event.sheet}`));
-      const edit = node('a', 'archive-edit-event', 'Edit event');
-      edit.href = '/admin/event.html?eventId=' + encodeURIComponent(event.eventId) + '&sheet=' + encodeURIComponent(event.sheet);
-      edit.target = '_blank'; edit.rel = 'noopener'; edit.title = 'Edit this event in QDP Admin';
-      body.append(edit);
       if (event.sourceIssue) body.append(node("p", "archive-result", event.sourceIssue));
-      const description = node('section', 'archive-event-description');
-      description.append(node('h4', '', 'Event description'), node('p', '', event.description ||
-        (event.sourceIssue ? 'Description unavailable: correct the source record and refresh.' : 'No description recorded.')));
-      body.append(description);
+      renderEventEditor(event, body);
       for (const proposal of event.proposals) renderProposal(proposal, event, body);
       card.append(flyer, body); fragment.append(card);
     }
     el.archiveEvents.replaceChildren(fragment);
+    for (const control of eventControls.values()) control.fit();
     el.archiveEmpty.hidden = !!payload.events.length;
     el.archiveEmpty.textContent = payload.scan ? "No suggestions match this view." : "Start a scan to find missing associations in recorded events.";
     el.archivePage.textContent = payload.totalEvents ? `${offset + 1}–${Math.min(offset + payload.pageSize, payload.totalEvents)} of ${payload.totalEvents} events` : "";
@@ -200,7 +322,7 @@
     status(job?.phase === "failed" ? job.error : messages[job?.phase] || "Ready to scan recorded events.", job?.phase === "failed");
     if (payload.separatePublish !== true) status('Install the v7.4.22 script replacements and update the existing Apps Script deployment to use separate saving and publishing.', true);
     el.archivePublishNote.textContent = payload.needsPublish ? "Saved archive changes are awaiting publication." :
-      "Save all changes writes approved revisions and rejections to the sheet. Publish saved changes updates the website separately.";
+      "Save all changes writes event edits, approved revisions, and rejections to the sheet. Publish saved changes updates the website separately.";
     if (payload.lastPublishedAt) el.archivePublishNote.textContent += " Last published " + new Date(payload.lastPublishedAt).toLocaleString() + ".";
     updateButtons(); scheduleStep();
   }
@@ -217,11 +339,15 @@
         if (!Array.isArray(result.savedKeys) || data.changes.some(change => !result.savedKeys.includes(change.key))) {
           throw new Error('The save was not confirmed. Your selections have been kept; refresh to check the saved review.');
         }
+        if (data.eventEdits.length && (!Array.isArray(result.savedEventKeys) || data.eventEdits.some(edit => !result.savedEventKeys.includes(eventKey(edit))))) {
+          throw new Error('The event edits were not confirmed. Your edits have been kept; refresh to check the saved records.');
+        }
         for (const key of result.savedKeys) drafts.delete(key);
+        for (const key of result.savedEventKeys || []) eventDrafts.delete(key);
       }
-      if (action === 'scan') drafts.clear();
+      if (action === 'scan') { drafts.clear(); eventDrafts.clear(); expandedEditors.clear(); }
       render(result);
-      if (action === 'save' && !active() && result.job?.phase !== 'failed') status(`${result.saved} decisions saved to the sheet. The website has not been published.`);
+      if (action === 'save' && !active() && result.job?.phase !== 'failed') status('Changes saved to the sheet. The website has not been published.');
       if (success) status(success);
     } catch (error) {
       let text = error.message;
@@ -261,7 +387,8 @@
   });
   el.archiveSave.addEventListener('click', saveAll);
   el.archiveApply.addEventListener('click', saveAll);
-  el.archiveClear.addEventListener('click', () => { drafts.clear(); for (const c of controls.values()) showDraft(c); updateButtons(); });
+  el.archiveClear.addEventListener('click', () => { drafts.clear(); eventDrafts.clear(); for (const c of controls.values()) showDraft(c);
+    for (const c of eventControls.values()) c.reset(); updateButtons(); });
   el.archivePublish.addEventListener("click", () => perform("publish"));
   el.archivePrevious.addEventListener("click", () => { offset -= state.pageSize; perform("bootstrap"); });
   el.archiveNext.addEventListener("click", () => { offset += state.pageSize; perform("bootstrap"); });
@@ -291,8 +418,8 @@
   el.archiveRejectPrevious.addEventListener("click", () => { rejectOffset = Math.max(0, rejectOffset - 30); loadRejects(); });
   el.archiveRejectNext.addEventListener("click", () => { rejectOffset += 30; loadRejects(); });
   window.addEventListener('beforeunload', event => {
-    if (drafts.size) { event.preventDefault(); event.returnValue = ''; }
+    if (dirtyCount()) { event.preventDefault(); event.returnValue = ''; }
   });
-  window.addEventListener('focus', () => { if (state && !busy) perform('bootstrap'); });
+  window.addEventListener('focus', () => { if (state && !busy && !eventDrafts.size) perform('bootstrap'); });
   perform("bootstrap", { references: true });
 })();

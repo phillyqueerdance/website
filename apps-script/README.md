@@ -8,7 +8,7 @@ recorded in `Events_Archive`, every `Archive YYYY` tab, and optionally the activ
 focus a scan on one profile or type. It does not import external historical
 events or perform an Instagram scrape.
 
-Install the supplied full **Core.gs v7.4.22**, **ArchiveReview.gs v7.4.22**, and
+Install the supplied full **Core.gs v7.4.22**, **ArchiveReview.gs v7.4.23**, and
 **PublicData.gs v7.4.22** in the existing Apps Script
 project. Save and update the existing Web app deployment to a new version,
 keeping its URL and access settings. Preserve every other script, including
@@ -18,14 +18,30 @@ and must not be installed alongside PublicData.gs. The full Core.gs and
 PublicData.gs replacements are supplied separately because they are maintained
 with the user's existing Apps Script source.
 
-Scan and check the revisions to approve; suggestions begin unchecked. Choices
-and rejections stay local across result pages until **Save all changes**. That
-action commits decisions and permanent rejects in one Sheets request, then
-applies approved revisions in batches. The rejection ledger and the review
+Each result includes an inline event editor. The title and complete description
+are directly editable; **Edit IDs and other event details** opens association
+pickers, dates, venue, links, visibility, and other available fields. Artist and
+collective pickers search the Index, including associations the scanner missed.
+Calculated fields stay protected. Source records are resolved by sheet and
+EventID, so moving rows does not direct an edit to a different event.
+
+Scan and check the revisions to approve; suggestions begin unchecked. Event
+edits, choices, and rejections stay local across result pages until **Save all
+changes**. That action validates every direct edit first, commits event edits,
+review decisions, and permanent rejects in one Sheets request, then applies
+remaining approved revisions in batches. Checked additions on a directly edited
+event are merged into that same commit. Conflicting single-value choices or a
+stale edited event stop the whole submitted edit/decision batch before writes.
+The rejection ledger and the review
 status are written atomically without depending on a potentially cached reread.
 The page can restore saved rejected matches for a later scan. **Start new scan**
 always replaces the current review and unsaved choices while retaining saved
 rejects and already applied source edits.
+
+After an event is edited, its remaining unapproved suggestions require a fresh
+scan because their evidence may have changed. The inline editor remains usable.
+A new scan also discards unsaved event edits. Formula expressions are protected
+and checked for changes; recalculated values alone do not make an edit stale.
 
 **Publish saved changes** is separate. Saved source edits set a publication
 hold respected by scheduled publishers and public fallback responses. Until
@@ -58,6 +74,11 @@ only the affected source tabs and checks affected row spans together. Main
 Admin bootstraps use one Apps Script request with the updated Core, and refreshes
 retain unchanged event cards. Older Core deployments retain their venue-list
 compatibility request.
+
+Inline editor data reuses one source-table read and one formula read per source
+tab on the displayed page. Multi-event saves recheck affected spans together.
+Profile options are created when a picker is opened, with search results capped
+to avoid rendering the entire artist catalog for every result card.
 
 Validation: `node --test tests/archive-updates.test.mjs
 tests/admin-bulk-api.test.mjs tests/archive.test.mjs`. For an integration pass
