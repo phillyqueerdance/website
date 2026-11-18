@@ -2,14 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-
 const source = readFileSync(new URL('../admin/archive-updates.js', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../admin/archive-updates.html', import.meta.url), 'utf8');
 const plain = value => JSON.parse(JSON.stringify(value));
 const proposal = (key, kind = 'artist', added = ['NEW']) => ({key, revision: 'r-' + key, kind,
   currentIds: [], proposedIds: added, state: 'pending', result: 'Ready', matched: 'Recorded lineup', evidence: 'Name in event copy'});
 
-function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = false, incompleteEvents = false, jobPhase = 'ready', separatePublish = true} = {}) {
+function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = false, incompleteEvents = false, jobPhase = 'ready', separatePublish = true, fullArchiveSearch = true, deferSearch = false} = {}) {
   class Element {
     constructor(tag = 'div') { this.tag = tag; this.children = []; this.listeners = {}; this.value = ''; this.attributes = {}; this.dataset = {}; this.checked = false; this.disabled = false; this.textContent = ''; }
     append(...children) { for (const child of children) this.children.push(...(child.tag === 'fragment' ? child.children : [child])); }
@@ -21,7 +20,7 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
   }
   const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(match => [match[1], new Element()]));
   elements.get('archiveIncludeActive').checked = true;
-  const requests = [], timers = new Map(), windowListeners = {};
+  const requests = [], timers = new Map(), windowListeners = {}, pendingSearches = [];
   let timerId = 0, needsPublish = false;
   const rejects = [];
   const events = pages.map((proposals, i) => ({eventId: 'EVENT-' + i, title: 'Night ' + i, sheet: 'Archive 2025',
@@ -40,6 +39,7 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
     for (const event of events) for (const p of event.proposals) summary[p.state]++;
     return {ok: 'yes', events: [events[offset]], totalEvents: events.length, pageSize: 1, offset, summary,
       scan: {scanned: events.length, total: events.length, proposed: 4}, scanInProgress: jobPhase === 'scanning', job: {phase: jobPhase},
+      fullArchiveSearch, archiveSearch: data.archiveSearch || '',
       references: {artist: [{id: 'NEW', name: 'New Artist'}, {id: 'MISSED', name: 'Missed Artist'}], collective: [],
         venue: [{id: 'ROOM', name: 'The Room'}], party: []}, needsPublish, separatePublish, inlineEventEdits: true,
       ...(data.includeRejects ? {rejectedTotal: rejects.length, rejectOffset: 0, rejects} : {})};
@@ -54,6 +54,9 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
   window: {confirm: () => true, addEventListener(name, fn) { windowListeners[name] = fn; }, QDPAdminProfiles: {
     message(node, text) { node.textContent = text; }, request: async (action, data) => {
       requests.push({action, data: plain(data)});
+      if (action === 'admin.archive.bootstrap' && data.archiveSearch && deferSearch) {
+        await new Promise(resolve => pendingSearches.push(resolve));
+      }
       if (action === 'admin.archive.save') {
         if (failSave) throw new Error('Network response interrupted');
         if (incompleteSave) return payload(data);
@@ -92,7 +95,7 @@ function setup({pages = [[proposal('A')]], failSave = false, incompleteSave = fa
   const field = (label, event = 'EVENT-0') => find('archiveEvents', child => child.attributes?.['aria-label'] === label + ' · ' + event)[0];
   const fill = async (label, value, event) => { const input = field(label, event); input.value = value; await input.emit('input'); await settle(); };
   const openDetails = async () => { const more = find('archiveEvents', child => child.className === 'archive-inline-more')[0]; more.open = true; await more.emit('toggle'); await settle(); };
-  return {elements, requests, context, settle, find, candidates, buttons, change, windowListeners, timers, field, fill, openDetails};
+  return {elements, requests, context, settle, find, candidates, buttons, change, windowListeners, timers, pendingSearches, field, fill, openDetails};
 }
 
 test('every proposed change starts unchecked, and checking or rejecting performs no write', async () => {
@@ -291,3 +294,93 @@ test('starting a new scan discards inline drafts without saving them', async () 
   assert.ok(h.field('Description').value.startsWith('Full event description'));
   assert.equal(h.requests.some(request => request.action === 'admin.archive.save'), false);
 });
+
+
+async function flushSearchTimer(h) {
+  const tasks = [...h.timers.entries()];
+  h.timers.clear();
+  for (const [, task] of tasks) await task();
+  await h.settle();
+}
+async function searchArchive(h, query) {
+  const input = h.elements.get('archiveMasterQuery');
+  input.value = query;
+  await input.emit('input');
+  await flushSearchTimer(h);
+}
+
+test('the master field searches without starting a scan or writing, and displays the returned archive count', async () => {
+  const h = setup({pages: [[]]}); await h.settle();
+  assert.equal(h.elements.get('archiveMasterQuery').disabled, false);
+  await searchArchive(h, 'Dance night');
+  assert.equal(h.requests.at(-1).action, 'admin.archive.bootstrap');
+  assert.equal(h.requests.at(-1).data.archiveSearch, 'Dance night');
+  assert.equal(h.requests.length, 2);
+  assert.match(h.elements.get('archiveMasterStatus').textContent, /1 matching archive event/);
+  assert.equal(h.elements.get('reviewHeading').textContent, 'Archive search results');
+  assert.ok(h.field('Description'));
+  assert.equal(h.elements.get('archiveSelectPage').disabled, true);
+});
+
+test('typing coalesces search requests and Enter runs the current query immediately', async () => {
+  const h = setup(); await h.settle();
+  const input = h.elements.get('archiveMasterQuery');
+  for (const value of ['Da', 'Dance', 'Dance night']) {input.value = value; await input.emit('input');}
+  assert.equal(h.requests.length, 1); assert.equal(h.timers.size, 1);
+  await input.emit('keydown', {key: 'Enter'}); await h.settle();
+  assert.equal(h.requests.at(-1).data.archiveSearch, 'Dance night'); assert.equal(h.requests.length, 2);
+  assert.equal(h.timers.size, 0);
+});
+
+test('master search suspends review filters and clearing restores them without dropping drafts', async () => {
+  const h = setup(); await h.settle();
+  await h.fill('Description', 'Unsaved cleanup'); await h.change(h.candidates()[0], true);
+  h.elements.get('archiveView').value = 'approved'; h.elements.get('archiveQuery').value = 'old review filter';
+  await searchArchive(h, 'ONE');
+  assert.equal(h.elements.get('archiveView').disabled, true); assert.equal(h.elements.get('archiveQuery').disabled, true);
+  assert.equal(h.field('Description').value, 'Unsaved cleanup'); assert.equal(h.candidates()[0].checked, true);
+  await h.elements.get('archiveMasterClear').emit('click'); await h.settle();
+  assert.equal(h.requests.at(-1).data.archiveSearch, '');
+  assert.equal(h.elements.get('archiveView').value, 'approved'); assert.equal(h.elements.get('archiveQuery').value, 'old review filter');
+  assert.equal(h.elements.get('archiveView').disabled, false);
+  assert.equal(h.field('Description').value, 'Unsaved cleanup'); assert.equal(h.candidates()[0].checked, true);
+  assert.equal(h.requests.some(r => r.action !== 'admin.archive.bootstrap'), false);
+});
+
+test('search pagination retains the query and inline edits save even without a scan proposal', async () => {
+  const h = setup({pages: [[], []]}); await h.settle();
+  await searchArchive(h, 'needle'); await h.fill('Description', 'Cleaned first event');
+  await h.elements.get('archiveNext').emit('click'); await h.settle();
+  assert.equal(h.requests.at(-1).data.archiveSearch, 'needle'); assert.equal(h.requests.at(-1).data.offset, 1);
+  await h.fill('Description', 'Cleaned second event', 'EVENT-1');
+  await h.elements.get('archiveSave').emit('click'); await h.settle();
+  const save = h.requests.find(r => r.action === 'admin.archive.save');
+  assert.equal(save.data.archiveSearch, 'needle'); assert.equal(save.data.changes.length, 0);
+  assert.equal(save.data.eventEdits.length, 2);
+  assert.equal(h.requests.some(r => r.action === 'admin.archive.publish'), false);
+});
+
+test('the newest query is retried after an in-flight search and an old response cannot replace its results', async () => {
+  const h = setup({deferSearch: true}); await h.settle();
+  const input = h.elements.get('archiveMasterQuery');
+  input.value = 'first'; await input.emit('input');
+  const firstRequest = flushSearchTimer(h); await h.settle();
+  assert.equal(h.requests.at(-1).data.archiveSearch, 'first');
+  input.value = 'latest'; await input.emit('input'); await flushSearchTimer(h);
+  assert.equal(h.requests.length, 2);
+  h.pendingSearches.shift()(); await firstRequest; await h.settle();
+  assert.match(h.elements.get('archiveMasterStatus').textContent, /Searching/);
+  const latestRequest = flushSearchTimer(h); await h.settle();
+  assert.equal(h.requests.at(-1).data.archiveSearch, 'latest');
+  h.pendingSearches.shift()(); await latestRequest; await h.settle();
+  assert.match(h.elements.get('archiveMasterStatus').textContent, /1 matching archive event/);
+  assert.equal(h.requests.length, 3);
+});
+
+test('older deployments explain the needed update instead of offering a search limited to suggestions', async () => {
+  const h = setup({fullArchiveSearch: false}); await h.settle();
+  assert.equal(h.elements.get('archiveMasterQuery').disabled, true);
+  assert.match(h.elements.get('archiveMasterStatus').textContent, /ArchiveReview.gs v7.4.25/);
+  await h.change(h.candidates()[0], true); assert.equal(h.elements.get('archiveSave').disabled, false);
+});
+

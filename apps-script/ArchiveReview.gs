@@ -1,8 +1,8 @@
 /**
- * Queer Dance Philly — Archive Updates v7.4.24
+ * Queer Dance Philly — Archive Updates v7.4.25
  * ArchiveReview.gs: Archive ID review, Admin Archive Updates, saved rejects,
  * approvals, resumable jobs, and artist-indicator recalculation.
- * Replace ArchiveReview.gs for inline archive editing; keep Core.gs and PublicData.gs v7.4.22.
+ * Install with Core.gs and Imports.gs v7.4.24; keep PublicData.gs v7.4.22.
  * Use the supplied PublicData.gs to publish every Archive YYYY tab.
  * Keep Imports.gs, scraper.gs, the manifest, services, properties, deployment
  * URL, spreadsheet data, and existing refresh triggers.
@@ -254,9 +254,7 @@ function qdpArchiveSheets_(ss, includeActive = false) {
 
 
 function qdpArchiveWithLock_(callback) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-  try { return callback(); } finally { lock.releaseLock(); }
+  return qdpWithWriteLock_(callback, 30000);
 }
 
 
@@ -343,9 +341,9 @@ function qdpArchiveAliasIndex_(rows, idHeader, nameHeaders, aliasHeader, handleH
     if (!id || id.includes(',')) return;
     ids.add(id);
     nameHeaders.forEach(h => { if (col(h) >= 0) add(row[col(h)], id, false); });
-    if (col(aliasHeader) >= 0) {
-      String(row[col(aliasHeader)] || '').split(',').forEach(a => add(a, id, false));
-    }
+    (Array.isArray(aliasHeader) ? aliasHeader : [aliasHeader]).forEach(header => {
+      if (col(header) >= 0) String(row[col(header)] || '').split(',').forEach(a => add(a, id, false));
+    });
     if (col(handleHeader) >= 0) {
       const handle = String(row[col(handleHeader)] || '').trim().replace(/^@/, '');
       if (/^[A-Za-z0-9_.]{4,}$/.test(handle)) add('@' + handle, id, true);
@@ -434,7 +432,7 @@ function qdpArchiveLookups_(ss) {
   const specs = {
     venue: ['Venues', 'VenueID', ['VenueName', 'Public_Name'], 'Aliases', 'Instagram'],
     artists: ['Artists', 'ArtistID', ['StageName'], 'Aliases', 'Instagram'],
-    collectives: ['Collectives', 'CollectiveID', ['CollectiveName', 'Public_Name'], 'Aliases', 'CollInsta'],
+    collectives: ['Collectives', 'CollectiveID', ['CollectiveName', 'Public_Name'], ['CollAliases', 'Aliases'], 'CollInsta'],
     party: ['Parties', 'PartyID', ['PartyName'], 'PartyAliases', 'PartyInsta']
   };
   const out = {};
@@ -584,44 +582,18 @@ function qdpArchiveIndicatorValues_(rawArtistIds, lookups, partyId) {
 
 
 function qdpArchiveRefreshIndicators_(target, lookups, cells) {
-  const c = target.layout.columns;
-  const sheet = target.layout.sheet;
+  const sheet = target.layout.sheet, c = target.layout.columns;
   const row = target.row || sheet.getRange(target.number, 1, 1, target.layout.width).getValues()[0];
-  const ids = row[c.artists - 1];
-  const partyId = row[c.party - 1];
-  const expected = qdpArchiveIndicatorValues_(ids, lookups, partyId);
-  if (expected.unknown) return { changed: 0, unknown: expected.unknown };
-  function write(column, value, highlight = false) {
-    if (cells) cells.push({ sheet, row: target.number, column, value, highlight });
-    else {
-      const cell = sheet.getRange(target.number, column);
-      cell.setValue(value);
-      if (highlight) cell.setBackground('#fff2b3');
-    }
-  }
-  let changed = 0;
-  [
-    [c.queerIndicator, expected.queer],
-    [c.transIndicator, expected.trans]
-  ].forEach(([column, value]) => {
-    if (!column) return;
-    if (String(row[column - 1] || '').trim() === value) return;
-    write(column, value, true);
-    changed++;
-  });
-  // Active events still participate in Calendar sync; mark their changes just
-  // as the ordinary Admin event editor does. Historical records stay historical.
-  if (target.layout.name === CONFIG.SHEET_EVENTS) {
-    const headers = target.layout.headers;
-    const edited = headers.findIndex(h => ['LastEditedAt', 'Last Edited At'].includes(h));
-    if (edited >= 0) write(edited + 1, new Date().toISOString());
-    const titleColumn = headers.findIndex(h => ['Title_Public (auto w/ emojis)', 'Title Public (auto w/ emojis)'].includes(h));
-    if (titleColumn >= 0 && typeof buildEventPublicTitle_ === 'function') {
-      write(titleColumn + 1, buildEventPublicTitle_(
-        row[c.title - 1], qdpArchiveIds_(ids), lookups.core, partyId));
-    }
-  }
-  return { changed, unknown: [] };
+  const original = target.original || row.slice();
+  const expected = qdpArchiveIndicatorValues_(row[c.artists - 1], lookups, row[c.party - 1]);
+  const rules = qdpApplyEventSaveRules_(row, target.layout.headers, lookups.core, {original, formulas: target.formulas || [],
+    refreshIndicators: true, refreshTitle: true, refreshExplicit: true, recordManual: true,
+    touched: row.map((value, index) => !sheetValuesEqual_(value, original[index]) ? index + 1 : 0).filter(Boolean),
+    trackCalendar: target.layout.name === CONFIG.SHEET_EVENTS,
+    markEdited: target.layout.name === CONFIG.SHEET_EVENTS, forceStamp: target.layout.name === CONFIG.SHEET_EVENTS});
+  const planned = [...rules.updates].map(([column, value]) => ({sheet, row: target.number, column, value, highlight: true}));
+  if (cells) cells.push(...planned); else qdpArchiveWriteCells_(sheet.getParent(), planned);
+  return {changed: planned.filter(cell => [c.queerIndicator, c.transIndicator].includes(cell.column)).length, unknown: expected.unknown || []};
 }
 
 // Write only the changed cells. The Sheets service sends the whole set in one
@@ -756,7 +728,12 @@ function qdpArchiveProposals_(row, layout, lookups, rejectedKeys = new Set()) {
       matches: partyMatches,
       evidence: partyInTitle.length ? title : desc }
   ];
+  const editState = qdpEventEditState_(row, layout.headers), owned = new Set(editState.owned);
+  const fieldKeys = {venue: 'venueId', party: 'partyId', artists: 'artistIds', collectives: 'collectiveIds'};
   const proposals = fields.map(f => {
+    if (f.single && owned.has(fieldKeys[f.key])) return null;
+    const blocked = new Set(editState.rejected[fieldKeys[f.key]] || []);
+    f.matches = f.matches.filter(match => !blocked.has(match.id));
     const current = String(row[c[f.key] - 1] || '').trim();
     if (!f.matches.length || (f.single && current)) return null;
     const old = qdpArchiveIds_(current);
@@ -780,7 +757,7 @@ function qdpArchiveProposals_(row, layout, lookups, rejectedKeys = new Set()) {
   const explicitBasis = qdpArchiveExplicitBasis_(
     row, c, lookups, venueMatches, partyMatches);
   const currentExplicit = String(row[c.explicit - 1] || '').trim();
-  if (explicitBasis && currentExplicit.toLowerCase() !== 'yes' &&
+  if (!owned.has('explicit') && explicitBasis && currentExplicit.toLowerCase() !== 'yes' &&
       !rejectedKeys.has(qdpArchiveRejectKey_(eventId, 'ExplicitQueer (Yes/No)', 'Yes'))) {
     proposals.push({
       field: 'ExplicitQueer (Yes/No)', current: currentExplicit,
@@ -1020,17 +997,19 @@ function qdpArchiveApplyApprovals_() {
     const meta = qdpArchiveAdminRead_(QDP_ARCHIVE_ADMIN_.metaKey) || {};
     const allowed = new Set(qdpArchiveSheets_(ss, meta.options && meta.options.includeActive));
     [...new Set(batch.map(item => String(item.r[2])))].filter(name => allowed.has(name)).forEach(name => {
+      qdpEnsureEventEditState_(ss.getSheetByName(name));
       const l = qdpArchiveLayout_(ss.getSheetByName(name));
       layouts[name] = l;
       const count = l.sheet.getLastRow() - l.firstDataRow + 1;
       const values = count > 0
         ? l.sheet.getRange(l.firstDataRow, 1, count, l.width).getValues() : [];
+      const formulas = count > 0 ? l.sheet.getRange(l.firstDataRow, 1, count, l.width).getFormulas() : [];
       byId[name] = new Map();
       values.forEach((row, i) => {
         const id = String(row[l.columns.eventId - 1] || '').trim();
         if (!id) return;
         if (!byId[name].has(id)) byId[name].set(id, []);
-        byId[name].get(id).push({ row, original: row.slice(), number: l.firstDataRow + i });
+        byId[name].get(id).push({ row, original: row.slice(), formulas: formulas[i], number: l.firstDataRow + i });
       });
     });
     const lookups = qdpArchiveLookups_(ss);
@@ -1081,7 +1060,8 @@ function qdpArchiveApplyApprovals_() {
             result = 'Unconfirmed queer evidence';
           } else {
             const next = proposed.join(', ');
-            if (next === current) result = 'No change';
+            if (target.formulas[col - 1]) result = 'Read-only formula';
+            else if (next === current) result = 'No change';
             else {
               // Recheck all affected rows together immediately before commit.
                 cells.push({ sheet: l.sheet, row: target.number, column: col, value: next, highlight: true });
@@ -1090,7 +1070,7 @@ function qdpArchiveApplyApprovals_() {
                 result = 'Applied';
                 const targetKey = l.name + '\u001e' + target.number;
                 if (!touched.has(targetKey)) {
-                  touched.set(targetKey, { layout: l, number: target.number, row: target.row, original: target.original,
+                  touched.set(targetKey, { layout: l, number: target.number, row: target.row, original: target.original, formulas: target.formulas,
                     reviewRows: [] });
                 }
                 touched.get(targetKey).reviewRows.push(item.queueRow);
@@ -1286,6 +1266,48 @@ function qdpArchiveAdminReferences_() {
   return out;
 }
 
+// Search saved source records independently of the latest scan and its filters.
+// Reuse one source-table read per tab; only build editors for the current page.
+function qdpArchiveAdminSearchNormalize_(value) {
+  return String(value == null ? '' : value).normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function qdpArchiveAdminSearchEvents_(ss, query, groups) {
+  const needle = qdpArchiveAdminSearchNormalize_(query);
+  const references = qdpArchiveAdminReferences_();
+  const names = Object.fromEntries(Object.entries(references)
+    .map(([kind, profiles]) => [kind, new Map(profiles.map(profile => [profile.id, profile.name]))]));
+  const events = [], seen = new Set();
+  qdpArchiveSheets_(ss).forEach(name => {
+    const source = qdpArchiveAdminSource_(ss, name), c = source.layout.columns;
+    const searchable = source.headers.map((header, i) => /^_?QDP.*(?:State|Meta)/i.test(header) ? -1 : i).filter(i => i >= 0);
+    const dateColumns = source.headers.map((header, i) => /^(?:Start|End)\s*Date$/.test(header) ? i : -1).filter(i => i >= 0);
+    source.rows.slice(1).forEach((row, index) => {
+      const eventId = String(row[c.eventId - 1] || '').trim(), title = String(row[c.title - 1] || '');
+      if (!eventId && !title && !String(row[c.description - 1] || '').trim()) return;
+      const key = qdpArchiveAdminEventKey_(name, eventId);
+      if (eventId && seen.has(key)) return;
+      const labels = [];
+      [['venue', 'venue'], ['artists', 'artist'], ['collectives', 'collective'], ['party', 'party']].forEach(([field, kind]) => {
+        qdpArchiveIds_(row[c[field] - 1]).forEach(id => { const label = names[kind] && names[kind].get(id); if (label) labels.push(label); });
+      });
+      const dates = dateColumns.map(i => row[i] instanceof Date && !isNaN(+row[i])
+        ? qdpArchiveAdminDate_(row[i]) : '');
+      const haystack = qdpArchiveAdminSearchNormalize_(
+        searchable.map(i => row[i] == null ? '' : row[i]).concat(dates, labels, name).join('\n'));
+      if (!haystack.includes(needle)) return;
+      if (eventId) seen.add(key);
+      const group = groups.get(key);
+      events.push({eventId, title: title || eventId || 'Untitled event', sheet: name, sourceRow: index + 2,
+        date: qdpArchiveAdminDate_(row[c.start - 1]), description: String(row[c.description - 1] || ''),
+        proposals: group ? group.proposals.slice() : []});
+    });
+  });
+  events.sort((a, b) => b.date.localeCompare(a.date) || a.sheet.localeCompare(b.sheet) || a.sourceRow - b.sourceRow);
+  return events;
+}
+
 function qdpArchiveAdminPage_(body) {
   const ss = qdpArchiveSpreadsheet_();
   const job = qdpArchiveAdminRead_(QDP_ARCHIVE_ADMIN_.jobKey);
@@ -1298,19 +1320,21 @@ function qdpArchiveAdminPage_(body) {
   const queue = qdpArchiveAdminQueue_(ss);
   const summary = { pending: 0, approved: 0, applied: 0, rejected: 0, blocked: 0 };
   const groups = new Map();
+  const archiveSearch = String(body.archiveSearch || '').trim();
+  if (archiveSearch.length > 1000) throw new Error('Search with up to 1,000 characters.');
   const query = String(body.query || '').trim().toLowerCase().slice(0, 200);
   const view = ['pending', 'approved', 'applied', 'rejected', 'blocked'].includes(body.view) ? body.view : '';
   queue.rows.forEach(row => {
     const state = qdpArchiveAdminRowState_(row);
     summary[state]++;
-    if (view && state !== view) return;
-    if (query && ![row[4], row[5], row[7], row[8], row[9], row[10]].join(' ').toLowerCase().includes(query)) return;
+    if (!archiveSearch && view && state !== view) return;
+    if (!archiveSearch && query && ![row[4], row[5], row[7], row[8], row[9], row[10]].join(' ').toLowerCase().includes(query)) return;
     const key = JSON.stringify([row[2], row[4]]);
     if (!groups.has(key)) groups.set(key, { eventId: String(row[4]), title: String(row[5]),
       sheet: String(row[2]), proposals: [] });
     groups.get(key).proposals.push(row);
   });
-  const all = Array.from(groups.values());
+  const all = archiveSearch ? qdpArchiveAdminSearchEvents_(ss, archiveSearch, groups) : Array.from(groups.values());
   const requestedOffset = Math.max(0, Math.floor(Number(body.offset) || 0));
   const offset = Math.min(requestedOffset, Math.max(0, Math.floor((all.length - 1) / QDP_ARCHIVE_ADMIN_.pageSize) * QDP_ARCHIVE_ADMIN_.pageSize));
   const events = all.slice(offset, offset + QDP_ARCHIVE_ADMIN_.pageSize);
@@ -1325,6 +1349,7 @@ function qdpArchiveAdminPage_(body) {
     const {headers, byId} = source;
     const column = names => headers.findIndex(h => names.includes(String(h).trim()));
     const matches = byId.get(event.eventId) || [];
+    if (!event.eventId) { event.sourceIssue = 'Missing EventID at row ' + event.sourceRow + '. Add an EventID in the source sheet before editing.'; return; }
     if (matches.length !== 1) { event.sourceIssue = 'Event missing or duplicated; scan again after correcting the source.'; return; }
     const target = qdpArchiveAdminCachedTarget_(ss, event.sheet, event.eventId);
     event.record = qdpArchiveAdminEventRecord_(target);
@@ -1339,7 +1364,7 @@ function qdpArchiveAdminPage_(body) {
   });
   const unsavedRejectCount = queue.rows.filter(row => row[0] === 'Reject' && row[1] !== 'Rejected (saved)' && qdpArchiveRejectedValues_(row).length).length;
   const payload = { summary, ...progress, unsavedRejectCount, separatePublish: typeof qdpPublicPublishSaved_ === 'function',
-    inlineEventEdits: true, events, totalEvents: all.length, offset, pageSize: QDP_ARCHIVE_ADMIN_.pageSize };
+    inlineEventEdits: true, fullArchiveSearch: true, archiveSearch, events, totalEvents: all.length, offset, pageSize: QDP_ARCHIVE_ADMIN_.pageSize };
   if (body.references) payload.references = qdpArchiveAdminReferences_();
   if (body.includeRejects) Object.assign(payload, qdpArchiveAdminRejects_(body));
   return payload;
@@ -1361,6 +1386,7 @@ function qdpArchiveAdminSource_(ss, name) {
   if (reads.sources.has(name)) return reads.sources.get(name);
   const sheet = ss.getSheetByName(name);
   if (!sheet) throw new Error('This event source is no longer available. Refresh Archive Updates.');
+  qdpEnsureEventEditState_(sheet);
   const range = sheet.getDataRange(), rows = range.getValues();
   const layout = qdpArchiveLayout_(sheet, rows[0]), byId = new Map();
   rows.slice(1).forEach((row, i) => {
@@ -1389,7 +1415,9 @@ function qdpArchiveAdminEventTarget_(body) {
   if (!qdpArchiveSheets_(ss, true).includes(name) || !id || id.length > 200) {
     throw new Error('Choose a recorded event from Archive Updates.');
   }
-  const sheet = ss.getSheetByName(name), layout = qdpArchiveLayout_(sheet);
+  const sheet = ss.getSheetByName(name);
+  qdpEnsureEventEditState_(sheet);
+  const layout = qdpArchiveLayout_(sheet);
   const rows = sheet.getDataRange().getValues();
   const matches = rows.slice(1).map((row, i) => ({ row, number: i + 2 }))
     .filter(item => String(item.row[layout.columns.eventId - 1] || '').trim() === id);
@@ -1492,43 +1520,25 @@ function qdpArchiveAdminPrepareEvent_(body, target) {
     if (lookupKey) {
       const ids = qdpArchiveIds_(value), original = qdpArchiveIds_(field.value);
       if (['venue', 'party'].includes(field.type) && ids.length > 1) throw new Error('Choose one ' + field.label.toLowerCase() + '.');
-      const unknown = ids.filter(id => !lookups[lookupKey].ids.has(id) && !original.includes(id) &&
-        !(field.type === 'venue' && ['SECLOC-001', 'TOBEAN-001'].includes(id)));
-      if (unknown.length) throw new Error('Unknown ' + field.label.toLowerCase() + ': ' + unknown.join(', '));
-      value = ids.join(', ');
+      value = qdpValidateReferences_(ids, field.type, lookups.core, original).join(', ');
     }
     changed.add(key); set(field.column, value);
   }
   const venueId = String(row[c.venue - 1] || '').trim();
   if (venueId && fields.some(field => field.manualLocation && changed.has(field.key))) throw new Error('Clear the venue before entering a manual location.');
-  const venueChanged = updates.has(c.venue), artistsChanged = updates.has(c.artists), partyChanged = updates.has(c.party);
-  const column = aliases => target.layout.headers.findIndex(h => aliases.includes(h)) + 1;
-  if (venueChanged && venueId) {
-    const venue = lookups.core.venueById[venueId];
-    if (venue) {
-      set(c.location, venue.publicName || venue.internal || venue.name || venueId);
-      set(column(['Address (from Venue)', 'Address from Venue', 'Address']), venue.address || '');
-      set(column(['Neighborhood (from Venue)', 'Neighborhood from Venue', 'Neighborhood']), venue.neighborhood || '');
-    }
-    if (!updates.has(c.explicit) && lookups.venue.queer.has(venueId)) set(c.explicit, 'Yes');
-  }
-  if (artistsChanged || partyChanged) {
-    const indicators = qdpArchiveIndicatorValues_(row[c.artists - 1], lookups, row[c.party - 1]);
-    if (!indicators.unknown) { set(c.queerIndicator, indicators.queer); set(c.transIndicator, indicators.trans); }
-  }
-  if ((updates.has(c.title) || artistsChanged || partyChanged) && typeof buildEventPublicTitle_ === 'function') {
-    const publicTitle = column(['Title_Public (auto w/ emojis)', 'Title Public (auto w/ emojis)', 'Title_Public']);
-    if (!updates.has(publicTitle)) set(publicTitle, buildEventPublicTitle_(row[c.title - 1], qdpArchiveIds_(row[c.artists - 1]), lookups.core, row[c.party - 1]));
-  }
-  if (updates.has(c.description) && !updates.has(c.explicit) && typeof contentImpliesExplicitQueer_ === 'function' &&
-      contentImpliesExplicitQueer_(row[c.title - 1], row[c.description - 1])) set(c.explicit, 'Yes');
+  const rules = qdpApplyEventSaveRules_(row, target.layout.headers, lookups.core, {original: target.row,
+    touched: [...updates.keys()], formulas: target.formulas, markEdited: target.layout.name === CONFIG.SHEET_EVENTS,
+    recordManual: true, trackCalendar: target.layout.name === CONFIG.SHEET_EVENTS});
+  rules.updates.forEach((value, column) => updates.set(column, value));
   const start = fields.find(field => field.label === 'Start date'), end = fields.find(field => field.label === 'End date');
   if (start && end && (changed.has(start.key) || changed.has(end.key))) {
     const from = updates.has(start.column) ? row[start.column - 1] : start.value;
     const to = updates.has(end.column) ? row[end.column - 1] : end.value;
     if (from && to && to < from) throw new Error('The end date cannot precede the start date.');
   }
-  if (updates.size && target.layout.name === CONFIG.SHEET_EVENTS) set(column(['LastEditedAt', 'Last Edited At']), new Date().toISOString());
+  if (updates.size && target.layout.name === CONFIG.SHEET_EVENTS) {
+    set(target.layout.headers.findIndex(header => ['LastEditedAt', 'Last Edited At'].includes(header)) + 1, new Date().toISOString());
+  }
   return {target, row, updates};
 }
 
@@ -1853,6 +1863,7 @@ function qdpArchiveAdminWorker() {
   QDP_ARCHIVE_REQUEST_ = null;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
+  QDP_WRITE_LOCK_DEPTH_++;
   let job, publishPhase = '';
   try {
     job = qdpArchiveAdminRead_(QDP_ARCHIVE_ADMIN_.jobKey);
@@ -1879,7 +1890,7 @@ function qdpArchiveAdminWorker() {
     qdpArchiveAdminWrite_(QDP_ARCHIVE_ADMIN_.jobKey, job);
   } catch (error) {
     qdpArchiveAdminFail_(job, error);
-  } finally { lock.releaseLock(); }
+  } finally { QDP_WRITE_LOCK_DEPTH_--; lock.releaseLock(); }
   if (!publishPhase) return;
   try {
     qdpPublicPublishSaved_(() => {

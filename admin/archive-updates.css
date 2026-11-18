@@ -79,3 +79,10 @@
   .archive-scan-fields .field { min-width: 0; }
   .archive-actions button { min-height: 42px; }
 }
+
+.archive-master-search-controls { display: flex; align-items: end; gap: 12px; margin-top: 16px; }
+.archive-master-search-controls .field { flex: 1; min-width: 0; }
+.archive-master-search-controls input { width: 100%; }
+.archive-master-search-controls .quiet-button { flex-shrink: 0; }
+@media (max-width: 540px) { .archive-master-search-controls { align-items: stretch; flex-direction: column; } .archive-master-search-controls .quiet-button { align-self: flex-start; } }
+

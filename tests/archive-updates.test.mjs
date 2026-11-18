@@ -1,14 +1,19 @@
-import test from 'node:test';
+import nodeTest from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import vm from 'node:vm';
-
 const source = readFileSync(new URL('../apps-script/ArchiveReview.gs', import.meta.url), 'utf8');
+// Core is maintained separately from this repository. Exercise its actual
+// shared save rules when the supplied source is available.
+function test(name, options, run) {
+  if (typeof options === 'function') { run = options; options = {}; }
+  return nodeTest(name, {...options, skip: options.skip || (!process.env.QDP_CORE_SOURCE && 'Set QDP_CORE_SOURCE to the installed Core.gs replacement')}, run);
+}
 const eventHeaders = ['Status', 'EventID', 'Title (internal)', 'StartDate', 'VenueID',
   'ArtistIDs (comma-separated)', 'Description', 'Location', 'HostCollectiveIDs (comma-separated)',
   'PartyID', 'ExplicitQueer (Yes/No)', 'CalendarColorId', 'QueerArtistIndicator', 'TransArtistIndicator', 'Flyer_URL',
-  'Title_Public (auto w/ emojis)', 'LastEditedAt'];
+  'Title_Public (auto w/ emojis)', 'LastEditedAt', 'QDP_EditState'];
 const event = (id, description, fields = {}) => Object.fromEntries(eventHeaders.map(h => [h, ({
   EventID: id, 'Title (internal)': 'Night ' + id, StartDate: '2025-04-01', Description: description,
   ...fields
@@ -16,7 +21,7 @@ const event = (id, description, fields = {}) => Object.fromEntries(eventHeaders.
 
 function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], active = [], extra = {}, staleReads = false } = {}) {
   let nextSheetId = 1;
-  const batchRequests = [], reads = [], snapshots = new Map();
+  const batchRequests = [], reads = [], formulaReads = [], snapshots = new Map();
   let digestCount = 0;
   class Range {
     constructor(sheet, row, col, height = 1, width = 1) {
@@ -31,8 +36,11 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
         values[this.row - 1 + i]?.[this.col - 1 + j] ?? ''));
     }
     getValue() { return this.getValues()[0][0]; }
-    getFormulas() { return Array.from({length: this.height}, (_, i) => Array.from({length: this.width}, (_, j) =>
-      this.sheet.formulas?.[this.row - 1 + i]?.[this.col - 1 + j] || '')); }
+    getFormulas() {
+      formulaReads.push(this.sheet.name);
+      return Array.from({length: this.height}, (_, i) => Array.from({length: this.width}, (_, j) =>
+        this.sheet.formulas?.[this.row - 1 + i]?.[this.col - 1 + j] || ''));
+    }
     setValues(values) {
       snapshots.delete(this.sheet.name);
       assert.equal(values.length, this.height);
@@ -100,11 +108,11 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
   const lock = { waitLock() { assert.equal(locked, false, 'No nested Script locks'); locked = true; },
     tryLock() { if (locked) return false; locked = true; return true; }, releaseLock() { assert.equal(locked, true); locked = false; } };
   const c = vm.createContext({ Date, Map, Set, JSON, String, Object, Array, RegExp, Math, Number, console,
-    CONFIG: { SHEET_EVENTS: 'Events' },
+    CONFIG: { SHEET_EVENTS: 'Events' }, Session: {getScriptTimeZone: () => 'America/New_York'},
     ss_: () => ss, LockService: { getScriptLock: () => lock },
     PropertiesService: { getScriptProperties: () => ({ getProperty: key => props.get(key) || null,
       setProperty: (key, value) => props.set(key, value), deleteProperty: key => props.delete(key) }) },
-    Utilities: { getUuid: randomUUID, DigestAlgorithm: { SHA_256: 'sha256' },
+    Utilities: { getUuid: randomUUID, DigestAlgorithm: { SHA_256: 'sha256' }, Charset: {UTF_8: 'UTF_8'},
       computeDigest: (_, text) => { digestCount++; return createHash('sha256').update(text).digest(); },
       base64EncodeWebSafe: bytes => Buffer.from(bytes).toString('base64url'),
       formatDate: (date, zone, format) => format === 'yyyy-MM-dd' ? new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(date) : date.toISOString() },
@@ -157,7 +165,7 @@ function setup({ events = [event('ONE', 'Featuring New Artist and The Crew')], a
   const approve = page => call('decide', { changes: proposals(page).filter(p => p.state === 'pending' && p.kind === 'artist')
     .map(p => ({ key: p.key, revision: p.revision, decision: 'Approve', proposedIds: p.proposedIds })) });
   const finish = () => { for (let i = 0; i < 30; i++) { const page = call('bootstrap'); if (!c.qdpArchiveAdminActive_(page.job)) return page; c.qdpArchiveAdminWorker(); } throw new Error('Job did not finish'); };
-  return { c, ss, sheets, props, triggers, publishes, batchRequests, reads, get digestCount() { return digestCount; }, call, plain, proposals, approve, finish, rows };
+  return { c, ss, sheets, props, triggers, publishes, batchRequests, reads, formulaReads, get digestCount() { return digestCount; }, call, plain, proposals, approve, finish, rows };
 }
 
 test('checked revisions and rejections save together; unchecked suggestions remain pending', () => {
@@ -194,7 +202,10 @@ test('all decisions and all archive cell updates use batch requests rather than 
   assert.equal(h.batchRequests[0].length, 250);
   h.c.qdpArchiveAdminWorker();
   assert.equal(h.batchRequests.length, 2);
-  assert.equal(h.batchRequests[1].length, 500); // ID, result, and two indicator cells for each event.
+  const updates = h.batchRequests[1].filter(request => request.updateCells?.start.sheetId === h.sheets.get('Events_Archive').getSheetId());
+  assert.equal(new Set(updates.map(request => request.updateCells.start.rowIndex)).size, 125);
+  assert.equal(new Set(updates.filter(request => request.updateCells.start.columnIndex === eventHeaders.indexOf('ArtistIDs (comma-separated)'))
+    .map(request => request.updateCells.start.rowIndex)).size, 125);
   assert.equal(h.finish().summary.applied, 125);
 });
 
@@ -375,7 +386,7 @@ test('inline saves protect formula and identity columns and reject newly invente
     const h = setup(), sheet = h.sheets.get('Events_Archive');
     sheet.formulas = [[], []]; sheet.formulas[1][eventHeaders.indexOf('Title_Public (auto w/ emojis)')] = '=A1';
     const record = h.call('scan').events[0].record;
-    assert.throws(() => h.call('save', {changes: [], eventEdits: [{sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision, fields}]}), /cannot be edited|Unknown artists/);
+    assert.throws(() => h.call('save', {changes: [], eventEdits: [{sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision, fields}]}), /cannot be edited|Unknown artists|Unknown artist ID/);
     assert.equal(h.batchRequests.length, 0);
   }
 });
@@ -420,7 +431,7 @@ test('bulk inline editing reads the source once and rechecks one span rather tha
   h.reads.length = 0;
   const result = h.call('save', {changes: [], eventEdits: edits});
   assert.equal(result.editedEvents, 40); assert.equal(h.batchRequests.length, 1);
-  assert.equal(h.reads.filter(read => read.sheet === 'Events_Archive').length, 2);
+  assert.equal(h.reads.filter(read => read.sheet === 'Events_Archive' && read.height > 1).length, 2);
 });
 
 test('Admin event editor saves a historical description to its original source without touching Events', () => {
@@ -771,3 +782,154 @@ test('Core integration: archive matching keeps DJ Love separate and honors brack
   assert.deepEqual(ids('ONE'), ['LETTERS']);
   assert.deepEqual(ids('TWO'), ['LOVE', 'EXACT', 'SHORT']);
 });
+
+
+test('master search reaches every archive tab before any scan and excludes the current Events tab', () => {
+  const h = setup({events: [event('BASE', 'Searchneedle base')], active: [event('CURRENT', 'Searchneedle current')],
+    extra: {'Archive 2023': [eventHeaders, eventHeaders.map(header => event('YEAR', 'Searchneedle old', {StartDate: '2023-02-01'})[header])]}});
+  const page = h.call('bootstrap', {archiveSearch: 'Searchneedle'});
+  assert.equal(page.fullArchiveSearch, true); assert.equal(page.scan, null);
+  assert.equal(page.totalEvents, 2);
+  assert.deepEqual(h.plain(page.events.map(e => e.eventId)), ['BASE', 'YEAR']);
+  assert.ok(page.events.every(e => e.record && e.proposals.length === 0));
+  assert.equal(h.sheets.has('Archive_ID_Review'), false); assert.equal(h.batchRequests.length, 0);
+});
+
+test('master search matches saved fields literally, including descriptions, locations, links, titles, and IDs', () => {
+  const h = setup({events: [event('UNIQUE-ID', 'A description with a+b? and house music',
+    {'Title (internal)': 'Sunrise special', Location: 'A place near River Street', Flyer_URL: 'https://example.test/flyer/8347.jpg'})]});
+  for (const text of ['UNIQUE-ID', 'sunrise', 'HOUSE MUSIC', 'River Street', '/flyer/8347.jpg', 'a+b?']) {
+    assert.equal(h.call('bootstrap', {archiveSearch: text}).totalEvents, 1, text);
+  }
+  assert.equal(h.call('bootstrap', {archiveSearch: 'a.*b'}).totalEvents, 0);
+});
+
+test('master search resolves linked profile names without inferring affiliations or unassigned artists', () => {
+  const h = setup({events: [event('ONE', 'Ordinary copy', {VenueID: 'ROOM', PartyID: 'NIGHT',
+    'ArtistIDs (comma-separated)': 'OLD', 'HostCollectiveIDs (comma-separated)': 'CREW'})]});
+  for (const text of ['The Room', 'The Night', 'Existing Artist', 'The Crew']) {
+    assert.equal(h.call('bootstrap', {archiveSearch: text}).totalEvents, 1, text);
+  }
+  assert.equal(h.call('bootstrap', {archiveSearch: 'New Artist'}).totalEvents, 0);
+});
+
+test('master search ignores case and accents while preserving a full phrase across whitespace', () => {
+  const h = setup({events: [event('ONE', 'SAZÓN brings\n\nwarm grooves.')]});
+  assert.equal(h.call('bootstrap', {archiveSearch: 'sazon brings warm'}).totalEvents, 1);
+  assert.equal(h.call('bootstrap', {archiveSearch: 'Sazón'}).totalEvents, 1);
+});
+
+test('master search ignores the last scan date and profile scope, and review query and status filters', () => {
+  const h = setup({events: [event('OLD', 'New Artist searchneedle', {StartDate: '2023-01-01'}),
+    event('NEWER', 'New Artist', {StartDate: '2026-01-01'})]});
+  h.call('scan', {from: '2026-01-01', kind: 'artist', profileId: 'NEW'});
+  const page = h.call('bootstrap', {archiveSearch: 'searchneedle', view: 'applied', query: 'not in this event'});
+  assert.equal(page.totalEvents, 1); assert.equal(page.events[0].eventId, 'OLD');
+  assert.equal(page.events[0].proposals.length, 0);
+});
+
+test('master search retains all suggestions for a matched event and clearing returns to filtered review', () => {
+  const h = setup(), scan = h.call('scan');
+  const page = h.call('bootstrap', {archiveSearch: 'ONE', view: 'applied', query: 'unmatched'});
+  assert.equal(page.events[0].proposals.length, scan.events[0].proposals.length);
+  const cleared = h.call('bootstrap', {archiveSearch: '', view: 'applied', query: 'unmatched'});
+  assert.equal(cleared.archiveSearch, ''); assert.equal(cleared.totalEvents, 0);
+});
+
+test('master search paginates all matches in stable newest-first order', () => {
+  const h = setup({events: Array.from({length: 45}, (_, i) => event('E-' + i, 'matchneedle',
+    {StartDate: new Date(Date.UTC(2025, 0, i + 1, 12)).toISOString().slice(0, 10)}))});
+  const ids = [];
+  for (const offset of [0, 20, 40]) {
+    const page = h.call('bootstrap', {archiveSearch: 'matchneedle', offset});
+    assert.equal(page.totalEvents, 45); assert.equal(page.offset, offset);
+    assert.equal(page.events.length, offset === 40 ? 5 : 20);
+    ids.push(...page.events.map(e => e.eventId));
+  }
+  assert.equal(new Set(ids).size, 45); assert.equal(ids[0], 'E-44'); assert.equal(ids.at(-1), 'E-0');
+  assert.equal(h.call('bootstrap', {archiveSearch: 'matchneedle', offset: 999}).offset, 40);
+});
+
+test('master search reports zero matches and safely clamps pagination', () => {
+  const h = setup(), page = h.call('bootstrap', {archiveSearch: 'does not exist', offset: 999});
+  assert.equal(page.totalEvents, 0); assert.equal(page.offset, 0); assert.equal(page.events.length, 0);
+  assert.throws(() => h.call('bootstrap', {archiveSearch: 'x'.repeat(1001)}), /1,000/);
+});
+
+test('master search includes cancelled and unpublished archive records for cleanup', () => {
+  const h = setup({events: [event('CANCELLED', 'needle', {Status: 'Cancelled'}),
+    event('DELETED', 'needle', {'Title (internal)': '(DELETED ENTRY) old listing'})]});
+  assert.equal(h.call('bootstrap', {archiveSearch: 'needle'}).totalEvents, 2);
+});
+
+test('master search shows missing and duplicate EventIDs with editing blocked', () => {
+  const h = setup({events: [event('', 'needle'), event('DUP', 'needle'), event('DUP', 'different copy')]});
+  const page = h.call('bootstrap', {archiveSearch: 'needle'});
+  assert.equal(page.totalEvents, 2);
+  const missing = page.events.find(e => !e.eventId), duplicate = page.events.find(e => e.eventId === 'DUP');
+  assert.match(missing.sourceIssue, /Missing EventID at row 2/); assert.equal(missing.record, undefined);
+  assert.match(duplicate.sourceIssue, /duplicated/); assert.equal(duplicate.record, undefined);
+});
+
+test('master search omits internal edit metadata and completely blank rows', () => {
+  const h = setup({events: [event('ONE', 'ordinary copy', {QDP_EditState: '{"v":1,"owned":[],"pending":[],"rejected":{},"note":"secretneedle"}'})]});
+  h.sheets.get('Events_Archive').rows.push(Array(eventHeaders.length).fill(''));
+  assert.equal(h.call('bootstrap', {archiveSearch: 'secretneedle'}).totalEvents, 0);
+  assert.equal(h.call('bootstrap', {archiveSearch: 'Events_Archive'}).totalEvents, 1);
+});
+
+test('master search loads formula data once only for source tabs on the displayed page', () => {
+  const h = setup({events: Array.from({length: 20}, (_, i) => event('E-' + i, 'needle', {StartDate: '2026-01-01'})),
+    extra: {'Archive 2024': [eventHeaders, eventHeaders.map(header => event('OLDER', 'needle', {StartDate: '2024-01-01'})[header])]}});
+  const page = h.call('bootstrap', {archiveSearch: 'needle'});
+  assert.equal(page.totalEvents, 21); assert.equal(page.events.length, 20);
+  assert.deepEqual(h.formulaReads, ['Events_Archive']);
+  for (const name of ['Events_Archive', 'Archive 2024']) {
+    assert.equal(h.reads.filter(read => read.sheet === name && read.height > 1).length, 1);
+  }
+});
+
+test('a result with no scan suggestion saves inline to its archive tab and changes its search membership', () => {
+  const h = setup({events: [event('ONE', 'oldneedle description')], active: [event('LIVE', 'Live untouched')]});
+  const currentBefore = JSON.stringify(h.sheets.get('Events').rows);
+  const record = h.call('bootstrap', {archiveSearch: 'oldneedle'}).events[0].record;
+  const result = h.call('save', {archiveSearch: 'oldneedle', changes: [], eventEdits: [{
+    sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision, fields: {Description: 'newneedle corrected copy'}}]});
+  assert.equal(result.editedEvents, 1); assert.equal(result.totalEvents, 0);
+  assert.equal(result.savedEventKeys.length, 1); assert.equal(result.needsPublish, true);
+  assert.equal(h.call('bootstrap', {archiveSearch: 'newneedle'}).totalEvents, 1);
+  assert.equal(JSON.stringify(h.sheets.get('Events').rows), currentBefore);
+  assert.deepEqual(h.publishes, []);
+});
+
+test('a stale search-result edit is rejected before any source writes', () => {
+  const h = setup(), record = h.call('bootstrap', {archiveSearch: 'ONE'}).events[0].record;
+  h.sheets.get('Events_Archive').rows[1][eventHeaders.indexOf('Description')] = 'Newer spreadsheet correction';
+  assert.throws(() => h.call('save', {changes: [], eventEdits: [{
+    sheet: record.sheet, eventId: record.eventId, expectedRevision: record.revision, fields: {Description: 'stale edit'}}]}), /changed/);
+  assert.equal(h.batchRequests.length, 0);
+});
+
+test('CollAliases and existing Aliases both contribute to collective matching in Core and archive review', () => {
+  const h = setup(), sheet = h.sheets.get('Collectives');
+  sheet.rows[0].push('CollAliases'); sheet.rows[1][2] = 'Old Crew Name'; sheet.rows[1].push('Rainbow Union, [UCQ]');
+  const lookups = h.c.buildLookupMaps_();
+  for (const text of ['Rainbow Union', 'Old Crew Name', 'UCQ']) {
+    assert.deepEqual(Array.from(h.c.detectIdsByKeywords_(text, lookups).colls), ['CREW'], text);
+    h.c.QDP_ARCHIVE_REQUEST_ = null;
+    assert.deepEqual(Array.from(h.c.qdpArchiveMatches_(text, h.c.qdpArchiveLookups_(h.ss).collectives), match => match.id), ['CREW'], text);
+  }
+  assert.deepEqual(Array.from(h.c.detectIdsByKeywords_('UCQfestival', lookups).colls), []);
+});
+
+test('CollAliases is editable through the collective profile and alias changes invalidate old approvals', () => {
+  const h = setup(), sheet = h.sheets.get('Collectives');
+  sheet.rows[0].push('CollAliases'); sheet.rows[1].push('Rainbow Union');
+  const profile = h.c.qdpAdminReadIndexProfile_({kind: 'collective', profileId: 'CREW'});
+  assert.equal(profile.fields.find(field => field.key === 'CollAliases').value, 'Rainbow Union');
+  const page = h.call('scan'), p = page.events[0].proposals.find(p => p.kind === 'artist');
+  sheet.rows[1][4] = 'Updated Union';
+  assert.throws(() => h.call('decide', {changes: [{key: p.key, revision: p.revision, decision: 'Approve', proposedIds: p.proposedIds}]}), /Index changed/);
+  assert.equal(h.batchRequests.length, 0);
+});
+

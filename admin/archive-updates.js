@@ -4,10 +4,11 @@
     "archiveIncludeActive", "archiveStatus", "archiveProgress", "archiveLastScan", "archiveRetry", "archiveCounts", "archiveView",
     "archiveQuery", "archiveSelectPage", "archiveSave", "archiveClear", "archiveDraftCount", "archiveEmpty", "archiveEvents",
     "archivePrevious", "archiveNext", "archivePage", "archiveApply", "archivePublish", "archivePublishNote", "archiveRejectDetails",
-    "archiveRejectStatus", "archiveRejectList", "archiveRejectPrevious", "archiveRejectNext"];
+    "archiveRejectStatus", "archiveRejectList", "archiveRejectPrevious", "archiveRejectNext",
+    "archiveMasterQuery", "archiveMasterClear", "archiveMasterStatus", "reviewHeading"];
   const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   const labels = { artist: "Artists", venue: "Venue", party: "Party", collective: "Collectives", classification: "Explicitly queer event" };
-  let state = null, references = {}, busy = false, offset = 0, rejectOffset = 0, timer, searchTimer;
+  let state = null, references = {}, busy = false, offset = 0, rejectOffset = 0, timer, searchTimer, pendingSearch = false;
   let controls = new Map(), eventControls = new Map(), namesByKind = {}, restoreButtons = [];
   const drafts = new Map(), eventDrafts = new Map(), expandedEditors = new Set();
   const eventKey = event => JSON.stringify([event.sheet, event.eventId]);
@@ -28,11 +29,21 @@
     return namesByKind[kind]?.get(id) || (kind === "classification" && id === "Yes" ? "Explicitly queer" : id);
   }
   function params() { return { offset, view: el.archiveView.value, query: el.archiveQuery.value,
-    includeRejects: el.archiveRejectDetails.open, rejectOffset }; }
+    archiveSearch: el.archiveMasterQuery.value.trim(), includeRejects: el.archiveRejectDetails.open, rejectOffset }; }
   function status(text, error = false) { api.message(el.archiveStatus, text, error); }
   function updateButtons() {
     const lock = locked();
     el.archiveRefresh.disabled = busy;
+    const searching = !!el.archiveMasterQuery.value.trim();
+    el.archiveMasterQuery.disabled = !state || state.fullArchiveSearch !== true;
+    el.archiveMasterClear.disabled = !searching || el.archiveMasterQuery.disabled;
+    el.archiveView.disabled = el.archiveQuery.disabled = busy || searching;
+    el.archiveMasterStatus.textContent = !state ? '' : state.fullArchiveSearch !== true
+      ? 'Install ArchiveReview.gs v7.4.25 and update the existing Apps Script deployment to enable full-archive search.'
+      : searching ? (state.archiveSearch === el.archiveMasterQuery.value.trim()
+        ? state.totalEvents.toLocaleString() + ' matching archive event' + (state.totalEvents === 1 ? '' : 's') + '. Scan filters do not limit these results.'
+        : 'Searching the full archive…')
+        : 'Enter any text to search all saved archive events. Clear the search to return to scan suggestions.';
     el.archiveScanFields.disabled = busy || !state;
     el.archiveRetry.hidden = state?.job?.phase !== "failed";
     el.archiveRetry.disabled = busy;
@@ -293,7 +304,8 @@
       const body = node("div", "archive-event-body"); body.append(node("p", "archive-event-date", dateLabel(event.date)));
       const title = node("h3"), link = node("a", "", event.title);
       link.href = "/?event=" + encodeURIComponent(event.eventId); link.target = "_blank"; link.rel = "noopener";
-      title.append(link); body.append(title, node("p", "event-id", `${event.eventId} · ${event.sheet}`));
+      if (event.eventId) title.append(link); else title.textContent = event.title;
+      body.append(title, node("p", "event-id", `${event.eventId || "Missing EventID"} · ${event.sheet}${event.sourceRow ? " · Row " + event.sourceRow : ""}`));
       if (event.sourceIssue) body.append(node("p", "archive-result", event.sourceIssue));
       renderEventEditor(event, body);
       for (const proposal of event.proposals) renderProposal(proposal, event, body);
@@ -302,7 +314,8 @@
     el.archiveEvents.replaceChildren(fragment);
     for (const control of eventControls.values()) control.fit();
     el.archiveEmpty.hidden = !!payload.events.length;
-    el.archiveEmpty.textContent = payload.scan ? "No suggestions match this view." : "Start a scan to find missing associations in recorded events.";
+    el.reviewHeading.textContent = payload.archiveSearch ? 'Archive search results' : 'Review associations';
+    el.archiveEmpty.textContent = payload.archiveSearch ? 'No archive events match this search.' : payload.scan ? "No suggestions match this view." : "Start a scan to find missing associations in recorded events.";
     el.archivePage.textContent = payload.totalEvents ? `${offset + 1}–${Math.min(offset + payload.pageSize, payload.totalEvents)} of ${payload.totalEvents} events` : "";
     if (payload.rejects) renderRejects(payload);
     renderProgress(payload);
@@ -331,10 +344,11 @@
     if (active()) timer = setTimeout(() => perform("step", { progressOnly: true }), state?.job?.leaseUntil > Date.now() ? 1500 : 250);
   }
   async function perform(action, data = {}, success = "") {
-    if (busy) { scheduleStep(); return; }
+    if (busy) { if (action === "bootstrap") pendingSearch = true; else scheduleStep(); return; }
+    const requested = { ...params(), ...data };
     busy = true; updateButtons(); el.archiveEvents.setAttribute("aria-busy", "true");
     try {
-      const result = await api.request("admin.archive." + action, { ...params(), ...data });
+      const result = await api.request("admin.archive." + action, requested);
       if (action === 'save') {
         if (!Array.isArray(result.savedKeys) || data.changes.some(change => !result.savedKeys.includes(change.key))) {
           throw new Error('The save was not confirmed. Your selections have been kept; refresh to check the saved review.');
@@ -346,7 +360,10 @@
         for (const key of result.savedEventKeys || []) eventDrafts.delete(key);
       }
       if (action === 'scan') { drafts.clear(); eventDrafts.clear(); expandedEditors.clear(); }
-      render(result);
+      const current = params();
+      const superseded = ['archiveSearch', 'view', 'query', 'offset'].some(key => requested[key] !== current[key]);
+      if (superseded) pendingSearch = true;
+      else render(result);
       if (action === 'save' && !active() && result.job?.phase !== 'failed') status('Changes saved to the sheet. The website has not been published.');
       if (success) status(success);
     } catch (error) {
@@ -358,7 +375,13 @@
         text = 'Install ArchiveReview.gs v7.4.22 and update the existing Apps Script deployment to save revisions together. Your selections have been kept.';
       }
       status(text, true); clearTimeout(timer);
-    } finally { busy = false; el.archiveEvents.setAttribute("aria-busy", "false"); updateButtons(); }
+    } finally {
+      busy = false; el.archiveEvents.setAttribute("aria-busy", "false"); updateButtons();
+      if (pendingSearch) {
+        pendingSearch = false; clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => perform("bootstrap"), 0);
+      }
+    }
   }
   function populateProfiles() {
     const kind = el.archiveKind.value, selected = el.archiveProfile.value;
@@ -370,14 +393,25 @@
   el.archiveScanForm.addEventListener("submit", event => {
     event.preventDefault();
     clearTimeout(searchTimer);
-    offset = 0; el.archiveView.value = ''; el.archiveQuery.value = '';
+    offset = 0; el.archiveView.value = ''; el.archiveQuery.value = ''; el.archiveMasterQuery.value = '';
     perform("scan", { includeActive: el.archiveIncludeActive.checked, from: el.archiveFrom.value, to: el.archiveTo.value,
       kind: el.archiveKind.value, profileId: el.archiveProfile.value });
   });
   el.archiveRefresh.addEventListener("click", () => perform("bootstrap", { references: true }));
   el.archiveRetry.addEventListener("click", () => perform("retry"));
   el.archiveView.addEventListener("change", () => { offset = 0; perform("bootstrap"); });
-  el.archiveQuery.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { offset = 0; perform("bootstrap"); }, 300); });
+  function queueSearch(delay = 300) {
+    clearTimeout(searchTimer); offset = 0; updateButtons();
+    searchTimer = setTimeout(() => perform("bootstrap"), delay);
+  }
+  el.archiveQuery.addEventListener("input", () => queueSearch());
+  el.archiveMasterQuery.addEventListener("input", () => queueSearch());
+  el.archiveMasterQuery.addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); clearTimeout(searchTimer); offset = 0; perform("bootstrap"); }
+  });
+  el.archiveMasterClear.addEventListener("click", () => {
+    el.archiveMasterQuery.value = ''; clearTimeout(searchTimer); offset = 0; updateButtons(); perform("bootstrap");
+  });
   el.archiveSelectPage.addEventListener('change', () => {
     const checked = el.archiveSelectPage.checked;
     for (const c of controls.values()) if (c.reviewable && (!c.single || c.choices.length === 1)) {
@@ -423,3 +457,4 @@
   window.addEventListener('focus', () => { if (state && !busy && !eventDrafts.size) perform('bootstrap'); });
   perform("bootstrap", { references: true });
 })();
+

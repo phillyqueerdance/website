@@ -8,9 +8,9 @@
   <title>Archive Updates | QDP Admin</title>
   <link rel="icon" type="image/png" href="/admin/favicon.png">
   <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
-  <link rel="stylesheet" href="/admin/archive-updates.css?v=20261117-inline-events">
+  <link rel="stylesheet" href="/admin/archive-updates.css?v=20261118-archive-search">
   <script src="/admin/profile-editor.js?v=20261117-integrity" defer></script>
-  <script src="/admin/archive-updates.js?v=20261117-inline-events" defer></script>
+  <script src="/admin/archive-updates.js?v=20261118-archive-search" defer></script>
 </head>
 <body>
   <header class="admin-header">
@@ -23,6 +23,16 @@
   <main class="admin-shell archive-shell">
     <nav aria-label="Admin tools"><a class="admin-page-link" href="/admin/">Back to Admin</a></nav>
     <p class="archive-intro">Connect newly added profiles to events already recorded in QDP.</p>
+
+    <section class="dashboard-panel archive-master-search" aria-labelledby="archiveSearchHeading">
+      <div class="section-heading"><h2 id="archiveSearchHeading">Search all archive events</h2></div>
+      <div class="archive-master-search-controls">
+        <label class="field"><span>Search the full archive</span><input id="archiveMasterQuery" type="search" maxlength="1000" placeholder="Any text, name, date, link, or ID…" aria-describedby="archiveMasterHelp archiveMasterStatus" disabled></label>
+        <button id="archiveMasterClear" class="quiet-button" type="button" disabled>Clear search</button>
+      </div>
+      <p id="archiveMasterHelp" class="field-help">Searches every archive tab, including events with no scan suggestions. Results appear below and can be edited here.</p>
+      <p id="archiveMasterStatus" class="dashboard-note" role="status" aria-live="polite"></p>
+    </section>
 
     <section class="dashboard-panel" aria-labelledby="scanHeading">
       <div class="section-heading"><h2 id="scanHeading">Scan recorded events</h2></div>
@@ -87,3 +97,4 @@
   </main>
 </body>
 </html>
+

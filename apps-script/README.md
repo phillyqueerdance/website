@@ -2,21 +2,42 @@
 
 ## Admin Archive Updates
 
+**Search and collective aliases (v7.4.25):** Replace **Core.gs** and
+**ArchiveReview.gs** with the complete supplied v7.4.25 scripts, then update the
+existing Apps Script web-app deployment. Keep Imports.gs v7.4.24 and the other
+installed scripts. No setup rerun or new scan is needed for search.
+
+The top search field searches saved records in `Events_Archive` and every
+`Archive YYYY` tab, including events with no review suggestions. It matches
+text in event fields and linked profile names, ignores case and accents, and
+shows 20 editable results per page, newest first. Scan dates, profile filters,
+and review status filters do not restrict this search. Clearing it returns to
+scan suggestions; unsaved edits and decisions survive searches and pagination.
+Matching uses saved sheet data, so local drafts affect the matches after saving.
+Current Events records remain part of scans when selected; master search covers
+archived records only.
+
+`Collectives.CollAliases` accepts comma-separated aliases and the existing
+`[exact-only phrase]` syntax. Core's shared matcher uses both `CollAliases` and
+any existing `Aliases` entries, so Calendar pulls, sheet ID detection, imports,
+and archive review use the same collective aliases. Existing manual selections
+and saved rejections still take precedence. New alias matches are picked up on
+the next pull or ID scan, rather than overwriting every historical row on
+installation. The collective profile editor exposes the new column when it
+exists. Editing the aliases invalidates approvals based on an older Index.
+
 The Admin dashboard links to `/admin/archive-updates`. It scans events already
 recorded in `Events_Archive`, every `Archive YYYY` tab, and optionally the active
 `Events` tab. Date ranges and artist, venue, party, or collective filters can
 focus a scan on one profile or type. It does not import external historical
 events or perform an Instagram scrape.
 
-Install the supplied full **Core.gs v7.4.22**, **ArchiveReview.gs v7.4.24**, and
-**PublicData.gs v7.4.22** in the existing Apps Script
-project. Save and update the existing Web app deployment to a new version,
-keeping its URL and access settings. Preserve every other script, including
-`scraper.gs`, `Imports.gs`, `ApifyAdminImport.gs`, the manifest, existing Script
-Properties, and refresh triggers. `archive-feed.gs` remains a reference publisher
-and must not be installed alongside PublicData.gs. The full Core.gs and
-PublicData.gs replacements are supplied separately because they are maintained
-with the user's existing Apps Script source.
+The full Core.gs replacement is supplied separately because it is maintained
+with the user's existing Apps Script source. Keep PublicData.gs v7.4.22,
+ApifyAdminImport.gs, scraper.gs, the manifest, Script Properties, and refresh
+triggers. `archive-feed.gs` remains a reference publisher and must not be
+installed alongside PublicData.gs. Preserve the existing deployment URL and
+access settings when creating the new deployment version.
 
 Each result includes an inline event editor. The title and complete description
 are directly editable; **Edit IDs and other event details** opens association
@@ -80,12 +101,12 @@ tab on the displayed page. Multi-event saves recheck affected spans together.
 Profile options are created when a picker is opened, with search results capped
 to avoid rendering the entire artist catalog for every result card.
 
-Validation: `node --test tests/archive-updates.test.mjs
-tests/admin-bulk-api.test.mjs tests/archive.test.mjs`. For an integration pass
-with the full maintained replacements, set `QDP_CORE_SOURCE` and
-`QDP_PUBLIC_DATA_SOURCE` to their local paths and include
-`tests/saved-publication.test.mjs`. Browser layout and interaction checks use
-isolated example records rather than changing the live archive.
+Validation: set `QDP_CORE_SOURCE` to the supplied Core.gs path and run
+`node --test tests/archive-updates.test.mjs tests/archive-review-ui.test.mjs`.
+The archive integration checks use Core's real shared save rules and skip with
+an explicit reason when its separately maintained source is unavailable.
+Browser layout and interaction checks use isolated example records rather than
+changing the live archive.
 
 ## Event photos
 
@@ -457,3 +478,4 @@ after sixty seconds when revisited. A missing or stale live record switches
 back to the Google path. Install the updated `archive-feed.gs` in the existing
 Apps Script project to activate the reduced-write publisher; the deployed
 website caching changes work independently until that replacement is saved.
+
