@@ -121,16 +121,21 @@
   }
 
   function splitEvents(events) {
-    const count = Math.ceil(events.length / MAX_EVENTS);
-    const base = Math.floor(events.length / count);
-    const remainder = events.length % count;
+    const pages = [];
     let index = 0;
-    return Array.from({ length: count }, (_, page) => {
-      const size = base + (page < remainder ? 1 : 0);
-      const result = events.slice(index, index + size);
-      index += size;
-      return result;
-    });
+    // Fill earlier pages; balance only the final two pages of this date.
+    while (events.length - index > MAX_EVENTS * 2) {
+      pages.push(events.slice(index, index + MAX_EVENTS));
+      index += MAX_EVENTS;
+    }
+    const remaining = events.length - index;
+    if (remaining > MAX_EVENTS) {
+      const middle = index + Math.ceil(remaining / 2);
+      pages.push(events.slice(index, middle), events.slice(middle));
+    } else if (remaining) {
+      pages.push(events.slice(index));
+    }
+    return pages;
   }
 
   function timeGroups(events) {
