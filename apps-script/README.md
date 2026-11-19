@@ -1,5 +1,27 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Admin Push and Pull without a queue (v7.4.27)
+
+Replace the separately supplied **Core.gs** with v7.4.27, save, and update the
+existing Apps Script web-app deployment to a new version. Keep its URL and
+access settings. No setup rerun or trigger installation is required.
+
+Admin Push and Pull now execute in the request that starts them. The page shows
+**running**, then completion or the returned error; keep it open until the
+operation finishes. A successful response includes the refreshed event list
+and Last Push/Last Pull status. The spreadsheet menu continues to run directly.
+The shared write lock still prevents simultaneous writes and names the active
+operation when it blocks another action.
+
+Old queued sync records no longer block saves. On the first direct sync, any
+remaining scheduled Admin sync triggers and their old queue record are removed.
+The retired trigger handler only cleans up; it never replays the old sync.
+Other scheduled tasks are preserved. Admin asks for the updated Core when it
+detects an older deployment, instead of submitting another queued operation.
+
+Validation: `QDP_CORE_SOURCE=/path/to/Core.gs node --test
+tests/admin-sync.test.mjs tests/admin-bulk.test.mjs tests/admin-bulk-api.test.mjs`.
+
 ## Admin Archive Backfill (2025 pilot)
 
 **Flyer approval fix (v1.1.1).** Replace ArchiveBackfill.gs and update the existing

@@ -14,7 +14,7 @@ function fn(name) {
 const plain=value=>JSON.parse(JSON.stringify(value));
 function setup(){
  const events=Array.from({length:3},(_,i)=>({eventId:`E${i}`,publicTitle:`Event ${i}`,description:'Original',artistIds:['KNOWN','UNRESOLVED'],venueId:'V',publishToWeb:true,explicitQueer:false,revision:`r${i}`,inSyncWindow:true}));
- const state={events,drafts:new Map(),cards:new Map(),capabilities:{bulkSave:true},busy:false,refreshing:false,syncJob:null,referencesVersion:'refs'};
+ const state={events,drafts:new Map(),cards:new Map(),capabilities:{bulkSave:true},busy:false,refreshing:false,referencesVersion:'refs'};
  const requests=[],messages=[],timers=[];
  const context=vm.createContext({state,Map,Set,TextEncoder,Date,console,
   elements:{syncProgress:{},saveAllButton:{}},
@@ -23,7 +23,7 @@ function setup(){
   showToast(message){messages.push(message);},setBusy(value){state.busy=value;},
   window:{confirm:()=>true},adminRequest:async(action,body)=>{requests.push({action,body});throw Error('Not configured');}});
  vm.runInContext(client.match(/^const EVENT_LOCATION_FIELDS = .+;$/m)[0],context);
- for(const name of ['baseDraft','draftFor','sameIds','draftIsDirty','draftMatchesEvent','eventSavePayload','saveAllChanges','saveChangedEvents','applySavedEvents','applySavedEvent','applyDashboard','trackSyncJob','pollSyncJob'])vm.runInContext(fn(name),context);
+ for(const name of ['baseDraft','draftFor','sameIds','draftIsDirty','draftMatchesEvent','eventSavePayload','saveAllChanges','saveChangedEvents','applySavedEvents','applySavedEvent','applyDashboard'])vm.runInContext(fn(name),context);
  for(const event of events)state.drafts.set(event.eventId,{...context.baseDraft(event),description:`Edit ${event.eventId}`});
  return {context,state,events,requests,messages,timers};
 }
@@ -85,11 +85,6 @@ test('refresh invalidates cards when reference data changes',()=>{
  h.context.applyDashboard({events:h.events.map(e=>({...e})),capabilities:{bulkSave:true},references:{artists:[{id:'NEW',name:'New Artist'}]}});
  assert.equal(h.state.cards.size,0);
 });
-test('background status polls request only status and retain edits',async()=>{
- const h=setup();h.state.syncJob={id:'J',kind:'pull',state:'queued'};h.context.adminRequest=async(action)=>{h.requests.push(action);return {job:{id:'J',kind:'pull',state:'running'}};};
- await h.context.pollSyncJob();assert.deepEqual(h.requests,['admin.status']);assert.equal(h.state.drafts.size,3);assert.equal(h.state.syncJob.state,'running');assert.equal(h.state.busy,false);
-});
-
 test('location-only drafts are included in Save all and clear only after confirmation',async()=>{
  const h=setup();h.state.drafts.clear();h.state.capabilities.eventLocations=true;
  const event=h.events[0];Object.assign(event,{venueId:'',location:'Original location',address:'',neighborhood:''});

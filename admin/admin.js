@@ -79,9 +79,6 @@ const state = {
   refreshing: false,
   capabilities: {},
   referencesVersion: "",
-  syncJob: null,
-  syncPollTimer: null,
-  syncPollFailures: 0,
   searchTimer: null,
   toastTimer: null
 };
@@ -580,8 +577,7 @@ function updateGlobalControls() {
       ? state.status.pendingOutsideWindowCount || 0
       : 0;
 
-  const syncActive = Boolean(state.syncJob);
-  const writesBlocked = state.busy || state.refreshing || syncActive;
+  const writesBlocked = state.busy || state.refreshing;
   elements.pullButton.disabled = writesBlocked || unsaved > 0;
 
   elements.pushButton.disabled =
@@ -774,7 +770,7 @@ function updateCardState(
   const resetButton =
     card.querySelector(".reset-button");
 
-  saveButton.disabled = state.busy || state.refreshing || Boolean(state.syncJob) || !dirty;
+  saveButton.disabled = state.busy || state.refreshing || !dirty;
   resetButton.disabled = state.busy || !dirty;
 
   const badge =
@@ -1444,7 +1440,6 @@ function applyDashboard(result, { preserveDrafts = false } = {}) {
   state.events.sort(compareEvents);
   state.status = result.status || null;
   renderStatus(); renderEvents(); updateGlobalControls();
-  if (result.syncJob && ['queued', 'running'].includes(result.syncJob.state)) trackSyncJob(result.syncJob);
 }
 
 async function refreshDashboard({ discardDrafts = false, preserveDrafts = false, quiet = false } = {}) {
@@ -1470,21 +1465,34 @@ async function refreshDashboard({ discardDrafts = false, preserveDrafts = false,
 }
 
 async function runSync(kind) {
-  if (unsavedCount() || state.busy || state.syncJob) {
+  if (state.busy || state.refreshing) return;
+  if (unsavedCount()) {
     showToast('Save or reset your unsaved edits before syncing.', true); return;
+  }
+  if (!state.capabilities.directSync) {
+    showToast('Install Core.gs v7.4.27 and update the existing Apps Script web-app deployment to start Push and Pull directly.', true);
+    return;
   }
   if (kind === 'pull' && state.status?.pendingPushTotalCount > 0 &&
       !window.confirm(`${state.status.pendingPushTotalCount} saved events have changes that have not been pushed. Pulling can replace those Sheet edits with Calendar data. Pull anyway?`)) return;
+  const label = kind === 'pull' ? 'Pull' : 'Push';
   setBusy(true);
+  elements.syncProgress.hidden = false;
+  elements.syncProgress.textContent = `${label} running. Keep this page open until it finishes.`;
   try {
-    const result = await adminRequest(`admin.${kind}`);
-    if (result.job) trackSyncJob(result.job);
-    else {
-      applyDashboard(result);
-      void refreshFeedFlyers();
-      showToast(`${kind === 'pull' ? 'Pull' : 'Push'} complete.`);
+    const result = await adminRequest(`admin.${kind}`, { referencesVersion: state.referencesVersion });
+    if (result.job || !Array.isArray(result.events) || !result.capabilities?.directSync) {
+      throw new Error('Completion was not confirmed. Refresh Admin and check the latest sync status before retrying.');
     }
-  } catch (error) { showToast(error.message, true); }
+    applyDashboard(result, { preserveDrafts: true });
+    void refreshFeedFlyers();
+    void window.QDPAdminIntegrity?.refresh();
+    elements.syncProgress.textContent = `${label} complete.`;
+    showToast(`${label} complete.`);
+  } catch (error) {
+    elements.syncProgress.textContent = `${label}: ${error.message}`;
+    showToast(error.message, true);
+  }
   finally { setBusy(false); }
 }
 
@@ -1602,7 +1610,7 @@ async function saveAllChanges() {
 
 
 async function saveChangedEvents(events, batch) {
-  if (state.busy || state.refreshing || state.syncJob) return;
+  if (state.busy || state.refreshing) return;
   const changes = events.map(eventSavePayload);
   const invalid = changes.find(change => !change.publicTitle.trim());
   if (invalid) { showToast(`${invalid.eventId}: Public title cannot be blank. Nothing was saved.`, true); return; }
@@ -1650,35 +1658,5 @@ function applySavedEvents(result, expectedIds) {
   updateStatusFromEvents(); renderStatus(); renderEvents(); updateGlobalControls();
 }
 
-
-function trackSyncJob(job) {
-  if (state.syncPollTimer !== null) clearTimeout(state.syncPollTimer);
-  state.syncJob = job; state.syncPollFailures = 0;
-  elements.syncProgress.hidden = false;
-  elements.syncProgress.textContent = `${job.kind === 'pull' ? 'Pull' : 'Push'} ${job.state === 'queued' ? 'queued; waiting to start' : 'running'}. You can keep browsing and editing; save after sync finishes.`;
-  updateGlobalControls(); state.cards.forEach(({card,event}) => updateCardState(card,event));
-  state.syncPollTimer = setTimeout(pollSyncJob, 2000);
-}
-
-
-async function pollSyncJob() {
-  state.syncPollTimer = null;
-  if (!state.syncJob) return;
-  try {
-    const result = await adminRequest('admin.status');
-    const job = result.job;
-    if (!job || job.id !== state.syncJob.id) throw new Error('Sync status changed. Refresh Admin to check the current operation.');
-    if (['queued', 'running'].includes(job.state)) { trackSyncJob(job); return; }
-    state.syncJob = null;
-    elements.syncProgress.textContent = job.state === 'complete'
-      ? `${job.kind === 'pull' ? 'Pull' : 'Push'} complete. Your unsaved edits have been kept.`
-      : `Sync stopped: ${job.error || 'Open Apps Script Executions for details.'} Your unsaved edits have been kept.`;
-    await refreshDashboard({ preserveDrafts: true, quiet: true });
-  } catch (error) {
-    state.syncPollFailures++;
-    elements.syncProgress.textContent = `Waiting for sync status: ${error.message} Your edits remain on this page.`;
-    state.syncPollTimer = setTimeout(pollSyncJob, Math.min(15000, 3000 * state.syncPollFailures));
-  }
-}
 
 elements.saveAllButton.addEventListener("click", saveAllChanges);
