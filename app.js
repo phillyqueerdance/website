@@ -1010,6 +1010,9 @@ function renderPoster() {
     fitPosterTitles();
     if (!eventDetail.hidden && activeEvent) updateDetailNavigationState();
   });
+  if (!requestedEventId() && !window.QDPArchive?.active && !window.QDPInfoView?.active) {
+    window.QDPAnalytics?.view("calendar");
+  }
 }
 
 function scrollOffset(element) {
@@ -1191,6 +1194,7 @@ async function shareEvent(event, status) {
   const url = eventShareUrl(id);
   if (navigator.share) {
     try {
+      window.QDPAnalytics?.event("share_open", event);
       await navigator.share({
         title: `Check out ${displayTitle(event)} on Queer Dance Philly`,
         url
@@ -1203,6 +1207,7 @@ async function shareEvent(event, status) {
 
   try {
     await copyEventLink(url);
+    window.QDPAnalytics?.event("link_copy", event);
     status.textContent = "Link copied";
   } catch (error) {
     status.textContent = "Could not copy link";
@@ -1504,6 +1509,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     eventDetail.focus({ preventScroll: true });
   }
   loadEventRelations(id, detailCard, seeMore, seeMoreLinks, event.related);
+  if (!infoView.active) window.QDPAnalytics?.view("event", id, displayTitle(event));
 }
 
 const eventRelations = new Map();
@@ -1746,6 +1752,9 @@ function hideEventDetail({ restoreFocus = true } = {}) {
   activeEventId = "";
   activeEvent = null;
   eventEntryPushed = false;
+  if (!window.QDPArchive?.active && !window.QDPInfoView?.active && !requestedEventId()) {
+    window.QDPAnalytics?.view("calendar");
+  }
 }
 
 function closeEventDetail() {
@@ -1902,6 +1911,7 @@ const infoView = {
       history.pushState({ qdpInfo: kind }, "", url);
     }
     this.active = kind;
+    window.QDPAnalytics?.view(kind);
     document.body.classList.add("info-mode");
     if (!eventDetail.hidden) {
       eventDetail.inert = true;
@@ -1955,6 +1965,15 @@ const infoView = {
     if (!eventDetail.hidden && activeEvent) window.QDPEventLinks?.apply(activeEvent);
     else if (window.QDPArchive?.active) window.QDPArchive.restoreMetadata();
     else document.title = "Queer Dance Philly";
+    if (!preserveMenu) {
+      const params = new URLSearchParams(location.search);
+      if (!eventDetail.hidden && activeEvent) window.QDPAnalytics?.view("event", eventIdOf(activeEvent), displayTitle(activeEvent));
+      else if (window.QDPArchive?.active) {
+        const kind = params.get("archive");
+        window.QDPAnalytics?.view(kind === "events" ? "past-events" : kind,
+          params.get("id") || "", window.QDPArchive.profile?.person?.name || "");
+      } else window.QDPAnalytics?.view("calendar");
+    }
     const origin = this.returnFocus;
     if (!eventDetail.hidden) eventDetail.focus({ preventScroll: true });
     else if (origin?.isConnected && origin !== document.body && !origin.closest("[inert], [hidden]")) origin.focus({ preventScroll: true });

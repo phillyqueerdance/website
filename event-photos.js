@@ -159,6 +159,8 @@
       event.stopPropagation();
       const strip = toggle.closest(".event-photo-strip");
       const open = toggle.getAttribute("aria-expanded") !== "true";
+      if (open) globalThis.QDPAnalytics?.track("gallery_open", { kind: "event", id: strip.dataset.eventId,
+        label: strip.querySelector(".event-title")?.textContent || "" });
       document.querySelectorAll(".event-photo-strip.is-open").forEach(other => {
         if (other === strip) return;
         other.classList.remove("is-open");

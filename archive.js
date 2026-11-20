@@ -570,9 +570,14 @@
       const matches = query ? searchIndex.filter(entry => entry.text.includes(query)).map(entry => entry.item) : profiles;
       renderDirectoryCards(kind, matches, results, query ? `No matching ${kind}.` : `No ${kind} in the archive yet.`);
     };
+    let searchTimer;
     input.oninput = () => {
       archiveStack.scrollTop = 0;
       renderMatches();
+      clearTimeout(searchTimer);
+      if (input.value.trim()) searchTimer = setTimeout(() => {
+        window.QDPAnalytics?.track("search_use", { kind, source: kind });
+      }, 1200);
     };
     if (hydrate && !input.value) {
       // Keep the server-rendered cards so their photos can finish loading in place.
@@ -831,6 +836,13 @@
     renderedAt = Date.now();
     syncYearHeadings();
     archive.updateControls();
+    trackArchiveView(params);
+  }
+
+  function trackArchiveView(params) {
+    if (requestedEventId() || window.QDPInfoView?.active) return;
+    window.QDPAnalytics?.view(params.view === "events" ? "past-events" : params.view,
+      profileViews[params.view] ? params.id : "", archive.profile?.person?.name || "");
   }
 
   async function refreshCurrentRoute(params) {
@@ -885,6 +897,7 @@
       }
       if (loadingKey !== params.key) {
         syncPopup();
+        trackArchiveView(params);
         if (params.view !== "scene-map" && Date.now() - renderedAt >= CLIENT_CACHE_MS) refreshCurrentRoute(params);
       }
       return;
@@ -946,7 +959,7 @@
     if (!hydrateDirectory) message(sceneMap ? "" : "Loading archive…");
     if (sceneMap) {
       try {
-        const module = await import("./scene-map.js?v=20261116-profile-links");
+        const module = await import("./scene-map.js?v=20261120-free-analytics-1");
         if (serial !== requestNumber) return;
         const directories = module.prepareSceneMap(params.focus);
         void directories.catch(() => {});
@@ -960,6 +973,7 @@
         if (serial !== requestNumber) return;
         await module.mountSceneMap(archiveStack, params.focus, directories);
         if (serial !== requestNumber) return;
+        trackArchiveView(params);
         renderedAt = Date.now();
         loadingKey = "";
         previousPoster.disabled = true;

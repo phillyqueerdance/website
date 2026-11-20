@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#111114">
+  <title>Analytics | QDP Admin</title>
+  <link rel="icon" type="image/png" href="/admin/favicon.png">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
+  <link rel="stylesheet" href="/admin/analytics.css?v=20261120-free-analytics-1">
+  <script src="/admin/analytics.js?v=20261120-free-analytics-1" defer></script>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-brand">
+      <img class="brand-mark" src="/admin/favicon.png" alt="" width="48" height="48">
+      <div><p class="eyebrow">Queer Dance Philly</p><h1>Analytics</h1></div>
+    </div>
+    <button id="analyticsRefresh" class="icon-button" type="button" aria-label="Refresh analytics">↻</button>
+  </header>
+  <main class="admin-shell analytics-shell">
+    <nav class="dashboard-links" aria-label="Admin tools">
+      <a class="admin-page-link" href="/admin/">Back to Admin</a>
+      <a class="admin-page-link" href="https://queerdancephilly.com/" target="_blank" rel="noopener">Open QDP</a>
+    </nav>
+    <section class="dashboard-panel" aria-labelledby="rangeHeading">
+      <div class="section-heading"><h2 id="rangeHeading">Visitor activity</h2><span id="analyticsUpdated" class="status-updated"></span></div>
+      <form id="analyticsRangeForm" class="analytics-range">
+        <label class="field"><span>Period</span><select id="analyticsPeriod">
+          <option value="1">Today</option><option value="7" selected>Last 7 days</option>
+          <option value="30">Last 30 days</option><option value="custom">Custom dates</option>
+        </select></label>
+        <div id="analyticsCustomDates" class="analytics-custom" hidden>
+          <label class="field"><span>From</span><input id="analyticsFrom" type="date"></label>
+          <label class="field"><span>Through</span><input id="analyticsTo" type="date"></label>
+          <button class="save-button" type="submit">Apply dates</button>
+        </div>
+        <button id="analyticsExport" class="quiet-button" type="button" disabled>Export CSV</button>
+      </form>
+      <p id="analyticsState" class="dashboard-note" role="status" aria-live="polite">Loading analytics…</p>
+      <p id="analyticsCoverage" class="analytics-coverage"></p>
+    </section>
+
+    <div id="analyticsContent" hidden>
+      <section aria-label="Activity totals"><div id="analyticsTotals" class="analytics-totals"></div></section>
+
+      <section class="dashboard-panel analytics-panel" aria-labelledby="growthHeading">
+        <div class="section-heading"><h2 id="growthHeading">Growth</h2></div>
+        <p class="dashboard-note">Visits are recorded per browser tab after 30 minutes of inactivity. They are not unique people or Cloudflare's visit totals.</p>
+        <div class="analytics-chart-key"><span class="chart-visits">Visits</span><span class="chart-opens">Event opens</span></div>
+        <div id="analyticsChart" class="analytics-chart"></div>
+        <details class="analytics-daily"><summary>Daily figures</summary><div class="analytics-table-wrap"><table class="analytics-table">
+          <thead><tr><th scope="col">Date</th><th scope="col">Visits</th><th scope="col">Event opens</th></tr></thead><tbody id="analyticsDaily"></tbody>
+        </table></div></details>
+        <div class="analytics-columns">
+          <section aria-labelledby="sourcesHeading"><h3 id="sourcesHeading">Where visits come from</h3><div id="analyticsSources"></div></section>
+          <section aria-labelledby="devicesHeading"><h3 id="devicesHeading">Devices</h3><div id="analyticsDevices"></div></section>
+        </div>
+        <p class="field-help">Direct / unknown includes visits whose source the browser did not provide. Blocking and privacy settings can reduce recorded activity.</p>
+      </section>
+
+      <section class="dashboard-panel analytics-panel" aria-labelledby="usageHeading">
+        <div class="section-heading"><h2 id="usageHeading">How people use QDP</h2></div>
+        <div class="analytics-columns">
+          <section aria-labelledby="sectionsHeading"><h3 id="sectionsHeading">Sections viewed</h3><div id="analyticsUsage"></div></section>
+          <section aria-labelledby="discoveryHeading"><h3 id="discoveryHeading">Discovery activity</h3><div id="analyticsDiscovery"></div></section>
+        </div>
+        <h3>Profiles</h3>
+        <label class="field analytics-search"><span>Find a profile in these results</span><input id="analyticsProfileSearch" type="search" placeholder="Name or ID"></label>
+        <div class="analytics-table-wrap"><table class="analytics-table">
+          <caption class="sr-only">Up to 100 profiles ranked by views, then map centers</caption>
+          <thead><tr><th scope="col">Profile</th><th scope="col">Type</th><th scope="col">Views</th><th scope="col">Map centers</th><th scope="col">External clicks</th></tr></thead>
+          <tbody id="analyticsProfiles"></tbody>
+        </table></div>
+      </section>
+
+      <section class="dashboard-panel analytics-panel" aria-labelledby="impactHeading">
+        <div class="section-heading"><h2 id="impactHeading">Event impact</h2></div>
+        <p class="dashboard-note">Impressions count listings at least half visible for 0.8 seconds, once per event and section during a page load. Direct event links can produce opens without listing impressions.</p>
+        <label class="field analytics-search"><span>Find an event in these results</span><input id="analyticsEventSearch" type="search" placeholder="Title or EventID"></label>
+        <div class="analytics-table-wrap"><table id="analyticsEventsTable" class="analytics-table">
+          <caption class="sr-only">Up to 100 events ranked by opens; select a numeric heading to sort</caption>
+          <thead><tr>
+            <th scope="col">Event</th>
+            <th scope="col"><button type="button" data-sort="impressions">Impressions</button></th>
+            <th scope="col" aria-sort="descending"><button type="button" data-sort="opens">Opens</button></th>
+            <th scope="col"><button type="button" data-sort="copies">Link copies</button></th>
+            <th scope="col"><button type="button" data-sort="shares">Share dialogs</button></th>
+            <th scope="col"><button type="button" data-sort="calendar">Calendar clicks</button></th>
+            <th scope="col"><button type="button" data-sort="directions">Directions</button></th>
+            <th scope="col"><button type="button" data-sort="outbound">External clicks</button></th>
+          </tr></thead><tbody id="analyticsEvents"></tbody>
+        </table></div>
+        <p class="field-help">Opening a share dialog does not prove a share was sent. Calendar, directions and external clicks do not prove a save, ticket purchase or attendance. Rankings show recorded activity, not a recommendation.</p>
+      </section>
+    </div>
+
+    <section class="dashboard-panel analytics-panel" aria-labelledby="collectionHeading">
+      <div class="section-heading"><h2 id="collectionHeading">Collection</h2><button id="analyticsPause" class="quiet-button" type="button" disabled>Pause collection</button></div>
+      <p id="analyticsCollection" class="dashboard-note">Checking collection…</p>
+      <label class="analytics-exclude"><input id="analyticsExclude" type="checkbox" checked> Exclude this browser from public-site tracking</label>
+      <p class="field-help">This browser is excluded by default when you open Admin. No visitor IDs, IP addresses, raw URLs or search text are stored. Dates use Philadelphia time; free usage limits reset at midnight UTC.</p>
+      <details><summary>Free setup and limits</summary>
+        <p class="field-help">Use Workers Free and D1 Free. The collector also has a conservative daily write budget; quota failures stop collection. Keep the database on the free plan. Analytics uses the account's shared allowances.</p>
+        <p class="field-help">Setup: create a D1 database, run migrations/0001_analytics.sql, bind it as QDP_ANALYTICS, and set QDP_ANALYTICS_FREE_PLAN to confirmed only after verifying Workers Free. Redeploy the site after changing bindings.</p>
+        <p class="field-help">Custom date ranges cover up to 90 days at a time. Older daily counts remain available while database storage allows.</p>
+      </details>
+    </section>
+  </main>
+  <noscript><p class="noscript">QDP Analytics requires JavaScript.</p></noscript>
+</body>
+</html>
