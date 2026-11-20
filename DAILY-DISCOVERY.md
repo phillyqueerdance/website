@@ -47,12 +47,22 @@ contain only stable event/proposal hashes, the decision and timestamps. Writes
 require existing Cloudflare Access authentication and a same-origin request.
 Five-item batches remain within the Workers Free subrequest limit.
 
-The task reads the dedicated, read-only `/api/discovery-decisions` feed using the
-credential saved in the private state. The corresponding production secret is
-`QDP_DISCOVERY_READ_TOKEN`. Send it in the Authorization header, never a URL.
-Follow every cursor; do not assume a failed read means no exclusions. The reader
-does not access Google Calendar, the index or Admin event endpoints. Keep the
-credential out of source, workbooks, logs and chat. Rotate both copies together.
+The scheduled task reads only these decision keys and their metadata through the
+connected Cloudflare account API. The private state identifies the existing
+account, namespace and exact prefix in `daily_discovery.decisionStore`. Use
+`GET /accounts/{account_id}/storage/kv/namespaces/{namespace_id}/keys` with that
+prefix and `limit=1000`; follow every `result_info.cursor`. Save the metadata as
+`decisions.json`, retaining each key suffix as `alias`. This direct account read
+was verified against production. It does not read any Calendar/index data.
+
+A separate credential-protected `/api/discovery-decisions` endpoint and
+`read-decisions.py` helper are available for compatible clients. Keep the
+credential in the private state/production secret, send it only in Authorization,
+and never log it. The current machine is rejected by the site's browser-signature
+check, so the scheduled task must use the supported Cloudflare account API. Do not
+retry that block, impersonate a browser or weaken site protections. No site-wide
+or endpoint-specific browser-check exception is required. If the account read
+fails, do not assume an empty exclusion list or launch paid collection.
 
 | Decision | Next scan |
 | --- | --- |
@@ -110,7 +120,8 @@ web-app deployment to a new version to activate that server-side field.
 Fetch the latest private state and the current repository before every task.
 
 ```sh
-python3 tools/discovery/read-decisions.py --state STATE.json --output decisions.json
+# First fetch decisions.json through the connected Cloudflare API, using only
+# daily_discovery.decisionStore and following every cursor.
 node tools/discovery/daily-review.mjs --state STATE.json --plan collection.json --spent 0
 python3 tools/discovery/collect-venues.py --output venues.json
 ```
