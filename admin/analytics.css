@@ -63,6 +63,18 @@
 .analytics-summary .analytics-totals { margin-top: 14px; }
 .analytics-summary .analytics-total { padding: 14px; background: var(--panel-raised); }
 .analytics-summary .analytics-total dd { font-size: 1.8rem; }
+.search-connection { margin-top: 16px; }
+.search-connection > details { margin-top: 20px; }
+.search-setup-steps { padding-left: 22px; line-height: 1.75; font-size: .9rem; }
+.search-setup-steps li { margin: 12px 0; }
+.search-setup-steps a { color: var(--yellow); }
+.search-callback { display: block; overflow-wrap: anywhere; padding: 12px; margin-top: 8px; background: var(--panel-raised); border-radius: 8px; }
+.search-client-form { display: grid; gap: 16px; max-width: 650px; margin-top: 22px; }
+.search-client-form button { justify-self: start; }
+#googleSearchPanel [hidden] { display: none; }
+#googleSearchPanel > .section-heading { gap: 16px; flex-wrap: wrap; }
+#searchDisconnect { margin-top: 16px; }
+#searchDevices { text-transform: capitalize; }
 @media (max-width: 800px) {
   .analytics-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analytics-columns { grid-template-columns: minmax(0, 1fr); gap: 8px; }

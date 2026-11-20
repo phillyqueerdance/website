@@ -8,8 +8,9 @@
   <title>Analytics | QDP Admin</title>
   <link rel="icon" type="image/png" href="/admin/favicon.png">
   <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
-  <link rel="stylesheet" href="/admin/analytics.css?v=20261120-free-analytics-1">
+  <link rel="stylesheet" href="/admin/analytics.css?v=20261120-search-console-1">
   <script src="/admin/analytics.js?v=20261120-free-analytics-1" defer></script>
+  <script src="/admin/search-console.js?v=20261120-search-console-1" defer></script>
 </head>
 <body>
   <header class="admin-header">
@@ -95,6 +96,60 @@
         <p class="field-help">Opening a share dialog does not prove a share was sent. Calendar, directions and external clicks do not prove a save, ticket purchase or attendance. Rankings show recorded activity, not a recommendation.</p>
       </section>
     </div>
+
+    <section id="googleSearchPanel" class="dashboard-panel analytics-panel" aria-labelledby="googleSearchHeading">
+      <div class="section-heading"><h2 id="googleSearchHeading">Google Search</h2><button id="searchRefresh" class="quiet-button" type="button" hidden>Refresh search data</button></div>
+      <p class="dashboard-note">How people find QDP through Google Search. These figures are separate from visitor activity above.</p>
+      <p id="searchState" class="dashboard-note" role="status" aria-live="polite">Checking Google connection…</p>
+      <div id="searchConnection" class="search-connection" hidden>
+        <p class="field-help">Connect the Google account that can view QDP in Search Console. QDP requests read-only Search Console access.</p>
+        <button id="searchConnect" class="save-button" type="button" disabled>Connect Google Search</button>
+        <details id="searchSetup">
+          <summary>Set up the Google connection</summary>
+          <ol class="search-setup-steps">
+            <li>Open <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">Google Cloud</a> using the account with QDP's Search Console access. Create or select a project. No paid service is needed.</li>
+            <li>Enable the <strong>Google Search Console API</strong> in that project.</li>
+            <li>Configure Google Auth Platform. For a new app used only by its creator, choose <strong>Personal</strong> mode if available. External apps left in Testing need authorization again after seven days.</li>
+            <li>Create an OAuth client of type <strong>Web application</strong>, named QDP Admin. Add this exact authorized redirect URI: <code class="search-callback">https://queerdancephilly.com/admin/search-console-callback</code></li>
+            <li>Enter the client ID and client secret below, save, then select Connect Google Search.</li>
+          </ol>
+          <form id="searchClientForm" class="search-client-form">
+            <label class="field"><span>Google OAuth client ID</span><input id="searchClientId" type="text" autocomplete="off" spellcheck="false" required maxlength="230" placeholder="….apps.googleusercontent.com"></label>
+            <label class="field"><span>Google OAuth client secret</span><input id="searchClientSecret" type="password" autocomplete="new-password" required maxlength="256"></label>
+            <button id="searchClientSave" class="quiet-button" type="submit" disabled>Save Google app credentials</button>
+          </form>
+          <p class="field-help">Credentials are encrypted on the server. They are never included in reports or sent to public-site visitors.</p>
+        </details>
+      </div>
+      <div id="searchConnected" hidden>
+        <form id="searchRangeForm" class="analytics-range">
+          <label class="field"><span>Search period</span><select id="searchPeriod"><option value="7">Last 7 complete days</option><option value="28" selected>Last 28 complete days</option><option value="90">Last 90 complete days</option><option value="custom">Custom dates</option></select></label>
+          <div id="searchCustomDates" class="analytics-custom" hidden>
+            <label class="field"><span>From</span><input id="searchFrom" type="date" required></label>
+            <label class="field"><span>Through</span><input id="searchTo" type="date" required></label>
+            <button class="save-button" type="submit">Apply search dates</button>
+          </div>
+          <button id="searchExport" class="quiet-button" type="button" disabled>Export search CSV</button>
+        </form>
+        <p id="searchCoverage" class="analytics-coverage"></p>
+        <div id="searchReport" hidden>
+          <div id="searchTotals" class="analytics-totals"></div>
+          <h3>Search traffic over time</h3>
+          <div class="analytics-chart-key"><span class="chart-visits">Google clicks</span><span class="chart-opens">Google impressions</span></div>
+          <div id="searchChart" class="analytics-chart"></div>
+          <details class="analytics-daily"><summary>Daily search figures</summary><div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th scope="col">Date</th><th scope="col">Clicks</th><th scope="col">Impressions</th><th scope="col">CTR</th><th scope="col">Avg. position</th></tr></thead><tbody id="searchDaily"></tbody></table></div></details>
+          <label class="field analytics-search"><span>Filter search terms and pages in these results</span><input id="searchFilter" type="search" placeholder="Search term, page or EventID"></label>
+          <h3>Top search terms</h3>
+          <div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th scope="col">Search term</th><th scope="col">Clicks</th><th scope="col">Impressions</th><th scope="col">CTR</th><th scope="col">Avg. position</th></tr></thead><tbody id="searchQueries"></tbody></table></div>
+          <h3>Top landing pages</h3>
+          <div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th scope="col">Page</th><th scope="col">Clicks</th><th scope="col">Impressions</th><th scope="col">CTR</th><th scope="col">Avg. position</th></tr></thead><tbody id="searchPages"></tbody></table></div>
+          <h3>Search devices</h3>
+          <div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th scope="col">Device</th><th scope="col">Clicks</th><th scope="col">Impressions</th><th scope="col">CTR</th><th scope="col">Avg. position</th></tr></thead><tbody id="searchDevices"></tbody></table></div>
+        </div>
+        <p class="field-help">Reports use Google's Pacific dates, final data, and a three-day processing buffer. Up to 16 months of existing history can be requested. Google omits some search terms for privacy; tables show up to 100 top terms and pages, so their sums may differ from the totals. Average position is not a fixed ranking.</p>
+        <button id="searchDisconnect" class="quiet-button" type="button">Disconnect Google Search</button>
+      </div>
+    </section>
 
     <section class="dashboard-panel analytics-panel" aria-labelledby="collectionHeading">
       <div class="section-heading"><h2 id="collectionHeading">Collection</h2><button id="analyticsPause" class="quiet-button" type="button" disabled>Pause collection</button></div>

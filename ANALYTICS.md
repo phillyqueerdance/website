@@ -34,6 +34,79 @@ No Cloudflare API token is needed. Counts are collected directly into the bound
 database. Existing Cloudflare Web Analytics continues separately; its historical
 totals are not imported or presented as these counters.
 
+## Google Search Console
+
+The same Analytics page has an independent **Google Search** section. Search
+Console clicks, impressions, CTR and average position are not added to QDP's
+visitor counters. Reports include daily figures, an equal preceding period,
+top 100 search terms, top 100 landing pages, device breakdowns, a result filter,
+and a separate CSV export. Totals come from Google's aggregate query rather
+than summing privacy-filtered query or page rows. Missing prior data suppresses
+comparisons. No individual search is matched to a QDP visitor.
+
+Production setup:
+
+1. Run `migrations/0002_search_console.sql` on the existing analytics database.
+2. Add a production **secret**, `QDP_SEARCH_CONSOLE_KEY`, containing 32 random
+   bytes encoded as unpadded base64url (43 characters), then redeploy. Keep the
+   original value: replacing it makes existing encrypted credentials unreadable.
+   Do not copy this secret or the production database binding into previews.
+3. In Google Cloud, create/select a project and enable **Google Search Console
+   API**. This API is free. Do not enable billing, paid services or BigQuery.
+4. Configure Google Auth Platform and create a **Web application** OAuth client
+   with this exact authorized redirect URI:
+   `https://queerdancephilly.com/admin/search-console-callback`.
+   For a new app used solely by its creator, Google's **Personal** mode avoids
+   External Testing's seven-day refresh-token expiration. Existing External
+   apps cannot switch to Personal; configure an appropriate production app or
+   create a new Personal project. Personal mode must use the creator's account.
+5. In Analytics > Google Search > Set up the Google connection, enter that
+   client's ID and secret. Submit them only in the Access-protected Admin form,
+   never in public source, URLs or chat. They are AES-256-GCM encrypted in D1
+   with purpose-bound authentication data; the encryption key remains a
+   Cloudflare production secret. They are never returned by the private API.
+6. Select **Connect Google Search**, choose the Google account with QDP access,
+   and consent to the sole scope `webmasters.readonly`. This requires a separate
+   Google connection; the ChatGPT Cloudflare plugin connection is insufficient.
+   The OAuth flow uses PKCE, a 10-minute encrypted Secure/HttpOnly/SameSite=Lax
+   host cookie, and a state bound to the initiating Admin email and connection
+   version. Tokens are exchanged server-side and encrypted; no Google tokens
+   are sent to browser JavaScript. The callback clears its cookie and redirects
+   away from authorization parameters with a no-referrer policy.
+7. Only verified QDP properties are accepted. Prefer
+   `sc-domain:queerdancephilly.com`, then the HTTPS root URL-prefix property,
+   then www/HTTP variants if those are the only authorized QDP properties.
+   Access to unrelated Google sites is neither stored nor reported.
+
+Search reports use **Pacific calendar dates**, final Web Search data, and an
+explicit three-day processing buffer. Custom dates can cover the available
+16-month window; they are separate from the first-party 90-day range controls.
+Google may omit anonymized queries and other rows, so tables need not sum to
+aggregate totals. Missing daily rows are not invented as zeros or joined by
+the chart. Average position is Google's aggregate, not a fixed rank.
+
+Reports refresh on Admin page access when their saved copy is older than six
+hours. There is no background job, additional visitor script or paid connector.
+Manual refresh is capped at once a minute, with at most 25 report fetches per
+UTC day (up to six Search Analytics requests each, plus a token refresh when
+needed). The atomic claim is shared by requests. At most 24 report snapshots
+are cached, for up to 30 days; stored credentials persist until disconnected.
+Quota/authorization failures are shown without a paid fallback or retries.
+Disconnect attempts Google token revocation, clears locally stored grants and
+report snapshots, and warns if Google could not confirm revocation. The saved
+OAuth app configuration remains so it can be reconnected. Replacing an app
+requires disconnecting first. Existing visitor collection is independent.
+
+Official references:
+- <https://developers.google.com/webmaster-tools/pricing>
+- <https://developers.google.com/webmaster-tools/v1/searchanalytics/query>
+- <https://developers.google.com/identity/protocols/oauth2/web-server>
+- <https://support.google.com/cloud/answer/15549945>
+
+Run `node --test tests/search-console.test.mjs` for encryption, OAuth state and
+PKCE, property/scope restrictions, retention/DST dates, authentication, real
+SQLite caching and atomic request budgets, token refresh and disconnect tests.
+
 ## What is counted
 
 | Counter | Definition |
