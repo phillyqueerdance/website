@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/poster-theme.css?v=20260926-01">
   <link rel="stylesheet" href="/admin/admin.css?v=20261117-admin-locations">
   <link rel="stylesheet" href="/admin/post-generator.css?v=20261020-queer-filter-1">
+  <link rel="stylesheet" href="/admin/analytics.css?v=20261120-free-analytics-1">
 </head>
 
 <body>
@@ -62,6 +63,7 @@
         <a class="admin-page-link" href="/admin/create-entity">Create entity</a>
         <a class="admin-page-link" href="/admin/archive-updates">Archive Updates</a>
         <a class="admin-page-link" href="/admin/archive-backfill">Archive Backfill</a>
+        <a class="admin-page-link" href="/admin/analytics">Analytics</a>
       </nav>
 
       <p id="dashboardState" class="dashboard-note" role="status">Loading overview…</p>
@@ -121,6 +123,12 @@
           </div>
         </section>
       </div>
+    </section>
+
+    <section class="dashboard-panel analytics-summary" aria-labelledby="analyticsSummaryHeading">
+      <div class="section-heading analytics-summary-heading"><h2 id="analyticsSummaryHeading">Visitor activity</h2><a class="admin-page-link" href="/admin/analytics">Open Analytics</a></div>
+      <p id="analyticsSummaryState" class="dashboard-note" role="status">Loading visitor activity…</p>
+      <div id="analyticsSummaryTotals" class="analytics-totals"></div>
     </section>
 
     <section id="calendar-sync" class="sync-panel" aria-labelledby="syncHeading" tabindex="-1">
@@ -457,6 +465,7 @@
   <script src="/admin/integrity.js?v=20261117-admin-locations"></script>
   <script src="/admin/admin.js?v=20261119-direct-sync"></script>
   <script src="/admin/post-generator.js?v=20261119-final-pages"></script>
+  <script src="/admin/analytics-summary.js?v=20261120-free-analytics-1"></script>
 </body>
 </html>
 

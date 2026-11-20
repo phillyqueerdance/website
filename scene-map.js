@@ -247,6 +247,7 @@ function toggleRelationship(map, line, keyboard = false) {
   closeRelationship(map);
   closeDetails(map);
   map.activeLine = line;
+  window.QDPAnalytics?.track("map_relationship", { kind: "scene-map", source: "scene-map" });
   line.control.setAttribute("aria-expanded", "true");
 
   const heading = node("div", "scene-map-detail-heading");
@@ -897,6 +898,7 @@ async function startScene(map, item, exploring = false) {
     await addSecondHop(map, scene);
     if (!map.root.isConnected || map.pendingScene !== scene) return;
     map.pendingScene = null;
+    window.QDPAnalytics?.track("map_focus", { kind: item.kind, id: item.id, label: item.name, source: "scene-map" });
     if (map.scene === scene) {
       renderMap(map, true);
       void loadVisibleConnections(map, scene);
@@ -1142,6 +1144,7 @@ export async function mountSceneMap(host, focusKey, directories) {
     reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)") };
   bindSearch(map, top);
   filters.addEventListener("change", () => {
+    window.QDPAnalytics?.track("filter_use", { kind: "scene-map", source: "scene-map" });
     map.allowed = new Set([...filters.querySelectorAll("label[data-kind] input:checked")].map(box => box.value));
     map.queerOnly = queerToggle.checked;
     if (map.scene && !matchesQueerFilter(map, map.scene.origin)) map.scene = null;
