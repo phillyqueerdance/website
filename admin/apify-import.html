@@ -9,8 +9,8 @@
   <link rel="icon" type="image/png" href="/admin/favicon.png">
   <link rel="stylesheet" href="/poster-theme.css?v=20260926-01">
   <link rel="stylesheet" href="/admin/admin.css?v=20261112-artist-crops-1">
-  <link rel="stylesheet" href="/admin/apify-import.css?v=20261116-corrections-2">
-  <script type="module" src="/admin/apify-import.js?v=20261116-corrections-3"></script>
+  <link rel="stylesheet" href="/admin/apify-import.css?v=20261120-daily-1">
+  <script type="module" src="/admin/apify-import.js?v=20261120-daily-1"></script>
 </head>
 <body class="apify-page">
   <header class="admin-header">
@@ -28,6 +28,7 @@
     <section class="apify-upload" aria-labelledby="workbook-label">
       <label id="workbook-label" for="workbook">Upload a scrape workbook</label>
       <input id="workbook" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+      <p class="apify-muted">Include saves an event to the import sheet. Wait keeps it for the next scrape. Exclude keeps it out of future scrapes. Save your choices below.</p>
       <p id="workbook-status" class="apify-status" role="status" aria-live="polite"></p>
     </section>
 
@@ -44,7 +45,7 @@
           <p id="save-count">0 events selected</p>
           <p id="save-status" class="apify-status" role="status" aria-live="polite"></p>
         </div>
-        <button id="save-apify" class="save-all-button" type="button" disabled>Save to Apify Sheet</button>
+        <button id="save-apify" class="save-all-button" type="button" disabled>Save decisions and included events</button>
       </footer>
     </section>
 

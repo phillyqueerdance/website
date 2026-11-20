@@ -1,5 +1,18 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Combined daily discovery and lineup corrections (v7.4.28)
+
+The Apify Import page now saves Include / Wait / Exclude decisions across daily
+workbooks. See [DAILY-DISCOVERY.md](../DAILY-DISCOVERY.md) for collection limits,
+the cumulative backlog, the protected feedback feed and the unchanged public
+calendar comparison. The normal existing import action remains in use.
+
+Replace the separately supplied **Core.gs** with v7.4.28 and update the existing
+web-app deployment to activate the new selectable **Lineup** correction field.
+The precise delta is [apify-lineup-corrections.patch](apify-lineup-corrections.patch).
+Keep every other bound script, property, permission, URL and trigger. No setup
+rerun, general lineup backfill or extra reconciliation job is introduced.
+
 ## Admin Push and Pull without a queue (v7.4.27)
 
 Replace the separately supplied **Core.gs** with v7.4.27, save, and update the

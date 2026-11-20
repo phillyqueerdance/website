@@ -1,0 +1,67 @@
+--- Core.gs
++++ Core.gs
+@@ -1,5 +1,5 @@
+ /**
+- * Queer Dance Philly — Apps Script Core v7.4.27
++ * Queer Dance Philly — Apps Script Core v7.4.28
+  * Core.gs: Settings, menus, Calendar sync, admin, flyer upload, forms, maps, and shared helpers.
+  * Install with the supplied ArchiveReview.gs for Admin Archive Updates.
+  * Use the supplied PublicData.gs to publish all Archive YYYY tabs.
+@@ -11,7 +11,7 @@
+  * Save and update the existing web-app deployment; no setup rerun is needed.
+  */
+ 
+-const QDP_VERSION = '7.4.27';
++const QDP_VERSION = '7.4.28';
+ 
+ const QDP_ADMIN_VENUE_LABELS_ = new Map([
+   ['SECLOC-001', { VenueName: 'Secret Location', Public_Name: 'Location not disclosed' }],
+@@ -4945,6 +4945,7 @@
+ 
+ const QDP_APIFY_CORRECTION_LABELS_ = Object.freeze({
+   description: 'Description',
++  lineup: 'Lineup',
+   start: 'Start date and time',
+   end: 'End date and time',
+   flyer: 'Flyer'
+@@ -5010,7 +5011,8 @@
+       if (field === 'flyer' && !/^https:\/\/\S+$/i.test(value)) {
+         throw new Error('The flyer needs a direct HTTPS image URL.');
+       }
+-      cells[field === 'description' ? 'Description' : 'RawFlyerURL'] = value;
++      if (field === 'lineup' && !value.trim()) throw new Error('Enter the confirmed lineup.');
++      cells[field === 'description' ? 'Description' : field === 'lineup' ? 'Lineup_Raw' : 'RawFlyerURL'] = value;
+       approved[field] = value;
+     }
+   }
+@@ -5124,6 +5126,9 @@
+     };
+     if (field === 'description') {
+       changes.description = stripAllQdpMetadata_(String(read('Description') ?? ''));
++    } else if (field === 'lineup') {
++      changes.lineup = String(read('Lineup_Raw') || '').trim();
++      if (!changes.lineup) throw new Error('The checked lineup is blank.');
+     } else if (field === 'flyer') {
+       changes.flyer = String(read('RawFlyerURL') || '').trim();
+       if (!/^https:\/\/\S+$/i.test(changes.flyer)) throw new Error('The checked flyer needs a direct HTTPS image URL.');
+@@ -5321,13 +5326,18 @@
+   }
+ 
+   const nextRow = target.row.slice();
++  const lineupColumn = headerIndex_(events.headers, ['Lineup_Raw']);
++  if ('lineup' in approved) {
++    if (!lineupColumn) throw new Error('Events needs a Lineup_Raw column.');
++    nextRow[lineupColumn - 1] = approved.lineup;
++  }
+   const descriptionColumn = headerIndex_(events.headers, ['Description']);
+   if ('description' in approved && descriptionColumn) nextRow[descriptionColumn - 1] = approved.description;
+   const rules = qdpApplyEventSaveRules_(nextRow, events.headers, buildLookupMaps_(), {original: target.row,
+     formulas: events.sheet.getRange(target.rowNumber, 1, 1, events.headers.length).getFormulas()[0],
+     markEdited: true, forceStamp: true, recordManual: true,
+-    touched: shared.flatMap(field => field === 'description' ? [descriptionColumn] :
+-      [headerIndex_(events.headers, [field === 'start' ? 'StartDate' : 'EndDate']), headerIndex_(events.headers, [field === 'start' ? 'StartTime' : 'EndTime'])])});
++    touched: (('lineup' in approved) ? [lineupColumn] : []).concat(shared.flatMap(field => field === 'description' ? [descriptionColumn] :
++      [headerIndex_(events.headers, [field === 'start' ? 'StartDate' : 'EndDate']), headerIndex_(events.headers, [field === 'start' ? 'StartTime' : 'EndTime'])]))});
+   requests.push(...qdpCellRequests_([...rules.updates].map(([column, value]) => ({sheet: events.sheet, row: target.rowNumber, column, value}))));
+   qdpApifyCorrectionConfirmRows_(events, [target]);
+   qdpApifyCorrectionConfirmRows_(intake, Array.from(rowUpdates.keys()));

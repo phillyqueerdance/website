@@ -4,6 +4,7 @@ const PACKAGE_ORIGIN = "https://workbook.invalid";
 const WORKBOOK_PART = "xl/workbook.xml";
 const utf8 = new TextDecoder("utf-8", { fatal: true });
 const EXCEL_NUMBER = /^[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+import { discoveryIdentity } from "../shared/discovery-identity.js?v=20261120-daily-1";
 
 export const REVIEW_FIELDS = [
   { name: "Title (internal)", label: "Event title", wide: true },
@@ -25,7 +26,8 @@ export const REVIEW_FIELDS = [
 const CORRECTION_FIELDS = [
   "Date", "Current title", "Correction", "Venue", "Instagram source",
   "Apply to existing event only", "Suggested Description", "RawFlyerURL", "Public listing",
-  "Suggested StartDate", "Suggested StartTime", "Suggested EndDate", "Suggested EndTime"
+  "Suggested StartDate", "Suggested StartTime", "Suggested EndDate", "Suggested EndTime",
+  "Suggested Lineup_Raw"
 ];
 
 function zipDirectory(bytes) {
@@ -205,7 +207,7 @@ function formattedTime(value) {
 }
 
 function candidates(rows, workbookKey, date1904) {
-  const names = REVIEW_FIELDS.map(field => field.name).concat(["Review", "Import readiness"]);
+  const names = REVIEW_FIELDS.map(field => field.name).concat(["Review", "Import readiness", "ImportSourceKey", "ImportSourceSnapshot"]);
   return readTable(rows, names, ["Title (internal)", "StartDate"], "New events")
     .filter(row => row.values["Title (internal)"])
     .map(({ rowNumber, values }) => {
@@ -224,7 +226,9 @@ function candidates(rows, workbookKey, date1904) {
         fields,
         suggestion: values.Review,
         readiness: values["Import readiness"],
-        decision: "",
+        identityFields: { ...fields, ImportSourceKey: values.ImportSourceKey, ImportSourceSnapshot: values.ImportSourceSnapshot },
+        decision: "WAIT",
+        decisionDirty: false,
         saved: false
       };
     });
@@ -276,8 +280,20 @@ export async function readScrapeWorkbook(file) {
   if (!newRows && !correctionRows) throw new Error("Choose a QDP workbook with a New events or Corrections tab.");
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
   const workbookKey = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
-  return {
+  const result = {
     candidates: candidates(newRows ?? [], workbookKey, date1904),
     corrections: corrections(correctionRows ?? [], workbookKey, date1904)
   };
+  for (const candidate of result.candidates) candidate.discovery = await discoveryIdentity(candidate.identityFields);
+  for (const correction of result.corrections) {
+    const fields = { StartDate: correction.Date, Location: correction.Venue,
+      "Title (internal)": correction["Current title"], Instagram_URL: correction["Instagram source"] };
+    correction.discovery = await discoveryIdentity(fields, "correction", JSON.stringify([
+      correction.Correction, correction["Suggested Description"], correction["Suggested StartDate"],
+      correction["Suggested StartTime"], correction["Suggested EndDate"], correction["Suggested EndTime"],
+      correction["Suggested Lineup_Raw"] || ""
+    ]));
+    correction.decision = "WAIT";
+  }
+  return result;
 }

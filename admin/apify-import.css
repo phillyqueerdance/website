@@ -170,6 +170,11 @@
   color: var(--red);
 }
 
+.apify-decision[aria-pressed="true"][data-decision="WAIT"] {
+  border-color: var(--text);
+  background: var(--panel-raised);
+}
+
 .apify-saved {
   margin: 0;
   color: var(--green);

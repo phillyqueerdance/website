@@ -1,4 +1,6 @@
 import { addArtistPhotoCrops, cropStore } from "../artist-photo-crops.js";
+import { recordDiscoveryImports, saveDiscoveryDecision } from "../discovery-decisions.js";
+import { validateIdentity } from "../../shared/discovery-identity.js";
 
 const DEFAULT_APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbxvCynlGyqJZqP-l6pG_vf2hFAwc-5sSHL9qftqrb5SCclR_8zeKRCHarKEe6XrPjKd/exec";
@@ -505,6 +507,11 @@ export async function onRequestPost(
       return jsonResponse({ ok: "yes", statuses: await Promise.all(body.links.map(checkProfileLink)) });
     }
 
+    if (action === "admin.apifyimport" && body.rows?.some(row => row.discovery)) {
+      if (body.rows.length > 5) return jsonResponse({error: "Save up to five discovery events per request."}, 400);
+      for (const row of body.rows) if (row.discovery) validateIdentity(row.discovery);
+    }
+    if (action === "admin.apifycorrection.stage" && body.discovery) validateIdentity(body.discovery);
     const upstreamPayload = await requestAppsScriptAdmin(context.env, { ...body, action });
     if (upstreamPayload.ok !== "yes") {
       return jsonResponse(
@@ -515,6 +522,11 @@ export async function onRequestPost(
         },
         400
       );
+    }
+
+    if (action === "admin.apifyimport") await recordDiscoveryImports(context.env, body.rows, upstreamPayload);
+    if (action === "admin.apifycorrection.stage" && body.discovery && typeof upstreamPayload.alreadySaved === "boolean") {
+      await saveDiscoveryDecision(context.env, body.discovery, "INCLUDE", true);
     }
 
     if ((action === "admin.artist.read" || action === "admin.artist.save") && upstreamPayload.artist) {
