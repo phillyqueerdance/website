@@ -41,44 +41,58 @@ claiming a verified event. Source collection alone is not completed review.
 
 ## Feedback and pending events
 
-Admin's **Include / Wait / Exclude** decisions are saved under
-`qdp-discovery-decision:v1:` in the existing public-feed KV binding. The records
-contain only stable event/proposal hashes, the decision and timestamps. Writes
-require existing Cloudflare Access authentication and a same-origin request.
-Five-item batches remain within the Workers Free subrequest limit.
+The discovery run reads and saves decisions in the private
+`QDP_Instagram_Review_State.json` item. **No Cloudflare account connection,
+API, KV read/write, Admin endpoint, protected decision feed, Worker, new endpoint
+or security configuration is required to collect, review, save progress or export
+the workbook.** Do not ask for Cloudflare access to repair or run this workflow.
+This policy replaces the former account-API requirement, including the old
+preflight failure recorded in run history.
 
-The scheduled task reads only these decision keys and their metadata through the
-connected Cloudflare account API. The private state identifies the existing
-account, namespace and exact prefix in `daily_discovery.decisionStore`. Use
-`GET /accounts/{account_id}/storage/kv/namespaces/{namespace_id}/keys` with that
-prefix and `limit=1000`; follow every `result_info.cursor`. Save the metadata as
-`decisions.json`, retaining each key suffix as `alias`. This direct account read
-was verified against production. It does not read any Calendar/index data.
+`daily_discovery.decisionReader` and `feedbackReader` are `saved_state`.
+`daily_discovery.feedbackPolicy` defines local reads and writes. Older feed/store
+settings and credentials are retained only under
+`daily_discovery.retiredDecisionConfiguration`, disabled for execution.
+The helpers never follow those settings.
 
-A separate credential-protected `/api/discovery-decisions` endpoint and
-`read-decisions.py` helper are available for compatible clients. Keep the
-credential in the private state/production secret, send it only in Authorization,
-and never log it. The current machine is rejected by the site's browser-signature
-check, so the scheduled task must use the supported Cloudflare account API. Do not
-retry that block, impersonate a browser or weaken site protections. No site-wide
-or endpoint-specific browser-check exception is required. If the account read
-fails, do not assume an empty exclusion list or launch paid collection.
+The preparation helper automatically uses `daily_discovery.decisions`. Its
+`--decisions` argument is optional and accepts a local decision export explicitly
+provided by the user. It merges newer choices with existing history by stable
+identity/alias and timestamp; an omitted or partial export never erases saved
+exclusions or confirmed import receipts. Invalid saved records must be recovered,
+not silently discarded. Save the resulting `NEXT_STATE.json` to the same private
+Library item using the current version guard. That save persists the review's
+choices and progress without a remote decision write.
 
-| Decision | Next scan |
+If no decision snapshot has ever been saved, the run proceeds with zero **known
+saved** decisions. This is not evidence that Admin has no exclusions. The helper
+records the snapshot's source, actual last live-sync timestamp (or unknown) and
+freshness limitation in Coverage. Missing live feedback never blocks collection,
+review, local decision saves, Excel generation or delivery. Do not invent a new
+sync timestamp when preparing a workbook.
+
+Admin still restores its own latest saved choices when a workbook is opened
+there. Those choices are not automatically copied into the daily review state.
+Consequently a workbook may contain an item already excluded or saved in Admin.
+Record this limitation rather than requesting access or claiming a live sync.
+The Admin application and its existing storage are separate from this task.
+
+| Known saved decision | Next scan |
 | --- | --- |
-| Include | Retire the item after the existing intake save is confirmed. A failed save remains pending; a lost response can retry the same existing workbook key. |
-| Wait | Carry the latest unresolved future event/proposal into the next file without importing it. Untouched rows default to Wait. |
-| Exclude | Suppress that event edition across workbooks and cross-posts. A different date is a different edition. Changing a saved choice back to Wait restores it. |
+| Include | Retire after confirmed intake success or a match through the normal public-calendar comparison. Delivery is not an import receipt. |
+| Wait | Carry the latest unresolved future event/proposal without importing it. Untouched rows default to Wait. |
+| Exclude | Suppress that edition across workbooks and cross-posts using known identities/aliases. A different date is a different edition. A newer known Wait restores it. |
 
-Source/event aliases and stable IDs are stored in the existing `ImportSourceKey`
-and `ImportSourceSnapshot` columns. Reuse a pending event's ID when new source
-evidence confirms it is the same edition. Do not collapse different editions,
-rooms, or simultaneous events based only on one shared post or address.
+Source/event aliases and stable IDs remain in `ImportSourceKey` and
+`ImportSourceSnapshot`. Reuse a pending event's ID when new evidence confirms the
+same edition. Do not collapse different editions, rooms or simultaneous events
+because they share a post or address. Correction receipts are proposal-specific.
 
 Every daily Excel is cumulative. Preserve unresolved leads and meaningful updates,
 replace superseded pending proposals, expire past events, and record dispositions.
-Older deliveries do not prove an import. Do not let a stale worker overwrite the
-latest Library state: retain and use its optimistic version guard.
+Keep decision-excluded items in the saved backlog so a newer Wait can restore
+them. Older deliveries do not prove an import. Preserve unrelated history and the
+state's optimistic version guard.
 
 ## Normal QDP comparison and corrections
 
@@ -120,15 +134,17 @@ web-app deployment to a new version to activate that server-side field.
 Fetch the latest private state and the current repository before every task.
 
 ```sh
-# First fetch decisions.json through the connected Cloudflare API, using only
-# daily_discovery.decisionStore and following every cursor.
+# No live feedback or external account connection is required.
+# This optional export reads only the local state snapshot.
+python3 tools/discovery/read-decisions.py --state STATE.json --output decisions.json
 node tools/discovery/daily-review.mjs --state STATE.json --plan collection.json --spent 0
 python3 tools/discovery/collect-venues.py --output venues.json
 ```
 
 The ChatGPT review supplies evidence-checked JSON with `candidates`, `corrections`,
 `listedIds` (persistent identities matched by the normal public-calendar check),
-`resolvedCorrectionIds`, `coverage`, `publicComparison` and `decisionReadAt`.
+`resolvedCorrectionIds`, `coverage` and `publicComparison`. The helper preserves
+the historical `decisionReadAt`; do not supply a new one without an actual sync.
 New candidates may use the saved legacy fields or a `fields` object with intake
 headers. Preserve all supported dates, times, named artists, descriptions, source
 URLs and direct image URLs. List relevant accounts, media, source and comparison
@@ -136,10 +152,16 @@ gaps in Coverage. No fabricated minimum event count.
 
 ```sh
 node tools/discovery/daily-review.mjs --state STATE.json --review reviewed.json \
-  --decisions decisions.json --date YYYY-MM-DD --output payload.json --next-state NEXT_STATE.json
+  --date YYYY-MM-DD --output payload.json --next-state NEXT_STATE.json
 node tools/discovery/export-workbook.mjs --payload payload.json \
   --template ACCEPTED_REFERENCE.xlsx --output QDP_Instagram_Review_YYYY-MM-DD.xlsx
 ```
+
+The preparation command saves candidate/correction progress and the merged
+known decision snapshot in `NEXT_STATE.json`. It does not contact the decision
+service. To merge an explicitly supplied local decision export, add
+`--decisions PROVIDED_DECISIONS.json`; a live decision read is never required.
+Save the workbook and replace the same private state item after generation.
 
 The exporter uses the Codex primary runtime's Artifact Tool. Run with
 `CODEX_PRIMARY_RUNTIME_NODE`; it resolves dependencies from

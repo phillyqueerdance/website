@@ -1,7 +1,9 @@
 // Deterministic preparation for the ChatGPT daily review. No collection or QDP writes.
 import fs from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { discoveryIdentity, validDecisionId } from "../../shared/discovery-identity.js";
+import { discoveryIdentity } from "../../shared/discovery-identity.js";
+import { mergeDecisionRecords, savedDecisionFeedback, useSavedDecisionState } from "./saved-decisions.mjs";
+export { decisionRecords } from "./saved-decisions.mjs";
 
 export const SETTINGS = Object.freeze({
   postsPerProfile: 3, overlapHours: 6, maxDailyActorChargeUsd: 0.59,
@@ -46,29 +48,23 @@ export function fieldsFor(candidate) {
   };
 }
 
-export function decisionRecords(input) {
-  const items = Array.isArray(input) ? input : input.records || input.result || [];
-  return items.map(item => item.metadata ? { ...item.metadata, alias: item.name?.split(":").at(-1) } : item)
-    .filter(item => item && validDecisionId(item.id));
-}
-
 function decisionFor(identity, records) {
-  return records.filter(record => (identity.aliases.includes(record.alias || record.id)
-    || record.aliases?.some(id => identity.aliases.includes(id)))
-    && (record.kind === identity.kind || record.decision === "EXCLUDE")
-    && (identity.kind !== "correction" || record.id === identity.id || record.decision === "EXCLUDE"))
-    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0];
+  return records.filter(record => identity.aliases.includes(record.alias || record.id)
+    && (record.kind === identity.kind || ["EXCLUDE", "WAIT"].includes(record.decision))
+    && (identity.kind !== "correction" || record.id === identity.id || ["EXCLUDE", "WAIT"].includes(record.decision)))
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
 }
 
 export async function prepareReview(state, review, decisionInput, today) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) throw new Error("Supply today's Philadelphia date.");
   if (!Array.isArray(state.intake_headers) || state.intake_headers.length !== 43) throw new Error("Use the saved 43-column intake layout.");
-  const records = decisionRecords(decisionInput);
+  const records = mergeDecisionRecords(state.daily_discovery?.decisions, decisionInput);
   const candidates = new Map();
   const excluded = [], expired = [], included = [];
   const freshlyListed = new Set(review.listedIds || []);
   // Legacy deliveries are retained: delivery never established an import.
-  for (const original of [...(state.previously_delivered_candidates || []), ...(state.pending_candidates || []), ...(review.candidates || [])]) {
+  for (const original of [...(state.previously_delivered_candidates || []), ...(state.daily_discovery?.excludedCandidates || []),
+    ...(state.pending_candidates || []), ...(review.candidates || [])]) {
     const fields = fieldsFor(original);
     const identity = await discoveryIdentity(fields);
     const match = [...candidates.values()].find(item => item.discovery.aliases.some(alias => identity.aliases.includes(alias)));
@@ -100,8 +96,8 @@ export async function prepareReview(state, review, decisionInput, today) {
     || a.fields.StartTime.localeCompare(b.fields.StartTime)
     || a.fields["Title (internal)"].localeCompare(b.fields["Title (internal)"]));
 
-  const corrections = new Map();
-  for (const original of [...(state.daily_discovery?.pendingCorrections || []), ...(review.corrections || [])]) {
+  const corrections = new Map(), excludedCorrections = new Map();
+  for (const original of [...(state.daily_discovery?.excludedCorrections || []), ...(state.daily_discovery?.pendingCorrections || []), ...(review.corrections || [])]) {
     const row = { ...original };
     row.Date ||= row.date || "";
     row["Current title"] ||= row.title || "";
@@ -119,21 +115,25 @@ export async function prepareReview(state, review, decisionInput, today) {
     const identity = await discoveryIdentity({ StartDate: row.Date, Location: row.Venue,
       "Title (internal)": row["Current title"], Instagram_URL: row["Instagram source"] }, "correction", proposal);
     const disposition = decisionFor(identity, records);
-    if (row.Date < today || ["INCLUDE", "EXCLUDE"].includes(disposition?.decision)
+    if (row.Date < today || disposition?.decision === "INCLUDE"
       || (review.resolvedCorrectionIds || []).includes(identity.id)) continue;
+    if (disposition?.decision === "EXCLUDE") { excludedCorrections.set(identity.id, row); continue; }
     corrections.set(identity.id, row);
   }
   const pending = [...candidates.values()].filter(item => ![...included, ...excluded, ...expired].includes(item));
   const coverage = { ...(review.coverage || {}), preparedAt: new Date().toISOString(),
+    decisionFeedback: savedDecisionFeedback(state, records),
     publicComparison: review.publicComparison || "Incomplete: public calendar comparison must be performed by the daily review.",
     candidates: actionable.length, corrections: corrections.size, excluded: excluded.length, expired: expired.length,
     includedOrAlreadyListed: included.length, waitingForLineup: pending.filter(item => item.leadWithoutLineup).length };
+  const localState = useSavedDecisionState(state, records);
   return {
     headers: state.intake_headers, rows: actionable.map(item => state.intake_headers.map(name => item.fields[name] || "")),
     corrections: [...corrections.values()], correctionHeaders: CORRECTION_HEADERS, coverage,
-    nextState: { ...state, pending_candidates: pending.map(item => ({ ...item, carried: true })),
-      daily_discovery: { ...(state.daily_discovery || {}), version: 1, settings: SETTINGS,
-        pendingCorrections: [...corrections.values()], lastPreparedDate: today, decisionReadAt: review.decisionReadAt || null,
+    nextState: { ...localState, pending_candidates: pending.map(item => ({ ...item, carried: true })),
+      daily_discovery: { ...localState.daily_discovery, version: 1, settings: SETTINGS,
+        pendingCorrections: [...corrections.values()], excludedCorrections: [...excludedCorrections.values()],
+        excludedCandidates: excluded, lastPreparedDate: today,
         decisions: records, lastCoverage: coverage } }
   };
 }
@@ -146,7 +146,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (args.plan) {
     await fs.writeFile(args.plan, JSON.stringify(collectionPlan(state, new Date(), Number(args.spent || 0)), null, 2));
   } else {
-    const result = await prepareReview(state, await read(args.review), await read(args.decisions), args.date);
+    const result = await prepareReview(state, await read(args.review), args.decisions ? await read(args.decisions) : undefined, args.date);
     const { nextState, ...payload } = result;
     await fs.writeFile(args.output, JSON.stringify(payload));
     await fs.writeFile(args["next-state"], JSON.stringify(nextState, null, 2));
