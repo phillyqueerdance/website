@@ -1,5 +1,4 @@
 import { addArtistPhotoCrops, cropStore } from "../artist-photo-crops.js";
-import { recordDiscoveryImports, saveDiscoveryDecision } from "../discovery-decisions.js";
 import { validateIdentity } from "../../shared/discovery-identity.js";
 
 const DEFAULT_APPS_SCRIPT_URL =
@@ -524,10 +523,11 @@ export async function onRequestPost(
       );
     }
 
-    if (action === "admin.apifyimport") await recordDiscoveryImports(context.env, body.rows, upstreamPayload);
-    if (action === "admin.apifycorrection.stage" && body.discovery && typeof upstreamPayload.alreadySaved === "boolean") {
-      await saveDiscoveryDecision(context.env, body.discovery, "INCLUDE", true);
+    if (((action === "admin.apifyimport" && body.rows?.some(row => row.discovery))
+      || (action === "admin.apifycorrection.stage" && body.discovery)) && upstreamPayload.feedbackVersion !== 1) {
+      return jsonResponse({error: "Discovery feedback needs Core.gs v7.4.29 and an updated Apps Script deployment. Retry the same selection after updating; existing intake keys prevent duplicates."}, 400);
     }
+
 
     if ((action === "admin.artist.read" || action === "admin.artist.save") && upstreamPayload.artist) {
       await addArtistPhotoCrops(context, cropStore(context.env), { artists: [upstreamPayload.artist] });

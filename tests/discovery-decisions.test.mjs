@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { discoveryIdentity, DECISION_PREFIX } from '../shared/discovery-identity.js';
-import { readDiscoveryDecision, saveDiscoveryDecision, recordDiscoveryImports } from '../functions/discovery-decisions.js';
+import { discoveryFixture } from './helpers/discovery-script-fixture.mjs';
+const readDiscoveryDecision = async (env, identity) => env.fixture.read(identity);
+const saveDiscoveryDecision = async (env, identity, decision, receipt = false) => env.fixture.save(identity, decision, receipt);
+const recordDiscoveryImports = async (env, rows, result) => env.fixture.import(rows, result);
 import { collectionPlan, prepareReview, decisionRecords } from '../tools/discovery/daily-review.mjs';
 
 const fields = (extra = {}) => ({'Title (internal)': 'Melt', StartDate: '2026-12-19', EndDate: '2026-12-20',
@@ -15,11 +18,9 @@ const state = () => ({usernames: ['one'], actor: 'sones/instagram-posts-scraper-
     'ImportSourceKey', 'ImportSourceSnapshot', ...Array.from({length: 33}, (_, i) => 'blank' + i)
   ], previously_delivered_candidates: [], pending_candidates: []});
 function store() {
-  const records = new Map();
-  return {records, env: {QDP_PUBLIC_FEED_KV: {
-    async get(key) { return records.has(key) ? JSON.parse(records.get(key).value) : null; },
-    async put(key, value, options) { records.set(key, {value, metadata: options.metadata}); }
-  }}};
+  const fixture = discoveryFixture();
+  return { env: {fixture}, get records() { return new Map(fixture.records().map(record =>
+    [DECISION_PREFIX + record.alias, {value: JSON.stringify(record), metadata: record}])); } };
 }
 test('Wait and Exclude survive another workbook and cross-post aliases', async () => {
   const h = store(), id = await discoveryIdentity(fields());
@@ -103,7 +104,7 @@ test('Include uses the existing intake action and sends its persistent identity'
   assert.equal(h.requests[0].body.action,'admin.apifyimport');assert.equal(h.requests[0].body.rows[0].discovery.id,candidate.discovery.id);
   assert.equal(candidate.saved,true);
 });
-test('Include batches stay within free-tier KV request limits and preserve completed batches on failure',async()=>{
+test('Include batches stay bounded and preserve completed batches on failure',async()=>{
   const h=ui();const identity=await discoveryIdentity(fields());
   const candidates=Array.from({length:7},(_,i)=>({decision:'INCLUDE',decisionDirty:true,saved:false,key:'book:'+(i+2),fields:fields(),discovery:identity}));
   h.state.review={candidates};

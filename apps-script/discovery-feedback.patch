@@ -1,0 +1,177 @@
+--- a/Core.gs
++++ b/Core.gs
+@@ -2 +2 @@
+- * Queer Dance Philly — Apps Script Core v7.4.28
++ * Queer Dance Philly — Apps Script Core v7.4.29
+@@ -14 +14 @@
+-const QDP_VERSION = '7.4.28';
++const QDP_VERSION = '7.4.29';
+@@ -116,0 +117 @@
++    .addItem('Discovery feedback connection', 'qdpSetupDiscoveryFeedback')
+@@ -4135,2 +4136,15 @@
+-  if (action === 'admin.apifyimport') return { ok: 'yes', ...qdpAdminImportWithRules_(body.rows) };
+-  if (action === 'admin.apifycorrection.stage') return { ok: 'yes', ...qdpApifyCorrectionStage_(body) };
++  if (action === 'admin.discovery.decisions') return { ok: 'yes', ...qdpDiscoveryAdmin_(body) };
++  if (action === 'admin.apifyimport') {
++    if (Array.isArray(body.rows)) body.rows.forEach(row => { if (row.discovery) qdpDiscoveryIdentity_(row.discovery); });
++    const result = qdpAdminImportWithRules_(body.rows);
++    qdpDiscoveryRecordImport_(body.rows, result);
++    return { ok: 'yes', feedbackVersion: 1, ...result };
++  }
++  if (action === 'admin.apifycorrection.stage') {
++    if (body.discovery) qdpDiscoveryIdentity_(body.discovery);
++    const result = qdpApifyCorrectionStage_(body);
++    if (body.discovery && typeof result.alreadySaved === 'boolean') {
++      qdpDiscoverySave_([{ identity: body.discovery, decision: 'INCLUDE' }], true);
++    }
++    return { ok: 'yes', feedbackVersion: 1, ...result };
++  }
+@@ -4189,0 +4204,3 @@
++if (String(body.action || '').trim().toLowerCase() === 'discovery.feedback.read') {
++return qdpFlyerJson_(qdpDiscoveryFeedback_(body));
++}
+@@ -5985,0 +6003,144 @@
++
++
++/* Included in the supplied Core.gs. Do not install a second copy. */
++const QDP_DISCOVERY_SHEET_ = 'QDP_Discovery_Decisions';
++const QDP_DISCOVERY_HEADERS_ = ['Alias', 'DecisionID', 'Kind', 'EventDate', 'Decision', 'UpdatedAt'];
++const QDP_DISCOVERY_READ_PROPERTY_ = 'QDP_DISCOVERY_READ_TOKEN';
++
++function qdpDiscoveryIdentity_(raw) {
++  const valid = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
++  if (!raw || !valid(raw.id) || !['event', 'correction'].includes(raw.kind)
++      || !/^\d{4}-\d{2}-\d{2}$/.test(raw.date || '') || !Array.isArray(raw.aliases)
++      || !raw.aliases.length || raw.aliases.length > 8 || !raw.aliases.every(valid)) {
++    throw new Error('An event decision is invalid. Reload its workbook.');
++  }
++  const aliases = [...new Set([raw.id, ...raw.aliases])];
++  if (aliases.length > 8) throw new Error('An event has too many decision aliases.');
++  return { id: raw.id, aliases, kind: raw.kind, date: raw.date };
++}
++
++function qdpDiscoveryTable_(create) {
++  const ss = ss_();
++  let sheet = ss.getSheetByName(QDP_DISCOVERY_SHEET_);
++  if (!sheet && create) sheet = ss.insertSheet(QDP_DISCOVERY_SHEET_);
++  if (!sheet) return { sheet: null, records: [] };
++  if (!sheet.getLastRow() && create) {
++    sheet.getRange(1, 1, 1, QDP_DISCOVERY_HEADERS_.length).setValues([QDP_DISCOVERY_HEADERS_]);
++    sheet.setFrozenRows(1);
++  }
++  const headers = sheet.getRange(1, 1, 1, QDP_DISCOVERY_HEADERS_.length).getValues()[0];
++  if (JSON.stringify(headers) !== JSON.stringify(QDP_DISCOVERY_HEADERS_)) {
++    throw new Error('The discovery decision ledger has an unexpected layout. Preserve it and recover the headers.');
++  }
++  const rows = sheet.getLastRow() > 1
++    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, QDP_DISCOVERY_HEADERS_.length).getValues() : [];
++  const records = rows.map(row => {
++    const [alias, id, kind, date, decision, updatedAt] = row.map(String);
++    const identity = qdpDiscoveryIdentity_({ id, kind, date, aliases: [alias] });
++    if (!['INCLUDE', 'WAIT', 'EXCLUDE'].includes(decision) || !Number.isFinite(Date.parse(updatedAt))) {
++      throw new Error('A saved discovery decision is invalid. Preserve the ledger and recover the record.');
++    }
++    return { alias, id: identity.id, kind, date, decision, updatedAt };
++  });
++  if (new Set(records.map(record => record.alias)).size !== records.length) {
++    throw new Error('The discovery decision ledger has duplicate aliases. Recover it before saving.');
++  }
++  return { sheet, records };
++}
++
++function qdpDiscoverySave_(items, receipt) {
++  if (!Array.isArray(items) || !items.length || items.length > 100) throw new Error('Save between one and 100 decisions.');
++  const changes = items.map(item => {
++    const identity = qdpDiscoveryIdentity_(item.identity);
++    if (!['WAIT', 'EXCLUDE', ...(receipt ? ['INCLUDE'] : [])].includes(item.decision)) {
++      throw new Error('Include is recorded only after a confirmed import.');
++    }
++    return { ...identity, decision: item.decision };
++  });
++  return qdpWithWriteLock_(() => {
++    const table = qdpDiscoveryTable_(true), records = new Map(table.records.map(record => [record.alias, record]));
++    const previousTime = Math.max(0, ...table.records.map(record => Date.parse(record.updatedAt)));
++    const updatedAt = new Date(Math.max(Date.now(), previousTime + 1)).toISOString();
++    const saved = changes.map(change => ({ ...change, updatedAt }));
++    for (const record of saved) {
++      const aliases = record.kind === 'correction' && record.decision !== 'EXCLUDE' ? [record.id] : record.aliases;
++      for (const alias of aliases) records.set(alias, {
++        alias, id: record.id, kind: record.kind, date: record.date, decision: record.decision, updatedAt
++      });
++    }
++    const rows = [...records.values()].map(record => [record.alias, record.id, record.kind, record.date, record.decision, record.updatedAt]);
++    if (table.sheet.getMaxRows() < rows.length + 1) {
++      table.sheet.insertRowsAfter(table.sheet.getMaxRows(), rows.length + 1 - table.sheet.getMaxRows());
++    }
++    table.sheet.getRange(2, 1, rows.length, QDP_DISCOVERY_HEADERS_.length).setNumberFormat('@').setValues(rows);
++    SpreadsheetApp.flush();
++    return saved;
++  }, 5000, 'Save discovery decisions');
++}
++
++function qdpDiscoveryAdmin_(body) {
++  if (!['read', 'save'].includes(body.operation) || !Array.isArray(body.items) || body.items.length > 100) {
++    throw new Error('Read or save up to 100 discovery decisions.');
++  }
++  const identities = body.items.map(item => qdpDiscoveryIdentity_(item.identity));
++  if (body.operation === 'save') return { feedbackVersion: 1, records: qdpDiscoverySave_(body.items, false) };
++  return qdpWithWriteLock_(() => {
++    const table = qdpDiscoveryTable_(false);
++    return { feedbackVersion: 1, records: identities.map(identity => table.records.filter(record =>
++      identity.aliases.includes(record.alias)
++      && (record.kind === identity.kind || ['EXCLUDE', 'WAIT'].includes(record.decision))
++      && (identity.kind !== 'correction' || record.id === identity.id || ['EXCLUDE', 'WAIT'].includes(record.decision)))
++      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0] || null) };
++  }, 5000, 'Read discovery decisions');
++}
++
++function qdpDiscoveryRecordImport_(rows, result) {
++  if (!rows || !rows.some(row => row.discovery)) return;
++  if (!Number.isInteger(result.added) || !Number.isInteger(result.alreadySaved)
++      || result.added + result.alreadySaved !== rows.length) {
++    throw new Error('The import was not fully confirmed; its decisions remain pending.');
++  }
++  qdpDiscoverySave_(rows.filter(row => row.discovery).map(row => ({ identity: row.discovery, decision: 'INCLUDE' })), true);
++}
++
++function qdpDiscoveryFeedback_(body) {
++  const expected = PropertiesService.getScriptProperties().getProperty(QDP_DISCOVERY_READ_PROPERTY_);
++  if (!/^[a-f0-9]{64}$/.test(expected || '') || !qdpFlyerSafeEqual_(body.readToken, expected)) {
++    throw new Error('Discovery read authorization required.');
++  }
++  return qdpWithWriteLock_(() => {
++    const records = qdpDiscoveryTable_(false).records;
++    const revision = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, JSON.stringify(records), Utilities.Charset.UTF_8)
++      .map(byte => ('0' + ((byte + 256) % 256).toString(16)).slice(-2)).join('');
++    let offset = 0;
++    if (body.cursor) {
++      const match = /^([a-f0-9]{64}):(\d+)$/.exec(String(body.cursor));
++      if (!match) throw new Error('Invalid discovery feedback cursor.');
++      if (match[1] !== revision) throw new Error('Discovery decisions changed during pagination. Restart the snapshot.');
++      offset = Number(match[2]);
++      if (!Number.isSafeInteger(offset) || offset < 1 || offset > records.length) throw new Error('Invalid discovery feedback cursor.');
++    }
++    const next = Math.min(offset + 1000, records.length);
++    return { ok: 'yes', feedbackVersion: 1, provider: 'apps_script', revision, total: records.length,
++      readAt: new Date().toISOString(), records: records.slice(offset, next), complete: next === records.length,
++      cursor: next === records.length ? null : revision + ':' + next };
++  }, 5000, 'Read discovery feedback snapshot');
++}
++
++function qdpSetupDiscoveryFeedback() {
++  const props = PropertiesService.getScriptProperties();
++  let token = props.getProperty(QDP_DISCOVERY_READ_PROPERTY_);
++  if (!/^[a-f0-9]{64}$/.test(token || '')) {
++    token = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Utilities.getUuid(), Utilities.Charset.UTF_8)
++      .map(byte => ('0' + ((byte + 256) % 256).toString(16)).slice(-2)).join('');
++    props.setProperty(QDP_DISCOVERY_READ_PROPERTY_, token);
++  }
++  qdpWithWriteLock_(() => { qdpDiscoveryTable_(true); SpreadsheetApp.flush(); }, 5000, 'Set up discovery feedback');
++  const config = { provider: 'apps_script', url: ScriptApp.getService().getUrl(), token };
++  const ui = ui_();
++  if (ui) {
++    const safe = JSON.stringify(config, null, 2).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
++    ui.showModalDialog(HtmlService.createHtmlOutput('<p>Save this private, read-only connection in the discovery review state. Do not publish it.</p><textarea readonly style="width:100%;height:180px">' + safe + '</textarea>').setWidth(600).setHeight(280), 'Discovery feedback connection');
++  }
++  return config; // Never log the credential or return it from the public feed.
++}

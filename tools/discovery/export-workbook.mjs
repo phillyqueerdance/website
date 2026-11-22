@@ -21,12 +21,12 @@ export async function exportWorkbook(payload, output, template) {
   const instructions = [
     ["Step", "Instructions"],
     ["1", "Upload the latest daily Excel on Admin → Apify Import. It includes unresolved future events from earlier days."],
-    ["2", "Choose Include, Wait or Exclude, then Save decisions and included events. Wait adds nothing. Admin restores its saved choices when you open another workbook; these choices are not automatically synced to the daily review state."],
+    ["2", "Choose Include, Wait or Exclude, then Save decisions and included events. Wait adds nothing and carries forward. Exclude suppresses that edition in future reviews. Saved choices sync automatically through the Apps Script decision ledger."],
     ["3", "Include saves selected events to Apify Import. Use the existing import rows + flyers, Calendar creation and Pull workflow."],
     ["4", "For Corrections, choose Include, select only the fields to change, and save the correction. Apply it to the existing event through the usual sheet workflow."],
-    ["5", "The daily review uses known decisions in its saved state and the public QDP calendar. Failed saves remain pending. Downloading a file does not mark it imported."],
+    ["5", "Confirmed Include receipts and Exclude choices retire items from the pending review. Failed saves remain pending. Downloading a file does not mark it imported."],
     ["Flyers", "Source image URLs can expire. Saved Drive copies depend on your existing flyer helper."],
-    ["Compatibility", "Spreadsheet paste remains supported: copy complete A:AQ rows with blanks intact. Save Wait/Exclude in Admin to restore them there. To update the daily review snapshot, explicitly supply a decision export."],
+    ["Compatibility", "Spreadsheet paste remains supported: copy complete A:AQ rows with blanks intact. Save Wait/Exclude in Admin; the next daily review reads those choices automatically. No manual feedback export is needed."],
     ["Coverage", "The normal public-calendar comparison remains. No extra Calendar/index reconciliation or automatic publishing is performed."]
   ];
   const tables = [

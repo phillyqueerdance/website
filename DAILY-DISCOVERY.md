@@ -41,58 +41,74 @@ claiming a verified event. Source collection alone is not completed review.
 
 ## Feedback and pending events
 
-The discovery run reads and saves decisions in the private
-`QDP_Instagram_Review_State.json` item. **No Cloudflare account connection,
-API, KV read/write, Admin endpoint, protected decision feed, Worker, new endpoint
-or security configuration is required to collect, review, save progress or export
-the workbook.** Do not ask for Cloudflare access to repair or run this workflow.
-This policy replaces the former account-API requirement, including the old
-preflight failure recorded in run history.
+Admin saves **Include / Wait / Exclude** in the `QDP_Discovery_Decisions` sheet
+through the existing Apps Script web app. The ledger contains only stable
+identity/source aliases, proposal IDs, edition dates, decisions and timestamps.
+The discovery task reads this ledger directly from **Google Apps Script**. No
+Cloudflare account connection, KV storage, account API, protected QDP feedback
+route, new Worker or security-rule configuration is used by the feedback store
+or scheduled review. The existing website's hosting/login stays as configured.
 
-`daily_discovery.decisionReader` and `feedbackReader` are `saved_state`.
-`daily_discovery.feedbackPolicy` defines local reads and writes. Older feed/store
-settings and credentials are retained only under
-`daily_discovery.retiredDecisionConfiguration`, disabled for execution.
-The helpers never follow those settings.
+### One-time activation
 
-The preparation helper automatically uses `daily_discovery.decisions`. Its
-`--decisions` argument is optional and accepts a local decision export explicitly
-provided by the user. It merges newer choices with existing history by stable
-identity/alias and timestamp; an omitted or partial export never erases saved
-exclusions or confirmed import receipts. Invalid saved records must be recovered,
-not silently discarded. Save the resulting `NEXT_STATE.json` to the same private
-Library item using the current version guard. That save persists the review's
-choices and progress without a remote decision write.
+Install the complete supplied **Core.gs v7.4.29** and update the **existing**
+web-app deployment to a new version. It already includes the helpers referenced
+in `apps-script/DiscoveryDecisions.gs`; do not install a duplicate copy. Keep
+all other scripts, properties, triggers, URLs and access settings.
 
-If no decision snapshot has ever been saved, the run proceeds with zero **known
-saved** decisions. This is not evidence that Admin has no exclusions. The helper
-records the snapshot's source, actual last live-sync timestamp (or unknown) and
-freshness limitation in Coverage. Missing live feedback never blocks collection,
-review, local decision saves, Excel generation or delivery. Do not invent a new
-sync timestamp when preparing a workbook.
+Run `qdpSetupDiscoveryFeedback` from the QDP spreadsheet. It creates the decision
+ledger and a read-only `QDP_DISCOVERY_READ_TOKEN` Script Property if absent. An
+existing token is preserved. The connection appears in a private dialog and is
+never logged. Save that configuration privately as
+`daily_discovery.appsScriptFeedback = {provider: "apps_script", url, token,
+enabled: true}` in the existing review state. Keep the credential out of Git,
+workbooks, URLs, logs and chat. No recurring export or manual feedback transfer
+is required after activation. Until installation is confirmed, keep the new
+connection disabled and retain the existing saved decisions.
 
-Admin still restores its own latest saved choices when a workbook is opened
-there. Those choices are not automatically copied into the daily review state.
-Consequently a workbook may contain an item already excluded or saved in Admin.
-Record this limitation rather than requesting access or claiming a live sync.
-The Admin application and its existing storage are separate from this task.
+### Every review
 
-| Known saved decision | Next scan |
+`tools/discovery/read-decisions.py` POSTs `discovery.feedback.read` with the
+read-only token **in the JSON body** to the exact saved `script.google.com`
+deployment URL. The only allowed redirect is Google's normal one-time
+`script.googleusercontent.com/macros/echo` ContentService response, fetched
+without forwarding credentials or a POST body. It follows every cursor and
+checks total records, unique aliases, completeness and a stable revision across
+pages. A write during pagination restarts the snapshot once. The reader cannot
+save decisions, import events or read Calendar/index sheets.
+
+Admin's normal authenticated saves write Wait and Exclude to the ledger. Include
+receipts are written by Apps Script **only after confirmed intake success**;
+correction receipts retire only that proposal. A failed receipt returns an
+error and retrying the same workbook key remains safe. No hosted KV write is
+part of a decision save or import confirmation.
+
+Pass the reader's `decisions.json` to the preparation helper. It merges newer
+choices by stable alias and timestamp without dropping saved decisions or
+receipts. A complete Google snapshot updates `decisionReadAt` and Coverage;
+preparing a workbook alone never fabricates a new sync time. Preserve the known
+snapshot and disclose a read failure if Google is temporarily unavailable.
+Continue with that saved snapshot rather than requesting Cloudflare access or
+pretending there are no exclusions. Invalid saved records need recovery and
+must not be silently erased.
+
+| Decision | Next scan |
 | --- | --- |
-| Include | Retire after confirmed intake success or a match through the normal public-calendar comparison. Delivery is not an import receipt. |
+| Include | Retire after a confirmed intake receipt or a match through the normal public-calendar comparison. Delivery is not an import receipt. |
 | Wait | Carry the latest unresolved future event/proposal without importing it. Untouched rows default to Wait. |
-| Exclude | Suppress that edition across workbooks and cross-posts using known identities/aliases. A different date is a different edition. A newer known Wait restores it. |
+| Exclude | Suppress that edition across workbooks and cross-posts using its identities/aliases. A different date is a different edition. A newer Wait restores it. |
 
 Source/event aliases and stable IDs remain in `ImportSourceKey` and
 `ImportSourceSnapshot`. Reuse a pending event's ID when new evidence confirms the
 same edition. Do not collapse different editions, rooms or simultaneous events
-because they share a post or address. Correction receipts are proposal-specific.
+because they share a post or address.
 
 Every daily Excel is cumulative. Preserve unresolved leads and meaningful updates,
-replace superseded pending proposals, expire past events, and record dispositions.
+replace superseded pending proposals, expire past events and record dispositions.
 Keep decision-excluded items in the saved backlog so a newer Wait can restore
 them. Older deliveries do not prove an import. Preserve unrelated history and the
-state's optimistic version guard.
+state's optimistic version guard. Retired Cloudflare settings remain disabled;
+do not follow obsolete feedback blockers in historical run records.
 
 ## Normal QDP comparison and corrections
 
@@ -134,8 +150,8 @@ web-app deployment to a new version to activate that server-side field.
 Fetch the latest private state and the current repository before every task.
 
 ```sh
-# No live feedback or external account connection is required.
-# This optional export reads only the local state snapshot.
+# Read current Admin decisions directly from the configured Apps Script feed.
+# Failure preserves the saved snapshot and is explicitly recorded in Coverage.
 python3 tools/discovery/read-decisions.py --state STATE.json --output decisions.json
 node tools/discovery/daily-review.mjs --state STATE.json --plan collection.json --spent 0
 python3 tools/discovery/collect-venues.py --output venues.json
@@ -144,7 +160,8 @@ python3 tools/discovery/collect-venues.py --output venues.json
 The ChatGPT review supplies evidence-checked JSON with `candidates`, `corrections`,
 `listedIds` (persistent identities matched by the normal public-calendar check),
 `resolvedCorrectionIds`, `coverage` and `publicComparison`. The helper preserves
-the historical `decisionReadAt`; do not supply a new one without an actual sync.
+the actual `decisionReadAt` from a complete Apps Script snapshot and otherwise
+retains the previous timestamp.
 New candidates may use the saved legacy fields or a `fields` object with intake
 headers. Preserve all supported dates, times, named artists, descriptions, source
 URLs and direct image URLs. List relevant accounts, media, source and comparison
@@ -152,16 +169,16 @@ gaps in Coverage. No fabricated minimum event count.
 
 ```sh
 node tools/discovery/daily-review.mjs --state STATE.json --review reviewed.json \
-  --date YYYY-MM-DD --output payload.json --next-state NEXT_STATE.json
+  --decisions decisions.json --date YYYY-MM-DD --output payload.json --next-state NEXT_STATE.json
 node tools/discovery/export-workbook.mjs --payload payload.json \
   --template ACCEPTED_REFERENCE.xlsx --output QDP_Instagram_Review_YYYY-MM-DD.xlsx
 ```
 
 The preparation command saves candidate/correction progress and the merged
-known decision snapshot in `NEXT_STATE.json`. It does not contact the decision
-service. To merge an explicitly supplied local decision export, add
-`--decisions PROVIDED_DECISIONS.json`; a live decision read is never required.
+known decision snapshot in `NEXT_STATE.json`. The separate reader supplies the
+latest Admin feedback; the preparation helper itself performs no network writes.
 Save the workbook and replace the same private state item after generation.
+Use `--cached` on the reader only for an explicitly labeled recovery/test run.
 
 The exporter uses the Codex primary runtime's Artifact Tool. Run with
 `CODEX_PRIMARY_RUNTIME_NODE`; it resolves dependencies from

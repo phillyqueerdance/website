@@ -1,5 +1,27 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Automatic discovery feedback through Apps Script (v7.4.29)
+
+The supplied complete **Core.gs v7.4.29** records Admin review choices in a
+`QDP_Discovery_Decisions` ledger. Confirmed event/correction intake saves create
+Include receipts in the same backend. The review reads a dedicated, read-only
+Apps Script POST endpoint, follows complete revision-checked snapshots and caches
+the result in its private state. No Cloudflare account, KV binding or API token
+is needed for feedback or the discovery run.
+
+Replace Core.gs, then update its existing web-app deployment without changing
+its URL/access or other scripts/triggers. Run `qdpSetupDiscoveryFeedback` in the
+bound spreadsheet to create the ledger and obtain the private read-only
+connection. Configure `daily_discovery.appsScriptFeedback` in the existing
+review state. Existing read tokens are preserved. No ongoing export is required.
+See [DAILY-DISCOVERY.md](../DAILY-DISCOVERY.md) for the full activation/run steps.
+
+[DiscoveryDecisions.gs](DiscoveryDecisions.gs) is the testable source reference;
+its functions are **already embedded** in the separately supplied full Core.gs.
+Do not also install it. The complete source delta is
+[discovery-feedback.patch](discovery-feedback.patch). The existing website's
+hosting and Admin login are unaffected; no Cloudflare settings need changing.
+
 ## Combined daily discovery and lineup corrections (v7.4.28)
 
 The Apify Import page now saves Include / Wait / Exclude decisions across daily

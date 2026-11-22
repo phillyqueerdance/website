@@ -1,5 +1,4 @@
-import { verifyAccess } from "./api.js";
-import { readDiscoveryDecision, saveDiscoveryDecision } from "../discovery-decisions.js";
+import { verifyAccess, requestAppsScriptAdmin } from "./api.js";
 import { validateIdentity } from "../../shared/discovery-identity.js";
 
 const json = (data, status = 200) => Response.json(data, { status, headers: {
@@ -30,11 +29,16 @@ export async function onRequestPost(context) {
         return json({ error: "Choose Wait or Exclude. Include needs a confirmed import." }, 400);
       }
     }
-    const records = [];
-    for (const item of body.items) records.push(body.operation === "read"
-      ? await readDiscoveryDecision(env, item.identity)
-      : await saveDiscoveryDecision(env, item.identity, item.decision));
-    return json({ ok: "yes", records });
+    const result = await requestAppsScriptAdmin(env, {
+      action: "admin.discovery.decisions", operation: body.operation, items: body.items
+    });
+    if (result.ok !== "yes" || result.feedbackVersion !== 1 || !Array.isArray(result.records)
+        || result.records.length !== body.items.length) {
+      throw new Error(result.error === "Unknown admin action."
+        ? "Discovery decisions need Core.gs v7.4.29 and an updated Apps Script web-app deployment."
+        : result.error || "The decision save was not confirmed. Retry the same selection.");
+    }
+    return json({ ok: "yes", records: result.records });
   } catch (error) {
     return json({ error: error.message || "The decisions could not be saved. Retry your selection." }, 400);
   }

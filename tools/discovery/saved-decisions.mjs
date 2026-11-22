@@ -34,11 +34,17 @@ export function mergeDecisionRecords(...inputs) {
   return [...records.values()];
 }
 
-export function savedDecisionFeedback(state, records = decisionRecords(state.daily_discovery?.decisions)) {
+export function savedDecisionFeedback(state, records = decisionRecords(state.daily_discovery?.decisions), input) {
+  const live = input?.source === "apps_script" && input.complete === true;
+  if (live && (!Number.isFinite(Date.parse(input.lastLiveSyncAt)) || !/^[a-f0-9]{64}$/.test(input.revision || "")
+      || input.total !== input.records?.length)) throw new Error("The Apps Script decision snapshot is incomplete.");
   return {
-    source: "saved_state", records: records.length,
-    lastLiveSyncAt: state.daily_discovery?.decisionReadAt || null,
-    liveAdminFeedback: "Not synced. New Admin choices are applied in Admin when the workbook is opened; they are not automatically copied into this review state."
+    source: live ? "apps_script" : "saved_state", records: records.length,
+    lastLiveSyncAt: live ? input.lastLiveSyncAt : state.daily_discovery?.decisionReadAt || null,
+    revision: live ? input.revision : null,
+    liveAdminFeedback: live ? "Synced directly from the Apps Script discovery decision ledger."
+      : "Not synced this run. Saved decisions are preserved; retry the configured Apps Script reader on the next run.",
+    ...(input?.feedbackReadError ? { feedbackReadError: input.feedbackReadError } : {})
   };
 }
 
@@ -49,17 +55,20 @@ export function useSavedDecisionState(state, records = decisionRecords(state.dai
     retired[name] = daily[name];
     delete daily[name];
   }
-  if (daily.decisionReader && daily.decisionReader !== "saved_state") retired.decisionReader = daily.decisionReader;
+  if (daily.decisionReader && !["saved_state", "apps_script"].includes(daily.decisionReader)) retired.decisionReader = daily.decisionReader;
   if (Object.keys(retired).length) daily.retiredDecisionConfiguration = { ...retired, disabled: true };
+  const connected = daily.appsScriptFeedback?.provider === "apps_script" && daily.appsScriptFeedback.enabled !== false;
   return {
     ...state, restrictions: { ...(state.restrictions || {}), no_cloudflare_access: true },
     daily_discovery: {
-      ...daily, decisionReader: "saved_state", feedbackReader: "saved_state", decisions: records,
+      ...daily, decisionReader: connected ? "apps_script" : "saved_state", feedbackReader: connected ? "apps_script" : "saved_state", decisions: records,
       feedbackPolicy: {
-        version: 2, readFrom: "daily_discovery.decisions", writeTo: "daily_discovery.decisions",
+        version: 3, readFrom: connected ? "Apps Script discovery decision ledger" : "daily_discovery.decisions",
+        writeTo: "Admin saves decisions and confirmed intake receipts in the Apps Script ledger; reviews cache them in daily_discovery.decisions.",
         requireLiveFeedback: false, requireCloudflare: false,
         persistence: "Save the next state to the same private Library item with its current version guard.",
-        adminFeedback: "Not automatically synced. Merge a newer decision export only when explicitly supplied by the user."
+        adminFeedback: connected ? "Read the configured Apps Script decisions-only feed before every review. No manual export or Cloudflare access."
+          : "Connection not activated. Preserve saved decisions until the Apps Script reader is configured."
       }
     }
   };

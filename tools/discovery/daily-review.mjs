@@ -122,7 +122,7 @@ export async function prepareReview(state, review, decisionInput, today) {
   }
   const pending = [...candidates.values()].filter(item => ![...included, ...excluded, ...expired].includes(item));
   const coverage = { ...(review.coverage || {}), preparedAt: new Date().toISOString(),
-    decisionFeedback: savedDecisionFeedback(state, records),
+    decisionFeedback: savedDecisionFeedback(state, records, decisionInput),
     publicComparison: review.publicComparison || "Incomplete: public calendar comparison must be performed by the daily review.",
     candidates: actionable.length, corrections: corrections.size, excluded: excluded.length, expired: expired.length,
     includedOrAlreadyListed: included.length, waitingForLineup: pending.filter(item => item.leadWithoutLineup).length };
@@ -134,7 +134,7 @@ export async function prepareReview(state, review, decisionInput, today) {
       daily_discovery: { ...localState.daily_discovery, version: 1, settings: SETTINGS,
         pendingCorrections: [...corrections.values()], excludedCorrections: [...excludedCorrections.values()],
         excludedCandidates: excluded, lastPreparedDate: today,
-        decisions: records, lastCoverage: coverage } }
+        decisions: records, decisionReadAt: coverage.decisionFeedback.lastLiveSyncAt, lastCoverage: coverage } }
   };
 }
 
