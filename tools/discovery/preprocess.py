@@ -40,8 +40,8 @@ def media_assets(row):
         versions = media.get('video_versions') or []
         if versions:
             video = max(versions, key=lambda v: int(v.get('width') or 0) * int(v.get('height') or 0)).get('url') or video
-        children = media.get('carousel_media') or media.get('childPosts') or (media.get('sidecar') or {}).get('edges') or []
-        is_video = bool(video or media.get('media_type') == 2 or str(media.get('type', '')).lower() in ('video', 'reel'))
+        children = media.get('carousel_media') or media.get('childPosts') or (media.get('edge_sidecar_to_children') or {}).get('edges') or (media.get('sidecar') or {}).get('edges') or []
+        is_video = bool(video or media.get('media_type') == 2 or media.get('is_video') is True or str(media.get('type', '')).lower() in ('video', 'reel'))
         if image:
             assets.append({'kind': 'preview' if is_video else 'image', 'url': image, 'position': position})
         if is_video:

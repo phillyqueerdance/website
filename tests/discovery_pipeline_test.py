@@ -19,6 +19,7 @@ from PIL import Image, ImageDraw
 class FakeEndpoint:
     def __init__(self):
         self.work, self.calls, self.items, self.posts, self.venues, self.runs = {}, [], {}, {}, {}, {}
+        self.recovery_jobs, self.recovery_receipts, self.match_items = [], [], []
         self.checkpoint = {'version': 1, 'value': {'activeRun': None, 'last_completed_collection_at': '2026-11-22T12:00:00Z', 'deferredGaps': ['keep']}}
         self.fail_stage_once, self.fail_root_once = False, False
     def __call__(self, action, body):
@@ -40,6 +41,9 @@ class FakeEndpoint:
             if body['version'] != self.checkpoint['version']: raise RuntimeError('This checkpoint changed.')
             self.checkpoint['value'].update(body['value']); self.checkpoint['version'] += 1
             return {'version': self.checkpoint['version']}
+        if action == 'flyer-retries.claim': return {'jobs': copy.deepcopy(self.recovery_jobs), 'deferred': 0}
+        if action == 'flyer-retries.complete':
+            self.recovery_receipts.append(copy.deepcopy(body)); return {'saved': True, 'status': 'saved' if body['saved'] else 'waiting'}
         if action == 'snapshot.sync': return {'inboxVersion': 1, 'readAt': 'now', 'changedRecords': 0}
         if action == 'budget.reserve':
             if body['id'] in self.runs: return {'created': False, 'reservation': self.runs[body['id']]}
@@ -61,7 +65,7 @@ class FakeEndpoint:
             self.venues[body['source']] = {'version': old['version'] + 1, 'value': copy.deepcopy(body['value'])}
             return {'version': old['version'] + 1}
         if action == 'match': return {'inboxVersion': 1, 'matchingComplete': all(f.get('date') or f.get('eventId') for f in body['facts']),
-            'events': [], 'items': [], 'calendar': [], 'intake': [], 'references': {'venues': [], 'venueAliases': []}}
+            'events': [], 'items': copy.deepcopy(self.match_items), 'calendar': [], 'intake': [], 'references': {'venues': [], 'venueAliases': []}}
         if action == 'flyers': return {'flyers': [{'id': item['id'], 'url': 'https://drive.google.com/uc?id=saved'} for item in body['items']]}
         if action == 'stage':
             for item in body['items']: self.items[item['discovery']['id']] = copy.deepcopy(item)

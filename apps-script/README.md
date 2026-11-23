@@ -602,18 +602,21 @@ back to the Google path. Install the updated `archive-feed.gs` in the existing
 Apps Script project to activate the reduced-write publisher; the deployed
 website caching changes work independently until that replacement is saved.
 
-# Discovery Review inbox — v7.4.33
+# Discovery Review inbox — v7.4.34
 
 Replace only `DiscoveryInbox.gs` in the existing Apps Script project, save, and
 update the existing web-app deployment to a new version. Keep Core.gs v7.4.31 or
 later, Imports.gs, scraper.gs, script properties, services and triggers. No new
 permissions, credentials, Cloudflare binding or D1 migration are required.
 
-Version 7.4.33 adds conditional snapshot records and verified original video-frame
-flyer storage in the existing image folder. The website can still build its
-matching cache from older full snapshots; saving video frames requires this
-Apps Script deployment. Existing v7.4.32 batched/optional-flyer import behavior is
-retained. Committing this file does not update the Apps Script deployment.
+Version 7.4.34 makes Title and valid start/end date/times the only required
+fields for owner-approved Discovery imports. Location, lineup, description and
+flyer may be blank. It also preserves inspected original Instagram image bytes
+when server-side URL retrieval fails.
+
+Conditional snapshots and video-frame saving were added in v7.4.33. These new
+optional-field rules and static-image byte uploads require v7.4.34. Existing
+batched imports remain compatible. Committing code does not update Apps Script.
 
 The scheduled workflow and review contract are authoritative in
 [DAILY-DISCOVERY.md](../DAILY-DISCOVERY.md). The authenticated Admin inbox remains

@@ -84,7 +84,7 @@ test('events without flyers bypass Drive and keep their essential validation',()
   const f=fixture(),item=proposal('a');item.fields.RawFlyerURL='';item.fields.Flyer_URL='';
   f.context.qdpInboxFlyer_=()=>{throw new Error('A missing flyer must not access Drive');};
   const saved=f.context.qdpInboxImport_([item]);assert.equal(saved.results[0].error,undefined);assert.equal(f.rows[0][f.c.flyer],'');assert.equal(f.calls.inserts,1);
-  const incomplete=proposal('b');incomplete.fields.Lineup_Raw='TBA';assert.match(f.context.qdpInboxImport_([incomplete]).results[0].error,/confirmed named lineup/);
+  const incomplete=proposal('b');incomplete.fields['Title (internal)']='Another party';incomplete.fields.Lineup_Raw='TBA';assert.equal(f.context.qdpInboxImport_([incomplete]).results[0].error,undefined);
 });
 test('an unavailable supplied flyer becomes an explicit warning and does not block the event',()=>{
   const f=fixture();f.context.qdpInboxFlyer_=()=>{throw new Error('Image download returned HTTP 403');};
@@ -100,4 +100,29 @@ test('lost Calendar acknowledgements are linked to the original draft before the
 test('a Calendar-only phase cannot create a new Events row and capabilities perform no writes',()=>{
   const f=fixture();const capability=f.context.qdpInboxAdmin_({action:'admin.discovery.import',phase:'capabilities',items:[]});assert.equal(capability.importVersion,2);assert.equal(f.calls.writes,0);
   const result=f.context.qdpInboxImport_([proposal('a')],'calendar');assert.match(result.results[0].error,/draft is missing/);assert.equal(f.rows.length,0);assert.equal(f.calls.inserts,0);
+});
+test('owner-approved Title and date/times import with every optional event field blank',()=>{
+ const f=fixture(),item=proposal('a');
+ for(const field of ['Location','Lineup_Raw','Description','RawFlyerURL','Flyer_URL'])item.fields[field]='';
+ f.context.qdpResolveEventIds_=()=>({venue:'',artists:[],colls:[],party:''});
+ const result=f.context.qdpInboxImport_([item]);assert.equal(result.results[0].error,undefined);assert.equal(f.calls.inserts,1);
+ assert.equal(f.rows[0][f.c.location],'');assert.equal(f.rows[0][f.c.description],'');assert.equal(f.rows[0][f.c.artists],'');
+ assert.equal(f.rows[0][f.c.venue],'');assert.equal(f.rows[0][headers.indexOf('Lineup_Raw')],'');
+});
+test('each missing essential field is rejected before any Sheet, Drive or Calendar write',()=>{
+ for(const key of ['Title (internal)','StartDate','StartTime','EndDate','EndTime']) {
+  const f=fixture(),item=proposal('a');item.fields[key]='';
+  assert.match(f.context.qdpInboxImport_([item]).results[0].error,/Title.*start date\/time.*end date\/time/);
+  assert.equal(f.calls.inserts,0);assert.equal(f.calls.writes,0);assert.equal(f.calls.downloads,0);
+ }
+});
+test('invalid date/time ranges fail per item without blocking another valid selection',()=>{
+ const f=fixture(),bad=proposal('a'),good=proposal('b');bad.fields.StartTime='not a time';good.fields['Title (internal)']='Valid party';
+ const result=f.context.qdpInboxImport_([bad,good]);assert.match(result.results.find(r=>r.id===bad.id).error,/valid start and end/);
+ assert.equal(result.results.find(r=>r.id===good.id).error,undefined);assert.equal(f.calls.inserts,1);
+});
+test('owner-approved description content is not an additional required-field gate',()=>{
+ const f=fixture(),item=proposal('a');item.fields.Description='Owner copy with https://example.com';item.fields.Location='';item.fields.Lineup_Raw='';
+ assert.equal(f.context.qdpInboxImport_([item]).results[0].error,undefined);assert.equal(f.calls.inserts,1);
+ assert.equal(f.context.qdpInboxAdmin_({action:'admin.discovery.import',phase:'capabilities'}).optionalDetails,true);
 });

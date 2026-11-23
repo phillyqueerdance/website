@@ -18,8 +18,9 @@ import subprocess
 import sys
 import time
 from zoneinfo import ZoneInfo
-from preprocess import normalize_dataset, partition, compare_schedule, fingerprint
+from preprocess import normalize_dataset, partition, compare_schedule, fingerprint, source_code
 from media import prepare_media
+from flyer_recovery import recover_posts
 
 ROOT = Path(__file__).resolve().parent
 
@@ -217,7 +218,7 @@ class Pipeline:
             return self.report()
         with self.stage('preprocessing'):
             if dataset is not None:
-                self.data['inputs'] = {'dataset': dataset}
+                self.data['inputs'] = {**self.data.get('inputs', {}), 'dataset': dataset}
             dataset = self.data.get('inputs', {}).get('dataset')
             if dataset is None:
                 raise ValueError('Attach the complete saved dataset before preprocessing.')
@@ -235,7 +236,25 @@ class Pipeline:
                     lookup = self.api('posts.lookup', {'ids': group, 'sources': sources})
                     screened += lookup['screenedIds'] + lookup.get('screenedKeys', [])
             new, known = partition(posts, screened)
-            self.data['inputs'].update({'posts': new, 'counts': {**counts, 'screenedPostsSkipped': len(known), 'newPosts': len(new)}})
+            new_count = len(new)
+            if 'flyerRecoveryJobs' not in self.data['inputs']:
+                recovery = self.api('flyer-retries.claim', {'runId': self.run_id, 'limit': 10})
+                self.data['inputs']['flyerRecoveryJobs'] = recovery['jobs']
+                self.metrics['flyerRecoveryDeferred'] = recovery.get('deferred', 0)
+                self.save()  # Claims survive interruption before free source retrieval.
+            jobs = self.data['inputs']['flyerRecoveryJobs']
+            recovered = recover_posts(jobs, posts, self.metrics,
+                prior_loader=lambda run_id: self.api('work.read', {'runId': run_id, 'sections': ['inputs']})['records'])
+            new_keys = {post['key'] for post in new}
+            for post in recovered:
+                if post['key'] in new_keys:
+                    new = [post if original['key'] == post['key'] else original for original in new]
+                else:
+                    post['isFlyerRecovery'] = True; new.append(post)
+            known_keys = {post['key'] for post in known}
+            recovered_known = sum(post['key'] in known_keys for post in recovered)
+            self.data['inputs'].update({'posts': new, 'counts': {**counts, 'screenedPostsSkipped': len(known) - recovered_known,
+                'screenedPostsRecovered': recovered_known, 'newPosts': new_count}})
             self.metrics.update(self.data['inputs']['counts'])
         self.state['phase'] = 'preparing_media'; self.save()
         with self.stage('media_preprocessing'):
@@ -293,7 +312,7 @@ class Pipeline:
                    'venues': {key: {k: v for k, v in value.items() if k != 'next'} for key, value in self.data['venues'].items()},
                    'searchPlan': search_plan(self.data['venues']), 'noKeywordFiltering': True,
                    'reviewContract': {'postReviews': 'One per new post: key, captionReviewed, flyerOutcome, reviewedSheets, fullResolutionVisuals, acknowledgedUnavailable.',
-                    'flyers': 'Verified original visualId plus candidateIndex or correctionIndex. Each chosen flyer requires a full-resolution inspection.',
+                    'flyers': 'Verified original visualId plus candidateIndex/correctionIndex, or recoveryId and targetIds from flyerRecovery. Each chosen flyer requires a full-resolution inspection. Recovery only supplies artwork; retain the saved event facts.',
                     'facts': 'Supply edition date, source URLs, aliases and existing EventID when known. Undated leads cannot establish absence.',
                     'searchReceipts': 'Record every planned query and actual source coverage; missing searches remain incomplete.',
                     'venueReviews': 'List source, id, hash for each reviewed new/changed venue entry; do not acknowledge unavailable pages.'}}
@@ -310,10 +329,20 @@ class Pipeline:
         if old_ids != new_ids:
             raise RuntimeError('Source media was restored with different or unavailable originals. Complete the changed visual review before finishing; no new collection is needed.')
 
+    def review_facts(self, review):
+        facts = facts_for(review)
+        for job in self.data.get('inputs', {}).get('flyerRecoveryJobs', []):
+            for item in job['items']:
+                fields = item['fields']
+                facts.append({'date': fields.get('StartDate') or item.get('date', ''), 'title': fields.get('Title (internal)', ''),
+                    'location': fields.get('Location', ''), 'venueId': fields.get('VenueID', ''), 'sources': [job['sourceUrl']],
+                    'eventId': item.get('result', {}).get('eventId') or item.get('eventId'), 'aliases': item.get('discovery', {}).get('aliases', [])})
+        return facts
+
     def match(self, review):
         self.data['review'] = review
         with self.stage('matching'):
-            facts = facts_for(review)
+            facts = self.review_facts(review)
             snapshots = [self.api('match', {'facts': group}) for group in chunks(facts, 50)]
             snapshot = merge_matches(snapshots)
             self.data['review']['matching'] = snapshot
@@ -321,64 +350,77 @@ class Pipeline:
         self.save()
         return {'matching': str(self.directory / 'matching.json'), 'complete': snapshot.get('matchingComplete', False)}
 
+    def selected_items(self, selection, payload):
+        if 'recoveryId' in selection:
+            jobs = {job['id']: job for job in self.data['inputs'].get('flyerRecoveryJobs', [])}
+            job = jobs.get(selection['recoveryId'])
+            if not job or not isinstance(selection.get('targetIds'), list) or not selection['targetIds']:
+                raise ValueError('Select an actual flyer recovery job and its target IDs.')
+            if set(selection['targetIds']) - {target['id'] for target in job['items']}:
+                raise ValueError('Recovery artwork cannot be attached to an unrelated proposal.')
+            assets = [a for a in self.data['media']['assets'] if a['postKey'] == job['sourceRef']]
+            if not any(image['visualId'] == selection.get('visualId') for asset in assets for image in asset.get('images', [])):
+                raise ValueError('Recovery artwork must belong to the reviewed recovery post.')
+            return [item for item in payload['items'] if item.get('_review', {}).get('kind') == 'recovery' and
+                    item['_review']['recoveryId'] == job['id'] and item['_review']['index'] in selection['targetIds']]
+        target = {'kind': 'candidate', 'index': selection['candidateIndex']} if 'candidateIndex' in selection else {'kind': 'correction', 'index': selection['correctionIndex']}
+        return [item for item in payload['items'] if item.get('_review') == target]
+
+    def upload_original(self, identity, visual, asset, original):
+        image = visual['kind'] != 'frame'
+        prefix = 'flyers.image' if image else 'flyers.frame'
+        parts = list(chunks(original, 96 * 1024))
+        source = {'postUrl': asset['sourceUrl'], 'verified': True}
+        if not image: source['seconds'] = visual['seconds']
+        for i, part in enumerate(parts):
+            self.api(prefix + '.part', {'id': identity, 'sha256': visual['sha256'], 'index': i, 'total': len(parts),
+                'base64': base64.b64encode(part).decode(), 'source': source})
+        return self.api(prefix + '.commit', {'id': identity, 'sha256': visual['sha256']})
+
     def preserve(self, payload, review):
         media = self.data['media']; visuals = {v['visualId']: v for v in media['visuals']}
         full = {v for r in review.get('postReviews', []) for v in r.get('fullResolutionVisuals', [])}
         progress = self.state['progress'].setdefault('flyers', {})
+        saved_posts, frame_posts = set(), set()
         for selection in review.get('flyers', []):
             visual = visuals.get(selection.get('visualId'))
             if not visual or visual['visualId'] not in full or selection.get('verified') is not True:
                 raise ValueError('Preserve only a verified actual flyer inspected at full resolution.')
-            target = {'kind': 'candidate', 'index': selection['candidateIndex']} if 'candidateIndex' in selection else {'kind': 'correction', 'index': selection['correctionIndex']}
-            item = next((item for item in payload['items'] if item.get('_review') == target), None)
-            if item is None: continue  # Excluded venues are never preserved or staged.
-            identity = item.get('discovery', {}).get('id') or item['_preservationId']
-            path = Path(visual['path']); original = path.read_bytes()
-            sha = hashlib.sha256(original).hexdigest()
-            if sha != visual['sha256']:
-                raise ValueError('The selected original media changed; inspect it again before saving.')
-            receipt_key = identity + ':' + sha
-            saved = progress.get(receipt_key)
-            asset = next((a for a in media['assets'] if any(i['visualId'] == visual['visualId'] for i in a.get('images', []))), None)
-            if not asset:
-                raise ValueError('The selected visual has no source association.')
-            if not saved:
-                try:
-                    if visual['kind'] == 'frame':
-                        parts = list(chunks(original, 96 * 1024))
-                        for i, part in enumerate(parts):
-                            self.api('flyers.frame.part', {'id': identity, 'sha256': sha, 'index': i, 'total': len(parts),
-                                'base64': base64.b64encode(part).decode(), 'source': {'postUrl': asset['sourceUrl'], 'seconds': visual['seconds'], 'verified': True}})
-                        saved = self.api('flyers.frame.commit', {'id': identity, 'sha256': sha})
-                    else:
-                        response = self.api('flyers', {'items': [{'id': identity, 'fields': {'RawFlyerURL': asset['url'],
-                            'Title (internal)': item['fields'].get('Title (internal)', '')}}]})
-                        saved = next((f for f in response.get('flyers', []) if f['id'] == identity), {})
-                    if not saved.get('url') or saved.get('error'):
-                        self.state.setdefault('flyerErrors', []).append({'id': identity, 'error': saved.get('error', 'No preservation receipt')})
-                        continue
-                    saved['fromVideo'] = visual['kind'] == 'frame'; progress[receipt_key] = saved; self.save()
-                except (RuntimeError, ValueError) as error:
-                    self.state.setdefault('flyerErrors', []).append({'id': identity, 'error': str(error), 'fromVideo': visual['kind'] == 'frame'})
-                    item['readiness'] = 'waiting: flyer preservation unconfirmed'
-                    item['note'] = (item.get('note', '') + '\nFlyer identified; preservation unconfirmed: ' + str(error)).strip()
-                    self.save(); continue
-            item['fields']['Flyer_URL'] = saved['url']
-            if visual['kind'] != 'frame': item['fields']['RawFlyerURL'] = asset['url']
-            if item['kind'] == 'correction': item['changes']['flyer'] = saved['url']
-        saved_posts = set()
-        frame_posts = set()
-        for selection in review.get('flyers', []):
-            visual = visuals.get(selection.get('visualId'))
-            if not visual: continue
-            target = {'kind': 'candidate', 'index': selection['candidateIndex']} if 'candidateIndex' in selection else {'kind': 'correction', 'index': selection['correctionIndex']}
-            item = next((item for item in payload['items'] if item.get('_review') == target), None)
-            if not item: continue
-            identity = item.get('discovery', {}).get('id') or item['_preservationId']
-            for asset in media['assets']:
-                if any(image['visualId'] == visual['visualId'] for image in asset.get('images', [])):
-                    if visual['kind'] == 'frame': frame_posts.add(asset['postKey'])
-                    if identity + ':' + visual['sha256'] in progress: saved_posts.add(asset['postKey'])
+            for item in self.selected_items(selection, payload):
+                identity = item.get('discovery', {}).get('id') or item['_preservationId']
+                original = Path(visual['path']).read_bytes()
+                if hashlib.sha256(original).hexdigest() != visual['sha256']:
+                    raise ValueError('The selected original media changed; inspect it again before saving.')
+                receipt_key = identity + ':' + visual['sha256']; saved = progress.get(receipt_key)
+                asset = next((a for a in media['assets'] if any(i['visualId'] == visual['visualId'] for i in a.get('images', []))), None)
+                if not asset: raise ValueError('The selected visual has no source association.')
+                if visual['kind'] == 'frame': frame_posts.add(asset['postKey'])
+                if not saved:
+                    try:
+                        if visual['kind'] == 'frame':
+                            saved = self.upload_original(identity, visual, asset, original)
+                        else:
+                            response = self.api('flyers', {'items': [{'id': identity, 'fields': {'RawFlyerURL': asset['url'],
+                                'Title (internal)': item['fields'].get('Title (internal)', '')}}]})
+                            saved = next((f for f in response.get('flyers', []) if f['id'] == identity), {})
+                            if (not saved.get('url') or saved.get('error')) and source_code(asset['sourceUrl']):
+                                # Instagram can allow the local download but reject Apps Script.
+                                # Preserve those exact inspected bytes instead of losing the flyer.
+                                saved = self.upload_original(identity, visual, asset, original)
+                        if not saved.get('url') or saved.get('error'):
+                            raise RuntimeError(saved.get('error', 'No preservation receipt'))
+                        saved['fromVideo'] = visual['kind'] == 'frame'; progress[receipt_key] = saved; self.save()
+                    except (RuntimeError, ValueError) as error:
+                        self.state.setdefault('flyerErrors', []).append({'id': identity, 'error': str(error), 'fromVideo': visual['kind'] == 'frame'})
+                        item['readiness'] = 'waiting: flyer preservation unconfirmed'
+                        item['note'] = (item.get('note', '') + '\nFlyer identified; preservation unconfirmed: ' + str(error)).strip()
+                        self.save(); continue
+                item['fields']['Flyer_URL'] = saved['url']; saved_posts.add(asset['postKey'])
+                for error in self.state.get('flyerErrors', []):
+                    if error['id'] == identity: error['resolvedAt'] = NOW()
+                if item.get('_review', {}).get('kind') == 'recovery': item['readiness'] = 'Flyer recovered; review saved event details.'
+                if visual['kind'] != 'frame': item['fields']['RawFlyerURL'] = asset['url']
+                if item['kind'] == 'correction': item['changes']['flyer'] = saved['url']
         for post in review.get('postReviews', []):
             if post['key'] in saved_posts: post['flyerOutcome'] = 'saved'
             elif post.get('flyerOutcome') == 'saved': post['flyerOutcome'] = 'preservation_failed'
@@ -386,6 +428,24 @@ class Pipeline:
         self.metrics['flyersVerified'] = len(review.get('flyers', []))
         self.metrics['flyersPreserved'] = len(progress)
         self.metrics['videoFlyersPreserved'] = sum(bool(v.get('fromVideo')) for v in progress.values())
+
+    def complete_recovery(self, payload):
+        done = self.state['progress'].setdefault('completedRecoveryJobs', {})
+        for job in self.data['inputs'].get('flyerRecoveryJobs', []):
+            if job['id'] in done: continue
+            recovered = []
+            for item in payload['items']:
+                info = item.get('_review', {})
+                if info.get('kind') == 'recovery' and info.get('recoveryId') == job['id'] and item['fields'].get('Flyer_URL'):
+                    recovered.append({'targetId': info['index'], 'proposalId': item.get('discovery', {}).get('id') or item['_preservationId'], 'url': item['fields']['Flyer_URL']})
+            assets = [asset for asset in self.data['media']['assets'] if asset['postKey'] == job['sourceRef']]
+            selected = any(s.get('recoveryId') == job['id'] for s in self.data.get('review', {}).get('flyers', []))
+            unavailable = any(asset['status'] == 'unavailable' for asset in assets) or (selected and not recovered)
+            receipt = self.api('flyer-retries.complete', {'runId': self.run_id, 'id': job['id'], 'version': job['version'], 'lease': job['lease'],
+                'outcome': 'saved' if recovered else 'unavailable' if unavailable else 'not_found', 'saved': recovered,
+                'error': 'Source/media retrieval or preservation remains incomplete.' if unavailable else ''})
+            done[job['id']] = receipt; self.save()
+        self.metrics['flyerRecoveryResolved'] = sum(result.get('status') == 'saved' for result in done.values())
 
     def finish(self, review=None):
         review = review if review is not None else self.data.get('review')
@@ -402,9 +462,10 @@ class Pipeline:
             self.state['coverage'] = coverage
         with self.stage('matching'):
             self.state['snapshot'] = self.api('snapshot.sync')
-            snapshots = [self.api('match', {'facts': group}) for group in chunks(facts_for(review), 50)]
+            snapshots = [self.api('match', {'facts': group}) for group in chunks(self.review_facts(review), 50)]
             snapshot = merge_matches(snapshots)
-            write_json(self.directory / 'review.json', review); write_json(self.directory / 'matching.json', snapshot)
+            payload_review = {**review, 'flyerRecoveryJobs': self.data['inputs'].get('flyerRecoveryJobs', [])}
+            write_json(self.directory / 'review.json', payload_review); write_json(self.directory / 'matching.json', snapshot)
             subprocess.run(['node', str(ROOT / 'pipeline-payload.mjs'), str(self.directory / 'review.json'),
                 str(self.directory / 'matching.json'), str(self.directory / 'payload.json')], check=True, capture_output=True, text=True)
             payload = json.loads((self.directory / 'payload.json').read_text())
@@ -420,7 +481,8 @@ class Pipeline:
                         item['readiness'] = 'waiting: ' + ', '.join(name for name, present in [('date', item.get('date')), ('named lineup', lineup and lineup.lower() not in ('tba','tbd','unknown')), ('preserved flyer', item['fields'].get('Flyer_URL'))] if not present)
                 # Review notes remain visible; human edits/decisions/receipts are owned by D1.
                 item['runId'] = self.run_id
-            pending = [item for item in payload['items'] if delivered.get(fingerprint(item)) is None]
+            pending = [item for item in payload['items'] if delivered.get(fingerprint(item)) is None and
+                       (item.get('_review', {}).get('kind') != 'recovery' or item['fields'].get('Flyer_URL'))]
             for group in chunks(pending, 10):
                 result = self.api('stage', {'items': group})
                 if result.get('staged') != len(group): raise RuntimeError('Delivery was not fully confirmed.')
@@ -430,7 +492,7 @@ class Pipeline:
             markers = []
             reviews = {r['key']: r for r in review.get('postReviews', [])}
             for post in self.data['inputs']['posts']:
-                if post.get('isPublicEvidence'): continue
+                if post.get('isPublicEvidence') or post.get('isFlyerRecovery'): continue
                 r = reviews[post['key']]
                 markers.append({'id': post['id'], 'source_url': next(iter(post['sources']), ''), 'source_accounts': post['accounts'],
                     'taken_at': post['taken_at'], 'caption_sha256': fingerprint(post['captions']), 'review_method': 'pipeline: caption, all slides and sampled video frames',
@@ -450,15 +512,18 @@ class Pipeline:
                     if not current or fingerprint(current['value']) != fingerprint(comparison['next']): raise
                     receipt = current
                 comparison['version'] = receipt['version']; self.save()
+        self.complete_recovery(payload)
         self.metrics['elapsedWallSeconds'] = (datetime.now(timezone.utc) - datetime.fromisoformat(self.state['startedAt'])).total_seconds()
         self.state['phase'] = 'complete'
         complete_searches = {r.get('id') for r in review.get('searchReceipts', []) if r.get('completed')}
         missing_searches = [q['id'] for q in search_plan(self.data['venues']) if q['id'] not in complete_searches]
         venue_missing = sum(not entry.get('reviewed') for v in self.data['venues'].values() for entry in v.get('next', {}).get('entries', {}).values())
-        self.state['coverage'].update({'missingSearches': missing_searches, 'unreviewedVenueEntries': venue_missing,
+        active_flyer_errors = [error for error in self.state.get('flyerErrors', []) if not error.get('resolvedAt')]
+        recovery_pending = [key for key, result in self.state['progress'].get('completedRecoveryJobs', {}).items() if result.get('status') != 'saved']
+        self.state['coverage'].update({'flyerRecoveryPending': recovery_pending, 'flyerRecoveryIssues': payload.get('recoveryIssues', []), 'missingSearches': missing_searches, 'unreviewedVenueEntries': venue_missing,
             'venueUnavailable': [key for key, v in self.data['venues'].items() if v['status'] == 'unavailable'],
-            'flyerPreservationErrors': self.state.get('flyerErrors', []),
-            'complete': not self.state.get('flyerErrors') and not missing_searches and not venue_missing and not coverage['unavailableMedia'] and not any(v['status'] == 'unavailable' for v in self.data['venues'].values())})
+            'flyerPreservationErrors': active_flyer_errors,
+            'complete': not active_flyer_errors and not payload.get('recoveryIssues') and not missing_searches and not venue_missing and not coverage['unavailableMedia'] and not any(v['status'] == 'unavailable' for v in self.data['venues'].values())})
         self.save(); self.run_summary('delivered' if self.state['coverage']['complete'] else 'delivered_with_coverage_gaps')
         self.patch_checkpoint({'activeRun': None, 'last_completed_review_at': NOW(),
             'last_review_status': 'delivered' if self.state['coverage']['complete'] else 'delivered_with_coverage_gaps',
