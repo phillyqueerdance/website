@@ -126,7 +126,7 @@ export async function discoveryRequest(context,isTask=false) {
       try {
         const options=await apps(context.env,{action:'admin.discovery.import',phase:'capabilities',items:[]});
         if(options.importVersion!==2)throw new Error('Update DiscoveryInbox.gs before using the batched import.');
-        result={phased:true,batchSize:20,optionalFlyer:true};
+        result={phased:true,batchSize:20,optionalFlyer:true,optionalDetails:options.optionalDetails===true};
       } catch(error) {
         if(!/Import between one and five proposals/.test(error.message))throw error;
         result={phased:false,batchSize:5,optionalFlyer:false,notice:'Install the updated DiscoveryInbox.gs to enable batched imports and events without flyers. Using the current importer for this selection.'};

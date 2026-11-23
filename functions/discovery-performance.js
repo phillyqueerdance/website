@@ -1,9 +1,10 @@
+import {flyerRecoveryAction} from './discovery-flyer-recovery.js';
 // Restricted discovery operations. All durable state uses the existing D1 binding.
 import {meta, setMeta, now, record} from './discovery-store.js';
 import {digest, normalized, sourceReference} from '../shared/discovery-identity.js';
 
 export const PERFORMANCE_ACTIONS = new Set(['pipeline.bootstrap','posts.lookup','posts.delta','snapshot.sync','match',
-  'work.read','work.save','checkpoint.patch','venues.read','venues.save','flyers.frame.part','flyers.frame.commit']);
+  'work.read','work.save','checkpoint.patch','venues.read','venues.save','flyers.frame.part','flyers.frame.commit','flyers.image.part','flyers.image.commit','flyer-retries.claim','flyer-retries.complete']);
 const validRun = id => typeof id === 'string' && /^[-a-zA-Z0-9_:]{1,128}$/.test(id);
 const validHash = value => /^[a-f0-9]{64}$/.test(value || '');
 function strings(values, limit, length = 300) {
@@ -79,7 +80,7 @@ export async function syncSnapshot(db, apps) {
     WHERE excluded.updated_at>discovery_decisions.updated_at`).bind(JSON.stringify(upstream.legacyDecisions)).run();
   await putRows(db,rows);
   const next={inboxVersion:1,readAt:upstream.readAt,window:upstream.window,index,referencesHash,
-    capabilities:{frameUpload:upstream.frameUploadVersion===1?1:0,snapshotDelta:upstream.deltaVersion===1?1:0,appsScriptVersion:upstream.discoveryVersion||null}};
+    capabilities:{frameUpload:upstream.frameUploadVersion===1?1:0,snapshotDelta:upstream.deltaVersion===1?1:0,imageUpload:upstream.imageUploadVersion===1?1:0,appsScriptVersion:upstream.discoveryVersion||null}};
   // Content-addressed records make interrupted syncs harmless. Publish the head last with CAS.
   const saved=await setMeta(db,'snapshot-head',next,previous?.version||0);
   return {inboxVersion:1,readAt:next.readAt,window:next.window,snapshotVersion:saved.version,
@@ -138,14 +139,17 @@ export async function matchFacts(db, body) {
 }
 function frameIdentity(body) {
   if(!validHash(body.id)||!validHash(body.sha256)) throw new Error('A proposal and exact image SHA-256 are required.');
-  return 'frame:'+body.id+':'+body.sha256;
+  return (body.kind==='image'?'image:':'frame:')+body.id+':'+body.sha256;
 }
 function frameSource(source) {
-  if(!source || source.verified!==true || !/^ig:/.test(sourceReference(source.postUrl)) ||
-    !Number.isFinite(source.seconds)||source.seconds<0||source.seconds>10800) throw new Error('A visually verified Instagram video frame and timestamp are required.');
-  return {postUrl:source.postUrl,seconds:source.seconds,verified:true};
+  if(!source || source.verified!==true || !String(source.postUrl||'').startsWith('https://') || !/^ig:/.test(sourceReference(source.postUrl)) ||
+    (source.kind!=='image'&&(!Number.isFinite(source.seconds)||source.seconds<0||source.seconds>10800))) throw new Error('A visually verified Instagram video frame and timestamp are required.');
+  const postUrl='https://www.instagram.com/p/'+sourceReference(source.postUrl).slice(3)+'/';
+  return source.kind==='image'?{postUrl,kind:'image',verified:true}:{postUrl,seconds:source.seconds,verified:true};
 }
 export async function performanceAction(db, action, body, apps) {
+  if(action.startsWith('flyers.image.')){body={...body,kind:'image',...(body.source?{source:{...body.source,kind:'image'}}:{})};action=action.replace('flyers.image.','flyers.frame.');}
+  if(action.startsWith('flyer-retries.'))return flyerRecoveryAction(db,action,body);
   if(action==='pipeline.bootstrap') {
     const [config,checkpoint]=await Promise.all([meta(db,'config'),meta(db,'checkpoint')]);
     const budget=await db.prepare('SELECT id,day,status,reserved_usd,actual_usd FROM discovery_runs WHERE day=?').bind(body.day||new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())).all();
@@ -181,7 +185,8 @@ export async function performanceAction(db, action, body, apps) {
     const prefix='pipeline:'+body.runId+':';
     if(action==='work.read') {
       const root=await meta(db,prefix+'state:0');
-      const keys=root?Object.values(root.value.manifest||{}).flatMap(section=>section.parts).map(key=>prefix+key):[];
+      if(body.sections&&(!Array.isArray(body.sections)||body.sections.some(s=>!['inputs','media','review','venues','metrics'].includes(s))))throw new Error('Invalid pipeline section filter.');
+      const keys=root?Object.entries(root.value.manifest||{}).filter(([section])=>!body.sections||body.sections.includes(section)).flatMap(([,section])=>section.parts).map(key=>prefix+key):[];
       const rows=keys.length?await db.prepare('SELECT key,value,version FROM discovery_meta WHERE key IN (SELECT value FROM json_each(?))').bind(JSON.stringify(keys)).all():{results:[]};
       const allKeys=await db.prepare('SELECT key FROM discovery_meta WHERE key>=? AND key<?').bind(prefix,prefix+'\uffff').all();
       const nextIndexes={};for(const row of allKeys.results){const [section,index]=row.key.slice(prefix.length).split(':');nextIndexes[section]=Math.max(nextIndexes[section]||0,Number(index)+1);}
@@ -201,7 +206,7 @@ export async function performanceAction(db, action, body, apps) {
   }
   if(action==='flyers.frame.part') {
     const key=frameIdentity(body),source=frameSource(body.source);
-    await db.prepare("DELETE FROM discovery_meta WHERE key>='frame:' AND key<'frame;' AND updated_at<?").bind(new Date(Date.now()-2*86400000).toISOString()).run();
+    await db.prepare("DELETE FROM discovery_meta WHERE ((key>='frame:' AND key<'frame;') OR (key>='image:' AND key<'image;')) AND updated_at<?").bind(new Date(Date.now()-2*86400000).toISOString()).run();
     if(!Number.isInteger(body.index)||!Number.isInteger(body.total)||body.total<1||body.total>64||body.index<0||body.index>=body.total||
       typeof body.base64!=='string'||!body.base64.length||body.base64.length>131072||! /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.base64)) throw new Error('Invalid bounded frame chunk.');
     const value={base64:body.base64,total:body.total,source},part=key+':'+body.index;
@@ -220,14 +225,15 @@ export async function performanceAction(db, action, body, apps) {
     const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0)),hash=await crypto.subtle.digest('SHA-256',bytes);
     if(Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('')!==body.sha256)throw new Error('The frame checksum does not match.');
     const jpeg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255,png=bytes.slice(0,8).join(',')==='137,80,78,71,13,10,26,10';
-    if(!jpeg&&!png)throw new Error('Only original JPEG or PNG video frames are accepted.');
+    const gif=String.fromCharCode(...bytes.slice(0,6)).match(/^GIF8[79]a$/),webp=String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP';
+    if(!jpeg&&!png&&!(body.kind==='image'&&(gif||webp)))throw new Error('Use original JPEG/PNG frames or JPEG/PNG/GIF/WebP post images.');
     // btoa cannot take a six-megabyte spread argument. Each binary chunk is encoded independently above.
     const base64=btoa(binary),result=await apps({action:'admin.discovery.flyers',items:[{id:body.id,frame:{base64,sha256:body.sha256,source:chunks[0].source}}]});
     const saved=result.flyers?.find(f=>f.id===body.id);
     if(!saved?.url||saved.error)throw new Error(saved?.error||'Frame preservation was not confirmed.');
-    await putRows(db,[stampRow('receipt:'+key,{id:body.id,url:saved.url,sha256:body.sha256,fromVideo:true})]);
+    await putRows(db,[stampRow('receipt:'+key,{id:body.id,url:saved.url,sha256:body.sha256,fromVideo:body.kind!=='image'})]);
     await db.prepare('DELETE FROM discovery_meta WHERE key>=? AND key<?').bind(key+':',key+':\uffff').run();
-    return {id:body.id,url:saved.url,sha256:body.sha256,fromVideo:true};
+    return {id:body.id,url:saved.url,sha256:body.sha256,fromVideo:body.kind!=='image'};
   }
   throw new Error('Unknown performance operation.');
 }
