@@ -141,8 +141,7 @@ Write engaging, lively promotional descriptions that make events appealing.
 Use vivid, natural, event-specific promotional copy grounded in verified
 information. Do not invent facts, atmosphere, performers, identities,
 restrictions, or unsupported details. Avoid dry, list-like descriptions.
-No URLs or process/evidence notes in Description. Preserve verified hours; assume only missing boundaries (10 PM /
-2 AM), explicitly note assumptions and correct overnight dates. Never invent
+Do not repeat event start or end times in Description: those belong in the structured StartTime/EndTime fields. The sole exception is when a source explicitly distinguishes doors opening from the event or music start; in that case, describe the verified doors time and event start time to clarify the difference. Do not add times to promotional copy merely for completeness, and never invent a doors time. No URLs or process/evidence notes in Description. Preserve verified hours in structured fields; assume only missing boundaries (10 PM / 2 AM), explicitly note assumptions in review notes rather than Description, and correct overnight dates. Never invent
 atmosphere, performers, identities or restrictions. Prefer the actual Instagram
 post URL in Event_URL. Leave Loc_Manual to the owner.
 
