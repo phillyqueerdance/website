@@ -19,8 +19,8 @@ export async function onRequestPost(context) {
     const raw = await request.text();
     if (new TextEncoder().encode(raw).length > 128 * 1024) return json({ error: "Decision request is too large." }, 413);
     const body = JSON.parse(raw);
-    if (!["read", "save"].includes(body.operation) || !Array.isArray(body.items) || body.items.length > 5) {
-      return json({ error: "Save up to five event decisions per request." }, 400);
+    if (!["read", "save"].includes(body.operation) || !Array.isArray(body.items) || body.items.length > 100) {
+      return json({ error: "Save up to 100 event decisions per request." }, 400);
     }
     // Validate the full batch before writing any decisions.
     for (const item of body.items) {

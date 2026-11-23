@@ -211,10 +211,10 @@ function pendingDecisions() {
 
 async function decisionRequest(operation, items) {
   const records = [];
-  for (let offset = 0; offset < items.length; offset += 5) {
+  for (let offset = 0; offset < items.length; offset += 100) {
     const response = await fetch("/admin/discovery-decisions", {
       method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({ operation, items: items.slice(offset, offset + 5) })
+      body: JSON.stringify({ operation, items: items.slice(offset, offset + 100) })
     });
     const data = await response.json().catch(() => null);
     if (!response.ok || data?.ok !== "yes" || !Array.isArray(data.records)) {

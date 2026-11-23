@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive"><meta name="theme-color" content="#111114">
+  <title>Discovery Review | QDP Admin</title>
+  <link rel="icon" href="/admin/favicon.png"><link rel="stylesheet" href="/poster-theme.css?v=20260926-01">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261112-artist-crops-1">
+  <link rel="stylesheet" href="/admin/apify-import.css?v=20261120-daily-1">
+  <link rel="stylesheet" href="/admin/discovery.css?v=20261123-1">
+  <script type="module" src="/admin/discovery.js?v=20261123-1"></script>
+</head>
+<body class="apify-page">
+  <header class="admin-header"><div class="admin-brand"><img class="brand-mark" src="/admin/favicon.png" width="48" height="48" alt="">
+    <div><p class="eyebrow">Queer Dance Philly</p><h1>Discovery Review</h1></div></div><a class="admin-page-link" href="/admin/">Back to Admin</a></header>
+  <main class="admin-shell">
+    <section class="apify-upload"><p>Review new discoveries and corrections here. Include selects an item for import. Wait keeps it for later; Exclude hides that edition.</p>
+      <p id="run-status" class="apify-muted"></p><details><summary>Latest review coverage</summary><pre id="coverage"></pre></details>
+      <p id="status" role="status" aria-live="polite"></p>
+      <div class="discovery-toolbar"><label>Show <select id="view"><option value="all">All pending</option><option value="new">New</option>
+        <option value="updated">Updated</option><option value="waiting">Waiting</option><option value="failed">Failed</option>
+        <option value="excluded">Excluded</option><option value="imported">Imported</option></select></label>
+        <label>Search <input id="query" type="search" placeholder="Title, venue, artist…"></label>
+        <button id="refresh" type="button">Refresh</button><button id="export" type="button">Download Excel</button>
+        <a href="/admin/apify-import.html">Import an older workbook</a></div>
+    </section>
+    <p id="count"></p><div id="items" class="apify-list"></div>
+    <nav class="discovery-pagination" aria-label="Review pages"><button id="previous" type="button">Previous</button><span id="page"></span><button id="next" type="button">Next</button></nav>
+    <footer class="apify-save"><span id="selection"></span><button id="add" class="save-all-button" type="button">Add selected to QDP</button></footer>
+  </main>
+</body></html>

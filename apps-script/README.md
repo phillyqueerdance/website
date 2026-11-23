@@ -602,3 +602,12 @@ back to the Google path. Install the updated `archive-feed.gs` in the existing
 Apps Script project to activate the reduced-write publisher; the deployed
 website caching changes work independently until that replacement is saved.
 
+# Discovery Review inbox — v7.4.31
+
+Install the complete supplied Core.gs v7.4.31, add `DiscoveryInbox.gs`, and replace
+the supplied `scraper.gs` with the batched version. Keep Imports.gs and all other
+scripts, properties, services, triggers and URLs. Save and update the existing
+web-app deployment to a new version. The full workflow is in DAILY-DISCOVERY.md.
+The authenticated Admin inbox is `/admin/discovery`; the restricted task endpoint
+is `/api/discovery`. Account write access to Cloudflare is only used for setup.
+
