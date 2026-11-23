@@ -7,12 +7,16 @@
   <link rel="icon" href="/admin/favicon.png"><link rel="stylesheet" href="/poster-theme.css?v=20260926-01">
   <link rel="stylesheet" href="/admin/admin.css?v=20261112-artist-crops-1">
   <link rel="stylesheet" href="/admin/apify-import.css?v=20261120-daily-1">
-  <link rel="stylesheet" href="/admin/discovery.css?v=20261123-2">
-  <script type="module" src="/admin/discovery.js?v=20261123-3"></script>
+  <link rel="stylesheet" href="/admin/discovery.css?v=20261123-4">
+  <script type="module" src="/admin/discovery.js?v=20261123-4"></script>
 </head>
 <body class="apify-page discovery-page">
-  <header class="admin-header"><div class="admin-brand"><img class="brand-mark" src="/admin/favicon.png" width="48" height="48" alt="">
-    <div><p class="eyebrow">Queer Dance Philly</p><h1>Discovery Review</h1></div></div><a class="admin-page-link" href="/admin/">Back to Admin</a></header>
+  <header class="admin-header discovery-header"><div class="admin-brand"><img class="brand-mark" src="/admin/favicon.png" width="48" height="48" alt="">
+    <div><p class="eyebrow">Queer Dance Philly</p><h1>Discovery Review</h1></div></div>
+    <div class="discovery-selection"><div><strong id="selection" aria-live="polite">0 selected</strong><p>Include selects · Wait keeps · Exclude hides</p><p>Flyers are optional.</p></div><button id="add" class="save-all-button" type="button" disabled>Add selected to QDP</button></div>
+    <a class="admin-page-link" href="/admin/">Back to Admin</a>
+    <p id="status" class="discovery-notice" role="status" aria-live="polite" hidden></p>
+  </header>
   <main class="admin-shell discovery-shell">
     <section class="discovery-inbox-header">
       <div class="discovery-intro"><div><p class="eyebrow">The next move</p><h2>Your review inbox</h2>
@@ -24,11 +28,10 @@
         <label class="discovery-search">Search <input id="query" type="search" placeholder="Find a title, venue or artist…"></label>
         <button id="refresh" class="discovery-button" type="button">Refresh</button><button id="export" class="discovery-button" type="button">Download Excel</button></div>
       <div class="discovery-inbox-meta"><p id="count" aria-live="polite"></p><a href="/admin/apify-import.html">Import an older workbook</a></div>
-      <p id="status" class="discovery-notice" role="status" aria-live="polite" hidden></p>
+      <p class="discovery-order-hint">Instagram posts first, then other discoveries. Each group runs in date order.</p>
     </section>
     <div id="items" class="apify-list" aria-busy="true"></div>
     <nav class="discovery-pagination" aria-label="Review pages"><button id="previous" type="button">Previous</button><span id="page"></span><button id="next" type="button">Next</button></nav>
-    <footer class="apify-save discovery-selection"><div><strong id="selection">0 selected</strong><p>Include selects · Wait keeps · Exclude hides</p></div><button id="add" class="save-all-button" type="button" disabled>Add selected to QDP</button></footer>
   </main>
   <p id="toast" class="discovery-toast" role="status" aria-live="polite" aria-atomic="true" hidden></p>
 </body></html>

@@ -53,9 +53,13 @@ function setup(records=[candidate()],options={}) {
       Object.assign(item,body,{version:item.version+1});return reply({ok:'yes',item});
     }
     if(body.action==='selected')return reply({ok:'yes',items:pending().filter(item=>item.decision==='INCLUDE').map(({id,version})=>({id,version}))});
+    if(body.action==='import-options')return reply({ok:'yes',phased:!state.legacyImporter,batchSize:state.legacyImporter?5:20});
     if(body.action==='import'){
       if(state.importGate)await state.importGate.promise;
-      return reply({ok:'yes',results:body.items.map(item=>({id:item.id,eventId:'FIXTURE',needsPublish:true}))});
+      return reply({ok:'yes',results:body.items.map(item=>{
+        const saved=state.records.find(row=>row.id===item.id);saved.version++;saved.status=body.phase==='sheet'?'accepted':'ready';
+        return{id:item.id,eventId:'FIXTURE',version:saved.version,sheetSaved:true,needsCalendar:body.phase==='sheet',needsPublish:body.phase!=='sheet'};
+      })});
     }
     if(body.action==='publish'){for(const item of state.records)if(body.ids.includes(item.id))item.status='imported';return reply({ok:'yes',published:body.ids.length});}
     return reply({error:'Unknown fixture operation'},400);
@@ -123,8 +127,24 @@ test('a failed comparison is explicit and Wait remains available without Google'
 });
 test('Add selected shows progress before import and refreshes QDP once per selection',async()=>{
   const hold=gate(),h=setup([candidate({decision:'INCLUDE'})],{importGate:hold});await h.settle();
-  const pending=h.elements.get('add').emit('click');await h.settle();assert.match(h.elements.get('toast').textContent,/Adding selected items:/);assert.equal(h.elements.get('add').attributes['aria-busy'],'true');assert.equal(h.elements.get('add').disabled,true);
+  const pending=h.elements.get('add').emit('click');await h.settle();assert.match(h.elements.get('toast').textContent,/Saving event rows:/);assert.equal(h.elements.get('add').attributes['aria-busy'],'true');assert.equal(h.elements.get('add').disabled,true);
   hold.release();await pending;await h.settle();assert.equal(h.requests.filter(request=>request.action==='publish').length,1);assert.match(h.elements.get('toast').textContent,/1 item\(s\) completed/);
+});
+test('forty-one selections finish every Sheet batch before Calendar batches and publish only once',async()=>{
+  const records=Array.from({length:41},(_,i)=>candidate({id:(i+1).toString(16).padStart(64,'0'),decision:'INCLUDE'})),h=setup(records);await h.settle();
+  await h.elements.get('add').emit('click');await h.settle();
+  const imports=h.requests.filter(request=>request.action==='import');assert.deepEqual(imports.map(request=>request.phase),['sheet','sheet','sheet','calendar','calendar','calendar']);assert.deepEqual(imports.map(request=>request.items.length),[20,20,1,20,20,1]);
+  assert.ok(imports.slice(3).every(request=>request.items.every(item=>item.version===2)));assert.equal(h.requests.filter(request=>request.action==='publish').length,1);assert.match(h.elements.get('toast').textContent,/41 item\(s\) completed/);
+});
+test('Review notes remain visible above the Links and IDs disclosure',async()=>{
+  const h=setup();await h.settle();const editor=h.find(element=>element.className==='apify-editor')[0];
+  const noteIndex=editor.children.findIndex(element=>element.textContent.includes('Review notes')),detailsIndex=editor.children.findIndex(element=>element.tagName==='DETAILS');
+  assert.ok(noteIndex>=0&&noteIndex<detailsIndex);assert.equal(editor.children[detailsIndex].children[0].textContent,'Links & IDs');assert.equal(h.walk(editor.children[detailsIndex]).some(element=>element.textContent==='Review notes'),false);
+  assert.ok(html.indexOf('id="selection"')<html.indexOf('Back to Admin'));assert.ok(html.indexOf('id="add"')<html.indexOf('Back to Admin'));assert.equal(html.includes('<footer'),false);
+});
+test('the updated client can finish imports while the older Apps Script is still installed',async()=>{
+  const h=setup([candidate({decision:'INCLUDE'})],{legacyImporter:true});await h.settle();await h.elements.get('add').emit('click');await h.settle();
+  const imports=h.requests.filter(request=>request.action==='import');assert.equal(imports.length,1);assert.equal(imports[0].phase,undefined);assert.equal(h.requests.filter(request=>request.action==='publish').length,1);
 });
 test('Refresh and Excel show progress, success and restored controls',async()=>{
   const h=setup();await h.settle();const hold=gate();h.state.itemsGate=hold;

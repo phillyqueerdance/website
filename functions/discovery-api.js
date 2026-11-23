@@ -1,5 +1,5 @@
 import { verifyAccess, requestAppsScriptAdmin } from './admin/api.js';
-import {database,record,meta,setMeta,stage,listItems,saveItem,reserveBudget,today,now,TASK_ACTIONS} from './discovery-store.js';
+import {database,record,meta,setMeta,stage,listItems,saveItem,reserveBudget,today,now,TASK_ACTIONS,discoveryOrderSQL} from './discovery-store.js';
 
 const response=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Robots-Tag':'noindex, nofollow','X-Content-Type-Options':'nosniff'}});
 async function bodyJSON(request) {
@@ -40,38 +40,62 @@ async function bootstrap(db) {
   return {config:config?.value||{},checkpoint,runs:runs.results.map(r=>({...r,data:JSON.parse(r.data)})),counts};
 }
 async function importSelected(context,db,body) {
-  if(!Array.isArray(body.items)||!body.items.length||body.items.length>5)throw new Error('Import up to five selected proposals per request.');
+  const phase=body.phase||'complete';
+  if(!['sheet','calendar','complete'].includes(phase))throw new Error('Choose a valid import phase.');
+  if(!Array.isArray(body.items)||!body.items.length||body.items.length>20)throw new Error('Import up to twenty selected proposals per request.');
+  if(body.items.some(item=>!item||!/^[a-f0-9]{64}$/.test(item.id)||!Number.isInteger(item.version))||new Set(body.items.map(item=>item.id)).size!==body.items.length)throw new Error('Choose unique, saved proposals.');
   const claimed=[],results=[],token=crypto.randomUUID(),stamp=now(),lease=Date.now()+7*60000;
+  const current=await db.prepare('SELECT * FROM discovery_items WHERE id IN (SELECT value FROM json_each(?))')
+    .bind(JSON.stringify(body.items.map(item=>item.id))).all();
+  const byId=new Map(current.results.map(row=>[row.id,row])),claims=[],candidates=[];
   for(const requested of body.items) {
-    const row=await db.prepare('SELECT * FROM discovery_items WHERE id=?').bind(String(requested.id)).first();
+    const row=byId.get(requested.id);
     if(!row||row.version!==requested.version) {results.push({id:requested.id,error:'This proposal changed. Reload it before importing.'});continue;}
-    if(['ready','imported','existing'].includes(row.status)){results.push({id:row.id,...JSON.parse(row.result),needsPublish:row.status==='ready'});continue;}
+    if(['ready','imported','existing'].includes(row.status)){results.push({id:row.id,...JSON.parse(row.result),version:row.version,needsPublish:row.status==='ready'});continue;}
     if(row.decision!=='INCLUDE'){results.push({id:row.id,error:'Choose Include and save the proposal first.'});continue;}
-    const result=await db.prepare(`UPDATE discovery_items SET status='importing',lease=?,lease_until=?,error='',updated_at=?
+    const saved=JSON.parse(row.result);
+    if(phase==='sheet'&&row.status==='accepted'){results.push({id:row.id,...saved,version:row.version,needsCalendar:true});continue;}
+    if(phase==='calendar'&&!saved.sheetSaved&&!saved.prepared){results.push({id:row.id,error:'Save this proposal to Events before creating its Calendar entry.'});continue;}
+    claims.push(db.prepare(`UPDATE discovery_items SET status='importing',lease=?,lease_until=?,error='',updated_at=?
       WHERE id=? AND version=? AND decision='INCLUDE' AND (status IN ('pending','failed','accepted') OR (status='importing' AND lease_until<?))`)
-      .bind(token,lease,stamp,row.id,row.version,Date.now()).run();
-    if(!result.meta.changes){results.push({id:row.id,error:'This proposal is already processing. Refresh to check its result.'});continue;}
-    claimed.push(record(row));
+      .bind(token,lease,stamp,row.id,row.version,Date.now()));
+    candidates.push(row);
+  }
+  if(claims.length){
+    const reserved=await db.batch(claims);
+    reserved.forEach((result,index)=>{
+      const row=candidates[index];
+      if(result.meta.changes)claimed.push(record(row));
+      else results.push({id:row.id,error:'This proposal is already processing. Refresh to check its result.'});
+    });
   }
   if(!claimed.length)return {results};
   let upstream;
-  try {upstream=await apps(context.env,{action:'admin.discovery.import',items:claimed.map(item=>({id:item.id,kind:item.kind,fields:item.fields,
+  try {upstream=await apps(context.env,{action:'admin.discovery.import',phase,items:claimed.map(item=>({id:item.id,kind:item.kind,fields:item.fields,
     eventId:item.eventId,changes:Object.fromEntries(item.selectedFields.map(key=>[key,item.changes[key]])),baseline:item.baseline,
     discovery:item.discovery,sourceUrl:item.sourceUrl,listingUrl:item.listingUrl}))});}
   catch(error){upstream={results:claimed.map(item=>({id:item.id,error:error.message}))};}
+  const updates=[],confirmed=[];
   for(const item of claimed) {
-    const result=upstream.results?.find(r=>r.id===item.id)||{id:item.id,error:'The import response was incomplete. Retry safely to recover its saved progress.'};
-    const status=result.error?'failed':result.alreadyPublished?'existing':'ready';
-    await db.prepare(`UPDATE discovery_items SET status=?,result=?,error=?,lease=NULL,lease_until=0,version=version+1,updated_at=?
-      WHERE id=? AND lease=?`).bind(status,JSON.stringify(result),result.error||'',now(),item.id,token).run();
-    results.push({...result,needsPublish:status==='ready'});
+    const previous={...item.result};delete previous.error;
+    const result={...previous,...(upstream.results?.find(r=>r.id===item.id)||{id:item.id,error:'The import response was incomplete. Retry safely to recover its saved progress.'})};
+    if(!result.error&&!result.alreadyPublished&&
+      ((result.needsCalendar&&!result.sheetSaved&&!result.prepared)||(!result.needsCalendar&&!result.calendarCreated)||(phase==='calendar'&&result.needsCalendar))) {
+      result.error='The import phase was not fully confirmed. Refresh and retry to recover its saved progress.';
+    }
+    const state=result.error?'failed':result.alreadyPublished?'existing':result.needsCalendar?'accepted':'ready';
+    updates.push(db.prepare(`UPDATE discovery_items SET status=?,result=?,error=?,lease=NULL,lease_until=0,version=version+1,updated_at=?
+      WHERE id=? AND lease=?`).bind(state,JSON.stringify(result),result.error||'',now(),item.id,token));
+    confirmed.push({...result,version:item.version+1,needsPublish:state==='ready'});
   }
+  const saved=await db.batch(updates);
+  saved.forEach((result,index)=>results.push(result.meta.changes?confirmed[index]:{id:claimed[index].id,error:'The import lease changed. Refresh to check its saved progress.'}));
   return {results};
 }
 async function publish(context,db,body) {
-  if(!Array.isArray(body.ids)||body.ids.length>100||!body.ids.length)throw new Error('Choose completed imports to publish.');
+  if(!Array.isArray(body.ids)||body.ids.length>5000||!body.ids.length)throw new Error('Choose completed imports to publish.');
   const ids=[...new Set(body.ids)].filter(id=>/^[a-f0-9]{64}$/.test(id));
-  const pending=await db.prepare(`SELECT id,result FROM discovery_items WHERE status='ready' AND id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(ids)).all();
+  const pending=await db.prepare(`SELECT id FROM discovery_items WHERE status='ready' AND id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(ids)).all();
   if(!pending.results.length)return {published:0};
   try {
     const publication=await apps(context.env,{action:'admin.discovery.publish'});
@@ -96,8 +120,18 @@ export async function discoveryRequest(context,isTask=false) {
     else if(action==='items') result=await listItems(db,body);
     else if(action==='stage') result=await stage(db,body.items);
     else if(action==='save'&&!isTask)result=await saveItem(db,body);
+    else if(action==='import-options'&&!isTask) {
+      try {
+        const options=await apps(context.env,{action:'admin.discovery.import',phase:'capabilities',items:[]});
+        if(options.importVersion!==2)throw new Error('Update DiscoveryInbox.gs before using the batched import.');
+        result={phased:true,batchSize:20,optionalFlyer:true};
+      } catch(error) {
+        if(!/Import between one and five proposals/.test(error.message))throw error;
+        result={phased:false,batchSize:5,optionalFlyer:false,notice:'Install the updated DiscoveryInbox.gs to enable batched imports and events without flyers. Using the current importer for this selection.'};
+      }
+    }
     else if(action==='selected'&&!isTask)result={items:(await db.prepare(`SELECT id,version FROM discovery_items WHERE decision='INCLUDE'
-      AND (date='' OR date>=?) AND status NOT IN ('imported','existing') ORDER BY date LIMIT 100`).bind(today()).all()).results};
+      AND (date='' OR date>=?) AND status NOT IN ('imported','existing') ORDER BY ${discoveryOrderSQL()}`).bind(today()).all()).results};
     else if(action==='import'&&!isTask)result=await importSelected(context,db,body);
     else if(action==='publish'&&!isTask)result=await publish(context,db,body);
     else if(action==='listings'&&!isTask) {
@@ -122,7 +156,8 @@ export async function discoveryRequest(context,isTask=false) {
           JOIN discovery_aliases a ON a.alias=d.alias WHERE a.item_id=discovery_items.id
           AND (d.kind=discovery_items.kind OR d.decision IN ('WAIT','EXCLUDE'))
           AND (discovery_items.kind='event' OR d.item_id=discovery_items.id OR d.decision IN ('WAIT','EXCLUDE'))
-          ORDER BY d.updated_at DESC LIMIT 1),version=version+1,updated_at=? WHERE status IN ('pending','failed','accepted')
+          ORDER BY d.updated_at DESC LIMIT 1),version=version+1,updated_at=? WHERE status IN ('pending','failed')
+          AND NOT COALESCE(json_extract(result,'$.sheetSaved'),0)
           AND EXISTS(SELECT 1 FROM discovery_decisions d JOIN discovery_aliases a ON a.alias=d.alias
             WHERE a.item_id=discovery_items.id AND d.updated_at>discovery_items.updated_at)` ).bind(now()).run();
       }

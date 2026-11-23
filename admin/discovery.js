@@ -13,7 +13,7 @@ const node = (tag, text = '', cls = '') => {
   if (cls) element.className = cls;
   return element;
 };
-const locked = item => ['ready','importing','imported','existing'].includes(item.status) || !!item.result?.sheetSaved;
+const locked = item => ['accepted','ready','importing','imported','existing'].includes(item.status) || !!item.result?.sheetSaved;
 const title = item => item.fields['Title (internal)'] || item.title || 'Untitled lead';
 const editable = item => ({fields:item.fields, changes:item.changes, selectedFields:item.selectedFields, decision:item.decision, baseline:item.baseline});
 
@@ -278,14 +278,14 @@ function correctionEditor(ui) {
 function eventEditor(ui) {
   const primary = REVIEW_FIELDS.filter(field => field.type !== 'link' && !['Timezone','Review_notes'].includes(field.name));
   for (const definition of primary) ui.editor.append(field(ui, definition));
-  const more = node('details', '', 'discovery-more'); more.append(node('summary', 'Links, IDs & review notes'));
+  ui.editor.append(field(ui, {name:'Review_notes', label:'Review notes', type:'textarea', wide:true}));
+  const more = node('details', '', 'discovery-more'); more.append(node('summary', 'Links & IDs'));
   const fields = node('div', '', 'discovery-more-fields');
   for (const definition of [
     {name:'Timezone', label:'Time zone'}, {name:'Event_URL', label:'Event URL', wide:true},
     {name:'Instagram_URL', label:'Instagram URL', wide:true}, {name:'RawFlyerURL', label:'Original flyer image URL', wide:true},
     {name:'VenueID', label:'Venue ID'}, {name:'ArtistIDs (comma-separated)', label:'Artist IDs'},
-    {name:'PartyID', label:'Party ID'}, {name:'HostCollectiveIDs (comma-separated)', label:'Collective IDs'},
-    {name:'Review_notes', label:'Review notes', type:'textarea', wide:true}
+    {name:'PartyID', label:'Party ID'}, {name:'HostCollectiveIDs (comma-separated)', label:'Collective IDs'}
   ]) fields.append(field(ui, definition));
   more.append(fields); ui.editor.append(more);
 }
@@ -295,7 +295,7 @@ function card(item) {
   const type = node('div', item.kind === 'correction' ? 'Listing correction' : 'New event', 'discovery-card-type');
   if (item.isNew || item.isUpdated) type.append(node('span', item.isUpdated ? 'Updated' : 'New', 'discovery-badge'));
   summary.append(type, node('h2', title(item)), node('p', [dateLabel(item.date), item.fields.Location].filter(Boolean).join(' · '), 'discovery-card-meta'));
-  const state = item.status === 'ready' ? 'Saved to Events and Calendar; website refresh pending.' : item.status === 'imported' ? 'Website refresh completed.' : item.status === 'existing' ? 'Already present in QDP.' : item.status === 'importing' ? 'Import is processing. Refresh to check its result.' : item.readiness || '';
+  const state = item.status === 'ready' ? 'Saved to Events and Calendar; website refresh pending.' : item.status === 'accepted' ? 'Prepared for Calendar. Add selected to QDP will finish the remaining steps.' : item.status === 'imported' ? 'Website refresh completed.' : item.status === 'existing' ? 'Already present in QDP.' : item.status === 'importing' ? 'Import is processing. Refresh to check its result.' : item.readiness || '';
   if (state) summary.append(node('p', state, 'discovery-card-status'));
   heading.append(summary); article.append(heading);
   const ui = {item, article, savedDecision:item.decision, current:null, currentCells:new Map(), decisions:[], comparing:false};
@@ -396,20 +396,36 @@ async function action(button, label, work) {
 }
 el.add.addEventListener('click', () => action(el.add, 'Adding selected items…', async () => {
   await flushEdits();
-  const selection = await request('selected'), ids = [], errors = [];
-  let completed = 0;
+  const selection = await request('selected'), ids = new Set(), errors = [], warnings = [], completed = new Set(), calendar = [];
   if (!selection.items.length) { await refreshSummary(); status('No saved Include selections are ready to add.', 'info'); return; }
-  for (let index = 0; index < selection.items.length; index += 5) {
-    status('Adding selected items: ' + index + ' of ' + selection.items.length + ' checked…', 'busy');
-    const data = await request('import', {items:selection.items.slice(index, index + 5)});
+  const options = await request('import-options');
+  const batchSize = options.phased ? 20 : 5;
+  const collect = (data, preparing = false) => {
     for (const result of data.results) {
+      if (result.warning) warnings.push(result.warning);
       if (result.error) errors.push(result.error);
-      else { completed++; if (result.needsPublish) ids.push(result.id); }
+      else if (result.needsCalendar) {
+        if (!preparing) throw new Error('Calendar creation is still pending. Refresh before retrying the saved selection.');
+        if (!Number.isInteger(result.version)) throw new Error('The saved row revision was not confirmed. Refresh before retrying.');
+        calendar.push({id:result.id, version:result.version});
+      } else { completed.add(result.id); if (result.needsPublish) ids.add(result.id); }
     }
+  };
+  // Finish every Sheet batch before starting any Calendar creation batch.
+  for (let index = 0; index < selection.items.length; index += batchSize) {
+    status((options.phased ? '1 of 3 · Saving event rows: ' : 'Adding selected items: ') + index + ' of ' + selection.items.length + ' checked…', 'busy');
+    collect(await request('import', {items:selection.items.slice(index, index + batchSize), ...(options.phased ? {phase:'sheet'} : {})}), options.phased);
   }
-  if (ids.length) { status('Refreshing QDP for ' + ids.length + ' item(s)…', 'busy'); await request('publish', {ids}); }
+  for (let index = 0; index < calendar.length; index += batchSize) {
+    status('2 of 3 · Creating Calendar events and applying corrections: ' + index + ' of ' + calendar.length + ' checked…', 'busy');
+    collect(await request('import', {phase:'calendar',items:calendar.slice(index, index + batchSize)}));
+  }
+  if (ids.size) {
+    status(options.phased ? '3 of 3 · Matching IDs with one Calendar Pull, then refreshing QDP…' : 'Refreshing QDP for ' + ids.size + ' item(s)…', 'busy');
+    await request('publish', {ids:[...ids]});
+  }
   await load();
-  status(completed + ' item(s) completed.' + (errors.length ? '\n' + errors.length + ' need attention:\n' + [...new Set(errors)].join('\n') : ''), errors.length ? 'error' : 'success');
+  status(completed.size + ' item(s) completed.' + (errors.length ? '\n' + errors.length + ' need attention:\n' + [...new Set(errors)].join('\n') : '') + (warnings.length ? '\n' + [...new Set(warnings)].join('\n') : '') + (options.notice ? '\n' + options.notice : ''), errors.length ? 'error' : 'success');
 }));
 el.refresh.addEventListener('click', () => action(el.refresh, 'Refreshing inbox…', async () => {
   await flushEdits(); await load(); status('Inbox refreshed.', 'success');

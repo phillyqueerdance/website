@@ -195,11 +195,17 @@ No workbook generation is required; use Admin Download Excel when requested.
 ## Owner import
 
 The signed-in owner edits proposals and saves Include / Wait / Exclude. Add selected
-to QDP processes up to five proposals per request and starts immediately. It saves
-flyers, matches IDs, writes Events, creates Calendar entries with stable retry IDs,
-and refreshes public data once after the selection. Per-item failures retain their
-progress and can be retried. Initial rows stay unpublished until Calendar creation
-is confirmed. Existing Push/Pull remain direct. Archive Review is separate.
+to QDP starts immediately. With DiscoveryInbox.gs v7.4.32 installed, it saves the
+selected new Events rows in batches of up to twenty before creating Calendar
+entries in parallel groups of ten and applying approved corrections. It then runs
+one normal Pull for ID matching and refreshes public data once for the selection.
+The owner's approved imports may omit a flyer; a failed image save becomes an
+explicit warning. This does not relax the flyer search and preservation priorities
+for automated recommendations above. Per-item failures retain their progress and
+stable Calendar creation IDs for safe retry. Initial rows stay unpublished until
+Calendar creation is confirmed. The website uses the previous five-item importer
+until the Apps Script replacement is deployed. Existing Push/Pull remain direct.
+Archive Review is separate.
 
 ## Delivery integrity and review boundaries
 
