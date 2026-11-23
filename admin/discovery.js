@@ -47,7 +47,7 @@ function card(item){
   if(item.error)article.append(node('p',item.error,'discovery-error'));
   const message=node('p','','discovery-save-status');
   const choices=node('fieldset','','apify-decisions');choices.append(node('legend','Review decision'));
-  const locked=['ready','importing','imported','existing'].includes(item.status);
+  const locked=['ready','importing','imported','existing'].includes(item.status)||!!item.result.sheetSaved;
   for(const decision of ['INCLUDE','WAIT','EXCLUDE']){const button=node('button',decision[0]+decision.slice(1).toLowerCase(),'apify-decision');button.type='button';button.setAttribute('aria-pressed',String(item.decision===decision));button.disabled=locked;
     button.addEventListener('click',async()=>{item.decision=decision;dirty.set(item.id,{item,message});for(const b of choices.querySelectorAll('button'))b.setAttribute('aria-pressed',String(b===button));await save(item,message).then(refreshSummary).catch(()=>{});});choices.append(button);}
   article.append(choices);

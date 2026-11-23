@@ -117,7 +117,7 @@ export async function saveItem(db,body) {
   const row=await db.prepare('SELECT * FROM discovery_items WHERE id=?').bind(body.id).first();
   if(!row) throw new Error('Proposal not found.');
   if(row.version!==body.version) throw new Error('This proposal changed. Reload it before saving. Your edits have been retained in this page.');
-  if(['imported','existing','importing','ready'].includes(row.status)) throw new Error('This proposal is already imported or being processed.');
+  if(['imported','existing','importing','ready'].includes(row.status)||parse(row.result).sheetSaved) throw new Error('This proposal has already begun importing. Edit its existing Events record or retry its remaining steps.');
   const fields=cleanFields(body.fields||{}),current=record(row),changes={...current.changes};
   for(const [key,value] of Object.entries(body.changes||{})) {
     if(!['description','lineup','start','end','flyer'].includes(key)||typeof value!=='string'||value.length>50000)throw new Error('Invalid correction field.');

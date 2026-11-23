@@ -44,6 +44,10 @@ test('an interrupted Google import reuses its saved Events row and Calendar retr
 test('different proposal IDs for the same event in a batch cannot create duplicate Calendar entries',()=>{
   const f=fixture(),r=f.context.qdpInboxImport_([proposal('a'),proposal('b')]);assert.equal(f.rows.length,1);assert.equal(f.calls.inserts,1);assert.equal(r.results.filter(x=>x.error).length,1);
 });
+test('a retry cannot silently discard edited proposal fields after the Events draft was saved',()=>{
+  const f=fixture();f.loseNextResponse();f.context.qdpInboxImport_([proposal('a')]);const changed=proposal('a');changed.fields.Description='Changed after partial import';
+  const result=f.context.qdpInboxImport_([changed]);assert.match(result.results[0].error,/different saved fields/);assert.equal(result.results[0].sheetSaved,true);assert.equal(f.calls.inserts,1);assert.equal(f.rows[0][f.c.description],'Copy');
+});
 test('a correction refuses stale evidence before changing Sheets or Calendar',()=>{
   const f=fixture();f.context.qdpInboxImport_([proposal('a')]);const row=f.rows[0],before=f.context.qdpInboxEvent_(f.table(),row),saved=row[f.c.description];
   const item={id:'b'.repeat(64),kind:'correction',eventId:before.eventId,changes:{description:'New'},baseline:{...before,fields:{...before.fields,description:'Stale'}}};

@@ -95,6 +95,12 @@ function qdpInboxCell_(header, value, tz) {
   return {userEnteredValue: {stringValue: String(value == null ? '' : value)}};
 }
 
+function qdpInboxFieldsRevision_(fields) {
+  const keys = ['Title (internal)', 'StartDate', 'EndDate', 'StartTime', 'EndTime', 'Timezone', 'Description',
+    'Location', 'Lineup_Raw', 'Event_URL', 'Instagram_URL', 'RawFlyerURL', 'VenueID', 'ArtistIDs (comma-separated)', 'PartyID', 'HostCollectiveIDs (comma-separated)', 'ExplicitQueer (Yes/No)'];
+  return qdpAdminRevision_(keys.map(key => String(fields[key] || '')));
+}
+
 function qdpInboxCalendar_(table, id, lookups) {
   const matches = table.rows.map((row, index) => ({row, number: index + 2})).filter(x => qviS_(qviRead_(x.row, table.col, 'eventId')) === id);
   if (matches.length !== 1) throw new Error('The EventID is missing or duplicated. Review the Events sheet.');
@@ -160,14 +166,22 @@ function qdpInboxImport_(items) {
         if (item.kind === 'correction') {results.push({id: item.id, ...qdpInboxCorrect_(item, table)});continue;}
         const key = 'qdp-discovery:v1:' + item.id, prior = sourceIndex.get(key) || [];
         if (prior.length > 1) throw new Error('This discovery source is duplicated in Events. Resolve it before retrying.');
-        if (prior.length) {plans.push({item, eventId: qviRead_(prior[0].row, c, 'eventId')});continue;}
+        if (prior.length) {
+          const savedSnapshot = JSON.parse(qviRead_(prior[0].row, c, 'snapshot') || '{}');
+          if (savedSnapshot.fieldsRevision && savedSnapshot.fieldsRevision !== qdpInboxFieldsRevision_(item.fields)) {
+            results.push({id: item.id, eventId: qviRead_(prior[0].row, c, 'eventId'), sheetSaved: true,
+              error: 'This proposal already has an Events draft with different saved fields. Edit that existing record, then retry its remaining steps.'});
+            continue;
+          }
+          plans.push({item, eventId: qviRead_(prior[0].row, c, 'eventId')});continue;
+        }
         const f = item.fields, detected = detectIdsByKeywords_([f['Title (internal)'], f.Description, f.Location, f.Lineup_Raw].filter(Boolean).join('\n'), lookups);
         const ids = qdpResolveEventIds_({venue: f.VenueID || '', artists: f['ArtistIDs (comma-separated)'] || '', colls: f['HostCollectiveIDs (comma-separated)'] || '', party: f.PartyID || ''},
           parseIdsFromDescription_(f.Description || ''), detected, lookups, {owned: [], pending: []});
         const draft = qviDraft_({title: f['Title (internal)'], startDate: f.StartDate, startTime: f.StartTime, endDate: f.EndDate, endTime: f.EndTime,
           timezone: f.Timezone || 'America/New_York', description: f.Description, venueId: ids.venue, artists: ids.artists, colls: ids.colls,
           party: ids.party, explicit: f['ExplicitQueer (Yes/No)'] || 'No', flyer: item.savedFlyer, url: f.Event_URL || f.Instagram_URL,
-          location: f.Location, key, snapshot: JSON.stringify({discovery: item.discovery})}, tz);
+          location: f.Location, key, snapshot: JSON.stringify({discovery: item.discovery, fieldsRevision: qdpInboxFieldsRevision_(f)})}, tz);
         qviValidateIds_(draft, lookups);
         const same = table.rows.filter(row => {
           const event = qdpInboxEvent_(table, row);
