@@ -324,8 +324,8 @@ function card(item) {
   const source = item.sourceUrl || item.fields.Instagram_URL || item.fields.Event_URL;
   const sourceBox = link(source, source, 'discovery-url'); if (sourceBox) media.append(sourceBox);
   const listing = item.listingUrl || (item.kind === 'correction' && item.eventId ? location.origin + '/?event=' + encodeURIComponent(item.eventId) : '');
-  const publicLink = link('View QDP listing ↗', listing); if (publicLink) media.append(publicLink);
-  if (item.result?.eventId) { const edit = link('Edit accepted event ↗', location.origin + '/admin/?editEvent=' + encodeURIComponent(item.result.eventId) + '#events'); if (edit) media.append(edit); }
+  const publicLink = link('QDP listing', listing); if (publicLink) media.append(publicLink);
+  if (item.result?.eventId) { const edit = link('Edit accepted event', location.origin + '/admin/?editEvent=' + encodeURIComponent(item.result.eventId) + '#events'); if (edit) media.append(edit); }
   ui.editor = node('fieldset', '', 'apify-editor'); ui.editor.disabled = locked(item);
   if (item.kind === 'correction') correctionEditor(ui); else eventEditor(ui);
   ui.save = node('button', 'Save edits', 'discovery-button'); ui.save.type = 'button';
