@@ -602,29 +602,19 @@ back to the Google path. Install the updated `archive-feed.gs` in the existing
 Apps Script project to activate the reduced-write publisher; the deployed
 website caching changes work independently until that replacement is saved.
 
-# Discovery Review inbox — v7.4.32
+# Discovery Review inbox — v7.4.33
 
-For an existing v7.4.31 installation, replace only `DiscoveryInbox.gs`, save, and
-update the existing web-app deployment to a new version. Keep Core.gs, Imports.gs,
-scraper.gs, script properties, services, and triggers. No new permissions are
-required. The website remains compatible with the old importer until this update
-is deployed.
+Replace only `DiscoveryInbox.gs` in the existing Apps Script project, save, and
+update the existing web-app deployment to a new version. Keep Core.gs v7.4.31 or
+later, Imports.gs, scraper.gs, script properties, services and triggers. No new
+permissions, credentials, Cloudflare binding or D1 migration are required.
 
-The updated importer saves all selected new events to Events in groups of twenty,
-then creates their Calendar events in parallel groups of ten, applies approved
-corrections, runs one normal Pull for ID matching, and refreshes the public feeds.
-Calendar creation IDs are persisted before creation, and each phase can resume
-after an interruption. Events without flyers are allowed; an unsuccessful image
-download is reported as a warning. Other required event details and named lineups
-remain mandatory. Instagram post associations sort before other discoveries,
-with date order inside each group, including across inbox pages.
+Version 7.4.33 adds conditional snapshot records and verified original video-frame
+flyer storage in the existing image folder. The website can still build its
+matching cache from older full snapshots; saving video frames requires this
+Apps Script deployment. Existing v7.4.32 batched/optional-flyer import behavior is
+retained. Committing this file does not update the Apps Script deployment.
 
-For the original installation:
-
-Install the complete supplied Core.gs v7.4.31, add `DiscoveryInbox.gs`, and replace
-the supplied `scraper.gs` with the batched version. Keep Imports.gs and all other
-scripts, properties, services, triggers and URLs. Save and update the existing
-web-app deployment to a new version. The full workflow is in DAILY-DISCOVERY.md.
-The authenticated Admin inbox is `/admin/discovery`; the restricted task endpoint
-is `/api/discovery`. Account write access to Cloudflare is only used for setup.
-
+The scheduled workflow and review contract are authoritative in
+[DAILY-DISCOVERY.md](../DAILY-DISCOVERY.md). The authenticated Admin inbox remains
+`/admin/discovery`; the restricted task endpoint remains `/api/discovery`.

@@ -1,3 +1,4 @@
+import {performanceAction,PERFORMANCE_ACTIONS} from '../functions/discovery-performance.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -154,7 +155,7 @@ test('Refresh and Excel show progress, success and restored controls',async()=>{
 });
 test('automatic listing reads filter requested events without writing or reconciling decisions',async()=>{
   const source=fs.readFileSync(new URL('../functions/discovery-api.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace('export async function discoveryRequest','async function discoveryRequest');
-  const calls=[],context=vm.createContext({Response,Request,URL,Map,Set,JSON,TextDecoder,Uint8Array,console,
+  const calls=[],context=vm.createContext({performanceAction,PERFORMANCE_ACTIONS,Response,Request,URL,Map,Set,JSON,TextDecoder,Uint8Array,console,
     verifyAccess:async()=>({email:'fixture'}),requestAppsScriptAdmin:async(env,body)=>{calls.push(body);return {ok:'yes',events:[current,{...current,eventId:'OTHER'}],legacyDecisions:[{alias:'must-not-be-reconciled'}]};},
     database:()=>({prepare(){throw new Error('A comparison must not read or write D1');}})});
   vm.runInContext(source,context);

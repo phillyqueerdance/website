@@ -2,16 +2,31 @@
 import argparse
 import concurrent.futures
 import html
+import hashlib
+import threading
+from html.parser import HTMLParser
 import json
 import re
 import urllib.parse
 import urllib.request
+import urllib.error
 
+
+_METER = None
+_METER_LOCK = threading.Lock()
+
+def meter(requests=0, size=0):
+    if _METER is not None:
+        with _METER_LOCK:
+            _METER['venueRequests'] = _METER.get('venueRequests', 0) + requests
+            _METER['venueBytes'] = _METER.get('venueBytes', 0) + size
 
 def fetch(url, headers=None):
     request = urllib.request.Request(url, headers={"User-Agent": "QDP event discovery (public schedules)", **(headers or {})})
+    meter(requests=1)
     with urllib.request.urlopen(request, timeout=25) as response:
         raw = response.read(5 * 1024 * 1024 + 1)
+    meter(size=len(raw))
     if len(raw) > 5 * 1024 * 1024:
         raise ValueError("Public schedule exceeded the retrieval limit; review coverage is incomplete.")
     return raw.decode("utf-8")
@@ -52,16 +67,75 @@ def dolphin():
             "note": "The official events page embeds a feed. Review the venue's new posts in the approved Instagram collection; do not count an unreadable embed as an empty schedule."}
 
 
-def wow():
+def wow(previous=None):
     url = "https://www.wowphilly.com/events"
     page = fetch(url)
     links = list(dict.fromkeys(html.unescape(link).replace("\\", "") for link in
         re.findall(r'https://www\.tixr\.com/groups/wowphilly/events/[^\s"\'<>\\]+', page)))
     if not links:
         raise ValueError("No event links could be extracted; do not treat this as an empty calendar.")
-    return {"venue": "Warehouse on Watts", "source": url, "status": "collected", "eventLinks": links,
+    return {"venue": "Warehouse on Watts", "source": url, "status": "collected", "events": detail_pages(links, previous or {}),
             "note": "Review linked event dates, named lineups, room, and flyer. The schedule also contains live shows and past events."}
 
+
+class ScheduleText(HTMLParser):
+    def __init__(self):
+        super().__init__(); self.hidden = 0; self.parts = []; self.json_script = False
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag in ('style', 'script'):
+            self.hidden += 1
+            self.json_script = tag == 'script' and (attributes.get('type') in ('application/ld+json','application/json') or attributes.get('id') == '__NEXT_DATA__')
+        if tag == 'meta' and attributes.get('property','').startswith('og:'):
+            self.parts.append(attributes.get('content',''))
+    def handle_endtag(self, tag):
+        if tag in ('style', 'script'):
+            self.hidden = max(0, self.hidden - 1); self.json_script = False
+    def handle_data(self, data):
+        if not self.hidden or self.json_script:
+            self.parts.append(data)
+
+
+def detail_page(url, previous):
+    old = previous.get('entries', {}).get(url, {})
+    conditional = old.get('entry', {}).get('conditional', {}) if old.get('reviewed') else {}
+    headers = {'User-Agent': 'QDP event discovery (public schedules)'}
+    if conditional.get('etag'): headers['If-None-Match'] = conditional['etag']
+    if conditional.get('modified'): headers['If-Modified-Since'] = conditional['modified']
+    meter(requests=1)
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=25) as response:
+            raw = response.read(5 * 1024 * 1024 + 1)
+            meter(size=len(raw))
+            if len(raw) > 5 * 1024 * 1024: raise ValueError('Detail page exceeds the safe retrieval bound.')
+            parser = ScheduleText(); parser.feed(raw.decode('utf-8'))
+            text = ' '.join(' '.join(parser.parts).split())
+            if not text: raise ValueError('No readable schedule data; use targeted public discovery.')
+            return {'url': url, 'contentHash': hashlib.sha256(text.encode()).hexdigest(), 'detailContent': text,
+                    'conditional': {'etag': response.headers.get('ETag'), 'modified': response.headers.get('Last-Modified')}, 'status': 'collected',
+                    'retrieval': {'requests': 1, 'bytes': len(raw)}}
+    except urllib.error.HTTPError as error:
+        if error.code == 304 and old.get('reviewed'):
+            return {**old['entry'], 'notModified': True, 'retrieval': {'requests': 1, 'bytes': 0}}
+        return {'url': url, 'status': 'incomplete', 'error': 'HTTP ' + str(error.code), 'retrieval': {'requests': 1, 'bytes': 0}}
+    except Exception as error:
+        return {'url': url, 'status': 'incomplete', 'error': str(error), 'retrieval': {'requests': 1, 'bytes': 0}}
+
+
+def detail_pages(links, previous):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        return list(pool.map(lambda url: detail_page(url, previous), links))
+
+
+def collect_all(previous=None, stats=None):
+    global _METER
+    _METER = stats
+    previous = previous or {}
+    sources = [('vals', "Val's", vals), ('dolphin', 'Dolphin Tavern', dolphin),
+               ('wow', 'Warehouse on Watts', lambda: wow(previous.get('wow', {})))]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        rows = list(pool.map(lambda item: {'key': item[0], **collect(item[1], item[2])}, sources))
+    return {'venues': rows}
 
 def collect(name, adapter):
     try:

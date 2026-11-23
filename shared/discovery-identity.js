@@ -11,8 +11,8 @@ export function normalized(value) {
 export function sourceReference(value) {
   try {
     const url = new URL(value);
-    const instagram = /(?:^|\.)instagram\.com$/i.test(url.hostname);
-    const post = /^\/(?:p|reel|tv)\/([^/]+)/.exec(url.pathname);
+    const instagram = /(?:^|\.)(?:instagram\.com|instagr\.am)$/i.test(url.hostname);
+    const post = /^\/(?:p|reel|reels|tv)\/([^/]+)/.exec(url.pathname);
     if (instagram && post) return "ig:" + post[1];
     return url.hostname.toLowerCase().replace(/^www\./, "") + url.pathname.replace(/\/$/, "");
   } catch { return ""; }

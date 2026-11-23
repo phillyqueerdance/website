@@ -1,3 +1,4 @@
+import {performanceAction, PERFORMANCE_ACTIONS} from './discovery-performance.js';
 import { verifyAccess, requestAppsScriptAdmin } from './admin/api.js';
 import {database,record,meta,setMeta,stage,listItems,saveItem,reserveBudget,today,now,TASK_ACTIONS,discoveryOrderSQL} from './discovery-store.js';
 
@@ -114,9 +115,10 @@ export async function discoveryRequest(context,isTask=false) {
       try{await verifyAccess(context);}catch{return response({error:'Sign in to QDP Admin.'},403);}
     }
     const body=await bodyJSON(context.request),action=String(body.action||'');
-    if(isTask&&!TASK_ACTIONS.has(action))return response({error:'This credential can handle review data only.'},403);
+    if(isTask&&!TASK_ACTIONS.has(action)&&!PERFORMANCE_ACTIONS.has(action))return response({error:'This credential can handle review data only.'},403);
     const db=database(context.env);let result;
-    if(action==='bootstrap') result=await bootstrap(db);
+    if(PERFORMANCE_ACTIONS.has(action)) result=await performanceAction(db,action,body,payload=>apps(context.env,payload));
+    else if(action==='bootstrap') result=await bootstrap(db);
     else if(action==='items') result=await listItems(db,body);
     else if(action==='stage') result=await stage(db,body.items);
     else if(action==='save'&&!isTask)result=await saveItem(db,body);

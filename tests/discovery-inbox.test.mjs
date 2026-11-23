@@ -1,3 +1,4 @@
+import {performanceAction,PERFORMANCE_ACTIONS} from '../functions/discovery-performance.js';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {sqliteD1} from './helpers/d1-sqlite.mjs';
 import {stage,listItems,saveItem,reserveBudget,meta,setMeta,record} from '../functions/discovery-store.js';
@@ -74,7 +75,7 @@ test('Instagram associations precede other discoveries chronologically across pa
 
 function ownerApi(db,upstream){
   const source=fs.readFileSync(new URL('../functions/discovery-api.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace('export async function discoveryRequest','async function discoveryRequest');
-  const c=vm.createContext({...store,Response,Request,URL,TextDecoder,Uint8Array,Date,Map,Set,JSON,Object,Number,String,crypto,console,
+  const c=vm.createContext({performanceAction,PERFORMANCE_ACTIONS,...store,Response,Request,URL,TextDecoder,Uint8Array,Date,Map,Set,JSON,Object,Number,String,crypto,console,
     database:()=>db,verifyAccess:async()=>({email:'fixture'}),requestAppsScriptAdmin:upstream});vm.runInContext(source,c);
   return async(action,body={})=>{
     const response=await c.discoveryRequest({env:{},request:new Request('https://queerdancephilly.com/admin/discovery',{method:'POST',headers:{Origin:'https://queerdancephilly.com','Content-Type':'application/json'},body:JSON.stringify({action,...body})})});

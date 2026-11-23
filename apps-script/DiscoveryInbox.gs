@@ -1,11 +1,11 @@
 /**
- * QDP Discovery Review v7.4.32.
+ * QDP Discovery Review v7.4.33.
  * Replace this file, keep Core.gs v7.4.31 or later, and update the EXISTING web-app
  * deployment. Uses the installed Imports.gs, scraper.gs and PublicData.gs.
  * No triggers, new permissions, or sync queue are installed by this file.
  */
 function qdpInboxAdmin_(body) {
-  if (body.action === 'admin.discovery.snapshot') return qdpInboxSnapshot_();
+  if (body.action === 'admin.discovery.snapshot') return qdpInboxSnapshot_(body);
   if (body.action === 'admin.discovery.flyers') return qdpInboxFlyers_(body.items);
   if (body.action === 'admin.discovery.import') {
     if (body.phase === 'capabilities') return {importVersion: 2, batchSize: 20, optionalFlyer: true};
@@ -37,6 +37,7 @@ function qdpInboxEvent_(table, row, calendar, sheetTz) {
   const id = qviS_(value('eventId')), calId = eventIdForApi_(qviS_(value('calId')));
   const live = calendar && calendar.get(calId);
   return {eventId: id, title: qviS_(value('title')), venueId: qviS_(value('venue')), location: qviS_(value('location')),
+    sourceUrl: qviS_(value('url')), instagramUrl: qviS_(row[table.headers.indexOf('Instagram_URL')]),
     sourceKey: qviS_(value('sourceKey')), calendarId: calId, publishToWeb: qviYes_(value('publish')), fields,
     revision: qdpAdminRevision_([id, fields, value('venue'), value('artists'), value('colls'), value('party')]),
     calendar: live ? {id: live.id, etag: live.etag, fields: {description: stripAllQdpMetadata_(live.description || ''),
@@ -44,7 +45,7 @@ function qdpInboxEvent_(table, row, calendar, sheetTz) {
       end: live.end && live.end.dateTime ? new Date(live.end.dateTime).toISOString() : ''}} : null};
 }
 
-function qdpInboxSnapshot_() {
+function qdpInboxSnapshot_(body) {
   const table = qviEventTable_(false), lookups = buildLookupMaps_(), calendar = new Map(), bounds = getWindowBounds();
   let pageToken = null, pages = 0;
   do {
@@ -58,7 +59,7 @@ function qdpInboxSnapshot_() {
   const events = table.rows.map(row => qdpInboxEvent_(table, row, calendar)).filter(event => event.eventId);
   const intake = ss_().getSheetByName('Apify Import');
   const staged = intake ? qviTable_(intake) : {rows: [], index: {}};
-  return {inboxVersion: 1, readAt: nowISO(), window: bounds, events,
+  const snapshot = {inboxVersion: 1, discoveryVersion: '7.4.33', frameUploadVersion: 1, readAt: nowISO(), window: bounds, events,
     calendar: [...calendar.values()].map(event => ({id: event.id, title: event.summary || '', location: event.location || '',
       start: event.start, end: event.end, updatedAt: event.updated, description: stripAllQdpMetadata_(event.description || '')})),
     legacyDecisions: qdpDiscoveryTable_(false).records,
@@ -73,6 +74,25 @@ function qdpInboxSnapshot_() {
       venueAliases: lookups.venueAliases.map(({id, key, exactOnly}) => ({id, key, exactOnly})),
       partyAliases: lookups.partyAliases.map(({id, key, exactOnly}) => ({id, key, exactOnly})),
       collectiveAliases: lookups.collAliases.map(({id, key, exactOnly}) => ({id, key, exactOnly}))}};
+  if (!body || body.mode !== 'delta') return snapshot;
+  const known = body.known || {}, hashes = {};
+  ['events','calendar','intake'].forEach(kind => {
+    hashes[kind] = {};
+    snapshot[kind] = snapshot[kind].filter(value => {
+      if (kind === 'intake') value.snapshotId = qdpInboxHash_(JSON.stringify([value.title,value.date,value.location,value.sourceKey]));
+      const id = kind === 'events' ? value.eventId : kind === 'calendar' ? value.id : value.snapshotId;
+      const hash = qdpInboxHash_(JSON.stringify(value));hashes[kind][id] = hash;
+      return !known[kind] || known[kind][id] !== hash;
+    });
+  });
+  hashes.references = qdpInboxHash_(JSON.stringify(snapshot.references));
+  if (known.references === hashes.references) delete snapshot.references;
+  return {...snapshot, deltaVersion: 1, hashes};
+}
+
+function qdpInboxHash_(text) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8)
+    .map(value => ('0' + (value & 255).toString(16)).slice(-2)).join('');
 }
 
 function qdpInboxFlyer_(id, fields) {
@@ -93,9 +113,35 @@ function qdpInboxFlyers_(items) {
   if (!Array.isArray(items) || items.length > 3) throw new Error('Preserve up to three flyers at a time.');
   return {flyers: items.map(item => {
     if (!/^[a-f0-9]{64}$/.test(item.id || '')) throw new Error('A proposal identity is required.');
-    try { return {id: item.id, ...qdpInboxFlyer_(item.id, item.fields || {})}; }
+    try { return {id: item.id, ...(item.frame ? qdpInboxFrameFlyer_(item.id, item.frame) : qdpInboxFlyer_(item.id, item.fields || {}))}; }
     catch (error) { return {id: item.id, error: error.message}; }
   })};
+}
+
+/** Original decoded frames only; no arbitrary folder, file ID, or rendering operation. */
+function qdpInboxFrameFlyer_(id, frame) {
+  const source = frame && frame.source;
+  if (!source || source.verified !== true || !/^https:\/\/(?:www\.|m\.)?instagram\.com\/(?:p|reel|reels|tv)\/[A-Za-z0-9_-]+\//.test(source.postUrl || '') ||
+    !Number.isFinite(source.seconds) || source.seconds < 0 || source.seconds > 10800 ||
+    !/^[a-f0-9]{64}$/.test(frame.sha256 || '') || typeof frame.base64 !== 'string' || frame.base64.length > 8 * 1024 * 1024) {
+    throw new Error('A verified original video frame, source and checksum are required.');
+  }
+  const bytes = Utilities.base64Decode(frame.base64), b = bytes.slice(0,8).map(n => n & 255);
+  if (!bytes.length || bytes.length > 6 * 1024 * 1024) throw new Error('Use an original frame up to 6 MB.');
+  const jpeg = b[0] === 255 && b[1] === 216 && b[2] === 255;
+  const png = b.join(',') === '137,80,78,71,13,10,26,10';
+  if (!jpeg && !png) throw new Error('Only original JPEG or PNG frames are accepted.');
+  const hash = data => Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, data)
+    .map(n => ('0' + (n & 255).toString(16)).slice(-2)).join('');
+  if (hash(bytes) !== frame.sha256) throw new Error('The original frame checksum does not match.');
+  const folder = qdpScanFolder_(), name = 'Discovery ' + id + ' frame ' + frame.sha256 + (jpeg ? '.jpg' : '.png');
+  const matches = folder.getFilesByName(name);let file;
+  while (matches.hasNext()) {const existing = matches.next();if (hash(existing.getBlob().getBytes()) === frame.sha256) {file = existing;break;}}
+  if (!file) file = folder.createFile(Utilities.newBlob(bytes, jpeg ? 'image/jpeg' : 'image/png', name));
+  if (hash(file.getBlob().getBytes()) !== frame.sha256) throw new Error('Saved frame verification failed.');
+  const resourceKey = file.getResourceKey();
+  return {url: 'https://drive.google.com/uc?export=view&id=' + file.getId() + (resourceKey ? '&resourcekey=' + encodeURIComponent(resourceKey) : ''),
+    sha256: frame.sha256, fromVideo: true};
 }
 
 function qdpInboxCell_(header, value, tz) {
