@@ -1,7 +1,16 @@
 # QDP daily discovery — persistent Admin inbox
 
+This is the **single authoritative runbook** for the scheduled QDP discovery review.
+The scheduled task supplies the private connection-file reference and points to
+this document; it must not embed a second copy of these operating rules.
+Read the current `main` version on every run. If this document cannot be read,
+report the blocker and do not start paid collection. Do not fall back to an old
+pasted copy or an earlier commit.
+
 The combined discovery task runs at its existing 08:00 America/New_York schedule.
-It performs the complete source and visual review and delivers findings directly
+Use the actual run date and time in America/New_York.
+It performs the complete source and visual review (collection alone is not completion)
+and delivers findings directly
 to https://queerdancephilly.com/admin/discovery. Excel is an optional export.
 
 ## Authoritative state and access
@@ -17,6 +26,7 @@ Cloudflare account connection or write permission is required.
 D1 holds the roster, screening markers, pending proposals, user edits and decisions,
 run checkpoints, budget reservations and import receipts. The old private review
 state remains a recovery/audit checkpoint; never rebuild or replace it each day.
+Never reset D1 from recovery copies or follow superseded restrictions from old runs.
 Read the current inbox state at every review. Do not rely on scratch surviving.
 
 Google and Cloudflare are authorized for this QDP workflow. Use only QDP-specific
@@ -26,8 +36,9 @@ are superseded. Do not publish private state, source rosters, or credentials in 
 ## Preflight and collection
 
 Read bootstrap/review-state and snapshot before paid collection. The snapshot
-must report inboxVersion=1. If Apps Script has not been installed/deployed, report
-the exact activation blocker and do not spend actor credits. The snapshot includes
+must report inboxVersion=1. If the snapshot or required endpoint cannot be read, report
+the exact connectivity blocker and do not spend actor credits. Do not launch
+a paid scrape merely to test connectivity. The snapshot includes
 Events (including unpublished drafts), pending intake, relevant Calendar entries,
 and entity aliases. Match stable source IDs first, then edition date + venue +
 title; preserve rooms and simultaneous events. Use public pages only to resolve
@@ -69,8 +80,11 @@ New recommendations require a confirmed named lineup and a usable flyer.
 
 ## Review and delivery
 
-Keep concise, factual promotional descriptions. No URLs or process/evidence notes
-in Description. Preserve verified hours; assume only missing boundaries (10 PM /
+Write engaging, lively promotional descriptions that make events appealing.
+Use vivid, natural, event-specific promotional copy grounded in verified
+information. Do not invent facts, atmosphere, performers, identities,
+restrictions, or unsupported details. Avoid dry, list-like descriptions.
+No URLs or process/evidence notes in Description. Preserve verified hours; assume only missing boundaries (10 PM /
 2 AM), explicitly note assumptions and correct overnight dates. Never invent
 atmosphere, performers, identities or restrictions. Prefer the actual Instagram
 post URL in Event_URL. Leave Loc_Manual to the owner.
@@ -121,16 +135,15 @@ and refreshes public data once after the selection. Per-item failures retain the
 progress and can be retried. Initial rows stay unpublished until Calendar creation
 is confirmed. Existing Push/Pull remain direct. Archive Review is separate.
 
-## Deployment
+## Delivery integrity and review boundaries
 
-Install complete Core.gs v7.4.31; add DiscoveryInbox.gs; replace the supplied
-scraper.gs with the batched version. Keep Imports.gs, ApifyAdminImport.gs,
-PublicData.gs, other scripts, properties and triggers. Update the existing web-app
-deployment to a new version. No URL changes or setup rerun is needed. The receipts
-tab is created only when a correction is first committed.
-
-Backend: QDP_DISCOVERY D1 binding, QDP_DISCOVERY_TASK_TOKEN secret, existing Admin
-Access settings and QDP_APPS_SCRIPT_URL/QDP_ADMIN_SHARED_SECRET. Preview uses a
-separate database. Never bind preview to production review data.
-
-Validation: QDP_CORE_SOURCE=/path/to/Core.gs node --test tests/*.test.mjs
+Return the confirmed Admin inbox link with new, updated, waiting, correction,
+and coverage counts; confirmed actor charges or clearly labeled retained/unknown
+reservations; and material limitations. Never fabricate successful reviews,
+public matching, image inspection, imports, publication, or complete account
+coverage. Preserve user edits, Include/Wait/Exclude decisions, and import receipts.
+Save progress and checkpoints promptly with version checks. Excel is optional via
+Admin export; do not build the old cumulative workbook. Do not automatically
+import, create Calendar entries, Pull, publish, or send external messages.
+Do not change code, infrastructure, access policies, credentials, billing,
+triggers, or schedules during a discovery review.
