@@ -5,6 +5,19 @@ export const DAY_LIMIT = 0.59;
 const parse = (s, fallback = {}) => { try { return JSON.parse(s); } catch { return fallback; } };
 export const now = () => new Date().toISOString();
 export const today = () => new Intl.DateTimeFormat('en-CA', {timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+export function discoveryOrderSQL() {
+  // Sort the entire inbox before LIMIT/OFFSET, including associations whose
+  // primary event link now points to a venue or ticket page.
+  const sources = ['$.sourceUrl','$.fields.Instagram_URL','$.fields.Event_URL'];
+  const urls = sources.flatMap(path => ["json_extract(data,'" + path + "')", "json_extract(edits,'" + path + "')"]);
+  const paths = ['p','reel','reels','tv'];
+  const prefixes = ['https://instagram.com/','https://www.instagram.com/','https://m.instagram.com/','https://instagr.am/'];
+  const instagram = prefixes.flatMap(prefix => paths.map(path => "lower(source.value) LIKE '" + prefix + path + "/%'"));
+  const date = "COALESCE(NULLIF(json_extract(edits,'$.fields.StartDate'),''),NULLIF(json_extract(data,'$.fields.StartDate'),''),date)";
+  const time = "COALESCE(json_extract(edits,'$.fields.StartTime'),json_extract(data,'$.fields.StartTime'),'')";
+  return `CASE WHEN EXISTS(SELECT 1 FROM json_each(json_array(${urls.join(',')})) source WHERE ${instagram.join(' OR ')}) THEN 0 ELSE 1 END,
+    CASE WHEN ${date}='' THEN 1 ELSE 0 END,${date},${time},created_at,id`;
+}
 export function database(env) {
   if (!env.QDP_DISCOVERY) throw new Error('Discovery Review is not configured.');
   return env.QDP_DISCOVERY;
@@ -79,14 +92,16 @@ export async function stage(db, items) {
       date=excluded.date,version=discovery_items.version+CASE WHEN discovery_items.digest<>excluded.digest THEN 1 ELSE 0 END,
       is_updated=CASE WHEN discovery_items.digest<>excluded.digest THEN 1 ELSE discovery_items.is_updated END,
       updated_at=CASE WHEN discovery_items.digest<>excluded.digest THEN excluded.updated_at ELSE discovery_items.updated_at END,
-      seen_at=excluded.seen_at WHERE discovery_items.status NOT IN ('imported','existing')`)
+      seen_at=excluded.seen_at WHERE discovery_items.status NOT IN ('accepted','importing','ready','imported','existing')
+      AND NOT COALESCE(json_extract(discovery_items.result,'$.sheetSaved'),0)`)
       .bind(item.id,item.kind,item.date,JSON.stringify(item.data),item.digest,stamp,stamp,stamp));
     statements.push(db.prepare('INSERT OR IGNORE INTO discovery_aliases(alias,item_id) SELECT value,? FROM json_each(?)')
       .bind(item.id,JSON.stringify(item.data.discovery.aliases)));
     statements.push(db.prepare(`UPDATE discovery_items SET decision=COALESCE((SELECT decision FROM discovery_decisions
       WHERE alias IN (SELECT value FROM json_each(?)) AND (kind=? OR decision IN ('WAIT','EXCLUDE'))
       AND (?='event' OR item_id=? OR decision IN ('WAIT','EXCLUDE')) ORDER BY updated_at DESC LIMIT 1),decision)
-      WHERE id=? AND status NOT IN ('importing','ready','imported','existing')`)
+      WHERE id=? AND status NOT IN ('accepted','importing','ready','imported','existing')
+      AND NOT COALESCE(json_extract(result,'$.sheetSaved'),0)`)
       .bind(JSON.stringify(item.data.discovery.aliases),item.kind,item.kind,item.id,item.id));
   }
   // At most ten proposals with eight aliases; split transaction groups to fit Free request limits.
@@ -107,7 +122,7 @@ export async function listItems(db,body={}) {
   }
   if(body.query) {where+=" AND (data LIKE ? OR edits LIKE ?)";params.push('%'+String(body.query).slice(0,150)+'%','%'+String(body.query).slice(0,150)+'%');}
   const [rows,count]=await db.batch([
-    db.prepare(`SELECT * FROM discovery_items WHERE ${where} ORDER BY CASE WHEN date='' THEN 1 ELSE 0 END,date,created_at LIMIT ? OFFSET ?`).bind(...params,limit,offset),
+    db.prepare(`SELECT * FROM discovery_items WHERE ${where} ORDER BY ${discoveryOrderSQL()} LIMIT ? OFFSET ?`).bind(...params,limit,offset),
     db.prepare(`SELECT COUNT(*) AS count FROM discovery_items WHERE ${where}`).bind(...params)
   ]);
   return {items:rows.results.map(record),total:count.results[0].count,offset,limit};
@@ -117,7 +132,7 @@ export async function saveItem(db,body) {
   const row=await db.prepare('SELECT * FROM discovery_items WHERE id=?').bind(body.id).first();
   if(!row) throw new Error('Proposal not found.');
   if(row.version!==body.version) throw new Error('This proposal changed. Reload it before saving. Your edits have been retained in this page.');
-  if(['imported','existing','importing','ready'].includes(row.status)||parse(row.result).sheetSaved) throw new Error('This proposal has already begun importing. Edit its existing Events record or retry its remaining steps.');
+  if(['accepted','imported','existing','importing','ready'].includes(row.status)||parse(row.result).sheetSaved) throw new Error('This proposal has already begun importing. Edit its existing Events record or retry its remaining steps.');
   const fields=cleanFields(body.fields||{}),current=record(row),changes={...current.changes};
   for(const [key,value] of Object.entries(body.changes||{})) {
     if(!['description','lineup','start','end','flyer'].includes(key)||typeof value!=='string'||value.length>50000)throw new Error('Invalid correction field.');
@@ -141,7 +156,8 @@ export async function saveItem(db,body) {
     ON CONFLICT(alias) DO UPDATE SET item_id=excluded.item_id,kind=excluded.kind,date=excluded.date,
     decision=excluded.decision,updated_at=excluded.updated_at`).bind(alias,row.id,row.kind,row.date,decision,stamp,row.id,nonce));
   if(decision!=='INCLUDE') statements.push(db.prepare(`UPDATE discovery_items SET decision=?,version=version+1,
-    updated_at=? WHERE id<>? AND status NOT IN ('importing','ready','imported','existing')
+    updated_at=? WHERE id<>? AND status NOT IN ('accepted','importing','ready','imported','existing')
+    AND NOT COALESCE(json_extract(result,'$.sheetSaved'),0)
     AND id IN (SELECT item_id FROM discovery_aliases WHERE alias IN (SELECT value FROM json_each(?)))
     AND EXISTS(SELECT 1 FROM discovery_items WHERE id=? AND json_extract(edits,'$._nonce')=?)`)
     .bind(decision,stamp,row.id,JSON.stringify(aliases),row.id,nonce));

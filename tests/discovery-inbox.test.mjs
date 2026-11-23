@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {sqliteD1} from './helpers/d1-sqlite.mjs';
 import {stage,listItems,saveItem,reserveBudget,meta,setMeta,record} from '../functions/discovery-store.js';
+import * as store from '../functions/discovery-store.js';
 import {discoveryRequest} from '../functions/discovery-api.js';
 import {candidateItem,correctionItem} from '../tools/discovery/inbox-payload.mjs';
 import {reviewBlob} from '../admin/discovery-export.js';
@@ -34,7 +35,7 @@ test('budget reservations are atomic and unknown charges cannot be spent again',
 });
 test('checkpoint updates require the current version',async()=>{const db=sqliteD1();await setMeta(db,'checkpoint',{activeRun:'one'},0);await assert.rejects(()=>setMeta(db,'checkpoint',{},0),/changed/);const current=await meta(db,'checkpoint');await setMeta(db,'checkpoint',{activeRun:'two'},current.version);assert.equal((await meta(db,'checkpoint')).value.activeRun,'two');});
 test('task credential cannot import, publish, save user decisions, or invoke arbitrary Google actions',async()=>{
-  const db=sqliteD1();for(const action of ['import','publish','save','listings','admin.push']){const result=await discoveryRequest({env:{QDP_DISCOVERY:db,QDP_DISCOVERY_TASK_TOKEN:'test-only'},request:new Request('https://queerdancephilly.com/api/discovery',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer test-only'},body:JSON.stringify({action})})},true);assert.equal(result.status,403);}
+  const db=sqliteD1();for(const action of ['import','import-options','publish','save','listings','admin.push']){const result=await discoveryRequest({env:{QDP_DISCOVERY:db,QDP_DISCOVERY_TASK_TOKEN:'test-only'},request:new Request('https://queerdancephilly.com/api/discovery',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer test-only'},body:JSON.stringify({action})})},true);assert.equal(result.status,403);}
   const invalid=await discoveryRequest({env:{QDP_DISCOVERY:db,QDP_DISCOVERY_TASK_TOKEN:'test-only'},request:new Request('https://queerdancephilly.com/api/discovery',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer invalid'},body:'{"action":"bootstrap"}'})},true);assert.equal(invalid.status,403);
 });
 test('task staging and lightweight state reads work without a Cloudflare account token',async()=>{
@@ -55,4 +56,62 @@ test('Excel export is a real ZIP with typed dates, four tabs, and literal formul
 test('Apps Script additions parse in the installed V8 syntax and are only reachable after Core authentication',()=>{
   const source=fs.readFileSync(new URL('../apps-script/DiscoveryInbox.gs',import.meta.url),'utf8');new vm.Script(source);
   const corePath=process.env.QDP_CORE_SOURCE;if(corePath){const core=fs.readFileSync(corePath,'utf8');new vm.Script(core);assert.ok(core.indexOf("Admin authorization failed.")<core.indexOf("'admin.discovery.snapshot'"));}
+});
+
+test('Instagram associations precede other discoveries chronologically across pagination',async()=>{
+  const db=sqliteD1(),row=(title,date,url,extra={})=>candidate({'Title (internal)':title,StartDate:date,Event_URL:url,...extra});
+  await stage(db,[
+    {...row('IG late','2099-12-22','https://tickets.example.org/late',{Instagram_URL:'https://www.instagram.com/reel/Late/'}),sourceUrl:'https://tickets.example.org/late'},
+    row('Other early','2099-12-01','https://venue.example.org/event'),
+    row('IG early','2099-12-10','https://instagram.com/p/Early/'),
+    row('IG undated','','https://www.instagram.com/p/Undated/'),
+    row('Profile is not a post','2099-12-05','https://www.instagram.com/venue/'),
+    row('Other undated','','https://venue.example.org/undated')
+  ]);
+  const titles=[];for(let offset=0;offset<6;offset+=2)titles.push(...(await listItems(db,{offset,limit:2})).items.map(item=>item.title));
+  assert.deepEqual(titles,['IG early','IG late','IG undated','Other early','Profile is not a post','Other undated']);
+});
+
+function ownerApi(db,upstream){
+  const source=fs.readFileSync(new URL('../functions/discovery-api.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace('export async function discoveryRequest','async function discoveryRequest');
+  const c=vm.createContext({...store,Response,Request,URL,TextDecoder,Uint8Array,Date,Map,Set,JSON,Object,Number,String,crypto,console,
+    database:()=>db,verifyAccess:async()=>({email:'fixture'}),requestAppsScriptAdmin:upstream});vm.runInContext(source,c);
+  return async(action,body={})=>{
+    const response=await c.discoveryRequest({env:{},request:new Request('https://queerdancephilly.com/admin/discovery',{method:'POST',headers:{Origin:'https://queerdancephilly.com','Content-Type':'application/json'},body:JSON.stringify({action,...body})})});
+    return {status:response.status,...await response.json()};
+  };
+}
+test('phased imports preserve durable receipts, freeze prepared proposals, and publish only completed items',async()=>{
+  const db=sqliteD1(),first=await item(db),saved=(await saveItem(db,{id:first.id,version:first.version,decision:'INCLUDE'})).item,calls=[];
+  const call=ownerApi(db,async(env,body)=>{
+    calls.push(body);
+    if(body.action==='admin.discovery.publish')return{ok:'yes',publishedAt:'fixture'};
+    if(body.phase==='capabilities')return{ok:'yes',importVersion:2};
+    return{ok:'yes',results:body.items.map(item=>({id:item.id,eventId:'TEST-121999',sheetSaved:true,needsCalendar:body.phase==='sheet',calendarCreated:body.phase==='calendar'}))};
+  });
+  assert.equal((await call('import-options')).phased,true);
+  const sheet=await call('import',{phase:'sheet',items:[{id:saved.id,version:saved.version}]});assert.equal(sheet.results[0].needsCalendar,true);assert.equal(sheet.results[0].version,saved.version+1);
+  const prepared=(await listItems(db)).items[0];assert.equal(prepared.status,'accepted');
+  await assert.rejects(()=>saveItem(db,{id:prepared.id,version:prepared.version,fields:{Description:'Cannot edit an importing row'}}),/already begun/);
+  await stage(db,[{...candidate({Description:'New scan evidence'}),discovery:prepared.discovery}]);assert.deepEqual((await listItems(db)).items[0],prepared);
+  assert.equal((await call('publish',{ids:[prepared.id]})).published,0);assert.equal(calls.filter(body=>body.action==='admin.discovery.publish').length,0);
+  const calendar=await call('import',{phase:'calendar',items:[{id:prepared.id,version:prepared.version}]});assert.equal(calendar.results[0].needsPublish,true);assert.equal((await listItems(db)).items[0].status,'ready');
+  assert.equal((await call('publish',{ids:[prepared.id]})).published,1);assert.equal((await listItems(db,{view:'imported'})).items[0].status,'imported');assert.equal(calls.filter(body=>body.action==='admin.discovery.publish').length,1);
+});
+test('a prepared selection resumes its Calendar phase after a failure without resubmitting its rows',async()=>{
+  const db=sqliteD1(),first=await item(db),saved=(await saveItem(db,{id:first.id,version:first.version,decision:'INCLUDE'})).item;
+  let fail=true;const phases=[],call=ownerApi(db,async(env,body)=>{
+    phases.push(body.phase);return{ok:'yes',results:body.items.map(item=>body.phase==='sheet'?{id:item.id,sheetSaved:true,needsCalendar:true}:
+      fail?{id:item.id,sheetSaved:true,error:'Calendar unavailable'}:{id:item.id,sheetSaved:true,needsCalendar:false,calendarCreated:true})};
+  });
+  await call('import',{phase:'sheet',items:[{id:saved.id,version:saved.version}]});let pending=(await listItems(db)).items[0];
+  await call('import',{phase:'calendar',items:[{id:pending.id,version:pending.version}]});pending=(await listItems(db)).items[0];assert.equal(pending.status,'failed');assert.equal(pending.result.sheetSaved,true);
+  await stage(db,[{...candidate({Description:'Later scan'}),discovery:pending.discovery}]);assert.deepEqual((await listItems(db)).items[0],pending);
+  fail=false;await call('import',{phase:'calendar',items:[{id:pending.id,version:pending.version}]});assert.equal((await listItems(db)).items[0].status,'ready');assert.deepEqual(phases,['sheet','calendar','calendar']);
+});
+test('the selected query includes the full selection beyond one hundred entries',async()=>{
+  const db=sqliteD1(),proposals=Array.from({length:101},(_,i)=>candidate({'Title (internal)':'Party '+i,Event_URL:'https://www.instagram.com/p/Unique'+i+'/'}));
+  for(let offset=0;offset<proposals.length;offset+=10)await stage(db,proposals.slice(offset,offset+10));
+  await db.prepare("UPDATE discovery_items SET decision='INCLUDE'").run();
+  const call=ownerApi(db,async()=>{throw new Error('Selection reads must not call Google');}),selected=await call('selected');assert.equal(selected.items.length,101);
 });

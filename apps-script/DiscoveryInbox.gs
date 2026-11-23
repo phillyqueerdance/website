@@ -1,23 +1,31 @@
 /**
- * QDP Discovery Review v7.4.31.
- * Add this file; replace Core.gs with v7.4.31, and update the EXISTING web-app
+ * QDP Discovery Review v7.4.32.
+ * Replace this file, keep Core.gs v7.4.31 or later, and update the EXISTING web-app
  * deployment. Uses the installed Imports.gs, scraper.gs and PublicData.gs.
  * No triggers, new permissions, or sync queue are installed by this file.
  */
 function qdpInboxAdmin_(body) {
   if (body.action === 'admin.discovery.snapshot') return qdpInboxSnapshot_();
   if (body.action === 'admin.discovery.flyers') return qdpInboxFlyers_(body.items);
-  if (body.action === 'admin.discovery.import') return qdpInboxImport_(body.items);
+  if (body.action === 'admin.discovery.import') {
+    if (body.phase === 'capabilities') return {importVersion: 2, batchSize: 20, optionalFlyer: true};
+    return qdpInboxImport_(body.items, body.phase);
+  }
   if (body.action === 'admin.discovery.publish') {
-    const live = qdpLivePublish(false);
-    const archive = qdpArchivePublish();
-    return {live, archive, publishedAt: nowISO()};
+    return qdpWithWriteLock_(() => {
+      // Recover lost creation receipts before Pull can mistake them for new
+      // Calendar additions. This only reads Calendar; it never creates an event.
+      qdpInboxReconcileCalendarDrafts_();
+      const pull = pullCalendarToSheet_Full();
+      const live = qdpLivePublish(false), archive = qdpArchivePublish();
+      return {pull, live, archive, publishedAt: nowISO()};
+    }, 20000, 'Match and publish Discovery Review imports');
   }
   throw new Error('Unknown Discovery Review action.');
 }
 
-function qdpInboxEvent_(table, row, calendar) {
-  const c = table.col, tz = table.sheet.getParent().getSpreadsheetTimeZone();
+function qdpInboxEvent_(table, row, calendar, sheetTz) {
+  const c = table.col, tz = sheetTz || table.sheet.getParent().getSpreadsheetTimeZone();
   const value = key => qviRead_(row, c, key);
   const time = prefix => {
     try { return qviWall_(qviDate_(value(prefix + 'Date'), tz), qviTime_(value(prefix + 'Time'), tz), qviS_(value('timezone')) || 'America/New_York').toISOString(); }
@@ -101,57 +109,156 @@ function qdpInboxFieldsRevision_(fields) {
   return qdpAdminRevision_(keys.map(key => String(fields[key] || '')));
 }
 
-function qdpInboxCalendar_(table, id, lookups) {
-  const matches = table.rows.map((row, index) => ({row, number: index + 2})).filter(x => qviS_(qviRead_(x.row, table.col, 'eventId')) === id);
-  if (matches.length !== 1) throw new Error('The EventID is missing or duplicated. Review the Events sheet.');
-  const target = matches[0], c = table.col, row = target.row.slice(), original = row.slice();
-  if (qviS_(qviRead_(row, c, 'calId'))) {
-    qviPut_(row, c, 'publish', 'Yes');qviSetRow_(table.sheet, target.number, row, original);
-    return {calendarId: qviRead_(row, c, 'calId'), calendarCreated: true};
-  }
-  const read = key => qviRead_(row, c, key), tz = table.sheet.getParent().getSpreadsheetTimeZone();
-  const draft = qviDraft_({title: read('title'), startDate: read('startDate'), startTime: read('startTime'), endDate: read('endDate'), endTime: read('endTime'),
-    timezone: read('timezone'), description: read('description'), venueId: read('venue'), artists: read('artists'), colls: read('colls'),
-    party: read('party'), explicit: read('explicit'), flyer: read('flyer'), url: read('url'), location: read('location')}, tz);
-  qviValidateIds_(draft, lookups);
-  const createId = read('createId');
-  if (!createId) throw new Error('The saved Calendar retry identity is missing.');
-  const body = qviCalendarBody_(draft, row, c, lookups, createId);
-  const result = qviCreateCalendar_(body), event = result.event;
-  qviPut_(row, c, 'calId', event.id); qviPut_(row, c, 'calUpdated', '');
-  qviPut_(row, c, 'description', body.description); qviPut_(row, c, 'edited', nowISO());
-  qviPut_(row, c, 'synced', result.recovered ? '' : nowISO());
-  qviPut_(row, c, 'notes', result.recovered ? 'Recovered the Discovery Review Calendar creation.' : 'Created by Discovery Review.');
-  qviPut_(row, c, 'publish', 'Yes');
-  qviSetRow_(table.sheet, target.number, row, original);
-  target.row.splice(0, target.row.length, ...row);
-  return {calendarId: event.id, calendarCreated: true, recovered: result.recovered};
+function qdpInboxReconcileCalendarDrafts_() {
+  const table = qviEventTable_(false), c = table.col;
+  table.rows.forEach((original, i) => {
+    const read = key => qviRead_(original, c, key), createId = qviS_(read('createId'));
+    if (read('calId') || !createId || !/^qdp-discovery:v1:/.test(qviS_(read('sourceKey')))) return;
+    let event;
+    try {event = Calendar.Events.get(CONFIG.CALENDAR_ID, createId);}
+    catch (error) {if (/\b404\b|\b410\b|not found|gone/i.test(String(error.message))) return;throw error;}
+    qviOwnCalendarEvent_(event, {extendedProperties: {private: {qdpEventId: qviS_(read('eventId')), qdpSpreadsheet: ss_().getId()}}});
+    const row = original.slice();qviPut_(row, c, 'calId', event.id);qviPut_(row, c, 'calUpdated', '');
+    // Keep Publish_To_Web as saved; failed proposals still need confirmation.
+    qviSetRow_(table.sheet, i + 2, row, original);
+  });
 }
 
-function qdpInboxImport_(items) {
+function qdpInboxCreateCalendarBatch_(bodies) {
+  const results = [], url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(CONFIG.CALENDAR_ID) + '/events?sendUpdates=none';
+  if (!bodies.length) return results;
+  const authorization = 'Bearer ' + ScriptApp.getOAuthToken();
+  // Parallel groups of ten avoid a read-before-insert round trip per event.
+  // Every body uses the CalendarCreateId already persisted in its Events row.
+  for (let offset = 0; offset < bodies.length; offset += 10) {
+    const batch = bodies.slice(offset, offset + 10); let responses;
+    try {
+      responses = UrlFetchApp.fetchAll(batch.map(body => ({url, method: 'post', contentType: 'application/json',
+        headers: {Authorization: authorization}, payload: JSON.stringify(body), muteHttpExceptions: true, followRedirects: false})));
+    } catch (_) {
+      batch.forEach(() => results.push({error: 'Calendar batch response was not confirmed. Retry to recover the saved creation IDs.'}));
+      continue;
+    }
+    batch.forEach((body, index) => {
+      try {
+        const response = responses[index], code = response.getResponseCode();let event;
+        try {event = JSON.parse(response.getContentText());} catch (_) {throw new Error('Calendar returned an unreadable response. Retry to recover this event.');}
+        if (code === 409) {
+          results.push({event: qviOwnCalendarEvent_(Calendar.Events.get(CONFIG.CALENDAR_ID, body.id), body), recovered: true});
+        } else if (code >= 200 && code < 300 && event.id === body.id) {
+          results.push({event: qviOwnCalendarEvent_(event, body), recovered: false});
+        } else throw new Error('Calendar ' + code + ': ' + String(event.error && event.error.message || 'creation was not confirmed').slice(0, 300));
+      } catch (error) {results.push({error: error.message});}
+    });
+  }
+  return results;
+}
+
+function qdpInboxCalendarBatch_(table, plans, lookups) {
+  const c = table.col, targets = [], pending = [], results = [], byId = new Map();
+  table.rows.forEach(row => {const id = qviS_(qviRead_(row, c, 'eventId'));if (!byId.has(id)) byId.set(id, []);byId.get(id).push(row);});
+  for (const plan of plans) {
+    try {
+      const matches = byId.get(plan.eventId) || [];
+      if (matches.length !== 1) throw new Error('The EventID is missing or duplicated. Review the Events sheet.');
+      const original = matches[0], row = original.slice(), read = key => qviRead_(row, c, key);
+      const target = {plan, original, row};
+      if (qviS_(read('calId'))) {
+        target.result = {calendarId: read('calId'), calendarCreated: true};qviPut_(row, c, 'publish', 'Yes');targets.push(target);continue;
+      }
+      const draft = qviDraft_({title: read('title'), startDate: read('startDate'), startTime: read('startTime'), endDate: read('endDate'), endTime: read('endTime'),
+        timezone: read('timezone'), description: read('description'), venueId: read('venue'), artists: read('artists'), colls: read('colls'),
+        party: read('party'), explicit: read('explicit'), flyer: read('flyer'), url: read('url'), location: read('location')}, table.sheet.getParent().getSpreadsheetTimeZone());
+      qviValidateIds_(draft, lookups);
+      if (!read('createId')) throw new Error('The saved Calendar retry identity is missing.');
+      target.body = qviCalendarBody_(draft, row, c, lookups, read('createId'));pending.push(target);
+    } catch (error) {results.push({id: plan.item.id, eventId: plan.eventId, sheetSaved: true, error: error.message});}
+  }
+  const created = qdpInboxCreateCalendarBatch_(pending.map(target => target.body));
+  pending.forEach((target, index) => {
+    const result = created[index] || {error: 'Calendar did not confirm this event. Retry safely.'};
+    if (result.error) {results.push({id: target.plan.item.id, eventId: target.plan.eventId, sheetSaved: true, error: result.error});return;}
+    qviPut_(target.row, c, 'calId', result.event.id);qviPut_(target.row, c, 'calUpdated', '');
+    qviPut_(target.row, c, 'description', target.body.description);qviPut_(target.row, c, 'edited', nowISO());
+    qviPut_(target.row, c, 'synced', result.recovered ? '' : nowISO());
+    qviPut_(target.row, c, 'notes', result.recovered ? 'Recovered the Discovery Review Calendar creation.' : 'Created by Discovery Review.');
+    qviPut_(target.row, c, 'publish', 'Yes');
+    target.result = {calendarId: result.event.id, calendarCreated: true, recovered: result.recovered};targets.push(target);
+  });
+  if (!targets.length) return results;
+  // Re-read once after the network batch. Preserve intervening edits and every
+  // formula, then persist only changed receipt cells in one Sheets request.
+  const fresh = qviEventTable_(false), index = new Map(), requests = [], saved = [];
+  fresh.rows.forEach((row, i) => {const id = qviS_(qviRead_(row, fresh.col, 'eventId'));if (!index.has(id)) index.set(id, []);index.get(id).push({row, number: i + 2});});
+  const formulas = fresh.rows.length ? fresh.sheet.getRange(2, 1, fresh.rows.length, fresh.headers.length).getFormulas() : [];
+  for (const target of targets) {
+    try {
+      const matches = index.get(target.plan.eventId) || [];
+      if (matches.length !== 1 || matches[0].row.some((value, i) => !sheetValuesEqual_(value, target.original[i]))) throw new Error('This Events row changed during Calendar creation. Its edits were retained; review and retry.');
+      const current = matches[0], changed = target.row.flatMap((value, i) => sheetValuesEqual_(value, target.original[i]) ? [] : [i]);
+      if (changed.some(i => formulas[current.number - 2][i])) throw new Error('A Calendar receipt column is a formula. Review the Events row before retrying.');
+      changed.forEach(i => requests.push({updateCells: {start: {sheetId: fresh.sheet.getSheetId(), rowIndex: current.number - 1, columnIndex: i},
+        rows: [{values: [qdpInboxCell_(fresh.headers[i], target.row[i], fresh.sheet.getParent().getSpreadsheetTimeZone())]}], fields: 'userEnteredValue'}}));
+      saved.push(target);
+    } catch (error) {results.push({id: target.plan.item.id, eventId: target.plan.eventId, sheetSaved: true, error: error.message});}
+  }
+  try {
+    if (requests.length) Sheets.Spreadsheets.batchUpdate({requests}, ss_().getId());
+    saved.forEach(target => results.push({id: target.plan.item.id, eventId: target.plan.eventId, sheetSaved: true, needsCalendar: false, ...target.result}));
+  } catch (_) {
+    saved.forEach(target => results.push({id: target.plan.item.id, eventId: target.plan.eventId, sheetSaved: true,
+      error: 'Calendar was saved, but its Events receipt was not confirmed. Retry safely to recover it.'}));
+  }
+  return results;
+}
+
+function qdpInboxValidateEvent_(fields, tz) {
+  if (['Title (internal)','StartDate','EndDate','StartTime','EndTime','Location'].some(key => !qviS_(fields[key]))) throw new Error('Needs event details');
+  if (qdpScanDescriptionHasLink_(fields.Description)) throw new Error('Description contains a link — move it to Event_URL or Instagram_URL');
+  if (!qviS_(fields.Lineup_Raw) || /^(tba|tbd|unknown|to be announced)$/i.test(qviS_(fields.Lineup_Raw))) throw new Error('A confirmed named lineup is required.');
+  if (qdpScanDates_(fields, tz).end <= new Date()) throw new Error('Past event — not imported');
+}
+
+function qdpInboxDuplicateCalendar_(drafts) {
+  if (!drafts.length) return [];
+  const starts = drafts.map(draft => +draft.start), events = [];let pageToken;
+  do {
+    const page = Calendar.Events.list(CONFIG.CALENDAR_ID, {timeMin: new Date(Math.min(...starts) - 60000).toISOString(),
+      timeMax: new Date(Math.max(...starts) + 60000).toISOString(), singleEvents: true, showDeleted: false, maxResults: 500,
+      fields: 'nextPageToken,items(id,summary,start,location)', pageToken});
+    events.push(...(page.items || []));pageToken = page.nextPageToken;
+  } while (pageToken);
+  return events;
+}
+
+function qdpInboxImport_(items, phase) {
   if (!FLAGS.PUSH_ENABLED) throw new Error('Calendar writes are disabled.');
-  if (!Array.isArray(items) || !items.length || items.length > 5) throw new Error('Import between one and five proposals.');
+  phase = phase || 'complete';
+  if (!['sheet','calendar','complete'].includes(phase)) throw new Error('Choose a valid import phase.');
+  if (!Array.isArray(items) || !items.length || items.length > 20) throw new Error('Import between one and twenty proposals.');
   const prepared = [], results = [];
   // Network downloads happen before the shared write lock. Revisions are checked inside it.
   for (const item of items) {
     if (!/^[a-f0-9]{64}$/.test(item.id || '') || !['event', 'correction'].includes(item.kind)) throw new Error('Invalid proposal.');
     try {
       if (item.kind === 'event') {
-        const ready = qdpScanValidate_({...item.fields, Review: 'Include', RawFlyerURL: item.fields.RawFlyerURL || item.fields.Flyer_URL}, ss_().getSpreadsheetTimeZone());
-        if (!ready.ok) throw new Error(ready.reason);
-        if (!qviS_(item.fields.Lineup_Raw) || /^(tba|tbd|unknown|to be announced)$/i.test(qviS_(item.fields.Lineup_Raw))) throw new Error('A confirmed named lineup is required.');
-        item.savedFlyer = qdpInboxFlyer_(item.id, item.fields).url;
-      } else if (item.changes && item.changes.flyer) {
+        qdpInboxValidateEvent_(item.fields, ss_().getSpreadsheetTimeZone());
+        item.savedFlyer = '';
+        if (phase !== 'calendar' && (item.fields.RawFlyerURL || item.fields.Flyer_URL)) {
+          try {item.savedFlyer = qdpInboxFlyer_(item.id, item.fields).url;}
+          catch (error) {item.flyerWarning = 'Added without a flyer: ' + error.message;}
+        }
+      } else if (phase !== 'sheet' && item.changes && item.changes.flyer) {
         item.savedFlyer = qdpInboxFlyer_(item.id, {'Title (internal)': item.eventId, RawFlyerURL: item.changes.flyer}).url;
       }
       prepared.push(item);
     } catch (error) { results.push({id: item.id, error: error.message}); }
   }
-  if (!prepared.length) return {results};
+  if (!prepared.length) return {importVersion: 2, results};
   return qdpWithWriteLock_(() => {
     const table = qviEventTable_(true), c = table.col, lookups = buildLookupMaps_(), existing = {ids: new Set()}, tz = ss_().getSpreadsheetTimeZone();
     // Read only ID columns when checking uniqueness across historical tabs.
-    ss_().getSheets().filter(sheet => sheet.getName() === CONFIG.SHEET_EVENTS || /archive/i.test(sheet.getName())).forEach(sheet => {
+    if (phase !== 'calendar') ss_().getSheets().filter(sheet => sheet.getName() === CONFIG.SHEET_EVENTS || /archive/i.test(sheet.getName())).forEach(sheet => {
       if (sheet.getLastRow() < 2) return;
       const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0], column = headers.indexOf('EventID') + 1;
       if (column) sheet.getRange(2, column, sheet.getLastRow() - 1, 1).getValues().forEach(row => {if (row[0]) existing.ids.add(String(row[0]));});
@@ -161,9 +268,14 @@ function qdpInboxImport_(items) {
       const key = qviS_(qviRead_(row, c, 'sourceKey'));
       if (key) {if (!sourceIndex.has(key)) sourceIndex.set(key, []);sourceIndex.get(key).push({row, number: i + 2});}
     });
+    const known = table.rows.map(row => qdpInboxEvent_(table, row, null, tz));
+    const live = phase === 'calendar' ? [] : qdpInboxDuplicateCalendar_(prepared.filter(item => item.kind === 'event' && !sourceIndex.has('qdp-discovery:v1:' + item.id))
+      .map(item => qdpScanDates_(item.fields, tz)));
     for (const item of prepared) {
       try {
-        if (item.kind === 'correction') {results.push({id: item.id, ...qdpInboxCorrect_(item, table)});continue;}
+        if (item.kind === 'correction') {
+          results.push(phase === 'sheet' ? {id: item.id, prepared: true, needsCalendar: true} : {id: item.id, needsCalendar: false, ...qdpInboxCorrect_(item, table)});continue;
+        }
         const key = 'qdp-discovery:v1:' + item.id, prior = sourceIndex.get(key) || [];
         if (prior.length > 1) throw new Error('This discovery source is duplicated in Events. Resolve it before retrying.');
         if (prior.length) {
@@ -175,6 +287,7 @@ function qdpInboxImport_(items) {
           }
           plans.push({item, eventId: qviRead_(prior[0].row, c, 'eventId')});continue;
         }
+        if (phase === 'calendar') throw new Error('The saved Events draft is missing. Save the selection to Events before creating Calendar entries.');
         const f = item.fields, detected = detectIdsByKeywords_([f['Title (internal)'], f.Description, f.Location, f.Lineup_Raw].filter(Boolean).join('\n'), lookups);
         const ids = qdpResolveEventIds_({venue: f.VenueID || '', artists: f['ArtistIDs (comma-separated)'] || '', colls: f['HostCollectiveIDs (comma-separated)'] || '', party: f.PartyID || ''},
           parseIdsFromDescription_(f.Description || ''), detected, lookups, {owned: [], pending: []});
@@ -183,23 +296,20 @@ function qdpInboxImport_(items) {
           party: ids.party, explicit: f['ExplicitQueer (Yes/No)'] || 'No', flyer: item.savedFlyer, url: f.Event_URL || f.Instagram_URL,
           location: f.Location, key, snapshot: JSON.stringify({discovery: item.discovery, fieldsRevision: qdpInboxFieldsRevision_(f)})}, tz);
         qviValidateIds_(draft, lookups);
-        const same = table.rows.filter(row => {
-          const event = qdpInboxEvent_(table, row);
+        const same = known.filter(event => {
           return normalizeKey_(event.title) === normalizeKey_(draft.title) && event.fields.start.slice(0, 10) === draft.start.toISOString().slice(0, 10)
             && (draft.venueId ? event.venueId === draft.venueId : normalizeKey_(event.location) === normalizeKey_(draft.location));
         });
         if (same.length) {
           if (same.length > 1) throw new Error('Multiple existing listings match this discovery. Resolve them before importing.');
-          const event = qdpInboxEvent_(table, same[0]);
+          const event = same[0];
           if (Math.abs(Date.parse(event.fields.start) - draft.start) >= 60000) throw new Error('An existing event has the same title, venue and date with a different time. Review it as a correction or confirm the distinct event manually.');
           results.push({id: item.id, eventId: event.eventId, alreadyPublished: event.publishToWeb && !!event.calendarId,
             calendarCreated: !!event.calendarId, error: event.publishToWeb && event.calendarId ? undefined : 'An existing QDP draft matches this discovery. Finish its existing Events record instead of adding another.'});
           continue;
         }
         // Catch Magic/Calendar additions that have not reached the Index yet.
-        const live = Calendar.Events.list(CONFIG.CALENDAR_ID, {timeMin: new Date(+draft.start - 60000).toISOString(), timeMax: new Date(+draft.start + 60000).toISOString(),
-          singleEvents: true, showDeleted: false, maxResults: 250, fields: 'items(id,summary,start,location)'});
-        const duplicate = (live.items || []).find(event => event.start && event.start.dateTime &&
+        const duplicate = live.find(event => event.start && event.start.dateTime &&
           Math.abs(+new Date(event.start.dateTime) - draft.start) < 60000 && normalizeKey_(stripIdentityEmojis_(event.summary || '')) === normalizeKey_(draft.title) &&
           (!event.location || normalizeKey_(event.location) === normalizeKey_(draft.location) || (draft.venueId && detectIdsByKeywords_(event.location, lookups).venue === draft.venueId)));
         if (duplicate) throw new Error('This event already exists in Calendar. Run Pull to use its existing record.');
@@ -211,7 +321,7 @@ function qdpInboxImport_(items) {
         Object.keys(values).forEach(name => qviPut_(row, c, name, values[name]));
         const lineup = table.headers.indexOf('Lineup_Raw'); if (lineup >= 0) row[lineup] = f.Lineup_Raw;
         qviApplyDerived_(row, c, draft, lookups, true);
-        append.push(row);plans.push({item, eventId: id});sourceIndex.set(key, [{row}]);table.rows.push(row);
+        append.push(row);plans.push({item, eventId: id});sourceIndex.set(key, [{row}]);table.rows.push(row);known.push(qdpInboxEvent_(table, row, null, tz));
       } catch (error) {results.push({id: item.id, error: error.message});}
     }
     if (append.length) {
@@ -219,12 +329,15 @@ function qdpInboxImport_(items) {
         rows: append.map(row => ({values: row.map((value, i) => qdpInboxCell_(table.headers[i], value, tz))})),
         fields: 'userEnteredValue,userEnteredFormat.numberFormat'}}]}, ss_().getId());
     }
-    const fresh = qviEventTable_(false);
-    for (const plan of plans) {
-      try {results.push({id: plan.item.id, eventId: plan.eventId, sheetSaved: true, ...qdpInboxCalendar_(fresh, plan.eventId, lookups)});}
-      catch (error) {results.push({id: plan.item.id, eventId: plan.eventId, sheetSaved: true, error: error.message});}
+    if (phase === 'sheet') {
+      plans.forEach(plan => results.push({id: plan.item.id, eventId: plan.eventId, sheetSaved: true, needsCalendar: true,
+        ...(plan.item.flyerWarning ? {warning: plan.item.flyerWarning} : {})}));
+    } else {
+      const done = qdpInboxCalendarBatch_(qviEventTable_(false), plans, lookups);
+      done.forEach(result => {const plan = plans.find(plan => plan.item.id === result.id);if (plan.item.flyerWarning) result.warning = plan.item.flyerWarning;});
+      results.push(...done);
     }
-    return {results};
+    return {importVersion: 2, results};
   }, 20000, 'Import Discovery Review selections');
 }
 
