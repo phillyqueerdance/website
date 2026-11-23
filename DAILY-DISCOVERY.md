@@ -74,12 +74,57 @@ collection after an interruption. No purchases, top-ups, billing changes, paid
 AI APIs, additional actor schedules, or deeper/lookback runs.
 
 Skip previously screened post IDs completely, including edited captions/replaced
-posters. For every new post review its caption and every available carousel slide,
-including posts without event keywords. Use contact sheets and full-size images
-where needed. Track downloads, actual visual inspection, sampled video frames and
-unavailable media separately. Do not claim full video/audio review. Preserve all
-known deferred initial failures; do not investigate or backfill them in this task.
-Record per-profile outcomes honestly; a successful run is not full account coverage.
+posters. Preserve all known deferred initial failures; do not investigate or
+backfill them in this task. These rules are unchanged.
+
+### Flyer-first visual review (high priority)
+
+**Finding and preserving the actual event flyer is a primary deliverable, not
+an optional enhancement.** For each NEW potentially relevant Instagram post,
+review its caption AND every available carousel slide, including posts without
+event keywords, before deciding that no usable flyer exists. Prioritize
+retrieving a legible, event-specific flyer over writing descriptions or polishing
+lower-priority findings. Do not mistake a post's generic cover, venue photo or
+artist portrait for an event flyer.
+
+**Videos and Reels require an active flyer search.** Do not stop at the cover
+image or caption. First inspect available thumbnails/preview images. When the
+video itself is accessible through existing free source media, sample frames
+at representative points across the clip (and around any transitions or
+visible flyer segments), then inspect promising frames at full resolution.
+Use a clean, legible still with the event's actual graphic, date and lineup
+when available, not a blurred transition or an Instagram UI screenshot.
+Extract the original frame as a JPEG/PNG where feasible; never invent,
+reconstruct or AI-generate a missing flyer. A still frame from an event
+promotion video counts as a valid event flyer when readable and accurate.
+Do not imply that sampled frames constitute a complete video/audio review.
+
+For each new event, search for usable artwork in this order: (1) the actual
+flyer in the post's images/carousel; (2) a legible frame in the post's
+video/Reel; (3) an event-specific flyer at its verified linked source or
+venue page. Use only already collected content and free public retrieval;
+do not expand the paid scraper, refresh the fixed roster, or exceed the
+$0.59 daily cap. Use contact sheets to triage images or frames and inspect
+the strongest candidates individually. Prefer a full-resolution image over
+a thumbnail whenever available.
+
+**Do not count a flyer as captured until it has a usable image URL and its
+preservation has succeeded through QDP's restricted flyers operation.**
+The current operation takes an HTTPS image URL, not a video or local image
+file. For video stills, use a verified direct image URL if one is available.
+If a locally extracted frame has no approved URL/upload path, do not pass a
+video URL, placeholder, fabricated URL, or unauthorized storage link as
+RawFlyerURL. Keep the event as waiting, record "flyer visible in video;
+extracted frame cannot yet be saved" distinctly from "no flyer found",
+and report this technical gap. Do not seek direct Google or Cloudflare
+account access as a workaround.
+
+Before marking any NEW post screened, complete and record its flyer search
+outcome (saved, no usable flyer, video frame found but unsavable, or media
+unavailable). Distinguish images downloaded, slides inspected, videos
+sampled, frames inspected, flyers verified, flyers actually saved, and
+unavailable media. Per-profile collection success is not full visual
+coverage.
 
 Use tools/discovery/collect-venues.py for the existing free Val's, Dolphin Tavern,
 and Warehouse on Watts checks, plus the existing public discovery searches.
@@ -123,10 +168,15 @@ node tools/discovery/inbox-payload.mjs --review reviewed.json --snapshot snapsho
 python3 tools/discovery/inbox-client.py --connection CONNECTION.json --action deliver --input payload.json --output delivery.json
 ```
 
-Preserve the chosen flyer for ready candidates with the flyers operation (up to
-three per call), before staging; write its returned public Drive URL to Flyer_URL.
-Reuse that saved URL on future runs. Missing/unavailable media remains an honest
-coverage gap and waiting lead. Do not copy every scraped image into Drive.
+Preserve each chosen flyer for ready candidates with the restricted flyers
+operation (up to three per call) **before** staging; write the returned,
+confirmed public Drive image URL to Flyer_URL. Reuse that saved URL on future
+runs. Give flyer preservation priority over optional write-up improvements.
+Only report a candidate as flyer-ready after a successful save. If video
+artwork was identified but no saveable image URL exists, record a waiting
+lead with the precise limitation rather than silently omitting the flyer.
+Missing/unavailable media remains an honest coverage gap; do not copy every
+scraped image into Drive.
 
 Save screening markers with screened-posts (up to thirty per request), progress
 with run.save, and the checkpoint with its exact current version. Read/reconcile
@@ -134,8 +184,12 @@ a version conflict; never force over a newer checkpoint. Keep activeRun until al
 review/progress/delivery writes are confirmed. Record actual coverage and counts.
 
 Return the verified Admin inbox link, concise new/updated/waiting/correction counts,
-actor charges or clearly labeled unknown reservations, and material gaps. Include
-verified venue/policy news and independent QDP/Callaia/Melt mentions separately.
+actor charges or clearly labeled unknown reservations, and material gaps.
+Include **flyer coverage**: new events with saved flyers, video/Reels examined,
+flyers captured from video, video flyers identified but unable to be saved,
+and genuinely missing/unavailable artwork. Do not inflate "captured" by
+counting a video frame that was only inspected. Include verified venue/policy
+news and independent QDP/Callaia/Melt mentions separately.
 No workbook generation is required; use Admin Download Excel when requested.
 
 ## Owner import
