@@ -12,7 +12,7 @@ def request(connection,action,body=None):
     if parsed.scheme!='https' or parsed.hostname not in ('queerdancephilly.com','qdp-ali.pages.dev') or parsed.path!='/api/discovery' or parsed.query or parsed.fragment:
         raise ValueError('Use the configured QDP discovery endpoint only.')
     payload=json.dumps({'action':action,**(body or {})}).encode()
-    req=urllib.request.Request(url,data=payload,headers={'Content-Type':'application/json','Authorization':'Bearer '+connection['token']})
+    req=urllib.request.Request(url,data=payload,headers={'Content-Type':'application/json','Authorization':'Bearer '+connection['token'],'User-Agent':'QDP-Discovery/1.0 (+https://queerdancephilly.com)'})
     try:
         with urllib.request.build_opener(NoRedirect).open(req,timeout=300) as response:
             result=json.load(response)

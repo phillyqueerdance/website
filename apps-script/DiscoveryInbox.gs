@@ -287,6 +287,7 @@ function qdpInboxCorrect_(item, table) {
   const rules = qdpApplyEventSaveRules_(next, table.headers, buildLookupMaps_(), {original: target.row, formulas, touched,
     markEdited: true, recordManual: true, refreshTitle: true, refreshIndicators: true});
   qviSetRow_(table.sheet, target.number, rules.row, target.row);
+  try {
   receipt.phase = 'sheet';put();
   if (shared.length) {
     const patch = {};
@@ -301,4 +302,7 @@ function qdpInboxCorrect_(item, table) {
   }
   receipt.phase = 'complete';put();
   return {eventId: current.eventId, sheetSaved: true, calendarCreated: true, correction: true};
+  } catch (error) {
+    return {eventId: current.eventId, sheetSaved: true, correction: true, error: error.message};
+  }
 }

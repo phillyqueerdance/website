@@ -58,3 +58,10 @@ test('lineup-only corrections update the sheet without Calendar reads or writes 
   const item={id:'c'.repeat(64),kind:'correction',eventId:before.eventId,changes:{lineup:'New named artist'},baseline:before};
   f.context.qdpInboxCorrect_(item,f.table());f.context.qdpInboxCorrect_(item,f.table());assert.equal(f.rows[0][headers.indexOf('Lineup_Raw')],'New named artist');assert.equal(f.calls.patches,0);
 });
+test('a Calendar correction failure retains the confirmed sheet receipt and recovers on retry',()=>{
+  const f=fixture();f.context.qdpInboxImport_([proposal('a')]);const before=f.context.qdpInboxEvent_(f.table(),f.rows[0],f.calendar);
+  const item={id:'d'.repeat(64),kind:'correction',eventId:before.eventId,changes:{description:'Revised copy'},baseline:before};
+  const patch=f.context.Calendar.Events.patch;f.context.Calendar.Events.patch=()=>{throw new Error('Calendar unavailable');};
+  const result=f.context.qdpInboxCorrect_(item,f.table());assert.equal(result.sheetSaved,true);assert.match(result.error,/Calendar unavailable/);assert.equal(f.rows[0][f.c.description],'Revised copy');
+  f.context.Calendar.Events.patch=patch;const retry=f.context.qdpInboxCorrect_(item,f.table());assert.equal(retry.error,undefined);assert.equal(f.calendar.get(before.calendarId).description,'Revised copy');
+});
