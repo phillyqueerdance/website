@@ -1,0 +1,78 @@
+{
+  "baselineVersion": 1,
+  "provenance": "Recorded historical run counters; not an independently replayed visual review.",
+  "recordedCycleDate": "2026-11-23",
+  "recordedPosts": {
+    "rawRows": 23,
+    "uniquePostIds": 21,
+    "crossPostDuplicateRows": 2,
+    "previouslyScreenedIdsSkippedCompletely": 14,
+    "newPostIds": 7,
+    "newCaptionsReviewed": 7,
+    "newPostScreeningMarkersSaved": 7,
+    "outOfScopeNewInstagramPosts": 6,
+    "undatedInstagramLeads": 1,
+    "editedPostOrOldMediaRechecks": 0
+  },
+  "recordedMedia": {
+    "instagramDistinctImageReferences": 11,
+    "instagramStillImages": 9,
+    "instagramVideoPreviewImages": 2,
+    "instagramImagesDownloaded": 11,
+    "instagramImageDownloadFailures": 0,
+    "instagramImagesActuallyInspected": 11,
+    "instagramCarouselSlidesInspected": 7,
+    "videosDownloaded": 2,
+    "videosSampled": 2,
+    "representativeFramesActuallyInspected": 12,
+    "transitionFramesActuallyInspected": 18,
+    "fullVideoAudioReview": false,
+    "ocrImages": 0,
+    "publicImageReferencesAttempted": 12,
+    "publicImagesDownloaded": 9,
+    "publicImageDownloadFailures": 3,
+    "publicImagesActuallyInspected": 9,
+    "eventFlyersVerifiedAndSaved": 4,
+    "newEventsWithSavedFlyers": 2,
+    "existingPendingEventsWithFlyersSaved": 2,
+    "eligibleFlyersCapturedFromVideo": 0,
+    "eligibleVideoFlyersIdentifiedButUnableToSave": 0,
+    "newWaitingWithMissingUsableArtwork": 7
+  },
+  "confirmedApifyUsd": null,
+  "retainedReservationUsd": 0.59,
+  "unavailableHistoricalMetrics": [
+    "ChatGPT tool calls",
+    "AI token usage",
+    "per-stage review duration",
+    "historical transferred bytes"
+  ],
+  "projections": {
+    "usageReduction": "Not measured. Mechanical preparation and unchanged comparisons move into scripts; every new visual remains in review.",
+    "quality": "No quality reduction is intended; equivalent discovery coverage requires observation over actual daily runs."
+  },
+  "recordedActorSeconds": 74.853,
+  "measuredReplay": {
+    "seconds": 0.0002936020000561257,
+    "rawRows": 23,
+    "uniquePosts": 21,
+    "duplicateRows": 2,
+    "collectionErrors": [],
+    "mediaAssociationsRetainedBeforeScreenedIDLookup": 76
+  },
+  "measuredSnapshot": {
+    "events": 180,
+    "calendar": 158,
+    "intake": 15,
+    "compactJsonBytes": 388659,
+    "note": "Fresh full-snapshot serialization, not a historical network measurement."
+  },
+  "measuredTargetedMatching": {
+    "scope": "Offline replay of the freshly retrieved bounded snapshot; one edition date, with complete aliases and baseline fields retained.",
+    "fullSnapshotBytes": 388659,
+    "targetedMatchBytes": 131392,
+    "reductionPercent": 66.19,
+    "matchingEvents": 6,
+    "matchingCalendar": 6
+  }
+}

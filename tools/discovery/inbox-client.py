@@ -1,25 +1,33 @@
 #!/usr/bin/env python3
 """Restricted QDP inbox client. Credentials stay in a private connection file."""
-import argparse,json,urllib.request,urllib.error,urllib.parse,pathlib
+import argparse,json,urllib.request,urllib.error,urllib.parse,pathlib,time
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):
         raise RuntimeError('The QDP inbox redirected. No credentials were forwarded.')
 
-def request(connection,action,body=None):
+def request(connection,action,body=None,metrics=None):
     url=connection.get('url','')
     parsed=urllib.parse.urlsplit(url)
     if parsed.scheme!='https' or parsed.hostname not in ('queerdancephilly.com','qdp-ali.pages.dev') or parsed.path!='/api/discovery' or parsed.query or parsed.fragment:
         raise ValueError('Use the configured QDP discovery endpoint only.')
-    payload=json.dumps({'action':action,**(body or {})}).encode()
+    payload=json.dumps({**(body or {}),'action':action}).encode()
+    started=time.monotonic()
+    if metrics is not None:
+        metrics['httpRequests']=metrics.get('httpRequests',0)+1
+        metrics['wireRequestBytes']=metrics.get('wireRequestBytes',0)+len(payload)
     req=urllib.request.Request(url,data=payload,headers={'Content-Type':'application/json','Authorization':'Bearer '+connection['token'],'User-Agent':'QDP-Discovery/1.0 (+https://queerdancephilly.com)'})
     try:
         with urllib.request.build_opener(NoRedirect).open(req,timeout=300) as response:
-            result=json.load(response)
+            raw=response.read(16*1024*1024+1)
+            if metrics is not None:metrics['wireResponseBytes']=metrics.get('wireResponseBytes',0)+len(raw)
+            if len(raw)>16*1024*1024:raise RuntimeError('The bounded discovery response is too large.')
+            result=json.loads(raw)
     except urllib.error.HTTPError as error:
         try: detail=json.loads(error.read()).get('error','Request failed')
         except Exception: detail='The QDP endpoint returned HTTP '+str(error.code)
         raise RuntimeError(detail) from None
+    if metrics is not None:metrics['wireSeconds']=metrics.get('wireSeconds',0)+time.monotonic()-started
     if result.get('ok')!='yes':raise RuntimeError(result.get('error','The operation was not confirmed.'))
     return result
 
