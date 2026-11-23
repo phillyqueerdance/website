@@ -100,6 +100,13 @@ export async function discoveryRequest(context,isTask=false) {
       AND (date='' OR date>=?) AND status NOT IN ('imported','existing') ORDER BY date LIMIT 100`).bind(today()).all()).results};
     else if(action==='import'&&!isTask)result=await importSelected(context,db,body);
     else if(action==='publish'&&!isTask)result=await publish(context,db,body);
+    else if(action==='listings'&&!isTask) {
+      if(!Array.isArray(body.eventIds)||!body.eventIds.length||body.eventIds.length>50||body.eventIds.some(id=>typeof id!=='string'||id.length>128))throw new Error('Choose up to fifty current listings.');
+      const wanted=new Set(body.eventIds.map(id=>id.toUpperCase()));
+      const current=await apps(context.env,{action:'admin.discovery.snapshot'});
+      // Comparisons are read-only: do not reconcile legacy decisions or change proposal versions here.
+      result={events:(current.events||[]).filter(event=>wanted.has(event.eventId.toUpperCase())),readAt:current.readAt};
+    }
     else if(action==='snapshot') {
       result=await apps(context.env,{action:'admin.discovery.snapshot'});
       const records=result.legacyDecisions;
