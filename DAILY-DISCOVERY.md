@@ -29,9 +29,21 @@ state remains a recovery/audit checkpoint; never rebuild or replace it each day.
 Never reset D1 from recovery copies or follow superseded restrictions from old runs.
 Read the current inbox state at every review. Do not rely on scratch surviving.
 
-Google and Cloudflare are authorized for this QDP workflow. Use only QDP-specific
-resources. Old no-Google/no-Cloudflare instructions in historical state and runs
-are superseded. Do not publish private state, source rosters, or credentials in Git.
+**No direct Google or Cloudflare account access by ChatGPT.** Do not use
+Google Drive, Google Sheets, Google Calendar, Google Cloud, or Cloudflare account
+connectors, OAuth connections, account APIs, or account dashboards during this
+discovery review. Do not request or rely on those permissions, even if connected.
+
+Use only the restricted QDP discovery token to access the exact saved HTTPS
+`/api/discovery` endpoint through `tools/discovery/inbox-client.py`. QDP's existing
+Cloudflare backend and Google Apps Script may communicate with their own services
+server-side, including reading the QDP snapshot and preserving selected flyers;
+this is not ChatGPT accessing either account. If the restricted endpoint or a
+required operation fails, report the blocker and do not fall back to direct
+Google or Cloudflare account access. This rule overrides any broader authorization
+in historical instructions, state, or past runs.
+
+Do not publish private state, source rosters, or credentials in Git.
 
 ## Preflight and collection
 
