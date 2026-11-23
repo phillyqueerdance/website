@@ -1,0 +1,86 @@
+--- a/Core.gs
++++ b/Core.gs
+@@ -1,5 +1,5 @@
+ /**
+- * Queer Dance Philly — Apps Script Core v7.4.29
++ * Queer Dance Philly — Apps Script Core v7.4.30
+  * Core.gs: Settings, menus, Calendar sync, admin, flyer upload, forms, maps, and shared helpers.
+  * Install with the supplied ArchiveReview.gs for Admin Archive Updates.
+  * Use the supplied PublicData.gs to publish all Archive YYYY tabs.
+@@ -11,7 +11,7 @@
+  * Save and update the existing web-app deployment; no setup rerun is needed.
+  */
+ 
+-const QDP_VERSION = '7.4.29';
++const QDP_VERSION = '7.4.30';
+ 
+ const QDP_ADMIN_VENUE_LABELS_ = new Map([
+   ['SECLOC-001', { VenueName: 'Secret Location', Public_Name: 'Location not disclosed' }],
+@@ -810,6 +810,19 @@
+ });
+ // Sort longer keys first (helps avoid short-name shadowing and exits earlier)
+ function byLenDesc(a, b){ return String(b.key||'').length - String(a.key||'').length; }
++// Party/collective Instagram cells may contain several handles or profile links.
++function addInstagramAliases(value, id, list) {
++String(value || '').split(',').forEach(token => {
++const handle = trim(token)
++.replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '')
++.replace(/[/?#].*$/, '').replace(/^@/, '');
++if (!/^[A-Za-z0-9._]+$/.test(handle)) return;
++const key = normalizeKey_(handle);
++const atKey = normalizeKey_('@' + handle);
++if (key) list.push({ key, id, exactOnly: false });
++if (atKey && atKey !== key) list.push({ key: atKey, id, exactOnly: false });
++});
++}
+ // ===== Artists ===== (StageName respects exact-only via Aliases)
+ const artists = shared(CONFIG.SHEET_ARTISTS);
+ const aIdx = artists.index;
+@@ -876,11 +889,13 @@
+ : []);
+ const collById = {};
+ const collAliases = [];
++// Prefer the live CollInsta column; keep older Instagram-only sheets working.
++const collInstagramColumn = cIdx['CollInsta'] != null ? cIdx['CollInsta'] : cIdx['Instagram'];
+ cValues.forEach(r => {
+ const id = trim(r[cIdx['CollectiveID']]);
+ if (!id) return;
+ const name = r[cIdx['CollectiveName']] || '';
+-const ig = trim(r[cIdx['Instagram']]).replace(/^@/, '');
++const ig = r[collInstagramColumn];
+ // CollAliases is the collective alias column; retain existing Aliases entries.
+ const aliasesRaw = ['CollAliases', 'Aliases'].map(header =>
+ cIdx[header] != null ? String(r[cIdx[header]] || '') : '').filter(Boolean).join(',');
+@@ -896,13 +911,7 @@
+ const { key, exactOnly } = parseAliasToken_(tok);
+ if (key) collAliases.push({ key, id, exactOnly: !!exactOnly });
+ });
+-// Instagram handle keys (both "name" and "@name"); treated as soft by default
+-if (ig) {
+-const k1 = normalizeKey_(ig);
+-const k2 = normalizeKey_('@' + ig);
+-if (k1) collAliases.push({ key: k1, id, exactOnly: false });
+-if (k2 && k2 !== k1) collAliases.push({ key: k2, id, exactOnly: false });
+-}
++addInstagramAliases(ig, id, collAliases);
+ });
+ // ===== Parties ===== (ID + name + [exact-only] aliases + event flags)
+ const parties = shared(CONFIG.SHEET_PARTIES);
+@@ -934,6 +943,7 @@
+ const { key, exactOnly } = parseAliasToken_(tok);
+ if (key) partyAliases.push({ key, id, exactOnly: !!exactOnly });
+ });
++addInstagramAliases(r[pIdx['PartyInsta']], id, partyAliases);
+ });
+ venueAliases.sort(byLenDesc);
+ artistAliases.sort(byLenDesc);
+@@ -5756,8 +5766,7 @@
+       ['CollBio', 'Public bio', 'Profile', 'long', 20000],
+       ['CollAliases', 'Collective aliases', 'Profile', 'text', 5000],
+       ['Aliases', 'Aliases', 'Profile', 'text', 5000],
+-      ['CollInsta', 'Public Instagram', 'Links', 'instagram', 3000],
+-      ['Instagram', 'Instagram used for matching', 'Links', 'instagram', 3000],
++      [['CollInsta', 'Instagram'], 'Instagram', 'Links', 'instagram', 3000],
+       ...QDP_ADMIN_PROFILE_WEBSITE_FIELDS_,
+       [['CollQueer', 'QueerCollective'], 'Queer collective', 'Visibility', 'flag', 3],
+       ['CollArtists', 'Artist IDs', 'Associations', 'ids', 5000],
