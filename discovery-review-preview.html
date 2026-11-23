@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive"><meta name="theme-color" content="#111114">
+  <title>Discovery Review · sample preview</title>
+  <link rel="icon" href="/admin/favicon.png"><link rel="stylesheet" href="/poster-theme.css?v=20260926-01">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261112-artist-crops-1">
+  <link rel="stylesheet" href="/admin/apify-import.css?v=20261120-daily-1">
+  <link rel="stylesheet" href="/admin/discovery.css?v=20261123-2">
+  <script src="/discovery-review-fixture.js"></script>
+  <script type="module" src="/admin/discovery.js?v=20261123-2"></script>
+</head>
+<body class="apify-page discovery-page">
+  <header class="admin-header"><div class="admin-brand"><img class="brand-mark" src="/admin/favicon.png" width="48" height="48" alt="">
+    <div><p class="eyebrow">Queer Dance Philly</p><h1>Discovery Review</h1></div></div><a class="admin-page-link" href="/admin/">Back to Admin</a></header>
+  <main class="admin-shell discovery-shell">
+    <section class="discovery-inbox-header">
+      <div class="discovery-intro"><div><p class="eyebrow">The next move</p><h2>Your review inbox</h2><p>Preview with sample data</p>
+        <p>Check the details, choose what belongs, and add it to QDP.</p></div>
+        <div class="discovery-run"><p id="run-status" class="apify-muted">Checking the latest review…</p><details><summary>Review coverage</summary><div id="coverage"></div></details></div></div>
+      <div class="discovery-toolbar"><label>View <select id="view"><option value="all">All pending</option><option value="new">New</option>
+        <option value="updated">Updated</option><option value="waiting">Waiting</option><option value="failed">Failed</option>
+        <option value="excluded">Excluded</option><option value="imported">Imported</option></select></label>
+        <label class="discovery-search">Search <input id="query" type="search" placeholder="Find a title, venue or artist…"></label>
+        <button id="refresh" class="discovery-button" type="button">Refresh</button><button id="export" class="discovery-button" type="button">Download Excel</button></div>
+      <div class="discovery-inbox-meta"><p id="count" aria-live="polite"></p><a href="/admin/apify-import.html">Import an older workbook</a></div>
+      <p id="status" class="discovery-notice" role="status" aria-live="polite" hidden></p>
+    </section>
+    <div id="items" class="apify-list" aria-busy="true"></div>
+    <nav class="discovery-pagination" aria-label="Review pages"><button id="previous" type="button">Previous</button><span id="page"></span><button id="next" type="button">Next</button></nav>
+    <footer class="apify-save discovery-selection"><div><strong id="selection">0 selected</strong><p>Include selects · Wait keeps · Exclude hides</p></div><button id="add" class="save-all-button" type="button" disabled>Add selected to QDP</button></footer>
+  </main>
+  <p id="toast" class="discovery-toast" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+</body></html>
