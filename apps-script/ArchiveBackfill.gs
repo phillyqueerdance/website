@@ -1,5 +1,5 @@
 /**
- * QDP archive backfill v1.1.1. Requires Core v7.4.26, ArchiveReview v7.4.25,
+ * QDP archive backfill v1.2.0. Requires Core v7.4.26, ArchiveReview v7.4.26,
  * PublicData v7.4.22+, and the existing QDP_Apify_Import / scraper helpers.
  * Source collection never writes an event. Apply is an explicit Admin action.
  */
@@ -9,11 +9,13 @@ const QDP_BACKFILL_ = Object.freeze({
   history: ['UpdateKey','CandidateKey','EventID','Sheet','BeforeJSON','AfterJSON','PreviousRevision','At'],
   runs: ['RunID','CoverageJSON','UpdatedAt'],
   names: {posts:'Backfill_Posts',review:'Backfill_Review',history:'Backfill_History',runs:'Backfill_Runs'},
-  folder: 'QDP_BACKFILL_SOURCE_FOLDER_ID', year: 2025,
+  folder: 'QDP_BACKFILL_SOURCE_FOLDER_ID',
   importRows: 500, importBytes: 6 * 1024 * 1024, saveRows: 24, saveFlyers: 8, workspaceRows: 500,
   editable: ['Title (internal)','StartDate','EndDate','StartTime','EndTime','Timezone','ExplicitQueer (Yes/No)',
     'VenueID','ArtistIDs (comma-separated)','PartyID','HostCollectiveIDs (comma-separated)',
-    'Description','Event_URL','Instagram_URL','RawFlyerURL','Flyer_URL']
+    'Description','Lineup_Raw','Event_URL','Instagram_URL','RawFlyerURL','Flyer_URL',
+    'Title_Public (auto w/ emojis)','Status','Location','Address (from Venue)',
+    'Neighborhood (from Venue)','Publish_To_Web','Ticket_URL','Source_URL','PhotoURLs']
 });
 
 let QDP_BACKFILL_INDEX_;
@@ -40,6 +42,9 @@ function qdpBackfillJSON_(value,max=45000) {
   const text=JSON.stringify(value);qdpBackfillString_(text,max);return text;
 }
 function qdpBackfillParse_(text,fallback) {try{return JSON.parse(text);}catch(e){return fallback;}}
+function qdpBackfillValidDate_(date) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date)&&!isNaN(Date.parse(date))&&new Date(date).toISOString().slice(0,10)===date;
+}
 function qdpBackfillRevision_(row) {return qdpArchiveDigest_(JSON.stringify(row));}
 function qdpBackfillAppend_(table,rows) {
   if(!rows.length)return null;
@@ -120,7 +125,7 @@ function qdpBackfillIngest_(body) {
     for(const [name,value] of Object.entries(facts))qdpBackfillString_(value);
     if(String(facts.Description||'').trim())throw new Error('Initial backfill candidates must leave Description blank. Request a description after selecting the event.');
     const date=facts.StartDate||'';
-    if(date&&(!/^2025-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date))throw new Error('This pilot accepts event dates in 2025; uncertain dates can stay blank.');
+    if(date&&!qdpBackfillValidDate_(date))throw new Error('Use a valid event date in YYYY-MM-DD format; uncertain dates can stay blank.');
     seen.add(key);newReviews.push([key,runId,qdpBackfillJSON_(postKeys),qdpBackfillJSON_(facts),qdpBackfillJSON_(candidate.evidence||{}),
       'pending','','','[]','',qdpBackfillJSON_(candidate.visual||{status:'pending'}),now,'','']);
   }
@@ -167,7 +172,7 @@ function qdpBackfillCatalog_(ss,sourceNames=null) {
       const item={sheet:name,eventId:id,date,title:String(row[c.title-1]||''),venueId:String(row[c.venue-1]||''),
         artistIds:qdpArchiveIds_(row[c.artists-1]),row,number:index+2,source};
       out.byKey.set(key,out.byKey.has(key)?null:item);
-      if(!date.startsWith('2025-')||sourceNames)return;
+      if(!qdpBackfillValidDate_(date)||sourceNames)return;
       item.text=row.map(v=>String(v==null?'':v)).join('\n');
       out.push(item);if(!out.byDate.has(date))out.byDate.set(date,[]);out.byDate.get(date).push(item);
       for(const match of item.text.matchAll(/https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/g)) {
@@ -180,7 +185,7 @@ function qdpBackfillCatalog_(ss,sourceNames=null) {
 
 function qdpBackfillTarget_(catalog,sheet,eventId) {
   const event=catalog.byKey.get(qdpArchiveAdminEventKey_(sheet,eventId));
-  if(!event||!event.date.startsWith('2025-'))throw new Error('Choose a unique archived 2025 event. The selected match may have moved or changed.');
+  if(!event||!qdpBackfillValidDate_(event.date))throw new Error('Choose a unique archived event with a valid start date. The selected match may have moved or changed.');
   const {source,number}=event;
   if(!source.formulas)source.formulas=source.range.getFormulas();
   const target={ss:source.ss,sheet:source.sheet,layout:source.layout,eventId,number,
@@ -197,6 +202,11 @@ function qdpBackfillTarget_(catalog,sheet,eventId) {
     target.layout={...target.layout,width:target.layout.width+1,headers:[...target.layout.headers,'Flyer_URL']};
     target.row.push('');target.formulas.push('');
   }
+  if(!target.layout.headers.includes('Lineup_Raw')) {
+    target.addLineupColumn=true;
+    target.layout={...target.layout,width:target.layout.width+1,headers:[...target.layout.headers,'Lineup_Raw']};
+    target.row.push('');target.formulas.push('');
+  }
   target.revision=qdpArchiveAdminEventRevision_(target);
   return target;
 }
@@ -205,15 +215,18 @@ const QDP_BACKFILL_FIELD_LABELS_ = Object.freeze({
   'Title (internal)':'Title',StartDate:'Start date',EndDate:'End date',StartTime:'Start time',EndTime:'End time',
   Timezone:'Time zone','ExplicitQueer (Yes/No)':'Explicitly queer event',VenueID:'Venue',
   'ArtistIDs (comma-separated)':'Artists','HostCollectiveIDs (comma-separated)':'Collectives',PartyID:'Party',
-  Description:'Description',Event_URL:'Event link',Instagram_URL:'Instagram link',
-  RawFlyerURL:'Original flyer link',Flyer_URL:'Flyer image URL'
+  Description:'Description',Lineup_Raw:'Raw lineup',Event_URL:'Event link',Instagram_URL:'Instagram link',
+  RawFlyerURL:'Original flyer link',Flyer_URL:'Flyer image URL',
+  'Title_Public (auto w/ emojis)':'Public title',Status:'Status',Location:'Location',
+  'Address (from Venue)':'Address','Neighborhood (from Venue)':'Neighborhood',
+  Publish_To_Web:'Show on website',Ticket_URL:'Ticket link',Source_URL:'Source link',PhotoURLs:'Photo URLs'
 });
 function qdpBackfillTargetRecord_(target) {
   const record=qdpArchiveAdminEventRecord_(target);
   const fields=new Map(record.fields.map(field=>[field.label,field]));
   record.fields=Object.entries(QDP_BACKFILL_FIELD_LABELS_).flatMap(([key,label])=>{
     const field=fields.get(label);
-    return field?[{key,value:field.value,type:field.type,maxLength:field.maxLength,readOnly:field.readOnly}]:[];
+    return field?[{key,label,value:field.value,type:field.type,maxLength:field.maxLength,readOnly:field.readOnly}]:[];
   });
   return record;
 }
@@ -328,7 +341,7 @@ function qdpBackfillPlanReview_(body,original,target,indexSignature) {
   if(body.state==='confirmed') {
     if(body.expectedIndexSignature!==indexSignature)throw new Error('The Index changed since this review opened. Reload it and check the match and selected fields again.');
     row[13]=indexSignature;
-    if(target.layout.name===CONFIG.SHEET_EVENTS||!qdpArchiveAdminDate_(target.row[target.layout.columns.start-1]).startsWith('2025-'))throw new Error('Choose an archived 2025 event.');
+    if(target.layout.name===CONFIG.SHEET_EVENTS||!qdpBackfillValidDate_(qdpArchiveAdminDate_(target.row[target.layout.columns.start-1])))throw new Error('Choose an archived event with a valid start date.');
     row[6]=target.layout.name;row[7]=target.eventId;
   }
   const draft=qdpBackfillString_(body.draftDescription||'');
@@ -376,7 +389,7 @@ function qdpBackfillApply_(body) {
   if(reviewRow[13]!==qdpArchiveLookups_(current.table.ss).signature)throw new Error('The Index changed after approval. Reload this review and confirm the choices again.');
   const selected=qdpBackfillParse_(reviewRow[8],[]);
   if(!selected.length)throw new Error('Choose and save the fields to update first.');
-  const target=qdpArchiveAdminEventTarget_({sheet:reviewRow[6],eventId:reviewRow[7]});
+  const target=qdpBackfillTarget_(qdpBackfillCatalog_(current.table.ss,new Set([reviewRow[6]])),reviewRow[6],reviewRow[7]);
   if(body.expectedTargetRevision!==target.revision)throw new Error('The archive event changed since review. Reload it before applying changes.');
   const fields=body.fields||{},keys=Object.keys(fields);
   if(keys.length!==selected.length||keys.some(k=>!selected.includes(k)))throw new Error('Apply exactly the fields selected in this saved review.');
@@ -391,12 +404,11 @@ function qdpBackfillApply_(body) {
     if(!saved.includes(fields.Flyer_URL))throw new Error('Save and verify the selected source flyer before applying it.');
   }
   const plan=qdpArchiveAdminPrepareEvent_({expectedRevision:target.revision,fields},target);
-  const latest=qdpArchiveAdminEventTarget_({sheet:reviewRow[6],eventId:reviewRow[7]});
-  if(latest.revision!==target.revision)throw new Error('This archive event changed while saving. Reload and review it again.');
+  if(qdpBackfillRecheckTargets_([plan]).has(target))throw new Error('This archive event changed while saving. Reload and review it again.');
   const before={},after={};plan.updates.forEach((v,c)=>{before[target.layout.headers[c-1]]=target.row[c-1];after[target.layout.headers[c-1]]=v;});
   const history=qdpBackfillTable_('history'),now=new Date().toISOString();
   reviewRow[5]='applied';reviewRow[11]=now;reviewRow[12]='Saved '+plan.updates.size+' changed cells; publication is separate.';
-  const cells=qdpBackfillRowCells_(current.table,current.index,reviewRow).concat([...plan.updates].map(([column,value])=>({sheet:target.sheet,row:latest.number,column,value})));
+  const cells=qdpBackfillRowCells_(current.table,current.index,reviewRow).concat([...plan.updates].map(([column,value])=>({sheet:target.sheet,row:target.number,column,value})));
   if(plan.updates.size)qdpArchiveAdminMarkDirty_();
   qdpBackfillCommit_(target.ss,cells,[qdpBackfillAppend_(history,[[Utilities.getUuid(),reviewRow[0],target.eventId,target.layout.name,
     qdpBackfillJSON_(before),qdpBackfillJSON_(after),target.revision,now]])]);
@@ -536,6 +548,7 @@ function qdpBackfillRecheckTargets_(plans) {
     const {target}=span;
     if(target.addEditState)qdpEnsureEventEditState_(target.sheet);
     if(target.addFlyerColumn)qdpBackfillEnsureFlyerColumn_(target.sheet);
+    if(target.addLineupColumn)qdpBackfillEnsureLineupColumn_(target.sheet);
     const header=target.sheet.getRange(1,1,1,target.sheet.getLastColumn()).getValues()[0].map(value=>String(value||'').trim());
     if(JSON.stringify(header)!==JSON.stringify(target.layout.headers))continue;
     const range=target.sheet.getRange(span.first,1,span.last-span.first+1,target.layout.width);
@@ -554,6 +567,13 @@ function qdpBackfillEnsureFlyerColumn_(sheet) {
   const column=sheet.getLastColumn()+1;
   if(column>sheet.getMaxColumns())sheet.insertColumnsAfter(sheet.getMaxColumns(),column-sheet.getMaxColumns());
   sheet.getRange(1,column).setValue('Flyer_URL');
+}
+function qdpBackfillEnsureLineupColumn_(sheet) {
+  const headers=sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+  if(headers.some(header=>String(header||'').trim()==='Lineup_Raw'))return;
+  const column=sheet.getLastColumn()+1;
+  if(column>sheet.getMaxColumns())sheet.insertColumnsAfter(sheet.getMaxColumns(),column-sheet.getMaxColumns());
+  sheet.getRange(1,column).setValue('Lineup_Raw');
 }
 
 function qdpBackfillSaveBatch_(changes,staged) {

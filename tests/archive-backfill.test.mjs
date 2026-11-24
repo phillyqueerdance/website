@@ -28,6 +28,49 @@ test('source intake preserves original records and leaves archive and Calendar u
   assert.deepEqual(h.plain(h.sheets.get('Events_Archive').rows),before);assert.deepEqual(h.publishes,[]);
   assert.deepEqual(JSON.parse(h.files[0][1]),[post()]);assert.equal(h.row().fields.Description,'');assert.equal(h.row().state,'pending');
 });
+test('imports, matching and approval accept valid dates across archive years without changing active Events',()=>{
+  for(const date of ['2024-02-29','2026-11-21','2027-01-01']) {
+    const h=fixture([event('ONE','Original',{VenueID:'ROOM',StartDate:date})]);
+    h.importOne(candidate({StartDate:date}));
+    const view=workspace(h),item=view.items[0],record=target(view);
+    assert.equal(item.matches[0].eventId,'ONE');
+    assert.equal(h.call('find',{query:date}).events[0].eventId,'ONE');
+    const saved=h.call('savebatch',{changes:[choice(item,record,{Status:'Reviewed'})]});
+    assert.equal(saved.results[0].state,'applied');
+    assert.equal(h.sheets.get('Events_Archive').rows[1][eventHeaders.indexOf('StartDate')],date);
+    assert.equal(h.sheets.get('Events').rows.length,1);
+  }
+});
+test('other-year imports reject impossible and malformed dates and keep uncertain dates blank',()=>{
+  for(const date of ['2026-02-29','2026-13-01','26-01-01','2026-1-1']) {
+    const h=fixture();assert.throws(()=>h.importOne(candidate({StartDate:date})),/valid event date/);
+  }
+  const h=fixture();h.importOne(candidate({StartDate:''}));assert.equal(h.row().fields.StartDate,'');
+});
+test('a selected raw lineup creates a missing legacy column and saves multiline text with history',()=>{
+  const h=fixture();h.importOne();const before=h.plain(h.sheets.get('Events_Archive').rows);
+  const view=workspace(h),record=target(view),field=record.fields.find(field=>field.key==='Lineup_Raw');
+  assert.equal(field.type,'long');assert.equal(field.readOnly,false);
+  assert.deepEqual(h.plain(h.sheets.get('Events_Archive').rows),before);
+  const lineup='New Artist b2b Existing Artist\nHosted by The Crew';
+  const saved=h.call('savebatch',{changes:[choice(view.items[0],record,{Lineup_Raw:lineup,Status:'Reviewed'})]});
+  assert.equal(saved.results[0].state,'applied');
+  const archive=h.sheets.get('Events_Archive'),column=archive.rows[0].indexOf('Lineup_Raw');
+  assert.equal(archive.rows[1][column],lineup);assert.equal(archive.rows[0].filter(h=>h==='Lineup_Raw').length,1);
+  assert.equal(archive.rows[1][archive.rows[0].indexOf('Description')],'Original copy');
+  assert.equal(archive.rows[1][archive.rows[0].indexOf('ArtistIDs (comma-separated)')],'');
+  assert.equal(JSON.parse(h.sheets.get('Backfill_History').rows[1][5]).Lineup_Raw,lineup);
+});
+test('raw lineup can be applied through the individual review API and formula cells remain protected',()=>{
+  const h=fixture();h.importOne();h.confirm(['Lineup_Raw']);let current=h.row();
+  h.call('apply',{key:current.key,expectedRevision:current.revision,expectedTargetRevision:current.target.revision,fields:{Lineup_Raw:'Reviewed names'}});
+  const archive=h.sheets.get('Events_Archive');assert.equal(archive.rows[1][archive.rows[0].indexOf('Lineup_Raw')],'Reviewed names');
+  const f=fixture(),sheet=f.sheets.get('Events_Archive');sheet.rows.forEach((row,i)=>row.push(i?'Calculated names':'Lineup_Raw'));
+  sheet.formulas=sheet.rows.map(row=>row.map(()=>''));sheet.formulas[1][sheet.rows[0].indexOf('Lineup_Raw')]='=A1';
+  f.importOne();const view=workspace(f),record=target(view);assert.equal(record.fields.find(field=>field.key==='Lineup_Raw').readOnly,true);
+  const saved=f.call('savebatch',{changes:[choice(view.items[0],record,{Lineup_Raw:'Overwrite'})]});
+  assert.match(saved.results[0].error,/cannot be edited/);assert.equal(sheet.rows[1][sheet.rows[0].indexOf('Lineup_Raw')],'Calculated names');
+});
 test('initial collection refuses unsolicited descriptions',()=>{
   const h=fixture();assert.throws(()=>h.importOne(candidate({Description:'Unrequested promotional copy'})),/must leave Description blank/);
   assert.equal(h.sheets.get('Backfill_Review').rows.length,1);

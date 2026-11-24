@@ -1,9 +1,20 @@
 /**
- * QDP Discovery Review v7.4.34.
+ * QDP Discovery Review v7.4.35. Uses ArchiveReview.gs v7.4.26 for event fields.
  * Replace this file, keep Core.gs v7.4.31 or later, and update the EXISTING web-app
  * deployment. Uses the installed Imports.gs, scraper.gs and PublicData.gs.
  * No triggers, new permissions, or sync queue are installed by this file.
  */
+const QDP_INBOX_FIELD_KEYS_ = Object.freeze({
+  Title:'Title (internal)','Public title':'Title_Public (auto w/ emojis)',Description:'description',
+  'Raw lineup':'lineup',Status:'Status','Start date':'start','Start time':'start','End date':'end','End time':'end',
+  'Time zone':'Timezone',Venue:'VenueID',Location:'Location',Address:'Address (from Venue)',
+  Neighborhood:'Neighborhood (from Venue)',Artists:'ArtistIDs (comma-separated)',
+  Collectives:'HostCollectiveIDs (comma-separated)',Party:'PartyID','Explicitly queer event':'ExplicitQueer (Yes/No)',
+  'Show on website':'Publish_To_Web','Event link':'Event_URL','Ticket link':'Ticket_URL','Source link':'Source_URL',
+  'Instagram link':'Instagram_URL','Flyer image URL':'flyer','Original flyer link':'RawFlyerURL','Photo URLs':'PhotoURLs'
+});
+function qdpInboxFieldKey_(field) { return QDP_INBOX_FIELD_KEYS_[field.label] || field.key; }
+
 function qdpInboxAdmin_(body) {
   if (body.action === 'admin.discovery.snapshot') return qdpInboxSnapshot_(body);
   if (body.action === 'admin.discovery.flyers') return qdpInboxFlyers_(body.items);
@@ -31,7 +42,16 @@ function qdpInboxEvent_(table, row, calendar, sheetTz) {
     try { return qviWall_(qviDate_(value(prefix + 'Date'), tz), qviTime_(value(prefix + 'Time'), tz), qviS_(value('timezone')) || 'America/New_York').toISOString(); }
     catch (_) { return ''; }
   };
-  const fields = {description: stripAllQdpMetadata_(qviS_(value('description'))),
+  const editable = typeof qdpArchiveAdminEventFields_ === 'function' ? qdpArchiveAdminEventFields_({
+    layout: {headers: table.headers}, row, formulas: table.formulas?.get(row) || []}) : [];
+  const definitions = new Map();
+  editable.forEach(({column, value, ...field}) => {
+    const key = qdpInboxFieldKey_(field), previous = definitions.get(key);
+    definitions.set(key, {...field, key, type: ['start','end'].includes(key) ? 'datetime-local' : field.type,
+      readOnly: Boolean(field.readOnly || previous?.readOnly)});
+  });
+  const fields = {...Object.fromEntries(editable.map(field => [qdpInboxFieldKey_(field), field.value])),
+    description: stripAllQdpMetadata_(qviS_(value('description'))),
     lineup: qviS_(table.headers.includes('Lineup_Raw') ? row[table.headers.indexOf('Lineup_Raw')] : ''),
     start: time('start'), end: time('end'), flyer: qviS_(value('flyer'))};
   const id = qviS_(value('eventId')), calId = eventIdForApi_(qviS_(value('calId')));
@@ -39,19 +59,31 @@ function qdpInboxEvent_(table, row, calendar, sheetTz) {
   return {eventId: id, title: qviS_(value('title')), venueId: qviS_(value('venue')), location: qviS_(value('location')),
     sourceUrl: qviS_(value('url')), instagramUrl: qviS_(row[table.headers.indexOf('Instagram_URL')]),
     sourceKey: qviS_(value('sourceKey')), calendarId: calId, publishToWeb: qviYes_(value('publish')), fields,
+    editableFields: [...definitions.values()],
     revision: qdpAdminRevision_([id, fields, value('venue'), value('artists'), value('colls'), value('party')]),
     calendar: live ? {id: live.id, etag: live.etag, fields: {description: stripAllQdpMetadata_(live.description || ''),
       start: live.start && live.start.dateTime ? new Date(live.start.dateTime).toISOString() : '',
-      end: live.end && live.end.dateTime ? new Date(live.end.dateTime).toISOString() : ''}} : null};
+      end: live.end && live.end.dateTime ? new Date(live.end.dateTime).toISOString() : ''},
+      rawFields: Object.fromEntries(['summary','location','description','start','end','colorId'].map(key => [key, qdpInboxCalendarValue_(live, key)]))} : null};
+}
+
+function qdpInboxCalendarValue_(event, key) {
+  const value = event[key];
+  if (key === 'start' || key === 'end') return value?.dateTime ? JSON.stringify({dateTime: new Date(value.dateTime).toISOString(), timeZone: value.timeZone || ''}) : JSON.stringify(value || {});
+  return String(value || '');
 }
 
 function qdpInboxSnapshot_(body) {
   const table = qviEventTable_(false), lookups = buildLookupMaps_(), calendar = new Map(), bounds = getWindowBounds();
+  if (table.rows.length && typeof qdpArchiveAdminEventFields_ === 'function') {
+    const formulas = table.sheet.getRange(2, 1, table.rows.length, table.headers.length).getFormulas();
+    table.formulas = new Map(table.rows.map((row, i) => [row, formulas[i]]));
+  }
   let pageToken = null, pages = 0;
   do {
     const page = Calendar.Events.list(CONFIG.CALENDAR_ID, {timeMin: bounds.timeMin, timeMax: bounds.timeMax,
       singleEvents: true, showDeleted: false, maxResults: 500, pageToken,
-      fields: 'nextPageToken,items(id,summary,location,description,start,end,etag,updated)'});
+      fields: 'nextPageToken,items(id,summary,location,description,start,end,colorId,etag,updated)'});
     (page.items || []).forEach(event => calendar.set(event.id, event));
     pageToken = page.nextPageToken;
     if (++pages >= 5 && pageToken) throw new Error('The Calendar snapshot exceeds its bounded window. Narrow the configured window before reviewing.');
@@ -59,7 +91,7 @@ function qdpInboxSnapshot_(body) {
   const events = table.rows.map(row => qdpInboxEvent_(table, row, calendar)).filter(event => event.eventId);
   const intake = ss_().getSheetByName('Apify Import');
   const staged = intake ? qviTable_(intake) : {rows: [], index: {}};
-  const snapshot = {inboxVersion: 1, discoveryVersion: '7.4.34', frameUploadVersion: 1, imageUploadVersion: 1, readAt: nowISO(), window: bounds, events,
+  const snapshot = {inboxVersion: 1, discoveryVersion: '7.4.35', frameUploadVersion: 1, imageUploadVersion: 1, readAt: nowISO(), window: bounds, events,
     calendar: [...calendar.values()].map(event => ({id: event.id, title: event.summary || '', location: event.location || '',
       start: event.start, end: event.end, updatedAt: event.updated, description: stripAllQdpMetadata_(event.description || '')})),
     legacyDecisions: qdpDiscoveryTable_(false).records,
@@ -400,6 +432,7 @@ function qdpInboxReceipts_() {
 }
 
 function qdpInboxCorrect_(item, table) {
+  if (Object.keys(item.changes || {}).some(key => !Object.prototype.hasOwnProperty.call(QDP_APIFY_CORRECTION_LABELS_, key))) return qdpInboxCorrectFields_(item, table);
   const matches = table.rows.map((row, i) => ({row, number: i + 2})).filter(x => qviS_(qviRead_(x.row, table.col, 'eventId')).toUpperCase() === String(item.eventId || '').toUpperCase());
   if (matches.length !== 1) throw new Error('The correction target is missing or duplicated in Events.');
   const target = matches[0], changes = item.changes, keys = Object.keys(changes || {}), tz = ss_().getSpreadsheetTimeZone();
@@ -468,4 +501,121 @@ function qdpInboxCorrect_(item, table) {
   } catch (error) {
     return {eventId: current.eventId, sheetSaved: true, correction: true, error: error.message};
   }
+}
+
+// Additional owner-selected fields use the same validators and derived values
+// as the event editor. Existing five-field corrections retain their receipts.
+function qdpInboxCorrectFields_(item, table) {
+  if (typeof qdpArchiveAdminPrepareEvent_ !== 'function') throw new Error('Install ArchiveReview.gs v7.4.26 to edit other event fields.');
+  const matches = table.rows.map((row, i) => ({row, number: i + 2})).filter(target =>
+    qviS_(qviRead_(target.row, table.col, 'eventId')).toUpperCase() === String(item.eventId || '').toUpperCase());
+  if (matches.length !== 1) throw new Error('The correction target is missing or duplicated in Events.');
+  const target = {...matches[0], ss: ss_(), sheet: table.sheet,
+    layout: qdpArchiveLayout_(table.sheet, table.headers), eventId: item.eventId};
+  target.formulas = table.sheet.getRange(target.number, 1, 1, table.headers.length).getFormulas()[0];
+  target.revision = qdpArchiveAdminEventRevision_(target);
+  table.formulas = new Map([[target.row, target.formulas]]);
+  const current = qdpInboxEvent_(table, target.row), keys = Object.keys(item.changes || {});
+  const specs = qdpArchiveAdminEventFields_(target), byKey = new Map(specs.map(field => [qdpInboxFieldKey_(field), field]));
+  if (!keys.length || keys.some(key => !byKey.has(key))) throw new Error('Select available event fields to apply.');
+  const fingerprint = qdpAdminRevision_([item.eventId, item.changes]), receipts = qdpInboxReceipts_();
+  const saved = receipts.rows.get(item.id);let receipt = saved && saved.value;
+  if (receipt && receipt.fingerprint !== fingerprint) throw new Error('This correction already began with different selected values. Review its existing Events record before changing the proposal.');
+  if (receipt?.phase === 'complete') return {eventId: current.eventId, sheetSaved: true, calendarCreated: true, correction: true, recovered: true};
+  for (const key of keys) {
+    const value = item.changes[key];
+    if (typeof value !== 'string' || value.length > 50000 || byKey.get(key).readOnly) throw new Error('The selected event field cannot be edited: ' + key);
+    const hash = qdpAdminRevision_([current.fields[key]]);
+    if (receipt) {
+      if (hash !== receipt.before[key] && hash !== receipt.desired[key]) throw new Error('Events ' + key + ' changed during the correction. Review before retrying.');
+    } else if (!item.baseline || item.baseline.eventId !== current.eventId ||
+      !Object.prototype.hasOwnProperty.call(item.baseline.fields || {}, key) || String(item.baseline.fields[key] || '') !== String(current.fields[key] || '')) {
+      throw new Error('The listing changed since review. Load its current details before approving again.');
+    }
+  }
+  const fields = {};
+  for (const key of keys) {
+    let value = item.changes[key];
+    if (key === 'start' || key === 'end') {
+      const prefix = key === 'start' ? 'Start' : 'End', local = qdpApifyCorrectionTime_(value);
+      for (const suffix of ['Date','Time']) {
+        const spec = specs.find(field => field.label === prefix + ' ' + suffix.toLowerCase());
+        if (!spec || spec.readOnly) throw new Error('The selected event date/time cannot be edited.');
+        fields[spec.key] = suffix === 'Date' ? local.slice(0,10) : local.slice(11);
+      }
+    } else {
+      if (key === 'flyer') {
+        if (!item.savedFlyer) throw new Error('Save and verify the selected source flyer first.');
+        value = item.savedFlyer;
+      }
+      fields[byKey.get(key).key] = value;
+    }
+  }
+  const plan = qdpArchiveAdminPrepareEvent_({expectedRevision: target.revision, fields}, target);
+  const next = qdpInboxEvent_(table, plan.row);
+  qdpApifyCorrectionCheckRange_(next.fields.start, next.fields.end);
+  const receiptRow = saved ? saved.number : receipts.sheet.getLastRow() + 1;
+  const put = () => receipts.sheet.getRange(receiptRow, 1, 1, 3).setValues([[item.id, JSON.stringify(receipt), nowISO()]]);
+  let calendar;
+  if (!receipt) {
+    const lookups = buildLookupMaps_(), before = qdpInboxCorrectionCalendarBody_(table, target.row, lookups),
+      after = qdpInboxCorrectionCalendarBody_(table, plan.row, lookups);
+    const calendarDesired = {};
+    for (const key of ['summary','location','description','start','end','colorId']) {
+      if (qdpInboxCalendarValue_(before,key) !== qdpInboxCalendarValue_(after,key)) calendarDesired[key] = after[key] ?? (key === 'colorId' ? null : '');
+    }
+    const calendarId = eventIdForApi_(current.calendarId), calendarBefore = {};
+    if (Object.keys(calendarDesired).length) {
+      calendar = qdpApifyCorrectionReadCalendar_(calendarId);
+      if (Object.prototype.hasOwnProperty.call(calendarDesired,'description')) {
+        const main = stripAllQdpMetadata_(calendar.description || ''), footer = String(calendar.description || '').slice(main.length).trim();
+        calendarDesired.description = [calendarDesired.description,footer].filter(Boolean).join('\n\n');
+      }
+      for (const key of Object.keys(calendarDesired)) {
+        const live = qdpInboxCalendarValue_(calendar,key);
+        if (!item.baseline.calendar || item.baseline.calendar.id !== calendarId || item.baseline.calendar.rawFields?.[key] !== live) {
+          throw new Error('Calendar changed since review. Load its current details before approving again.');
+        }
+        calendarBefore[key] = qdpAdminRevision_([live]);
+      }
+    }
+    receipt = {format: 2, fingerprint, eventId: current.eventId, phase: 'planned', calendarId,
+      before: {}, desired: {}, calendarBefore, calendarDesired};
+    keys.forEach(key => {
+      receipt.before[key] = qdpAdminRevision_([current.fields[key]]);
+      receipt.desired[key] = qdpAdminRevision_([next.fields[key]]);
+    });
+    put();
+  }
+  // Recheck the row after planning; never overwrite an intervening event edit.
+  const fresh = table.sheet.getRange(target.number,1,1,table.headers.length);
+  if (qdpArchiveAdminEventRevision_({...target,row:fresh.getValues()[0],formulas:fresh.getFormulas()[0]}) !== target.revision) throw new Error('The listing changed while saving. Reload and review it again.');
+  if (plan.updates.size) qviSetRow_(table.sheet,target.number,plan.row,target.row);
+  try {
+    receipt.phase = 'sheet';put();
+    const patch = {}, desired = receipt.calendarDesired || {};
+    if (Object.keys(desired).length) {
+      calendar = calendar || qdpApifyCorrectionReadCalendar_(receipt.calendarId);
+      for (const [key,value] of Object.entries(desired)) {
+        const live = qdpInboxCalendarValue_(calendar,key);
+        if (live === qdpInboxCalendarValue_({[key]:value},key)) continue;
+        if (qdpAdminRevision_([live]) !== receipt.calendarBefore[key]) throw new Error('Calendar ' + key + ' changed during this correction. Review before retrying.');
+        patch[key] = value;
+      }
+      if (Object.keys(patch).length) Calendar.Events.patch(patch,CONFIG.CALENDAR_ID,receipt.calendarId,{sendUpdates:'none'},{'If-Match':calendar.etag});
+    }
+    receipt.phase = 'complete';put();
+    return {eventId:current.eventId,sheetSaved:true,calendarCreated:true,correction:true};
+  } catch (error) {
+    return {eventId:current.eventId,sheetSaved:true,correction:true,error:error.message};
+  }
+}
+
+function qdpInboxCorrectionCalendarBody_(table,row,lookups) {
+  const read = key => qviRead_(row,table.col,key);
+  const draft = qviDraft_({title:read('title'),startDate:read('startDate'),startTime:read('startTime'),
+    endDate:read('endDate'),endTime:read('endTime'),timezone:read('timezone'),description:read('description'),
+    venueId:read('venue'),artists:read('artists'),colls:read('colls'),party:read('party'),
+    explicit:read('explicit'),flyer:read('flyer'),url:read('url'),location:read('location')},ss_().getSpreadsheetTimeZone());
+  return qviCalendarBody_(draft,row,table.col,lookups,eventIdForApi_(read('calId')));
 }

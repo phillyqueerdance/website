@@ -179,6 +179,7 @@ function flyer(url, label) {
   return figure;
 }
 function renderCurrent(ui) {
+  if (ui.renderOtherFields) ui.renderOtherFields();
   for (const [key, element] of ui.currentCells) {
     const value = ui.current?.fields?.[key];
     element.replaceChildren();
@@ -243,37 +244,66 @@ function correctionEditor(ui) {
     finally { ui.retry.textContent = label; ui.retry.setAttribute('aria-busy', 'false'); controls(); }
   });
   comparison.append(ui.comparisonStatus, ui.retry); editor.append(comparison);
-  for (const [key, value] of Object.entries(item.changes)) {
+  const recommended = new Set(item.recommendedFields || Object.keys(item.changes));
+  const rendered = new Set(), inputs = new Map();
+  const more = node('details', '', 'discovery-more');
+  more.append(node('summary', 'Other event fields'));
+  const otherFields = node('div', '', 'discovery-other-fields');
+  more.append(otherFields);
+  function appendChange(key, value, parent, definition = {}, isRecommended = false) {
+    if (rendered.has(key) || definition.readOnly) return;
+    rendered.add(key);
+    const label = fieldLabels[key] || definition.label || key;
     const row = node('section', '', 'discovery-change'); row.dataset.field = key;
     const heading = node('div', '', 'discovery-change-heading');
-    heading.append(node('h3', fieldLabels[key] || key));
+    heading.append(node('h3', label));
     const apply = node('label', '', 'discovery-apply'), checkbox = node('input');
     checkbox.type = 'checkbox'; checkbox.checked = item.selectedFields.includes(key);
-    checkbox.setAttribute('aria-label', 'Apply ' + (fieldLabels[key] || key) + ' · ' + title(item));
+    checkbox.setAttribute('aria-label', 'Apply ' + label + ' · ' + title(item));
     apply.append(checkbox, node('span', 'Apply change')); heading.append(apply);
     const columns = node('div', '', 'discovery-compare');
     const current = node('div', '', 'discovery-current'), proposed = node('div', '', 'discovery-proposed');
     current.append(node('p', 'Current QDP listing', 'discovery-column-label'));
     const currentValue = node('div', 'Loading current listing…', 'discovery-current-value');
     ui.currentCells.set(key, currentValue); current.append(currentValue);
-    proposed.append(node('p', 'Recommended change', 'discovery-column-label'));
-    const input = node(key === 'start' || key === 'end' || key === 'flyer' ? 'input' : 'textarea');
-    input.setAttribute('aria-label', 'Proposed ' + (fieldLabels[key] || key) + ' · ' + title(item));
+    proposed.append(node('p', isRecommended ? 'Recommended change' : 'Your change', 'discovery-column-label'));
+    const long = ['description','lineup','PhotoURLs'].includes(key) || ['long','textarea'].includes(definition.type);
+    const input = node(long ? 'textarea' : 'input');
+    inputs.set(key,input);
+    input.setAttribute('aria-label', 'Proposed ' + label + ' · ' + title(item));
+    input.maxLength = definition.maxLength || 50000;
     if (key === 'start' || key === 'end') {
       input.type = 'datetime-local'; input.step = 1;
-      item.changes[key] = localTime(value); input.value = item.changes[key];
-    } else { if (key === 'flyer') input.type = 'url'; input.value = value; }
+      input.value = localTime(value);
+      if (Object.hasOwn(item.changes,key)) item.changes[key] = input.value;
+    } else {
+      if (key === 'flyer' || definition.type === 'url') input.type = 'url';
+      else if (['date','time'].includes(definition.type)) input.type = definition.type;
+      input.value = value || '';
+    }
     if (key === 'flyer' && value) proposed.append(flyer(value, 'Recommended flyer'));
     proposed.append(input);
     checkbox.addEventListener('change', () => {
+      if (checkbox.checked) item.changes[key] = input.value;
       item.selectedFields = checkbox.checked ? [...new Set([...item.selectedFields, key])] : item.selectedFields.filter(field => field !== key);
       markDirty(ui); save(ui, {notify:true}).catch(() => {});
     });
     input.addEventListener('input', () => { item.changes[key] = input.value; markDirty(ui); });
     input.addEventListener('change', () => save(ui).catch(() => {}));
-    columns.append(current, proposed); row.append(heading, columns); editor.append(row);
+    columns.append(current, proposed); row.append(heading, columns); parent.append(row);
   }
-  if (!Object.keys(item.changes).length) editor.append(node('p', 'No correction fields were supplied for this lead. You can keep it with Wait or exclude it.', 'apify-muted'));
+  for (const key of recommended) if (Object.hasOwn(item.changes,key)) appendChange(key,item.changes[key],editor,{},true);
+  for (const [key,value] of Object.entries(item.changes)) if (!recommended.has(key)) appendChange(key,value,otherFields);
+  ui.renderOtherFields = () => {
+    for (const definition of ui.current?.editableFields || []) {
+      const key = definition.key;
+      if (recommended.has(key)) continue;
+      if (inputs.has(key) && !Object.hasOwn(item.changes,key)) inputs.get(key).value = ['start','end'].includes(key) ? localTime(ui.current.fields[key]) : ui.current.fields[key] || '';
+      appendChange(key,Object.hasOwn(item.changes,key) ? item.changes[key] : ui.current.fields[key],otherFields,definition);
+    }
+  };
+  if (!Object.keys(item.changes).length) editor.append(node('p', 'No recommended changes were supplied. Expand “Other event fields” to make your own corrections.', 'apify-muted'));
+  editor.append(more);
 }
 function eventEditor(ui) {
   const primary = REVIEW_FIELDS.filter(field => field.type !== 'link' && !['Timezone','Review_notes'].includes(field.name));
