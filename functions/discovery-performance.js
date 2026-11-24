@@ -2,6 +2,7 @@ import {flyerRecoveryAction} from './discovery-flyer-recovery.js';
 // Restricted discovery operations. All durable state uses the existing D1 binding.
 import {meta, setMeta, now, record} from './discovery-store.js';
 import {digest, normalized, sourceReference} from '../shared/discovery-identity.js';
+import {readSnapshot, snapshotIndexPages} from './discovery-snapshot.js';
 
 export const PERFORMANCE_ACTIONS = new Set(['pipeline.bootstrap','posts.lookup','posts.delta','snapshot.sync','match',
   'work.read','work.save','checkpoint.patch','venues.read','venues.save','flyers.frame.part','flyers.frame.commit','flyers.image.part','flyers.image.commit','flyer-retries.claim','flyer-retries.complete']);
@@ -47,7 +48,7 @@ function indexEntry(kind, id, hash, value) {
     sources:[value.sourceUrl,value.instagramUrl,value.url].filter(Boolean).map(sourceReference)};
 }
 export async function syncSnapshot(db, apps) {
-  const previous = await meta(db,'snapshot-head'), head=previous?.value;
+  const previous = await readSnapshot(db), head=previous?.value;
   const known = Object.fromEntries(['events','calendar','intake'].map(kind => [kind,
     Object.fromEntries((head?.index||[]).filter(r=>r.kind===kind).map(r=>[r.id,r.hash]))]));
   known.references=head?.referencesHash || '';
@@ -78,18 +79,20 @@ export async function syncSnapshot(db, apps) {
     SELECT json_extract(value,'$.alias'),json_extract(value,'$.id'),json_extract(value,'$.kind'),json_extract(value,'$.date'),json_extract(value,'$.decision'),json_extract(value,'$.updatedAt')
     FROM json_each(?) WHERE 1 ON CONFLICT(alias) DO UPDATE SET item_id=excluded.item_id,kind=excluded.kind,date=excluded.date,decision=excluded.decision,updated_at=excluded.updated_at
     WHERE excluded.updated_at>discovery_decisions.updated_at`).bind(JSON.stringify(upstream.legacyDecisions)).run();
+  const changedRecords=rows.length, pages=await snapshotIndexPages(index), existingParts=new Set(head?.indexParts||[]);
+  rows.push(...pages.rows.filter(page=>!existingParts.has(page.key)).map(page=>stampRow(page.key,page.value)));
   await putRows(db,rows);
-  const next={inboxVersion:1,readAt:upstream.readAt,window:upstream.window,index,referencesHash,
+  const next={inboxVersion:1,readAt:upstream.readAt,window:upstream.window,...pages.manifest,referencesHash,
     capabilities:{frameUpload:upstream.frameUploadVersion===1?1:0,snapshotDelta:upstream.deltaVersion===1?1:0,imageUpload:upstream.imageUploadVersion===1?1:0,appsScriptVersion:upstream.discoveryVersion||null}};
   // Content-addressed records make interrupted syncs harmless. Publish the head last with CAS.
   const saved=await setMeta(db,'snapshot-head',next,previous?.version||0);
   return {inboxVersion:1,readAt:next.readAt,window:next.window,snapshotVersion:saved.version,
     counts:Object.fromEntries(['events','calendar','intake'].map(kind=>[kind,index.filter(r=>r.kind===kind).length])),
-    changedRecords:rows.length,upstreamDelta:upstream.deltaVersion===1,capabilities:next.capabilities};
+    changedRecords,indexPages:pages.rows.length,upstreamDelta:upstream.deltaVersion===1,capabilities:next.capabilities};
 }
 export async function matchFacts(db, body) {
   if(!Array.isArray(body.facts)||body.facts.length>50) throw new Error('Compare up to fifty facts at a time.');
-  const saved=await meta(db,'snapshot-head');
+  const saved=await readSnapshot(db);
   if(!saved) throw new Error('Synchronize the authoritative snapshot before matching.');
   const head=saved.value;
   const refs=(await meta(db,'snapshot:references:'+head.referencesHash))?.value;

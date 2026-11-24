@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {sqliteD1} from './helpers/d1-sqlite.mjs';
 import {performanceAction,syncSnapshot,matchFacts} from '../functions/discovery-performance.js';
+import {readSnapshot} from '../functions/discovery-snapshot.js';
 import {stage,saveItem,listItems,meta,setMeta} from '../functions/discovery-store.js';
 import {discoveryRequest} from '../functions/discovery-api.js';
 import {pipelinePayload} from '../tools/discovery/pipeline-payload.mjs';
@@ -32,7 +33,7 @@ test('snapshot retrieval sends delta hashes, transfers only relevant event dates
 });
 test('snapshot deletions remove current matching entries while historical cache remains intact',async()=>{
  const db=sqliteD1();await syncSnapshot(db,async()=>snapshot([event('ONE','2099-12-19')]));
- const head=(await meta(db,'snapshot-head')).value;
+ const head=(await readSnapshot(db)).value;
  await syncSnapshot(db,async()=>({...snapshot([]),deltaVersion:1,references:undefined,hashes:{events:{},calendar:{},intake:{},references:head.referencesHash}}));
  assert.equal((await matchFacts(db,{facts:[{date:'2099-12-19'}]})).events.length,0);
  assert.ok(await meta(db,head.index[0].key));
@@ -41,6 +42,29 @@ test('an interrupted snapshot never exposes a partial head or loses an old basel
  const db=sqliteD1();await syncSnapshot(db,async()=>snapshot([event('ONE','2099-12-19')]));
  let changed=false;await assert.rejects(()=>syncSnapshot(db,async()=>{await setMeta(db,'snapshot-head',{...(await meta(db,'snapshot-head')).value,readAt:'newer'},1);changed=true;return snapshot([event('TWO','2099-12-20')]);}),/checkpoint changed/);
  assert.equal(changed,true);const result=await matchFacts(db,{facts:[{date:'2099-12-19'}]});assert.equal(result.events[0].eventId,'ONE');
+});
+test('large snapshots use bounded index pages without losing records, sources or correction baselines',async()=>{
+ const db=sqliteD1(),events=Array.from({length:900},(_,i)=>({...event('EVENT-'+i,i===0?'2099-12-19':'2099-12-20','Party '+i+' 🏳️‍⚧️ '+ 'x'.repeat(80)),location:'Venue '+i+' '+ 'v'.repeat(80)}));
+ const result=await syncSnapshot(db,async()=>snapshot(events)),saved=await meta(db,'snapshot-head'),hydrated=await readSnapshot(db);
+ assert.ok(JSON.stringify(hydrated.value.index).length>150000);assert.ok(JSON.stringify(saved.value).length<2000);assert.equal(saved.value.index,undefined);assert.equal(saved.value.indexCount,900);assert.ok(result.indexPages>1);
+ for(const key of saved.value.indexParts){const page=await meta(db,key);assert.ok(JSON.stringify(page.value).length<=100000);}
+ assert.equal(hydrated.value.index.length,900);const match=await matchFacts(db,{facts:[{date:'2099-12-19'}]});assert.deepEqual(match.events,[events[0]]);assert.deepEqual(match.references,refs);
+ const all=await matchFacts(db,{facts:[{eventId:'EVENT-899'}]});assert.equal(all.events[0].eventId,'EVENT-899');
+ const unchanged=await syncSnapshot(db,async body=>({...snapshot([]),references:undefined,deltaVersion:1,hashes:{...body.known}}));
+ assert.equal(unchanged.changedRecords,0);assert.deepEqual((await meta(db,'snapshot-head')).value.indexParts,saved.value.indexParts);
+ for(const key of saved.value.indexParts)assert.equal((await meta(db,key)).version,1);
+});
+test('old inline snapshot heads migrate without a full transfer or losing aliases',async()=>{
+ const db=sqliteD1();await syncSnapshot(db,async()=>snapshot([event('ONE','2099-12-19')]));
+ const saved=await readSnapshot(db),legacy={...saved.value};delete legacy.indexVersion;delete legacy.indexParts;delete legacy.indexCount;
+ await setMeta(db,'snapshot-head',legacy,saved.version);let seen;
+ await syncSnapshot(db,async body=>{seen=body.known;return {...snapshot([]),references:undefined,deltaVersion:1,hashes:body.known};});
+ assert.ok(seen.events.ONE);assert.equal((await meta(db,'snapshot-head')).value.indexVersion,2);assert.equal((await matchFacts(db,{facts:[{eventId:'ONE'}]})).events[0].eventId,'ONE');
+});
+test('a missing or corrupt index page blocks matching instead of claiming absence',async()=>{
+ const db=sqliteD1();await syncSnapshot(db,async()=>snapshot([event('ONE','2099-12-19')]));const head=(await meta(db,'snapshot-head')).value,key=head.indexParts[0],page=(await meta(db,key)).value;
+ await db.prepare('DELETE FROM discovery_meta WHERE key=?').bind(key).run();await assert.rejects(()=>matchFacts(db,{facts:[{eventId:'ONE'}]}),/index is incomplete/);
+ await setMeta(db,key,[{...page[0],id:'CHANGED'}],0);await assert.rejects(()=>matchFacts(db,{facts:[{eventId:'ONE'}]}),/index is incomplete/);
 });
 test('cross-posts reuse pending identity through venue aliases and preserve owner edits, choices and receipts',async()=>{
  const db=sqliteD1(),fields={'Title (internal)':'Party',StartDate:'2099-12-19',Location:'Test room',Event_URL:'https://www.instagram.com/p/OLD/',Lineup_Raw:'DJ Test'};

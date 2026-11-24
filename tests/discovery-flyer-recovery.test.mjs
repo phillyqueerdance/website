@@ -68,3 +68,10 @@ test('flyer recovery is bounded and does not resurrect excluded or expired queue
  const item=claims.jobs[0].items[0];await saveItem(db,{id:item.id,version:item.version,decision:'EXCLUDE'});
  const next=await call(db,'flyer-retries.claim',{runId:'second'});assert.equal(next.jobs.length,2);assert.ok(next.jobs.every(j=>j.items.every(i=>i.id!==item.id)));
 });
+test('flyer recovery reads paged snapshots and skips artwork already saved on the imported event',async()=>{
+ const db=sqliteD1();await stage(db,[candidate()]);const item=await first(db);
+ await db.prepare("UPDATE discovery_items SET status='imported',result=? WHERE id=?").bind(JSON.stringify({eventId:'EXISTING'}),item.id).run();
+ await syncSnapshot(db,async()=>({inboxVersion:1,readAt:'2099-01-01',events:[{eventId:'EXISTING',title:'Party',fields:{start:'2099-12-19T22:00:00Z',flyer:'https://drive.google.com/uc?id=saved'}}],calendar:[],intake:[],references:{venues:[],venueAliases:[]}}));
+ assert.equal((await meta(db,'snapshot-head')).value.indexVersion,2);
+ assert.equal((await call(db,'flyer-retries.claim')).jobs.length,0);
+});

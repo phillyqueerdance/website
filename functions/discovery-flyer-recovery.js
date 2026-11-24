@@ -2,6 +2,7 @@
 // This queue never imports, publishes, removes screening history or changes decisions.
 import {meta,setMeta,record,now,today} from './discovery-store.js';
 import {digest,sourceReference} from '../shared/discovery-identity.js';
+import {readSnapshot} from './discovery-snapshot.js';
 const validRun=id=>typeof id==='string'&&/^[-a-zA-Z0-9_:]{1,128}$/.test(id);
 const blocked=new Set(['importing','accepted']);
 const missingFlyer=item=>!String(item.fields.Flyer_URL||'').trim();
@@ -11,7 +12,7 @@ async function targets(db) {
     AND (COALESCE(NULLIF(json_extract(edits,'$.fields.StartDate'),''),date)='' OR COALESCE(NULLIF(json_extract(edits,'$.fields.StartDate'),''),date)>=?)
     AND trim(COALESCE(json_extract(edits,'$.fields.Flyer_URL'),json_extract(data,'$.fields.Flyer_URL'),''))=''`).bind(today()).all();
   const items=rows.results.map(record).filter(item=>!blocked.has(item.status)&&missingFlyer(item));
-  const head=(await meta(db,'snapshot-head'))?.value;
+  const head=(await readSnapshot(db))?.value;
   const ids=new Set(items.map(item=>String(item.result?.eventId||item.eventId||'').toUpperCase()).filter(Boolean));
   const entries=(head?.index||[]).filter(entry=>entry.kind==='events'&&ids.has(entry.id.toUpperCase()));
   const saved=entries.length?await db.prepare("SELECT key,json_extract(value,'$.fields.flyer') AS flyer FROM discovery_meta WHERE key IN (SELECT value FROM json_each(?))").bind(JSON.stringify(entries.map(entry=>entry.key))).all():{results:[]};
