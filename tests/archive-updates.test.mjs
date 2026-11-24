@@ -777,3 +777,49 @@ test('CollAliases is editable through the collective profile and alias changes i
   assert.equal(h.batchRequests.length, 0);
 });
 
+test('collective and party Instagram columns drive normal and Archive Review matching', () => {
+  const h = setup({events: [event('ONE', 'Hosted by @rainbow_union with @nightshift_phl')]});
+  h.sheets.get('Collectives').rows[1][3] = '@rainbow_union';
+  h.sheets.get('Parties').rows[1][3] = '@nightshift_phl';
+  const found = h.c.detectIdsByKeywords_('Hosted by @RAINBOW_UNION with @NIGHTSHIFT_PHL', h.c.buildLookupMaps_());
+  assert.deepEqual(Array.from(found.colls), ['CREW']);
+  assert.equal(found.party, 'NIGHT');
+  const lookups = h.c.qdpArchiveLookups_(h.ss);
+  assert.deepEqual(Array.from(h.c.qdpArchiveMatches_('@rainbow_union', lookups.collectives), p => p.id), ['CREW']);
+  assert.deepEqual(Array.from(h.c.qdpArchiveMatches_('@nightshift_phl', lookups.party), p => p.id), ['NIGHT']);
+  const proposals = h.call('scan').events[0].proposals;
+  assert.ok(proposals.some(p => p.kind === 'collective' && p.proposedIds.includes('CREW')));
+  assert.ok(proposals.some(p => p.kind === 'party' && p.proposedIds.includes('NIGHT')));
+});
+
+test('comma-separated Instagram handles and profile links each match without treating placeholders as handles', () => {
+  const h = setup();
+  h.sheets.get('Collectives').rows[1][3] = '@rainbow_union, @crew_archive';
+  h.sheets.get('Parties').rows[1][3] = '@nightshift_phl, @nightshift_afters, https://www.instagram.com/nightshift_live/';
+  const lookups = h.c.buildLookupMaps_();
+  for (const handle of ['@rainbow_union', 'crew_archive']) {
+    assert.deepEqual(Array.from(h.c.detectIdsByKeywords_(handle, lookups).colls), ['CREW']);
+  }
+  for (const handle of ['@nightshift_phl', 'nightshift_afters', '@nightshift_live']) {
+    assert.equal(h.c.detectIdsByKeywords_(handle, lookups).party, 'NIGHT');
+  }
+  h.sheets.get('Parties').rows[1][3] = '[Unverified Instagram]';
+  assert.equal(h.c.detectIdsByKeywords_('Unverified Instagram', h.c.buildLookupMaps_()).party, '');
+});
+
+test('the collective editor and matcher prefer CollInsta and retain legacy Instagram-only sheets', () => {
+  const h = setup(), sheet = h.sheets.get('Collectives');
+  sheet.rows[0].push('Instagram'); sheet.rows[1].push('@legacy_crew');
+  sheet.rows[1][3] = '@current_crew';
+  const fields = h.c.qdpAdminReadIndexProfile_({kind: 'collective', profileId: 'CREW'}).fields;
+  assert.deepEqual(Array.from(fields.filter(f => f.type === 'instagram'), f => [f.key, f.value]), [['CollInsta', '@current_crew']]);
+  let lookups = h.c.buildLookupMaps_();
+  assert.deepEqual(Array.from(h.c.detectIdsByKeywords_('@current_crew', lookups).colls), ['CREW']);
+  assert.deepEqual(Array.from(h.c.detectIdsByKeywords_('@legacy_crew', lookups).colls), []);
+  sheet.rows[0][3] = 'OldUnusedColumn';
+  const legacy = h.c.qdpAdminReadIndexProfile_({kind: 'collective', profileId: 'CREW'}).fields;
+  assert.equal(legacy.find(f => f.key === 'CollInsta').value, '@legacy_crew');
+  lookups = h.c.buildLookupMaps_();
+  assert.deepEqual(Array.from(h.c.detectIdsByKeywords_('@legacy_crew', lookups).colls), ['CREW']);
+});
+

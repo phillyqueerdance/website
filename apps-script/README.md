@@ -1,5 +1,31 @@
 # QDP public-data publisher, event pages, and profiles
 
+## Collective and Party Instagram matching (v7.4.30)
+
+Replace the separately supplied complete **Core.gs** with v7.4.30, save, and
+update the existing web-app deployment to a new version, retaining its URL and
+access settings. No setup rerun, column migration, or other script replacement
+is required. The source delta is [collective-party-handles.patch](collective-party-handles.patch).
+
+The shared ID matcher now reads `Collectives.CollInsta` and `Parties.PartyInsta`
+alongside names and aliases. Each comma-separated handle is considered
+individually; Instagram profile links are accepted too. Calendar pulls, sheet
+ID detection, imports, and Archive Review all use the shared matcher. Existing
+manual selections, saved rejections, and public profile approvals still apply.
+
+The collective editor uses `CollInsta` for its Instagram field. Older sheets
+with only `Instagram` remain supported for editing and matching; when both
+headers exist, `CollInsta` is authoritative. Keep the renamed `CollAliases`
+header; both it and any existing `Aliases` entries are already supported.
+
+Installing this version does not rewrite saved event IDs. Future pulls and
+scans use the handles; run a normal ID re-detection or review scan when you want
+to check existing records. Publish saved changes through the usual workflow.
+
+Validation: `QDP_CORE_SOURCE=/path/to/Core.gs node --test
+tests/archive-updates.test.mjs tests/archive-backfill.test.mjs
+tests/admin-sync.test.mjs tests/discovery-apps-script.test.mjs`.
+
 ## Automatic discovery feedback through Apps Script (v7.4.29)
 
 The supplied complete **Core.gs v7.4.29** records Admin review choices in a
