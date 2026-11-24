@@ -314,7 +314,7 @@ class Pipeline:
                    'reviewContract': {'postReviews': 'One per new post: key, captionReviewed, flyerOutcome, reviewedSheets, fullResolutionVisuals, acknowledgedUnavailable.',
                     'flyers': 'Verified original visualId plus candidateIndex/correctionIndex, or recoveryId and targetIds from flyerRecovery. Each chosen flyer requires a full-resolution inspection. Recovery only supplies artwork; retain the saved event facts.',
                     'facts': 'Supply edition date, source URLs, aliases and existing EventID when known. Undated leads cannot establish absence.',
-                    'searchReceipts': 'Record every planned query and actual source coverage; missing searches remain incomplete.',
+                    'searchReceipts': 'Record targeted venue fallback queries and actual source coverage; broader discovery, news and mentions belong to the separate daily task.',
                     'venueReviews': 'List source, id, hash for each reviewed new/changed venue entry; do not acknowledge unavailable pages.'}}
         write_json(self.directory / 'ai-review-inputs.json', payload)
 
@@ -593,15 +593,10 @@ def merge_matches(snapshots):
 
 
 def search_plan(venues):
-    # All dance/DJ genres qualify. These queries fill source gaps, not identity-based filters.
-    return [
-        {'id': 'near_term_gaps', 'query': 'Philadelphia DJ dance parties today tomorrow this week', 'purpose': 'Uncovered near-term editions across organizers, RA, ticket and community calendars.'},
-        {'id': 'announcements', 'query': 'Philadelphia DJ dance parties next week new announced', 'purpose': 'Days 8–14 and newly announced later editions; compare only genuine leads.'},
-        {'id': 'venue_policy', 'query': 'Philadelphia nightlife venue opening closure policy news', 'purpose': 'Material new venue/policy changes.'},
-        {'id': 'qdp_mentions', 'query': '"Queer Dance Philly" -site:queerdancephilly.com', 'purpose': 'Independent mentions; separate from event recommendations.'},
-        {'id': 'callaia_melt_mentions', 'query': '"Callaia" OR "Melt" Philadelphia DJ party', 'purpose': 'Independent artist/party mentions; do not repeat owned announcements.'},
-        *[{'id': 'venue_gap_' + key, 'query': (value.get('venue') or key) + ' Philadelphia upcoming DJ events lineup', 'purpose': 'Resolve an unavailable official source using free public evidence.'}
-          for key, value in venues.items() if value.get('status') == 'unavailable']]
+    # Broader discovery, news and mentions run in the separate daily report.
+    return [{'id': 'venue_gap_' + key, 'query': (value.get('venue') or key) + ' Philadelphia upcoming DJ events lineup',
+             'purpose': 'Resolve this unavailable official venue source using free public evidence.'}
+            for key, value in venues.items() if key in ('vals', 'dolphin', 'wow') and value.get('status') == 'unavailable']
 
 
 def main():
@@ -633,3 +628,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

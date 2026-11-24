@@ -148,6 +148,18 @@ class DiscoveryPipelineTest(unittest.TestCase):
         current = {'status': 'collected', 'events': [{'url': 'https://public.example/party', 'status': 'incomplete', 'error': '403'}]}
         result = compare_schedule(current); self.assertEqual(result['entries'][0]['change'], 'unavailable')
         self.assertEqual(len(result['next']['entries']), 0)
+    def test_admin_search_plan_only_resolves_specific_venue_gaps(self):
+        venues = {key: {'venue': name, 'status': 'collected'} for key, name in
+                  [('vals', "Val's"), ('dolphin', 'Dolphin Tavern'), ('wow', 'Warehouse on Watts')]}
+        self.assertEqual(search_plan(venues), [])
+        venues['dolphin']['status'] = 'unavailable'
+        venues['unapproved'] = {'venue': 'Other venue', 'status': 'unavailable'}
+        plan = search_plan(venues)
+        self.assertEqual([query['id'] for query in plan], ['venue_gap_dolphin'])
+        self.assertIn('Dolphin Tavern', plan[0]['query'])
+        venues['vals']['status'] = venues['wow']['status'] = 'unavailable'
+        self.assertEqual({query['id'] for query in search_plan(venues)},
+                         {'venue_gap_vals', 'venue_gap_dolphin', 'venue_gap_wow'})
     def test_journal_recovers_last_committed_generation_after_failed_publish(self):
         endpoint = FakeEndpoint(); pipeline = Pipeline({}, self.directory, 'test', endpoint).load()
         pipeline.data['inputs'] = {'text': 'old' * 40000}; pipeline.save()
@@ -212,3 +224,4 @@ class DiscoveryPipelineTest(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main(verbosity=2)
+
