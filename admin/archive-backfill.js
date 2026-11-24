@@ -480,7 +480,7 @@
     function appendFields(box) {
       const relevant = node('div', 'backfill-recommended-fields');
       const details = node('details', 'backfill-fields');
-      details.open = controls.State.value === 'drafts' && descriptionReady(item);
+      details.open = false;
       details.append(node('summary', '', 'Other event fields'));
       const fields = draft.target.fields.filter(field => field.key !== 'Flyer_URL')
         .map(field => [field.key, field.label || fieldLabels[field.key] || field.key]);
@@ -524,7 +524,7 @@
         row.append(option, values);
         const normalize = value => field.type === 'time' ? String(value || '').replace(/^(\d{2}:\d{2})(?::00)?$/, '$1') : String(value || '').trim();
         const proposed = draft.values[key] || '';
-        const recommended = draft.selected.has(key) ||
+        const recommended = draft.selected.has(key) || (key === 'Description' && descriptionReady(item)) ||
           (Boolean(proposed.trim()) && normalize(proposed) !== normalize(field.value));
         (recommended ? relevant : details).append(row);
       }

@@ -255,8 +255,9 @@ test('the upload confirms success beside the picker and opens the draft with its
   assert.deepEqual(h.requests.map(request => request.action), ['admin.backfill.bootstrap', 'admin.backfill.draftbatch']);
   await h.get('ReviewDrafts').emit('click');
   assert.equal(h.get('State').value, 'drafts');
+  assert.ok(h.find(n => n.className === 'backfill-recommended-fields').length);
   assert.equal(h.find(n => n.tag === 'article').length, 1);
-  assert.equal(h.find(n => n.className === 'backfill-fields')[0].open, true);
+  assert.equal(h.find(n => n.className === 'backfill-fields')[0].open, false);
   const description = h.find(n => n.tag === 'textarea')[0];
   assert.equal(description.value, 'Proposed new description.');
   assert.equal(description.readOnly, true);
