@@ -48,7 +48,7 @@
  <link rel="stylesheet" href="style.css?v=20261007-accessibility-1">
  <link rel="stylesheet" href="poster-theme.css?v=20261007-bubble-links-1">
  <link rel="stylesheet" href="poster-redesign.css?v=20261023-scrolling-back-1">
- <link rel="stylesheet" href="archive.css?v=20261113-directory-tab-gap-1">
+ <link rel="stylesheet" href="archive.css?v=20261126-melt-page-1">
  <link rel="stylesheet" href="scene-map.css?v=20261116-profile-links">
  <link rel="stylesheet" href="mobile.css?v=20261112-discover-menu-motion-1">
  <link rel="stylesheet" href="event-photos.css?v=20261027-mobile-camera-1">
@@ -265,15 +265,28 @@
       The night is what you make it.
     </p>
 
-    <p class="melt-instagram-line">
-      <a href="https://www.instagram.com/melt.phl/" target="_blank" rel="noopener noreferrer">@melt.phl on Instagram</a>
-    </p>
+    <a class="melt-flyer" href="https://ra.co/events/2584254" target="_blank" rel="noopener noreferrer" aria-label="Melt on December 19 — view on Resident Advisor">
+      <img src="melt-2026-12-19.webp" alt="Melt, Saturday December 19, 9 PM–late at Val’s Lesbian Bar. Sounds by doll.redacted, Kuhren the Selector, and Callaia. No cover, 21+." width="1533" height="2000" loading="lazy" decoding="async">
+    </a>
     <section class="event-detail-see-more melt-see-more" aria-labelledby="meltSeeMoreHeading">
       <h3 id="meltSeeMoreHeading">See More</h3>
       <div id="meltArchiveDates" class="event-detail-see-more-links" aria-live="polite">
-        <span>Loading archived dates…</span>
+        <span>Loading dates…</span>
       </div>
     </section>
+    <div class="event-detail-actions melt-actions">
+      <a href="https://www.instagram.com/melt.phl/" target="_blank" rel="noopener noreferrer" aria-label="Melt on Instagram" title="Instagram">
+        <svg class="event-detail-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false">
+          <rect x="3" y="3" width="18" height="18" rx="5"></rect>
+          <circle cx="12" cy="12" r="4.2"></circle>
+          <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"></circle>
+        </svg>
+      </a>
+      <button id="meltShareButton" type="button" aria-label="Share Melt" title="Share">
+        <img class="event-detail-action-icon" src="icons8-ios-share-48.png" alt="">
+      </button>
+      <span id="meltShareStatus" class="event-share-status" role="status"></span>
+    </div>
 
   </div>
 
@@ -1341,8 +1354,8 @@
   <script src="profile-metadata.js?v=20261113-discover-perf-1"></script>
   <script src="event-linking.js?v=20261022-directory-search-1"></script>
   <script src="live-calendar.js?v=20261019-calendar-cutoff-1"></script>
-  <script src="app.js?v=20261120-free-analytics-1"></script>
-  <script src="archive.js?v=20261120-free-analytics-1"></script>
+  <script src="app.js?v=20261126-melt-page-1"></script>
+  <script src="archive.js?v=20261126-melt-page-1"></script>
   <script src="mobile.js?v=20261110-directory-search"></script>
   <script src="menu-pointer-sparkles.js?v=20261002-discover-1"></script>
 

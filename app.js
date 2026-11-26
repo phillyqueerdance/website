@@ -1184,6 +1184,28 @@ async function copyEventLink(url) {
   if (!copied) throw new Error("Clipboard copy failed.");
 }
 
+async function shareMelt(status) {
+  const url = new URL("/#melt", location.origin).href;
+  status.textContent = "";
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "Melt | Queer Dance Philly", url });
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") return;
+    }
+  }
+  try {
+    await copyEventLink(url);
+    status.textContent = "Link copied";
+  } catch {
+    status.textContent = "Could not copy link";
+  }
+  setTimeout(() => {
+    if (status.isConnected) status.textContent = "";
+  }, 2500);
+}
+
 async function shareEvent(event, status) {
   const id = eventIdOf(event);
   if (!id) {
@@ -1997,6 +2019,9 @@ aboutLink.addEventListener("click", event => {
 });
 aboutCloseButton.addEventListener("click", () => infoView.close());
 meltCloseButton.addEventListener("click", () => infoView.close());
+document.getElementById("meltShareButton").addEventListener("click", () => {
+  shareMelt(document.getElementById("meltShareStatus"));
+});
 window.addEventListener("popstate", () => {
   const kind = location.hash.slice(1);
   if (infoViews[kind]) {

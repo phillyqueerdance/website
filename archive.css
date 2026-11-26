@@ -109,7 +109,8 @@
   padding-right: 1.3cqw;
   overflow: auto;
 }
-#aboutDialog .about-dialog-content {
+#aboutDialog .about-dialog-content,
+#meltDialog .about-dialog-content {
   padding-right: 0;
   scrollbar-gutter: stable both-edges;
 }
@@ -129,6 +130,13 @@
 .poster-info-page .about-dialog-close { position: absolute; top: 2cqw; right: 2cqw; z-index: 2; }
 .poster-info-page .melt-dialog-logo { width: min(46cqw, 280px); }
 .poster-info-page .melt-dialog-content { max-height: none; }
+.melt-flyer {
+  display: block;
+  width: min(100%, 420px);
+  margin: 4cqw auto 0;
+}
+.melt-flyer img { display: block; width: 100%; height: auto; }
+.melt-flyer:focus-visible { outline: 2px solid #ffea86; outline-offset: 4px; }
 .melt-see-more { margin: 4cqw 0 0; }
 .info-mode .poster-controls { visibility: hidden; }
 

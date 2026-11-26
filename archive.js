@@ -390,18 +390,21 @@
     const links = document.getElementById("meltArchiveDates");
     if (!links) return;
     links.setAttribute("aria-busy", "true");
-    links.replaceChildren(node("span", "", "Loading archived dates…"));
+    links.replaceChildren(node("span", "", "Loading dates…"));
     try {
       const data = await load("party", "MELT-001");
       if (data.profile?.id !== "MELT-001" || !Array.isArray(data.events)) {
-        throw new Error("Invalid Melt archive");
+        throw new Error("Invalid Melt dates");
       }
       const now = Date.now();
-      const events = sortEvents(data.events.filter(event => {
+      const upcoming = [], past = [];
+      for (const event of sortEvents(data.events.filter(event =>
+        eventIdOf(event) && Number.isFinite(Date.parse(event.start))))) {
         const start = Date.parse(event.start), end = Date.parse(event.end);
         const cutoff = Number.isFinite(end) && end >= start ? end : start;
-        return eventIdOf(event) && Number.isFinite(start) && cutoff < now;
-      })).reverse();
+        (cutoff >= now ? upcoming : past).push(event);
+      }
+      const events = [...upcoming, ...past.reverse()];
       const format = new Intl.DateTimeFormat("en-US", {
         timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric"
       });
@@ -416,11 +419,11 @@
         link.setAttribute("aria-label", `Melt on ${label}`);
         links.appendChild(link);
       }
-      if (!events.length) links.appendChild(node("span", "", "No archived dates yet."));
+      if (!events.length) links.appendChild(node("span", "", "No dates listed yet."));
     } catch {
       const retry = retryButton(loadMeltDates);
       retry.className = "event-detail-related-retry";
-      retry.textContent = "Archived dates unavailable. Try again";
+      retry.textContent = "Dates unavailable. Try again";
       links.replaceChildren(retry);
     } finally {
       links.setAttribute("aria-busy", "false");
