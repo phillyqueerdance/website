@@ -132,7 +132,7 @@
 .poster-info-page .melt-dialog-content { max-height: none; }
 .melt-flyer {
   display: block;
-  width: min(100%, 420px);
+  width: 100%;
   margin: 4cqw auto 0;
 }
 .melt-flyer img { display: block; width: 100%; height: auto; }
