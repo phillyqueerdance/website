@@ -15,6 +15,18 @@ test('new evidence preserves user edits and decisions; unchanged carry-forward i
   await stage(db,[{...candidate({Description:'Updated source copy'}),discovery:first.discovery}]);read=(await listItems(db)).items[0];assert.equal(read.isUpdated,true);assert.equal(read.fields.Description,'My copy');assert.equal(read.decision,'WAIT');
   await assert.rejects(()=>saveItem(db,{id:first.id,version:saved.version,fields:{Description:'Stale'}}),/changed/);
 });
+test('owner-added correction fields persist independently of source recommendations and only selected fields apply',async()=>{
+  const db=sqliteD1();const source={kind:'correction',eventId:'TEST',date:'2099-12-19',
+    fields:candidate().fields,changes:{description:'Recommended copy'}};
+  await stage(db,[source]);const original=(await listItems(db)).items[0];
+  const saved=(await saveItem(db,{id:original.id,version:original.version,decision:'INCLUDE',
+    changes:{Status:'Reviewed','Title (internal)':'Owner title'},selectedFields:['Status']})).item;
+  assert.equal(saved.changes.Status,'Reviewed');assert.equal(saved.changes['Title (internal)'],'Owner title');
+  assert.deepEqual(saved.selectedFields,['Status']);assert.deepEqual(saved.recommendedFields,['description']);
+  await stage(db,[{...source,discovery:original.discovery}]);const read=(await listItems(db)).items[0];
+  assert.equal(read.changes.Status,'Reviewed');assert.deepEqual(read.recommendedFields,['description']);
+  await assert.rejects(()=>saveItem(db,{id:read.id,version:read.version,changes:{CalendarEventId:'replace'}}),/Invalid correction field/);
+});
 test('Exclude survives later staging; Wait restores the edition; different dates remain separate',async()=>{
   const db=sqliteD1(),first=await item(db);await saveItem(db,{id:first.id,version:first.version,decision:'EXCLUDE'});
   await stage(db,[candidate()]);assert.equal((await listItems(db)).total,0);const excluded=(await listItems(db,{view:'excluded'})).items[0];

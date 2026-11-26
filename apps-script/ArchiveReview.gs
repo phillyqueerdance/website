@@ -1,5 +1,5 @@
 /**
- * Queer Dance Philly — Archive Updates v7.4.25
+ * Queer Dance Philly — Archive Updates v7.4.26
  * ArchiveReview.gs: Archive ID review, Admin Archive Updates, saved rejects,
  * approvals, resumable jobs, and artist-indicator recalculation.
  * Install with Core.gs and Imports.gs v7.4.24; keep PublicData.gs v7.4.22.
@@ -1434,6 +1434,7 @@ function qdpArchiveAdminEventFields_(target) {
     [['Title (internal)', 'Title'], 'Title', 'Event', 'text', 500],
     [['Title_Public (auto w/ emojis)', 'Title Public (auto w/ emojis)', 'Title_Public'], 'Public title', 'Event', 'text', 500],
     [['Description'], 'Description', 'Event', 'long', 50000],
+    [['Lineup_Raw'], 'Raw lineup', 'Associations', 'long', 40000],
     [['Status'], 'Status', 'Event', 'text', 100],
     [['StartDate', 'Start Date'], 'Start date', 'Date and time', 'date', 10],
     [['StartTime', 'Start Time'], 'Start time', 'Date and time', 'time', 20],

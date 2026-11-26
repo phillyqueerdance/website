@@ -90,6 +90,29 @@ test('current and recommended fields load automatically in one read without savi
   assert.match(media.children[1].textContent,/QDP listing/);
   assert.equal(h.elements.get('items').hidden,false);
 });
+test('other correction fields expand from current values and save without promoting them to recommendations',async()=>{
+  const listing={...current,fields:{...current.fields,Status:'Draft','Title (internal)':'Current title'},
+    editableFields:[{key:'description',label:'Description',type:'long'},{key:'lineup',label:'Raw lineup',type:'long'},
+      {key:'Status',label:'Status',type:'text'},{key:'Title (internal)',label:'Title',type:'text'}]};
+  const h=setup([correction({changes:{description:'Recommended copy'},recommendedFields:['description']})],{listings:[listing]});await h.settle();
+  const details=h.find(n=>n.tagName==='DETAILS'&&n.children[0]?.textContent==='Other event fields')[0];
+  assert.equal(Boolean(details.open),false);
+  assert.ok(h.walk(details).some(n=>n.attributes['aria-label']==='Proposed Status · A night together'));
+  const input=h.field('Proposed Status · A night together');assert.equal(input.value,'Draft');
+  assert.equal(h.state.records[0].changes.Status,undefined);
+  input.value='Reviewed';await input.emit('input');
+  const check=h.field('Apply Status · A night together');check.checked=true;await check.emit('change');await h.settle();
+  await h.button('Include').emit('click');await h.settle();
+  const saved=h.requests.filter(r=>r.action==='save').at(-1);
+  assert.equal(saved.changes.Status,'Reviewed');assert.deepEqual(saved.selectedFields,['Status']);
+  assert.equal(saved.baseline.fields.Status,'Draft');assert.deepEqual(h.state.records[0].recommendedFields,['description']);
+});
+test('a previously saved manual multiline field remains a textarea when reopening the correction',async()=>{
+  const photos='https://images.example/one.jpg\nhttps://images.example/two.jpg';
+  const h=setup([correction({changes:{description:'Recommended copy',PhotoURLs:photos},recommendedFields:['description']})]);await h.settle();
+  const input=h.field('Proposed PhotoURLs · A night together');
+  assert.equal(input.tagName,'TEXTAREA');assert.equal(input.value,photos);
+});
 test('Include, Wait and Exclude show immediate saving feedback, confirmed state and selection counts',async()=>{
   const hold=gate(),h=setup([candidate()],{saveGate:hold});await h.settle();
   const include=h.button('Include'),pending=include.emit('click');await h.settle();

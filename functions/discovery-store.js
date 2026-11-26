@@ -2,6 +2,11 @@ import { discoveryIdentity, validateIdentity, digest } from '../shared/discovery
 
 export const TASK_ACTIONS = new Set(['bootstrap','items','stage','posts.read','posts.save','checkpoint','run.read','run.save','budget.reserve','snapshot','flyers']);
 export const DAY_LIMIT = 0.59;
+export const CORRECTION_FIELDS = Object.freeze(['description','lineup','start','end','flyer',
+  'Title (internal)','Title_Public (auto w/ emojis)','Status','Timezone','VenueID','Location',
+  'Address (from Venue)','Neighborhood (from Venue)','ArtistIDs (comma-separated)',
+  'HostCollectiveIDs (comma-separated)','PartyID','ExplicitQueer (Yes/No)','Publish_To_Web',
+  'Event_URL','Ticket_URL','Source_URL','Instagram_URL','RawFlyerURL','PhotoURLs']);
 const parse = (s, fallback = {}) => { try { return JSON.parse(s); } catch { return fallback; } };
 export const now = () => new Date().toISOString();
 export const today = () => new Intl.DateTimeFormat('en-CA', {timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -26,6 +31,7 @@ export function record(row) {
   const source = parse(row.data), edits = parse(row.edits);
   return {...source, id:row.id, kind:row.kind, date:row.date,
     fields:{...source.fields,...edits.fields}, changes:{...source.changes,...edits.changes},
+    recommendedFields:Object.keys(source.changes || {}),
     selectedFields:edits.selectedFields || source.selectedFields || [],baseline:edits.baseline || source.baseline,
     decision:row.decision,status:row.status,version:row.version,
     isNew:!!row.is_new,isUpdated:!!row.is_updated,result:parse(row.result),error:row.error,
@@ -48,7 +54,9 @@ export function cleanFields(raw) {
   if (!raw || typeof raw!=='object' || Array.isArray(raw)) throw new Error('Event fields are required.');
   const allowed=['Title (internal)','StartDate','EndDate','StartTime','EndTime','Timezone','ExplicitQueer (Yes/No)',
     'Location','Description','Lineup_Raw','RawFlyerURL','Flyer_URL','Event_URL','Instagram_URL','Review_notes',
-    'VenueID','ArtistIDs (comma-separated)','PartyID','HostCollectiveIDs (comma-separated)'];
+    'VenueID','ArtistIDs (comma-separated)','PartyID','HostCollectiveIDs (comma-separated)',
+    'Title_Public (auto w/ emojis)','Status','Address (from Venue)','Neighborhood (from Venue)',
+    'Publish_To_Web','Ticket_URL','Source_URL','PhotoURLs'];
   const out={};
   for(const key of allowed) if(raw[key]!=null) {
     if(typeof raw[key]!=='string'||raw[key].length>50000) throw new Error('Invalid '+key+'.');
@@ -62,7 +70,7 @@ export async function normalizeItem(raw) {
   if(date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Use an ISO event date.');
   const changes={};
   for(const [key,value] of Object.entries(raw.changes||{})) {
-    if(!['description','lineup','start','end','flyer'].includes(key)||typeof value!=='string'||value.length>50000) throw new Error('Invalid correction field.');
+    if(!CORRECTION_FIELDS.includes(key)||typeof value!=='string'||value.length>50000) throw new Error('Invalid correction field.');
     changes[key]=value;
   }
   let identity;
@@ -135,7 +143,7 @@ export async function saveItem(db,body) {
   if(['accepted','imported','existing','importing','ready'].includes(row.status)||parse(row.result).sheetSaved) throw new Error('This proposal has already begun importing. Edit its existing Events record or retry its remaining steps.');
   const fields=cleanFields(body.fields||{}),current=record(row),changes={...current.changes};
   for(const [key,value] of Object.entries(body.changes||{})) {
-    if(!['description','lineup','start','end','flyer'].includes(key)||typeof value!=='string'||value.length>50000)throw new Error('Invalid correction field.');
+    if(!CORRECTION_FIELDS.includes(key)||typeof value!=='string'||value.length>50000)throw new Error('Invalid correction field.');
     changes[key]=value;
   }
   const decision=body.decision||current.decision;

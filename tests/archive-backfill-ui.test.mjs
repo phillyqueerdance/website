@@ -9,7 +9,7 @@ const busyMessage = 'Another QDP save or sync is running. Your changes have not 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, flyerReadOnly = false,
-  omitFlyer = false, descriptionRequests = []} = {}) {
+  omitFlyer = false, descriptionRequests = [], extraFields = [], proposalFields = {}} = {}) {
   class Element {
     constructor(tag) {
       Object.assign(this, {tag, children: [], listeners: {}, value: '', attributes: {}, checked: false,
@@ -36,6 +36,7 @@ function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, f
     const target = {sheet, eventId, revision: 'event-r1', title: 'Current event ' + i, fields: [
       {key: 'Title (internal)', value: 'Current event ' + i},
       {key: 'Description', value: 'Existing description'},
+      ...extraFields,
       ...(!omitFlyer ? [{key: 'Flyer_URL', value: '', readOnly: flyerReadOnly}] : [])
     ]};
     records.targets[JSON.stringify([sheet, eventId])] = target;
@@ -43,7 +44,7 @@ function setup({count = 1, failKey = '', ingestErrors = [], unmatched = false, f
       url: 'https://www.instagram.com/p/Example/', caption: 'Original caption',
       media: [{id: postId, order: 1, url: 'https://images.example/source.jpg', savedUrl: ''}]};
     records.items.push({key: 'candidate:' + i, revision: 'r1', runId: '2025', indexSignature: 'index-r1',
-      fields: {'Title (internal)': 'Proposed event ' + i, Description: ''},
+      fields: {'Title (internal)': 'Proposed event ' + i, Description: '', ...proposalFields},
       state: awaitingDescription ? 'confirmed' : 'pending', selectedFields: awaitingDescription ? ['Description'] : [],
       targetSheet: awaitingDescription ? sheet : '', targetEventId: awaitingDescription ? eventId : '',
       draftDescription: '', visual: {status: 'inspected'},
@@ -122,6 +123,22 @@ test('reviewing across pages queues match and flyer selections locally and saves
   assert.ok(changes.every(change => change.flyer.postKey && change.selectedFields.join(',') === 'Flyer_URL'));
   assert.equal(h.get('Publish').hidden, false);
   assert.equal(h.get('Save').disabled, true);
+});
+test('recommended lineups stay in front while unrequested event fields expand and save independently',async()=>{
+  const h=setup({extraFields:[{key:'Lineup_Raw',label:'Raw lineup',type:'long',value:'Old names'},
+    {key:'Status',label:'Status',value:'Draft'}],proposalFields:{Lineup_Raw:'New names'}});
+  await settle();
+  const all=root=>root.children.flatMap(child=>[child,...all(child)]);
+  const relevant=h.find(n=>n.className==='backfill-recommended-fields')[0];
+  const other=h.find(n=>n.className==='backfill-fields')[0];
+  assert.equal(Boolean(other.open),false);assert.equal(other.children[0].textContent,'Other event fields');
+  assert.ok(all(relevant).some(n=>n.attributes['aria-label']==='Raw lineup proposal'));
+  assert.ok(!all(relevant).some(n=>n.attributes['aria-label']==='Status proposal'));
+  const input=all(other).find(n=>n.attributes['aria-label']==='Status proposal');assert.equal(input.value,'Draft');
+  input.value='Reviewed';await input.emit('input');
+  const check=all(other).find(n=>n.attributes['aria-label']==='Apply Status');check.checked=true;await check.emit('change');
+  await h.get('Save').emit('click');const saved=h.requests.at(-1).body.changes[0];
+  assert.deepEqual(saved.selectedFields,['Status']);assert.deepEqual(saved.fields,{Status:'Reviewed'});
 });
 
 test('choosing a different suggested record and dismissing another proposal are local decisions', async () => {
@@ -205,7 +222,7 @@ test('an unmatched proposal explains why approval is unavailable and enables it 
   const hint = h.find(element => element.className === 'backfill-meta backfill-flyer-availability')[0];
   assert.equal(hint.hidden, false);
   assert.match(hint.textContent, /Choose an archive event/);
-  const search = h.find(element => element.tag === 'input' && element.placeholder === 'Search 2025 archive events')[0];
+  const search = h.find(element => element.tag === 'input' && element.placeholder === 'Search archive events')[0];
   search.value = 'EV-1';
   await h.buttons('Find archive event')[0].emit('click');
   await h.find(element => element.className === 'backfill-match')[0].emit('click');
@@ -238,8 +255,9 @@ test('the upload confirms success beside the picker and opens the draft with its
   assert.deepEqual(h.requests.map(request => request.action), ['admin.backfill.bootstrap', 'admin.backfill.draftbatch']);
   await h.get('ReviewDrafts').emit('click');
   assert.equal(h.get('State').value, 'drafts');
+  assert.ok(h.find(n => n.className === 'backfill-recommended-fields').length);
   assert.equal(h.find(n => n.tag === 'article').length, 1);
-  assert.equal(h.find(n => n.className === 'backfill-fields')[0].open, true);
+  assert.equal(h.find(n => n.className === 'backfill-fields')[0].open, false);
   const description = h.find(n => n.tag === 'textarea')[0];
   assert.equal(description.value, 'Proposed new description.');
   assert.equal(description.readOnly, true);

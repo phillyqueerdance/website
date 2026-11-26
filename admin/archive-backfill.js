@@ -18,6 +18,7 @@
     StartTime: 'Start time', EndTime: 'End time', Timezone: 'Time zone',
     'ExplicitQueer (Yes/No)': 'Explicitly queer', VenueID: 'Venue ID',
     'ArtistIDs (comma-separated)': 'Artist IDs', PartyID: 'Party ID',
+    Lineup_Raw: 'Raw lineup',
     'HostCollectiveIDs (comma-separated)': 'Collective IDs', Description: 'Update description',
     Event_URL: 'Event link', Instagram_URL: 'Instagram link', RawFlyerURL: 'Source flyer link'
   };
@@ -95,11 +96,14 @@
 
   function draftFor(item) {
     if (!state.drafts.has(item.key)) {
+      const target = targetFor(item);
+      const values = Object.fromEntries((target?.fields || []).map(field => [field.key, field.value]));
+      for (const [key, value] of Object.entries(item.fields)) if (String(value || '').trim()) values[key] = value;
       state.drafts.set(item.key, {
         key: item.key, revision: item.revision, indexSignature: item.indexSignature,
-        state: item.state, target: targetFor(item),
+        state: item.state, target,
         selected: new Set(item.selectedFields.filter(key => key !== 'Description' || !item.draftDescription)),
-        values: {...item.fields, Description: item.draftDescription}, dirty: false,
+        values: {...values, Description: item.draftDescription}, dirty: false,
         flyer: null, slide: 0, stale: false
       });
     }
@@ -167,13 +171,14 @@
       const wrap = node('div', 'backfill-coverage-wrap');
       const table = node('table', 'backfill-coverage-table');
       const header = node('tr');
-      for (const label of ['Account', 'Posts returned', 'Posted in 2025', 'Oldest post', 'Coverage note']) {
+      for (const label of ['Account', 'Posts returned', 'Event year(s)', 'Oldest post', 'Coverage note']) {
         header.append(node('th', '', label));
       }
       table.append(header);
       for (const account of run.coverage.accounts || []) {
         const row = node('tr');
-        for (const value of [account.account, account.posts, account.posts2025, account.oldest, account.note]) {
+        const years = (run.coverage.eventYears || [run.coverage.eventYear]).filter(Boolean).join(', ');
+        for (const value of [account.account, account.posts, years, account.oldest, account.note]) {
           row.append(node('td', '', String(value ?? '')));
         }
         table.append(row);
@@ -415,6 +420,9 @@
       for (const key of draft.selected) {
         if (!target.fields.some(field => field.key === key && !field.readOnly)) draft.selected.delete(key);
       }
+      for (const field of target.fields) {
+        if (field.key !== 'Description' && !draft.selected.has(field.key) && !String(item.fields[field.key] || '').trim()) draft.values[field.key] = field.value;
+      }
       queue(item, draft, 'confirmed');
       showTarget();
       showSlide();
@@ -438,7 +446,7 @@
       const form = node('div', 'backfill-manual');
       const query = node('input');
       query.type = 'search';
-      query.placeholder = 'Search 2025 archive events';
+      query.placeholder = 'Search archive events';
       query.maxLength = 250;
       const results = node('div');
       const search = button('Find archive event', async () => {
@@ -457,7 +465,7 @@
             results.append(button(target.title + ' · ' + date + ' · ' + target.eventId,
               () => selectTarget(target), 'backfill-match'));
           }
-          if (!results.childNodes.length) results.append(node('p', '', 'No 2025 archive event matched.'));
+          if (!results.childNodes.length) results.append(node('p', '', 'No archive event matched.'));
         } catch (error) {
           api.message(rowMessage, error.message, true);
         } finally {
@@ -470,10 +478,12 @@
     }
 
     function appendFields(box) {
+      const relevant = node('div', 'backfill-recommended-fields');
       const details = node('details', 'backfill-fields');
-      details.open = controls.State.value === 'drafts' && descriptionReady(item);
-      details.append(node('summary', '', 'Edit event details and description'));
-      const fields = Object.entries(fieldLabels);
+      details.open = false;
+      details.append(node('summary', '', 'Other event fields'));
+      const fields = draft.target.fields.filter(field => field.key !== 'Flyer_URL')
+        .map(field => [field.key, field.label || fieldLabels[field.key] || field.key]);
       if (details.open) fields.sort(([a], [b]) => (b === 'Description') - (a === 'Description'));
       for (const [key, label] of fields) {
         const field = draft.target.fields.find(field => field.key === key);
@@ -482,10 +492,11 @@
         const option = node('label', 'backfill-choice');
         const check = node('input');
         check.type = 'checkbox';
+        check.setAttribute('aria-label', 'Apply ' + label);
         check.checked = draft.selected.has(key);
         option.append(check, node('span', '', label));
         const values = node('div');
-        const input = node(key === 'Description' ? 'textarea' : 'input');
+        const input = node(field.type === 'long' || ['Description', 'Lineup_Raw'].includes(key) ? 'textarea' : 'input');
         input.value = draft.values[key] || '';
         input.maxLength = field.maxLength || 40000;
         if (['date', 'time', 'url'].includes(field.type)) input.type = field.type;
@@ -511,8 +522,13 @@
         syncInput();
         values.append(node('p', 'backfill-before', 'Current: ' + (field.value || '(blank)')), input);
         row.append(option, values);
-        details.append(row);
+        const normalize = value => field.type === 'time' ? String(value || '').replace(/^(\d{2}:\d{2})(?::00)?$/, '$1') : String(value || '').trim();
+        const proposed = draft.values[key] || '';
+        const recommended = draft.selected.has(key) || (key === 'Description' && descriptionReady(item)) ||
+          (Boolean(proposed.trim()) && normalize(proposed) !== normalize(field.value));
+        (recommended ? relevant : details).append(row);
       }
+      if (relevant.childNodes.length) box.append(relevant);
       box.append(details);
     }
 

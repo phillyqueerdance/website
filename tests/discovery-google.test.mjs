@@ -1,12 +1,13 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';import {createHash} from 'node:crypto';
 const gs=fs.readFileSync(new URL('../apps-script/DiscoveryInbox.gs',import.meta.url),'utf8');
-const headers=['EventID','Title (internal)','StartDate','StartTime','EndDate','EndTime','Timezone','Description','VenueID','ArtistIDs (comma-separated)','HostCollectiveIDs (comma-separated)','PartyID','ExplicitQueer (Yes/No)','Flyer_URL','Event_URL','Location','Publish_To_Web','LastEditedAt','CalendarEventId','LastSyncedAt','CalendarUpdatedAt','SyncNotes','ImportSourceKey','ImportSourceSnapshot','CalendarCreateId','Lineup_Raw'];
+const headers=['EventID','Title (internal)','StartDate','StartTime','EndDate','EndTime','Timezone','Description','VenueID','ArtistIDs (comma-separated)','HostCollectiveIDs (comma-separated)','PartyID','ExplicitQueer (Yes/No)','Flyer_URL','Event_URL','Location','Publish_To_Web','LastEditedAt','CalendarEventId','LastSyncedAt','CalendarUpdatedAt','SyncNotes','ImportSourceKey','ImportSourceSnapshot','CalendarCreateId','Lineup_Raw','Status','Ticket_URL'];
 const aliases={eventId:'EventID',title:'Title (internal)',startDate:'StartDate',startTime:'StartTime',endDate:'EndDate',endTime:'EndTime',timezone:'Timezone',description:'Description',venue:'VenueID',artists:'ArtistIDs (comma-separated)',colls:'HostCollectiveIDs (comma-separated)',party:'PartyID',explicit:'ExplicitQueer (Yes/No)',flyer:'Flyer_URL',url:'Event_URL',location:'Location',publish:'Publish_To_Web',edited:'LastEditedAt',calId:'CalendarEventId',synced:'LastSyncedAt',calUpdated:'CalendarUpdatedAt',notes:'SyncNotes',sourceKey:'ImportSourceKey',snapshot:'ImportSourceSnapshot',createId:'CalendarCreateId'};
 function fixture(){
+  const formulas=new Map();
   const rows=[],calendar=new Map(),receipts=new Map(),calls={inserts:0,patches:0,writes:0,downloads:0,calendarBatches:0,appends:0,lists:0};let loseResponse=false;
   const c=Object.fromEntries(Object.entries(aliases).map(([k,v])=>[k,headers.indexOf(v)]));
   const sheet={getName:()=> 'Events',getParent:()=>ss,getLastRow:()=>rows.length+1,getLastColumn:()=>headers.length,getSheetId:()=>1,
-    getRange(row,col,height=1,width=1){return {getValues(){return row===1?[headers.slice(col-1,col-1+width)]:rows.slice(row-2,row-2+height).map(r=>r.slice(col-1,col-1+width));},getFormulas:()=>Array.from({length:height},()=>Array(width).fill(''))};}};
+    getRange(row,col,height=1,width=1){return {getValues(){return row===1?[headers.slice(col-1,col-1+width)]:rows.slice(row-2,row-2+height).map(r=>r.slice(col-1,col-1+width));},getFormulas:()=>Array.from({length:height},(_,i)=>Array.from({length:width},(_,j)=>formulas.get((row+i)+':'+(col+j))||''))};}};
   const receiptSheet={getLastRow:()=>receipts.size+1,getRange(row){return{setValues(values){receipts.set(values[0][0],{number:row,value:JSON.parse(values[0][1])});}};}};
   const ss={getSpreadsheetTimeZone:()=> 'America/New_York',getSheets:()=>[sheet],getId:()=> 'fixture',getSheetByName:()=>null};
   const table=()=>({sheet,headers,col:c,rows:rows.map(r=>r.slice())});
@@ -28,7 +29,7 @@ function fixture(){
     qdpApifyCorrectionTime_:s=>s,qdpApifyCorrectionReadCalendar_:id=>structuredClone(calendar.get(id)),qdpApifyCorrectionCheckRange_:(start,end)=>{if(Date.parse(end)<=Date.parse(start))throw new Error('Invalid range');},
     sheetValuesEqual_:(a,b)=>a instanceof Date&&b instanceof Date?+a===+b:a===b,qdpApplyEventSaveRules_:row=>({row}),
     qviSetRow_:(sh,n,row,original)=>{if(JSON.stringify(rows[n-2])!==JSON.stringify(original))throw new Error('The row changed');rows[n-2]=row.slice();calls.writes++;},
-    qviCalendarBody_:(draft,row,col,lookups,id)=>({id,summary:draft.title,description:draft.description,start:{dateTime:draft.start.toISOString()},end:{dateTime:draft.end.toISOString()},extendedProperties:{private:{qdpEventId:read(row,col,'eventId'),qdpSpreadsheet:ss.getId()}}}),
+    qviCalendarBody_:(draft,row,col,lookups,id)=>({id,summary:draft.title,description:draft.description,location:draft.location||'',start:{dateTime:draft.start.toISOString()},end:{dateTime:draft.end.toISOString()},extendedProperties:{private:{qdpEventId:read(row,col,'eventId'),qdpSpreadsheet:ss.getId()}}}),
     qviOwnCalendarEvent_:(event,body)=>{assert.equal(event.extendedProperties?.private.qdpEventId,body.extendedProperties.private.qdpEventId);assert.equal(event.extendedProperties?.private.qdpSpreadsheet,body.extendedProperties.private.qdpSpreadsheet);return event;},
     qviCreateCalendar_:body=>{if(calendar.has(body.id))return{event:calendar.get(body.id),recovered:true};calls.inserts++;calendar.set(body.id,{...body,etag:'etag'});if(loseResponse){loseResponse=false;throw new Error('Lost response after Calendar insert');}return{event:calendar.get(body.id),recovered:false};},
     Calendar:{Events:{list:()=>{calls.lists++;return{items:[]};},get:(cal,id)=>{if(!calendar.has(id))throw new Error('404 not found');return structuredClone(calendar.get(id));},patch:(patch,cal,id,options,conditions)=>{calls.patches++;const event=calendar.get(id);if(event.etag!==conditions['If-Match'])throw new Error('412');Object.assign(event,patch);}}},
@@ -39,7 +40,16 @@ function fixture(){
   vm.runInContext(gs,context);
   context.qdpInboxFlyer_=()=>{calls.downloads++;return{url:'https://drive.google.com/uc?id=owned-flyer'};};
   context.qdpInboxCell_=(header,value)=>({raw:value});context.qdpInboxReceipts_=()=>({sheet:receiptSheet,rows:receipts});
-  return {context,rows,c,calendar,calls,table,loseNextResponse(){loseResponse=true;}};
+  function enableEditor(){
+    vm.runInContext(fs.readFileSync(new URL('../apps-script/ArchiveReview.gs',import.meta.url),'utf8'),context);
+    context.qdpArchiveLayout_=(sheet,headers)=>({name:'Events',headers,width:headers.length,columns:{eventId:c.eventId+1,title:c.title+1,start:c.startDate+1,venue:c.venue+1}});
+    context.qdpArchiveDigest_=hash;context.qdpArchiveLookups_=()=>({core:{}});
+    context.qdpArchiveLink_=value=>/^https?:\/\//.test(value)?value:'';
+    context.qdpArchiveIds_=value=>String(value||'').split(',').map(v=>v.trim()).filter(Boolean);
+    context.qdpValidateReferences_=ids=>ids;
+    context.qdpApplyEventSaveRules_=(row,headers,lookups,options)=>({row,updates:new Map(row.flatMap((value,i)=>value!==options.original[i]?[[i+1,value]]:[]))});
+  }
+  return {context,rows,c,calendar,calls,table,formulas,enableEditor,loseNextResponse(){loseResponse=true;}};
 }
 const proposal=id=>({id:id.repeat(64),kind:'event',fields:{'Title (internal)':'Fixture party',StartDate:'2099-12-19',StartTime:'21:00',EndDate:'2099-12-20',EndTime:'02:00',Timezone:'America/New_York',Description:'Copy',Location:'Fixture venue',Lineup_Raw:'Named artist',RawFlyerURL:'https://images.example/flyer.jpg'}});
 test('an interrupted Google import reuses its saved Events row and Calendar retry identity',()=>{
@@ -62,6 +72,65 @@ test('lineup-only corrections update the sheet without Calendar reads or writes 
   const f=fixture();f.context.qdpInboxImport_([proposal('a')]);const before=f.context.qdpInboxEvent_(f.table(),f.rows[0]);f.context.qdpApifyCorrectionReadCalendar_=()=>{throw new Error('Lineup must not access Calendar');};
   const item={id:'c'.repeat(64),kind:'correction',eventId:before.eventId,changes:{lineup:'New named artist'},baseline:before};
   f.context.qdpInboxCorrect_(item,f.table());f.context.qdpInboxCorrect_(item,f.table());assert.equal(f.rows[0][headers.indexOf('Lineup_Raw')],'New named artist');assert.equal(f.calls.patches,0);
+});
+test('unrecommended event fields validate and persist, and a title edit updates only Calendar summary',()=>{
+  const f=fixture();f.enableEditor();f.context.qdpInboxImport_([proposal('a')]);
+  const before=f.context.qdpInboxEvent_(f.table(),f.rows[0],f.calendar),cal=structuredClone(f.calendar.get(before.calendarId));
+  assert.ok(before.editableFields.some(field=>field.key==='Status'));
+  const item={id:'e'.repeat(64),eventId:before.eventId,changes:{'Title (internal)':'Owner edited title',Status:'Reviewed'},baseline:before};
+  const saved=f.context.qdpInboxCorrect_(item,f.table());assert.equal(saved.error,undefined);
+  assert.equal(f.rows[0][f.c.title],'Owner edited title');assert.equal(f.rows[0][headers.indexOf('Status')],'Reviewed');
+  const live=f.calendar.get(before.calendarId);assert.equal(live.summary,'Owner edited title');assert.equal(live.description,cal.description);
+  assert.deepEqual(live.start,cal.start);assert.equal(f.calls.patches,1);
+  f.context.qdpInboxCorrect_(item,f.table());assert.equal(f.calls.patches,1);
+});
+test('manual sheet-only fields do not require Calendar, and bad links or stale field values write nothing',()=>{
+  const f=fixture();f.enableEditor();f.context.qdpInboxImport_([proposal('a')]);
+  const before=f.context.qdpInboxEvent_(f.table(),f.rows[0],f.calendar),writes=f.calls.writes;
+  assert.throws(()=>f.context.qdpInboxCorrect_({id:'e'.repeat(64),eventId:before.eventId,changes:{Ticket_URL:'javascript:bad'},baseline:before},f.table()),/HTTP or HTTPS/);
+  assert.equal(f.calls.writes,writes);
+  f.context.qdpApifyCorrectionReadCalendar_=()=>{throw new Error('A sheet-only edit must not read Calendar');};
+  f.context.qdpInboxCorrect_({id:'f'.repeat(64),eventId:before.eventId,changes:{Status:'Reviewed'},baseline:before},f.table());
+  assert.equal(f.rows[0][headers.indexOf('Status')],'Reviewed');assert.equal(f.calls.patches,0);
+  const savedWrites=f.calls.writes;
+  assert.throws(()=>f.context.qdpInboxCorrect_({id:'g'.repeat(64),eventId:before.eventId,changes:{Status:'Other'},baseline:before},f.table()),/changed since review/);
+  assert.equal(f.calls.writes,savedWrites);
+});
+test('manual corrections keep the saved Calendar plan across a partial failure and preserve unrelated later edits',()=>{
+  const f=fixture();f.enableEditor();f.context.qdpInboxImport_([proposal('a')]);const before=f.context.qdpInboxEvent_(f.table(),f.rows[0],f.calendar);
+  const item={id:'h'.repeat(64),eventId:before.eventId,changes:{'Title (internal)':'Revised title',description:'Revised copy'},baseline:before};
+  const patch=f.context.Calendar.Events.patch;f.context.Calendar.Events.patch=()=>{throw new Error('Calendar unavailable');};
+  const first=f.context.qdpInboxCorrect_(item,f.table());assert.equal(first.sheetSaved,true);assert.match(first.error,/Calendar unavailable/);
+  f.rows[0][headers.indexOf('Status')]='Separate later edit';f.context.Calendar.Events.patch=patch;
+  assert.equal(f.context.qdpInboxCorrect_(item,f.table()).error,undefined);
+  assert.equal(f.calendar.get(before.calendarId).summary,'Revised title');assert.equal(f.calendar.get(before.calendarId).description,'Revised copy');
+  assert.equal(f.rows[0][headers.indexOf('Status')],'Separate later edit');
+});
+test('mixed manual and description corrections preserve the existing Calendar metadata footer',()=>{
+  const f=fixture();f.enableEditor();f.context.qdpInboxImport_([proposal('a')]);
+  f.context.stripAllQdpMetadata_=value=>String(value).replace(/\n\n\[QDP metadata\]$/,'');
+  const id=f.rows[0][f.c.calId];f.calendar.get(id).description='Copy\n\n[QDP metadata]';
+  const before=f.context.qdpInboxEvent_(f.table(),f.rows[0],f.calendar);
+  const saved=f.context.qdpInboxCorrect_({id:'k'.repeat(64),eventId:before.eventId,changes:{Status:'Reviewed',description:'New copy'},baseline:before},f.table());
+  assert.equal(saved.error,undefined);assert.equal(f.calendar.get(id).description,'New copy\n\n[QDP metadata]');
+});
+test('an explicitness edit can clear the prior derived Calendar color with a null patch',()=>{
+  const f=fixture();f.enableEditor();f.context.qdpInboxImport_([proposal('a')]);
+  const body=f.context.qviCalendarBody_;
+  f.context.qviCalendarBody_=(draft,row,col,lookups,id)=>({...body(draft,row,col,lookups,id),colorId:row[col.explicit]==='Yes'?'3':undefined});
+  f.rows[0][f.c.explicit]='Yes';const id=f.rows[0][f.c.calId];f.calendar.get(id).colorId='3';
+  const before=f.context.qdpInboxEvent_(f.table(),f.rows[0],f.calendar);
+  const saved=f.context.qdpInboxCorrect_({id:'l'.repeat(64),eventId:before.eventId,changes:{'ExplicitQueer (Yes/No)':'No'},baseline:before},f.table());
+  assert.equal(saved.error,undefined);assert.equal(f.calendar.get(id).colorId,null);
+});
+test('new correction fields protect formulas, require their current baseline and recheck Calendar before writing',()=>{
+  const f=fixture();f.enableEditor();f.context.qdpInboxImport_([proposal('a')]);const before=f.context.qdpInboxEvent_(f.table(),f.rows[0],f.calendar),writes=f.calls.writes;
+  f.formulas.set('2:'+(headers.indexOf('Status')+1),'=A1');
+  assert.throws(()=>f.context.qdpInboxCorrect_({id:'i'.repeat(64),eventId:before.eventId,changes:{Status:'Overwrite'},baseline:before},f.table()),/cannot be edited/);
+  assert.equal(f.calls.writes,writes);
+  f.calendar.get(before.calendarId).summary='Changed in Calendar';
+  assert.throws(()=>f.context.qdpInboxCorrect_({id:'j'.repeat(64),eventId:before.eventId,changes:{'Title (internal)':'Overwrite'},baseline:before},f.table()),/Calendar changed/);
+  assert.equal(f.calls.writes,writes);
 });
 test('a Calendar correction failure retains the confirmed sheet receipt and recovers on retry',()=>{
   const f=fixture();f.context.qdpInboxImport_([proposal('a')]);const before=f.context.qdpInboxEvent_(f.table(),f.rows[0],f.calendar);

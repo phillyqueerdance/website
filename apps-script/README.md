@@ -57,7 +57,22 @@ detects an older deployment, instead of submitting another queued operation.
 Validation: `QDP_CORE_SOURCE=/path/to/Core.gs node --test
 tests/admin-sync.test.mjs tests/admin-bulk.test.mjs tests/admin-bulk-api.test.mjs`.
 
-## Admin Archive Backfill (2025 pilot)
+## Admin Archive Backfill (all archive years)
+
+**Years and event fields (v1.2.0).** Replace **ArchiveBackfill.gs** and
+**ArchiveReview.gs v7.4.26**, then update the existing web-app deployment.
+Valid full dates from any year can be imported, matched and applied to an
+archived event. Active Events rows remain outside Backfill. Existing 2025
+collections remain compatible; the own-account 2026 collection can now be
+imported too, including the file originally labelled PENDING_YEAR_SUPPORT.
+
+**Lineup_Raw** is an explicitly selectable multiline field. Relevant proposals
+stay in front; **Other event fields** expands the rest of the event editor's
+editable fields, prefilled from the current event. A missing historical
+Lineup_Raw column is previewed without writing and added when an approved edit
+is saved. Formula protection, explicit field selection, revision checks and
+before/after history remain in effect. Saving raw names does not select or
+replace ArtistIDs automatically.
 
 **Flyer approval fix (v1.1.1).** Replace ArchiveBackfill.gs and update the existing
 web-app deployment. Older archive tabs receive a flyer column when an approved
@@ -71,7 +86,7 @@ suggested records together, then filters and pages locally.
 The new `/admin/archive-backfill` page reviews externally collected historical
 Instagram evidence beside existing archive events. Install the separately supplied
 **Core.gs v7.4.26**, add **ArchiveBackfill.gs** to the existing Apps Script project,
-and update its existing web-app deployment. Keep ArchiveReview.gs v7.4.25,
+and update its existing web-app deployment. Use ArchiveReview.gs v7.4.26,
 PublicData.gs v7.4.22+, Imports.gs, the Apify flyer importer, properties,
 permissions, deployment URL and existing triggers. No setup rerun is required.
 
@@ -602,12 +617,22 @@ back to the Google path. Install the updated `archive-feed.gs` in the existing
 Apps Script project to activate the reduced-write publisher; the deployed
 website caching changes work independently until that replacement is saved.
 
-# Discovery Review inbox — v7.4.34
+# Discovery Review inbox — v7.4.35
 
-Replace only `DiscoveryInbox.gs` in the existing Apps Script project, save, and
-update the existing web-app deployment to a new version. Keep Core.gs v7.4.31 or
+Replace `DiscoveryInbox.gs` and `ArchiveReview.gs v7.4.26` in the existing Apps
+Script project, save, and update the existing web-app deployment to a new version. Keep Core.gs v7.4.31 or
 later, Imports.gs, scraper.gs, script properties, services and triggers. No new
 permissions, credentials, Cloudflare binding or D1 migration are required.
+
+Corrections keep source-recommended changes in front. **Other event fields**
+exposes the remaining editable fields from the current event, including fields
+without a recommendation. They are saved as owner edits, with separate field
+selection; they do not become source recommendations after refresh. Formula
+cells and sync-owned identifiers remain protected. Additional edits use the
+shared event editor's validators and derived values. Calendar changes compare
+the reviewed baseline and use the existing conditional patch; retries retain
+their original plan and do not overwrite unrelated changes. Existing
+five-field correction receipts and batched imports remain compatible.
 
 Version 7.4.34 makes Title and valid start/end date/times the only required
 fields for owner-approved Discovery imports. Location, lineup, description and
