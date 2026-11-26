@@ -37,7 +37,9 @@ export async function onRequestGet(context) {
     const rewritten = new HTMLRewriter()
       .on("#eventStack", { element(element) { element.setInnerContent(markup, { html: true }); } })
       .on("#dateLabel", { element(element) { element.setInnerContent(dateLabel); } })
-      .on("#qdpInitialEvents", { element(element) { element.setInnerContent(JSON.stringify(prepared)); } })
+      .on("#qdpInitialEvents", { element(element) {
+        element.setInnerContent(globalThis.QDPEventMetadata.serialize(globalThis.QDPEventMetadata.exportPayload(prepared)));
+      } })
       .transform(page);
     const headers = new Headers(rewritten.headers);
     headers.set("Cache-Control", `public, max-age=${maxAge}`);

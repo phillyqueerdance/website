@@ -8,6 +8,22 @@
     result.searchParams.set("event", id);
     return result.href;
   };
+  // Public JSON carries its source with the description. QDP renders only the
+  // original event copy, including when an API result is opened from Discover.
+  const sourceNotice = "Reading this outside Queer Dance Philly? You’re viewing a copy of a QDP listing. Check QDP for the full calendar and any updates or corrections.";
+  const displayDescription = value => {
+    const text = String(value ?? "").replace(/\r\n?/g, "\n");
+    if (!text.startsWith(`${sourceNotice}\nOriginal listing: ${origin}/`)) return text;
+    const start = text.indexOf("\n\n");
+    return start < 0 ? "" : text.slice(start + 2);
+  };
+  const exportEvent = event => ({ ...event,
+    description: `${sourceNotice}\nOriginal listing: ${event.eventId ? url(event.eventId) : `${origin}/`}\n\n${displayDescription(event.description)}`
+  });
+  const exportPayload = payload => ({ ...payload,
+    ...(Array.isArray(payload.events) ? { events: payload.events.map(exportEvent) } : {}),
+    ...(payload.event ? { event: exportEvent(payload.event) } : {})
+  });
   const safeUrl = value => {
     try {
       const result = new URL(String(value || ""));
@@ -45,16 +61,17 @@
       eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode"
     };
     if (event.end && Date.parse(event.end) >= Date.parse(event.start)) result.endDate = event.end;
-    if (event.description) result.description = event.description;
+    const copy = displayDescription(event.description);
+    if (copy) result.description = copy;
     if (image(event)) result.image = [image(event)];
     const artists = (event.related || []).filter(item => item.kind === "artist");
     if (artists.length) result.performer = artists.map(item => ({ "@type": "Person", name: item.name }));
     // Price, tickets, and organizer are omitted unless the index actually supplies them.
     return result;
   };
-  const description = event => String(event.description || "").replace(/\s+/g, " ").trim().slice(0, 180) || cleanTitle(event);
+  const description = event => displayDescription(event.description).replace(/\s+/g, " ").trim().slice(0, 180) || cleanTitle(event);
   const serialize = value => JSON.stringify(value).replace(/</g, "\\u003c")
     .replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
-  globalThis.QDPEventMetadata = Object.freeze({ origin, cleanTitle, url, safeUrl, undisclosed,
+  globalThis.QDPEventMetadata = Object.freeze({ origin, cleanTitle, url, sourceNotice, displayDescription, exportEvent, exportPayload, safeUrl, undisclosed,
     image, schema, description, serialize, usesValsMeltStrip, title: event => `${cleanTitle(event)} | Queer Dance Philly` });
 })();

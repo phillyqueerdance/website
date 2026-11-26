@@ -81,7 +81,7 @@ export function publicEvent(input) {
   const start = value(input.start, 60);
   const title = value(input.title, 300);
   if (!eventId || !title || Number.isNaN(Date.parse(start))) return null;
-  const description = value(input.description, 8000)
+  const description = value(globalThis.QDPEventMetadata.displayDescription(input.description), 8000)
     .split(/^\s*(?:-{3,}|—+)\s*QDP (?:WEB|IDs)\s*(?:-{3,}|—+)\s*$/im)[0].trim();
   return {
     eventId, title, start,
@@ -204,7 +204,7 @@ export async function onRequestGet(context) {
     }
     if (prepared?.payload) {
       if (resource === "artists") await addArtistPhotoCrops(context, kv, prepared.payload);
-      const result = cacheResponse(context, Response.json(prepared.payload, {
+      const result = cacheResponse(context, Response.json(globalThis.QDPEventMetadata.exportPayload(prepared.payload), {
         headers: { ...headers, "Cache-Control": "public, max-age=60",
           "X-QDP-Archive-Source": "prepared" }
       }), CACHE_SECONDS);
@@ -235,7 +235,7 @@ export async function onRequestGet(context) {
     const payload = cleanPayload(resource, await response.json(), id);
     if (!payload) throw new Error("Apps Script archive resource is unavailable or has an invalid shape");
     if (resource === "artists") await addArtistPhotoCrops(context, kv, payload);
-    const result = cacheResponse(context, Response.json(payload, { headers }), CACHE_SECONDS);
+    const result = cacheResponse(context, Response.json(globalThis.QDPEventMetadata.exportPayload(payload), { headers }), CACHE_SECONDS);
     if (cache) {
       const write = cache.put(cacheKey, result.clone());
       if (context.waitUntil) context.waitUntil(write); else await write;

@@ -1,5 +1,6 @@
 import { readKvJson, withKvScope, cacheResponse, freshResponse } from "../kv-cache.js";
 import "../../live-calendar.js";
+import "../../event-metadata.js";
 
 const liveCalendar = globalThis.QDPLiveCalendar;
 
@@ -25,7 +26,7 @@ function createJsonResponse(
   } = {}
 ) {
   return new Response(
-    JSON.stringify(payload),
+    JSON.stringify(globalThis.QDPEventMetadata.exportPayload(payload)),
     {
       status,
       headers: {

@@ -16,10 +16,11 @@ function calendarUrl(event, origin) {
   result.search = new URLSearchParams({ action: "TEMPLATE", text: meta.cleanTitle(event),
     dates: `${utc(start)}/${utc(end)}`, stz: "America/New_York", etz: "America/New_York",
     location: [event.venue, event.address].filter(Boolean).join(", "),
-    details: [event.description, meta.url(event.eventId, origin)].filter(Boolean).join("\n\n") }).toString();
+    details: [meta.displayDescription(event.description), meta.url(event.eventId, origin)].filter(Boolean).join("\n\n") }).toString();
   return result.href;
 }
 export function renderEventDetail(event, requestUrl) {
+  const description = meta.displayDescription(event.description);
   const url = new URL(requestUrl);
   const back = new URL(url);
   back.searchParams.delete("event");
@@ -42,7 +43,7 @@ export function renderEventDetail(event, requestUrl) {
         <p class="event-detail-venue-time">${map ? `<a href="${escape(map)}" target="_blank" rel="noopener noreferrer">${escape(event.venue)}</a>` : escape(event.venue)}
           ${event.venue ? '<span aria-hidden="true"> | </span>' : ""}<time datetime="${escape(event.start)}">${escape(timeLabel(event))}</time></p>
         ${event.address ? `<p class="event-detail-address">${escape(event.address)}</p>` : ""}</div>
-      <div class="event-detail-more">${event.description ? `<p>${escape(event.description)}</p>` : ""}
+      <div class="event-detail-more">${description ? `<p>${escape(description)}</p>` : ""}
         <div class="event-detail-actions"><a href="${escape(calendarUrl(event, url.origin))}" target="_blank" rel="noopener noreferrer" aria-label="Add to Google Calendar"><img class="event-detail-action-icon" src="/icons8-ios-calendar-48.png" alt=""></a></div></div>
       ${globalThis.QDPEventPhotos.gallery(event)}
       ${related ? `<section class="event-detail-see-more" aria-label="See More"><h3>See More</h3><div class="event-detail-see-more-links">${related}</div></section>` : ""}
@@ -79,7 +80,7 @@ export function renderEventPage(context, page, result, id) {
         `<article class="event-detail-card without-flyer"><h2 id="eventDetailTitle">${escape(result.error)}</h2><a href="/">← Back to Calendar</a></article>`;
       element.setInnerContent(body, { html: true });
     } })
-    .on("#qdpInitialEvent", { element(element) { element.setInnerContent(meta.serialize({ ...result, id })); } });
+    .on("#qdpInitialEvent", { element(element) { element.setInnerContent(meta.serialize({ ...meta.exportPayload(result), id })); } });
   if (event) {
     const values = [
       ['meta[name="description"]', meta.description(event)],

@@ -2,15 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import '../event-metadata.js';
 
 const source = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const start = source.indexOf('function googleCalendarEventUrl(event) {');
 const end = source.indexOf('\nasync function copyEventLink', start);
 assert.ok(start >= 0 && end > start);
 const calendarUrl = vm.runInNewContext(
-  source.slice(start, end) + '\ngoogleCalendarEventUrl',
+  source.slice(source.indexOf('function stripQdpFooter('), source.indexOf('\nfunction normalizePublicEvents(')) +
+    '\n' + source.slice(start, end) + '\ngoogleCalendarEventUrl',
   {
     Date, URL,
+    window: { QDPEventMetadata: globalThis.QDPEventMetadata },
     eventVenue: event => event.venue,
     eventAddress: event => event.address,
     eventIdOf: event => event.eventId,
@@ -40,4 +43,12 @@ test('an event without an end time gets a one-hour calendar draft', () => {
   }));
   assert.equal(url.searchParams.get('dates'), '20261002T000000Z/20261002T010000Z');
   assert.equal(url.searchParams.has('location'), false);
+});
+
+test('Add to Calendar uses the original description even when opened from a public JSON export', () => {
+  const event = { eventId: 'QDP1', title: 'Dance', start: '2026-10-01T22:00:00-04:00',
+    description: 'Doors at 10.\n\nKeep the complete event copy.' };
+  const exported = globalThis.QDPEventMetadata.exportEvent(event);
+  const details = new URL(calendarUrl(exported)).searchParams.get('details');
+  assert.equal(details, event.description + '\n\nhttps://queerdancephilly.com/?event=QDP1');
 });

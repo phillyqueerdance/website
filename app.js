@@ -418,7 +418,7 @@ function appendStartTime(time, event) {
 }
 
 function stripQdpFooter(description) {
-  const text = String(description || "")
+  const text = window.QDPEventMetadata.displayDescription(description)
     .replace(/\r\n?/g, "\n");
 
   const footerStart = text.search(
@@ -1161,7 +1161,7 @@ function googleCalendarEventUrl(event) {
   url.searchParams.set("stz", "America/New_York");
   url.searchParams.set("etz", "America/New_York");
   if (location) url.searchParams.set("location", location);
-  const details = [event.description, eventIdOf(event) && eventShareUrl(eventIdOf(event))]
+  const details = [stripQdpFooter(event.description), eventIdOf(event) && eventShareUrl(eventIdOf(event))]
     .filter(Boolean).join("\n\n");
   if (details) url.searchParams.set("details", details);
   return url.href;
@@ -1448,7 +1448,7 @@ function openEventDetail(event, { updateHistory = true } = {}) {
     document.createElement("p");
 
   description.textContent =
-    event.description || "";
+    stripQdpFooter(event.description);
 
   const titleLocation = document.createElement("div");
   titleLocation.className = "event-detail-title-location";
